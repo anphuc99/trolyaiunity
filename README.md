@@ -32,3 +32,7 @@ Menu:
 Output root:
 
 - `Assets/Features/<FeatureName>/`
+
+Note:
+
+- When changing feature-related code patterns or conventions, update the Feature Generator templates accordingly to prevent new features from compiling with outdated code.
