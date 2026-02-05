@@ -14,7 +14,7 @@ namespace Core.Infrastructure.Requests
 		private static bool _hooked;
 		private static readonly HashSet<ControllerScopeKey> ActiveSceneScopes = new HashSet<ControllerScopeKey>();
 
-		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
 		private static void Init()
 		{
 			HookSceneEvents();
