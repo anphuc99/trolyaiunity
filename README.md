@@ -17,3 +17,12 @@ It provides:
 - Request routing from View to Controller via `[Request("key")]`.
 - Event publishing from Controller to View via `EventBus.Publish("key", payload)`.
 - Attribute-based view binding via `[OnEvent("key")]` and `BaseView`.
+
+## Feature Generator Tool
+An editor tool is available to generate a new feature skeleton with the required folder structure, scene, asmdefs, and starter scripts.
+
+Menu:
+- `Tools/Feature Generator`
+
+Output root:
+- `Assets/Features/<FeatureName>/`
