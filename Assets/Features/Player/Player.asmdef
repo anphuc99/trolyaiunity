@@ -1,7 +1,10 @@
 {
     "name": "Player",
     "rootNamespace": "",
-    "references": ["Core"],
+    "references": [
+        "Core",
+        "UniTask"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
