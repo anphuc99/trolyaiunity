@@ -57,14 +57,14 @@ namespace Core.Infrastructure.Views
 			EnsureScopeActiveForThisViewScene();
 			_binder.Bind();
 			_enabledAfterScope = true;
-			OnEnableAfterScope();
+			OnEnabled();
 		}
 
 		/// <summary>
-		/// Called after this view's scene scope is ensured active and after event binding is applied.
-		/// Override in derived views to run logic that relies on scoped controllers being active.
+		/// Called after this view is enabled, after its scene scope is ensured active,
+		/// and after event binding is applied.
 		/// </summary>
-		protected virtual void OnEnableAfterScope()
+		protected virtual void OnEnabled()
 		{
 		}
 
@@ -76,15 +76,15 @@ namespace Core.Infrastructure.Views
 			_binder?.Unbind();
 			if (_enabledAfterScope)
 			{
-				OnDisableAfterScope();
+				OnDisabled();
 				_enabledAfterScope = false;
 			}
 		}
 
 		/// <summary>
-		/// Called when disabling a view that previously ran <see cref="OnEnableAfterScope"/>.
+		/// Called when disabling a view that previously ran <see cref="OnEnabled"/>.
 		/// </summary>
-		protected virtual void OnDisableAfterScope()
+		protected virtual void OnDisabled()
 		{
 		}
 
