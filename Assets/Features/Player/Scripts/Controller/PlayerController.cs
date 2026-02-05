@@ -9,7 +9,7 @@ namespace Features.Player.Controller
 	/// <summary>
 	/// Controller for Player.
 	/// </summary>
-	[Core.Infrastructure.Attributes.ControllerScope("PlayerGameplay")]
+	[Core.Infrastructure.Attributes.ControllerScope(Core.Infrastructure.Attributes.ControllerScopeKey.PlayerGameplay)]
 	public static class PlayerController
 	{
 		/// <summary>

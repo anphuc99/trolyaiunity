@@ -13,14 +13,14 @@ namespace Core.Infrastructure.Requests
 	public static class RequestController
 	{
 		private const string LogPrefix = "[RequestController]";
-		private const string DefaultScopeKey = "__global__";
+		private static readonly ControllerScopeKey DefaultScopeKey = ControllerScopeKey.Global;
 
 		private static readonly object InitSync = new object();
 		private static bool _initialized;
 
 		private static readonly Dictionary<string, Action<object>> InvokersByKey = new Dictionary<string, Action<object>>(StringComparer.Ordinal);
-		private static readonly Dictionary<string, ScopeBindings> BindingsByScope = new Dictionary<string, ScopeBindings>(StringComparer.Ordinal);
-		private static readonly HashSet<string> ActiveScopes = new HashSet<string>(StringComparer.Ordinal);
+		private static readonly Dictionary<ControllerScopeKey, ScopeBindings> BindingsByScope = new Dictionary<ControllerScopeKey, ScopeBindings>();
+		private static readonly HashSet<ControllerScopeKey> ActiveScopes = new HashSet<ControllerScopeKey>();
 		private static readonly object ScopeSync = new object();
 
 		/// <summary>
@@ -67,15 +67,9 @@ namespace Core.Infrastructure.Requests
 		/// Activates a controller scope by key, registering its request handlers and running init hooks.
 		/// </summary>
 		/// <param name="scopeKey">Scope key to activate.</param>
-		public static void ActivateScope(string scopeKey)
+		public static void ActivateScope(ControllerScopeKey scopeKey)
 		{
 			EnsureInitialized();
-
-			if (string.IsNullOrWhiteSpace(scopeKey))
-			{
-				Debug.LogError($"{LogPrefix} ActivateScope failed: scope key is null/empty.");
-				return;
-			}
 
 			lock (ScopeSync)
 			{
@@ -102,14 +96,9 @@ namespace Core.Infrastructure.Requests
 		/// Deactivates a controller scope by key, unregistering its request handlers and running shutdown hooks.
 		/// </summary>
 		/// <param name="scopeKey">Scope key to deactivate.</param>
-		public static void DeactivateScope(string scopeKey)
+		public static void DeactivateScope(ControllerScopeKey scopeKey)
 		{
 			EnsureInitialized();
-
-			if (string.IsNullOrWhiteSpace(scopeKey))
-			{
-				return;
-			}
 
 			bool wasActive;
 			lock (ScopeSync)
@@ -220,13 +209,13 @@ namespace Core.Infrastructure.Requests
 			ActivateScope(DefaultScopeKey);
 		}
 
-		private static string GetScopeKey(Type type)
+		private static ControllerScopeKey GetScopeKey(Type type)
 		{
 			var scopeAttribute = type.GetCustomAttribute<ControllerScopeAttribute>(inherit: false);
 			return scopeAttribute != null ? scopeAttribute.ScopeKey : DefaultScopeKey;
 		}
 
-		private static ScopeBindings GetOrCreateScopeBindings(string scopeKey)
+		private static ScopeBindings GetOrCreateScopeBindings(ControllerScopeKey scopeKey)
 		{
 			if (!BindingsByScope.TryGetValue(scopeKey, out var bindings))
 			{
@@ -337,7 +326,7 @@ namespace Core.Infrastructure.Requests
 			scopeBindings.Requests.Add(new RequestBinding(key, invoker));
 		}
 
-		private static void RegisterBindings(string scopeKey, ScopeBindings bindings)
+		private static void RegisterBindings(ControllerScopeKey scopeKey, ScopeBindings bindings)
 		{
 			for (var i = 0; i < bindings.Requests.Count; i++)
 			{
@@ -352,7 +341,7 @@ namespace Core.Infrastructure.Requests
 			}
 		}
 
-		private static void UnregisterBindings(string scopeKey)
+		private static void UnregisterBindings(ControllerScopeKey scopeKey)
 		{
 			if (!BindingsByScope.TryGetValue(scopeKey, out var bindings))
 			{
@@ -369,7 +358,7 @@ namespace Core.Infrastructure.Requests
 			}
 		}
 
-		private static void InvokeInitActions(string scopeKey)
+		private static void InvokeInitActions(ControllerScopeKey scopeKey)
 		{
 			if (!BindingsByScope.TryGetValue(scopeKey, out var bindings))
 			{
@@ -389,7 +378,7 @@ namespace Core.Infrastructure.Requests
 			}
 		}
 
-		private static void InvokeShutdownActions(string scopeKey)
+		private static void InvokeShutdownActions(ControllerScopeKey scopeKey)
 		{
 			if (!BindingsByScope.TryGetValue(scopeKey, out var bindings))
 			{

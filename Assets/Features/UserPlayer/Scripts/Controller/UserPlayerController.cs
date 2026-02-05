@@ -8,7 +8,7 @@ namespace Features.UserPlayer.Controller
 	/// <summary>
 	/// Controller for UserPlayer.
 	/// </summary>
-	[Core.Infrastructure.Attributes.ControllerScope("UserPlayerGameplay")]
+	[Core.Infrastructure.Attributes.ControllerScope(Core.Infrastructure.Attributes.ControllerScopeKey.UserPlayerGameplay)]
 	public static class UserPlayerController
 	{
 		/// <summary>

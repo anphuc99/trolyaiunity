@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Core.Infrastructure.Attributes;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -11,7 +12,7 @@ namespace Core.Infrastructure.Requests
 	{
 		private const string LogPrefix = "[ControllerScopeSceneBridge]";
 		private static bool _hooked;
-		private static readonly HashSet<string> ActiveSceneScopes = new HashSet<string>();
+		private static readonly HashSet<ControllerScopeKey> ActiveSceneScopes = new HashSet<ControllerScopeKey>();
 
 		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
 		private static void Init()
@@ -19,10 +20,7 @@ namespace Core.Infrastructure.Requests
 			HookSceneEvents();
 
 			var activeScene = SceneManager.GetActiveScene();
-			if (activeScene.IsValid() && !string.IsNullOrWhiteSpace(activeScene.name))
-			{
-				ActivateSceneScope(activeScene.name);
-			}
+			TryActivateSceneScope(activeScene);
 		}
 
 		private static void HookSceneEvents()
@@ -39,25 +37,53 @@ namespace Core.Infrastructure.Requests
 
 		private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
 		{
-			if (!scene.IsValid() || string.IsNullOrWhiteSpace(scene.name))
-			{
-				return;
-			}
-
-			ActivateSceneScope(scene.name);
+			TryActivateSceneScope(scene);
 		}
 
 		private static void OnSceneUnloaded(Scene scene)
 		{
-			if (!scene.IsValid() || string.IsNullOrWhiteSpace(scene.name))
+			TryDeactivateSceneScope(scene);
+		}
+
+		private static void TryActivateSceneScope(Scene scene)
+		{
+			if (!TryResolveScope(scene, out var scopeKey))
 			{
 				return;
 			}
 
-			DeactivateSceneScope(scene.name);
+			ActivateSceneScope(scopeKey);
 		}
 
-		private static void ActivateSceneScope(string scopeKey)
+		private static void TryDeactivateSceneScope(Scene scene)
+		{
+			if (!TryResolveScope(scene, out var scopeKey))
+			{
+				return;
+			}
+
+			DeactivateSceneScope(scopeKey);
+		}
+
+		private static bool TryResolveScope(Scene scene, out ControllerScopeKey scopeKey)
+		{
+			scopeKey = ControllerScopeKey.Global;
+			if (!scene.IsValid() || string.IsNullOrWhiteSpace(scene.name))
+			{
+				return false;
+			}
+
+			if (!System.Enum.TryParse(scene.name, ignoreCase: false, out ControllerScopeKey parsed))
+			{
+				Debug.LogWarning($"{LogPrefix} Scene '{scene.name}' does not map to a ControllerScopeKey enum value.");
+				return false;
+			}
+
+			scopeKey = parsed;
+			return true;
+		}
+
+		private static void ActivateSceneScope(ControllerScopeKey scopeKey)
 		{
 			if (ActiveSceneScopes.Contains(scopeKey))
 			{
@@ -68,7 +94,7 @@ namespace Core.Infrastructure.Requests
 			ActiveSceneScopes.Add(scopeKey);
 		}
 
-		private static void DeactivateSceneScope(string scopeKey)
+		private static void DeactivateSceneScope(ControllerScopeKey scopeKey)
 		{
 			if (!ActiveSceneScopes.Contains(scopeKey))
 			{

@@ -78,6 +78,7 @@ namespace EditorTools.FeatureGenerator
 			CreateAsmdef(featureRoot, sanitizedName);
 			CreateTestsAsmdef(featureRoot, sanitizedName);
 			CreateScene(featureRoot, sanitizedName);
+			EnsureScopeKeyExists(sanitizedName + "Gameplay");
 
 			CreateTextFile($"{featureRoot}/Scripts/Requests/{sanitizedName}Requests.cs", BuildRequestsFile(featureNamespace, keyBase, sanitizedName));
 			CreateTextFile($"{featureRoot}/Scripts/Events/{sanitizedName}Events.cs", BuildEventsFile(featureNamespace, keyBase, sanitizedName));
@@ -229,6 +230,51 @@ namespace EditorTools.FeatureGenerator
 			File.WriteAllText(fullPath, content);
 		}
 
+		private static void EnsureScopeKeyExists(string scopeKeyName)
+		{
+			if (string.IsNullOrWhiteSpace(scopeKeyName))
+			{
+				return;
+			}
+
+			var enumAssetPath = "Assets/Core/Infrastructure/Attributes/ControllerScopeKey.cs";
+			var enumFullPath = Path.Combine(Application.dataPath, enumAssetPath.Substring("Assets/".Length));
+			if (!File.Exists(enumFullPath))
+			{
+				return;
+			}
+
+			var content = File.ReadAllText(enumFullPath);
+			if (content.Contains(scopeKeyName))
+			{
+				return;
+			}
+
+			var enumStart = content.IndexOf("public enum ControllerScopeKey", StringComparison.Ordinal);
+			if (enumStart < 0)
+			{
+				return;
+			}
+
+			var enumClose = content.IndexOf("\t}", enumStart, StringComparison.Ordinal);
+			if (enumClose < 0)
+			{
+				return;
+			}
+
+			var checkIndex = enumClose - 1;
+			while (checkIndex > enumStart && char.IsWhiteSpace(content[checkIndex]))
+			{
+				checkIndex--;
+			}
+
+			var needsComma = checkIndex > enumStart && content[checkIndex] != ',';
+			var indent = "\t\t";
+			var addition = (needsComma ? "," : string.Empty) + Environment.NewLine + indent + scopeKeyName;
+			var updated = content.Insert(enumClose, addition + Environment.NewLine);
+			File.WriteAllText(enumFullPath, updated);
+		}
+
 		private static string BuildRequestsFile(string ns, string keyBase, string featureName)
 		{
 			return "using System;\n\n" +
@@ -287,7 +333,7 @@ namespace EditorTools.FeatureGenerator
 				"\t/// <summary>\n" +
 				$"\t/// Controller for {featureName}.\n" +
 				"\t/// </summary>\n" +
-				$"\t[Core.Infrastructure.Attributes.ControllerScope(\"{featureName}Gameplay\")]\n" +
+				$"\t[Core.Infrastructure.Attributes.ControllerScope(Core.Infrastructure.Attributes.ControllerScopeKey.{featureName}Gameplay)]\n" +
 				$"\tpublic static class {featureName}Controller\n" +
 				"\t{\n" +
 				"\t\t/// <summary>\n" +

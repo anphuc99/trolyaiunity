@@ -12,20 +12,14 @@ namespace Core.Infrastructure.Attributes
 		/// <summary>
 		/// Gets the scope key.
 		/// </summary>
-		public string ScopeKey { get; }
+		public ControllerScopeKey ScopeKey { get; }
 
 		/// <summary>
 		/// Creates a new controller scope attribute.
 		/// </summary>
 		/// <param name="scopeKey">Scope key used to activate the controller.</param>
-		/// <exception cref="ArgumentException">Thrown when <paramref name="scopeKey"/> is null or whitespace.</exception>
-		public ControllerScopeAttribute(string scopeKey)
+		public ControllerScopeAttribute(ControllerScopeKey scopeKey)
 		{
-			if (string.IsNullOrWhiteSpace(scopeKey))
-			{
-				throw new ArgumentException("Scope key cannot be null or whitespace.", nameof(scopeKey));
-			}
-
 			ScopeKey = scopeKey;
 		}
 	}

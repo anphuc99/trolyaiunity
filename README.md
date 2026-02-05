@@ -19,7 +19,8 @@ It provides:
 - Request routing from View to Controller via `[Request("key")]`.
 - Event publishing from Controller to View via `EventBus.Publish("key", payload)`.
 - Attribute-based view binding via `[OnEvent("key")]` and `BaseView`.
-- Controller scoping via `[ControllerScope("ScopeKey")]` with `[ControllerInit]` / `[ControllerShutdown]` hooks.
+- Controller scoping via `[ControllerScope(ControllerScopeKey.ScopeName)]` with `[ControllerInit]` / `[ControllerShutdown]` hooks.
+- Scene names should match `ControllerScopeKey` enum values for auto activation.
 
 ## Feature Generator Tool
 
