@@ -18,7 +18,7 @@ namespace Core.Infrastructure.Requests
 		private static readonly object InitSync = new object();
 		private static bool _initialized;
 
-		private static readonly Dictionary<string, Action<object>> InvokersByKey = new Dictionary<string, Action<object>>(StringComparer.Ordinal);
+		private static readonly Dictionary<string, Func<object, object>> InvokersByKey = new Dictionary<string, Func<object, object>>(StringComparer.Ordinal);
 		private static readonly Dictionary<ControllerScopeKey, ScopeBindings> BindingsByScope = new Dictionary<ControllerScopeKey, ScopeBindings>();
 		private static readonly HashSet<ControllerScopeKey> ActiveScopes = new HashSet<ControllerScopeKey>();
 		private static readonly object ScopeSync = new object();
@@ -61,6 +61,61 @@ namespace Core.Infrastructure.Requests
 			{
 				Debug.LogError($"{LogPrefix} Request '{key}' threw: {ex}");
 			}
+		}
+
+		/// <summary>
+		/// Executes a request by key and returns a typed result.
+		/// </summary>
+		/// <typeparam name="T">Expected return type.</typeparam>
+		/// <param name="key">Request key.</param>
+		/// <param name="payload">Optional payload.</param>
+		/// <returns>The typed result or default when unavailable/mismatched.</returns>
+		public static T Execute<T>(string key, object payload = null)
+		{
+			EnsureInitialized();
+
+			if (string.IsNullOrWhiteSpace(key))
+			{
+				Debug.LogError($"{LogPrefix} Execute failed: key is null/empty.");
+				return default;
+			}
+
+			if (!InvokersByKey.TryGetValue(key, out var invoker) || invoker == null)
+			{
+				Debug.LogError($"{LogPrefix} Unknown request key '{key}'.");
+				return default;
+			}
+
+			object result;
+			try
+			{
+				result = invoker(payload);
+			}
+			catch (Exception ex)
+			{
+				Debug.LogError($"{LogPrefix} Request '{key}' threw: {ex}");
+				return default;
+			}
+
+			if (result == null)
+			{
+				var isValueType = typeof(T).IsValueType;
+				var isNullableValueType = Nullable.GetUnderlyingType(typeof(T)) != null;
+				if (isValueType && !isNullableValueType)
+				{
+					Debug.LogError($"{LogPrefix} Request '{key}' returned null for non-nullable type {typeof(T).FullName}.");
+				}
+
+				return default;
+			}
+
+			if (result is T typed)
+			{
+				return typed;
+			}
+
+			Debug.LogError($"{LogPrefix} Request '{key}' returned {result.GetType().FullName} but caller expected {typeof(T).FullName}.");
+			return default;
 		}
 
 		/// <summary>
@@ -294,12 +349,6 @@ namespace Core.Infrastructure.Requests
 				return;
 			}
 
-			if (method.ReturnType != typeof(void))
-			{
-				Debug.LogError($"{LogPrefix} Ignoring request '{key}': method must return void ({Describe(method)}).");
-				return;
-			}
-
 			var parameters = method.GetParameters();
 			if (parameters.Length > 1)
 			{
@@ -307,7 +356,7 @@ namespace Core.Infrastructure.Requests
 				return;
 			}
 
-			Action<object> invoker;
+			Func<object, object> invoker;
 			if (parameters.Length == 0)
 			{
 				invoker = CreateNoArgInvoker(key, method);
@@ -398,21 +447,40 @@ namespace Core.Infrastructure.Requests
 			}
 		}
 
-		private static Action<object> CreateNoArgInvoker(string key, MethodInfo method)
+		private static Func<object, object> CreateNoArgInvoker(string key, MethodInfo method)
 		{
+			if (method.ReturnType == typeof(void))
+			{
+				try
+				{
+					var action = (Action)Delegate.CreateDelegate(typeof(Action), method);
+					return _ =>
+					{
+						action();
+						return null;
+					};
+				}
+				catch (Exception ex)
+				{
+					Debug.LogError($"{LogPrefix} Invalid request '{key}': cannot bind no-arg delegate for {Describe(method)}: {ex}");
+					return null;
+				}
+			}
+
 			try
 			{
-				var action = (Action)Delegate.CreateDelegate(typeof(Action), method);
-				return _ => action();
+				var funcType = typeof(Func<>).MakeGenericType(method.ReturnType);
+				var funcDelegate = Delegate.CreateDelegate(funcType, method);
+				return CreateNoArgInvokerWithReturn(key, method.ReturnType, funcDelegate);
 			}
 			catch (Exception ex)
 			{
-				Debug.LogError($"{LogPrefix} Invalid request '{key}': cannot bind no-arg delegate for {Describe(method)}: {ex}");
+				Debug.LogError($"{LogPrefix} Invalid request '{key}': cannot bind no-arg return delegate for {Describe(method)}: {ex}");
 				return null;
 			}
 		}
 
-		private static Action<object> CreateSingleArgInvoker(string key, MethodInfo method, ParameterInfo parameter)
+		private static Func<object, object> CreateSingleArgInvoker(string key, MethodInfo method, ParameterInfo parameter)
 		{
 			if (parameter == null)
 			{
@@ -427,26 +495,41 @@ namespace Core.Infrastructure.Requests
 			}
 
 			var parameterType = parameter.ParameterType;
+			if (method.ReturnType == typeof(void))
+			{
+				try
+				{
+					var delegateType = typeof(Action<>).MakeGenericType(parameterType);
+					var typedDelegate = Delegate.CreateDelegate(delegateType, method);
+					return CreateTypedInvoker(key, parameterType, typedDelegate);
+				}
+				catch (Exception ex)
+				{
+					Debug.LogError($"{LogPrefix} Invalid request '{key}': cannot bind single-arg delegate for {Describe(method)}: {ex}");
+					return null;
+				}
+			}
+
 			try
 			{
-				var delegateType = typeof(Action<>).MakeGenericType(parameterType);
+				var delegateType = typeof(Func<,>).MakeGenericType(parameterType, method.ReturnType);
 				var typedDelegate = Delegate.CreateDelegate(delegateType, method);
-				return CreateTypedInvoker(key, parameterType, typedDelegate);
+				return CreateTypedInvokerWithReturn(key, parameterType, method.ReturnType, typedDelegate);
 			}
 			catch (Exception ex)
 			{
-				Debug.LogError($"{LogPrefix} Invalid request '{key}': cannot bind single-arg delegate for {Describe(method)}: {ex}");
+				Debug.LogError($"{LogPrefix} Invalid request '{key}': cannot bind single-arg return delegate for {Describe(method)}: {ex}");
 				return null;
 			}
 		}
 
-		private static Action<object> CreateTypedInvoker(string key, Type parameterType, Delegate typedDelegate)
+		private static Func<object, object> CreateTypedInvoker(string key, Type parameterType, Delegate typedDelegate)
 		{
 			try
 			{
 				var factory = typeof(RequestController).GetMethod(nameof(CreateTypedInvokerGeneric), BindingFlags.Static | BindingFlags.NonPublic);
 				var genericFactory = factory.MakeGenericMethod(parameterType);
-				return (Action<object>)genericFactory.Invoke(null, new object[] { key, typedDelegate });
+				return (Func<object, object>)genericFactory.Invoke(null, new object[] { key, typedDelegate });
 			}
 			catch (Exception ex)
 			{
@@ -455,7 +538,37 @@ namespace Core.Infrastructure.Requests
 			}
 		}
 
-		private static Action<object> CreateTypedInvokerGeneric<T>(string key, Delegate typedDelegate)
+		private static Func<object, object> CreateTypedInvokerWithReturn(string key, Type parameterType, Type returnType, Delegate typedDelegate)
+		{
+			try
+			{
+				var factory = typeof(RequestController).GetMethod(nameof(CreateTypedInvokerWithReturnGeneric), BindingFlags.Static | BindingFlags.NonPublic);
+				var genericFactory = factory.MakeGenericMethod(parameterType, returnType);
+				return (Func<object, object>)genericFactory.Invoke(null, new object[] { key, typedDelegate });
+			}
+			catch (Exception ex)
+			{
+				Debug.LogError($"{LogPrefix} Failed to build invoker for request '{key}' (param {parameterType}, return {returnType}): {ex}");
+				return null;
+			}
+		}
+
+		private static Func<object, object> CreateNoArgInvokerWithReturn(string key, Type returnType, Delegate typedDelegate)
+		{
+			try
+			{
+				var factory = typeof(RequestController).GetMethod(nameof(CreateNoArgInvokerWithReturnGeneric), BindingFlags.Static | BindingFlags.NonPublic);
+				var genericFactory = factory.MakeGenericMethod(returnType);
+				return (Func<object, object>)genericFactory.Invoke(null, new object[] { key, typedDelegate });
+			}
+			catch (Exception ex)
+			{
+				Debug.LogError($"{LogPrefix} Failed to build invoker for request '{key}' (return {returnType}): {ex}");
+				return null;
+			}
+		}
+
+		private static Func<object, object> CreateTypedInvokerGeneric<T>(string key, Delegate typedDelegate)
 		{
 			var action = (Action<T>)typedDelegate;
 			var isValueType = typeof(T).IsValueType;
@@ -468,21 +581,57 @@ namespace Core.Infrastructure.Requests
 					if (isValueType && !isNullableValueType)
 					{
 						Debug.LogError($"{LogPrefix} Request '{key}' expected payload of type {typeof(T).FullName} but got null.");
-						return;
+						return null;
 					}
 
 					action(default);
-					return;
+					return null;
 				}
 
 				if (payload is T typed)
 				{
 					action(typed);
-					return;
+					return null;
 				}
 
 				Debug.LogError($"{LogPrefix} Request '{key}' payload type mismatch. Expected {typeof(T).FullName}, got {payload.GetType().FullName}.");
+				return null;
 			};
+		}
+
+		private static Func<object, object> CreateTypedInvokerWithReturnGeneric<TPayload, TResult>(string key, Delegate typedDelegate)
+		{
+			var func = (Func<TPayload, TResult>)typedDelegate;
+			var isValueType = typeof(TPayload).IsValueType;
+			var isNullableValueType = Nullable.GetUnderlyingType(typeof(TPayload)) != null;
+
+			return payload =>
+			{
+				if (payload == null)
+				{
+					if (isValueType && !isNullableValueType)
+					{
+						Debug.LogError($"{LogPrefix} Request '{key}' expected payload of type {typeof(TPayload).FullName} but got null.");
+						return default(TResult);
+					}
+
+					return func(default);
+				}
+
+				if (payload is TPayload typed)
+				{
+					return func(typed);
+				}
+
+				Debug.LogError($"{LogPrefix} Request '{key}' payload type mismatch. Expected {typeof(TPayload).FullName}, got {payload.GetType().FullName}.");
+				return default(TResult);
+			};
+		}
+
+		private static Func<object, object> CreateNoArgInvokerWithReturnGeneric<TResult>(string key, Delegate typedDelegate)
+		{
+			var func = (Func<TResult>)typedDelegate;
+			return _ => func();
 		}
 
 		private static string Describe(MethodInfo method)
@@ -506,9 +655,9 @@ namespace Core.Infrastructure.Requests
 		private readonly struct RequestBinding
 		{
 			public readonly string Key;
-			public readonly Action<object> Invoker;
+			public readonly Func<object, object> Invoker;
 
-			public RequestBinding(string key, Action<object> invoker)
+			public RequestBinding(string key, Func<object, object> invoker)
 			{
 				Key = key;
 				Invoker = invoker;

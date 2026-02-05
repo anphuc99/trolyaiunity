@@ -459,10 +459,29 @@ namespace EditorTools.FeatureGenerator
 				"\t/// </summary>\n" +
 				"\tpublic static class RequestController\n" +
 				"\t{\n" +
+				"\t\t/// <summary>\n" +
+				"\t\t/// Executes a request by key.\n" +
+				"\t\t/// </summary>\n" +
+				"\t\t/// <param name=\"key\">Request key.</param>\n" +
+				"\t\t/// <param name=\"payload\">Optional payload.</param>\n" +
 				"\t\tpublic static void Execute(string key, object payload = null)\n" +
 				"\t\t{\n" +
 				"\t\t\tCore.Infrastructure.Requests.RequestController.Execute(key, payload);\n" +
 				"\t\t}\n\n" +
+				"\t\t/// <summary>\n" +
+				"\t\t/// Executes a request by key and returns a typed result.\n" +
+				"\t\t/// </summary>\n" +
+				"\t\t/// <typeparam name=\"T\">Expected return type.</typeparam>\n" +
+				"\t\t/// <param name=\"key\">Request key.</param>\n" +
+				"\t\t/// <param name=\"payload\">Optional payload.</param>\n" +
+				"\t\t/// <returns>The typed result or default when unavailable/mismatched.</returns>\n" +
+				"\t\tpublic static T Execute<T>(string key, object payload = null)\n" +
+				"\t\t{\n" +
+				"\t\t\treturn Core.Infrastructure.Requests.RequestController.Execute<T>(key, payload);\n" +
+				"\t\t}\n\n" +
+				"\t\t/// <summary>\n" +
+				"\t\t/// Ensures request bindings are initialized.\n" +
+				"\t\t/// </summary>\n" +
 				"\t\tpublic static void Initialize()\n" +
 				"\t\t{\n" +
 				"\t\t\tCore.Infrastructure.Requests.RequestController.Initialize();\n" +

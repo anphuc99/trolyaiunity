@@ -22,6 +22,18 @@ namespace Core.Infrastructure.Views
 		}
 
 		/// <summary>
+		/// Sends a request to the Controller layer and returns a typed result.
+		/// </summary>
+		/// <typeparam name="T">Expected return type.</typeparam>
+		/// <param name="key">Request key.</param>
+		/// <param name="payload">Optional payload.</param>
+		/// <returns>The typed result or default when unavailable/mismatched.</returns>
+		protected T SendRequest<T>(string key, object payload = null)
+		{
+			return RequestController.Execute<T>(key, payload);
+		}
+
+		/// <summary>
 		/// Unity Awake. Initializes binder.
 		/// </summary>
 		protected virtual void Awake()
