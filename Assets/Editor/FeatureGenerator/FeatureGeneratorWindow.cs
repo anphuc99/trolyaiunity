@@ -293,10 +293,27 @@ namespace EditorTools.FeatureGenerator
 			}
 
 			var needsComma = checkIndex > enumStart && content[checkIndex] != ',';
+			var nextValue = GetNextScopeKeyValue(content, enumStart, enumClose);
 			var indent = "\t\t";
-			var addition = (needsComma ? "," : string.Empty) + Environment.NewLine + indent + scopeKeyName;
+			var addition = (needsComma ? "," : string.Empty) + Environment.NewLine + indent + scopeKeyName + " = " + nextValue;
 			var updated = content.Insert(enumClose, addition + Environment.NewLine);
 			File.WriteAllText(enumFullPath, updated);
+		}
+
+		private static int GetNextScopeKeyValue(string content, int enumStart, int enumClose)
+		{
+			var maxValue = -1;
+			var enumBody = content.Substring(enumStart, enumClose - enumStart);
+			var matches = Regex.Matches(enumBody, @"=\s*(\d+)");
+			for (var i = 0; i < matches.Count; i++)
+			{
+				if (int.TryParse(matches[i].Groups[1].Value, out var value) && value > maxValue)
+				{
+					maxValue = value;
+				}
+			}
+
+			return maxValue + 1;
 		}
 
 		private static string BuildRequestsFile(string ns, string keyBase, string featureName)
