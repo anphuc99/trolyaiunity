@@ -60,6 +60,9 @@ namespace EditorTools.FeatureGenerator
 			}
 
 			EnsureFolderExists(RootFolder);
+			CreateFolder(featureRoot, "Scenes");
+			CreateFolder(featureRoot, "Prefabs");
+			CreateFolder(featureRoot, "Assets");
 			CreateFolder(featureRoot, "_GamePlay/Scenes");
 			CreateFolder(featureRoot, "_GamePlay/Prefabs");
 			CreateFolder(featureRoot, "_GamePlay/Art");
@@ -172,7 +175,7 @@ namespace EditorTools.FeatureGenerator
 
 		private static void CreateScene(string featureRoot, string featureName)
 		{
-			var scenePath = $"{featureRoot}/_GamePlay/Scenes/{featureName}Gameplay.unity";
+			var scenePath = $"{featureRoot}/Scenes/{featureName}Gameplay.unity";
 			var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 			EditorSceneManager.SaveScene(scene, scenePath);
 		}
