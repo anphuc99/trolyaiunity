@@ -1,4 +1,3 @@
-using Core.Infrastructure.Attributes;
 using UnityEngine;
 using Features.Player.Events;
 using Features.Player.Infrastructure;
@@ -10,13 +9,13 @@ namespace Features.Player.Controller
 	/// <summary>
 	/// Controller for Player.
 	/// </summary>
-	[ControllerScope("PlayerGameplay")]
+	[Core.Infrastructure.Attributes.ControllerScope("PlayerGameplay")]
 	public static class PlayerController
 	{
 		/// <summary>
 		/// Called when the controller scope is entered.
 		/// </summary>
-		[ControllerInit]
+		[Core.Infrastructure.Attributes.ControllerInit]
 		public static void OnEnterScope()
 		{
 		}
@@ -24,7 +23,7 @@ namespace Features.Player.Controller
 		/// <summary>
 		/// Called when the controller scope is exited.
 		/// </summary>
-		[ControllerShutdown]
+		[Core.Infrastructure.Attributes.ControllerShutdown]
 		public static void OnExitScope()
 		{
 		}
