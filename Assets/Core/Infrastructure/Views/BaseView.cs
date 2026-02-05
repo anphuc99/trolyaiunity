@@ -1,5 +1,7 @@
+using Core.Infrastructure.Attributes;
 using Core.Infrastructure.Requests;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Core.Infrastructure.Views
 {
@@ -10,6 +12,7 @@ namespace Core.Infrastructure.Views
 	public abstract class BaseView : MonoBehaviour
 	{
 		private ViewEventBinder _binder;
+		private bool _enabledAfterScope;
 
 		/// <summary>
 		/// Sends a request to the Controller layer via string key.
@@ -51,7 +54,18 @@ namespace Core.Infrastructure.Views
 				_binder = new ViewEventBinder(this);
 			}
 
+			EnsureScopeActiveForThisViewScene();
 			_binder.Bind();
+			_enabledAfterScope = true;
+			OnEnableAfterScope();
+		}
+
+		/// <summary>
+		/// Called after this view's scene scope is ensured active and after event binding is applied.
+		/// Override in derived views to run logic that relies on scoped controllers being active.
+		/// </summary>
+		protected virtual void OnEnableAfterScope()
+		{
 		}
 
 		/// <summary>
@@ -60,6 +74,18 @@ namespace Core.Infrastructure.Views
 		protected virtual void OnDisable()
 		{
 			_binder?.Unbind();
+			if (_enabledAfterScope)
+			{
+				OnDisableAfterScope();
+				_enabledAfterScope = false;
+			}
+		}
+
+		/// <summary>
+		/// Called when disabling a view that previously ran <see cref="OnEnableAfterScope"/>.
+		/// </summary>
+		protected virtual void OnDisableAfterScope()
+		{
 		}
 
 		/// <summary>
@@ -68,6 +94,23 @@ namespace Core.Infrastructure.Views
 		protected virtual void OnDestroy()
 		{
 			_binder?.Unbind();
+			_enabledAfterScope = false;
+		}
+
+		private void EnsureScopeActiveForThisViewScene()
+		{
+			var scene = gameObject.scene;
+			if (!scene.IsValid() || string.IsNullOrWhiteSpace(scene.name))
+			{
+				return;
+			}
+
+			if (!System.Enum.TryParse(scene.name, ignoreCase: false, out ControllerScopeKey scopeKey))
+			{
+				return;
+			}
+
+			RequestController.ActivateScope(scopeKey);
 		}
 	}
 }
