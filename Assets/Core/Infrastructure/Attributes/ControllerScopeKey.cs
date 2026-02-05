@@ -11,6 +11,8 @@ namespace Core.Infrastructure.Attributes
 		UserPlayerGameplay = 2,
 		UserPlayer2Gameplay = 3,
 		UserPlayer3Gameplay = 4,
-		UserPlayer4Gameplay = 5
+		UserPlayer4Gameplay = 5,
+		UserPlayer5Gameplay = 6,
+		UserPlayer6Gameplay = 7
 	}
 }

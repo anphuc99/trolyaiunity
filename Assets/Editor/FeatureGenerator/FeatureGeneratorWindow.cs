@@ -295,8 +295,16 @@ namespace EditorTools.FeatureGenerator
 			var needsComma = checkIndex > enumStart && content[checkIndex] != ',';
 			var nextValue = GetNextScopeKeyValue(content, enumStart, enumClose);
 			var indent = "\t\t";
-			var prefix = needsComma ? "," : string.Empty;
-			var addition = prefix + Environment.NewLine + indent + scopeKeyName + " = " + nextValue;
+
+			// If we need a comma, insert it right after the last non-whitespace character
+			if (needsComma)
+			{
+				content = content.Insert(checkIndex + 1, ",");
+				// Recalculate enumClose since we inserted a character
+				enumClose = content.IndexOf("\t}", enumStart, StringComparison.Ordinal);
+			}
+
+			var addition = Environment.NewLine + indent + scopeKeyName + " = " + nextValue;
 			var updated = content.Insert(enumClose, addition + Environment.NewLine);
 			File.WriteAllText(enumFullPath, updated);
 		}
