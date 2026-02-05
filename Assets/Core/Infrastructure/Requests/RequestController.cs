@@ -17,6 +17,7 @@ namespace Core.Infrastructure.Requests
 
 		private static readonly object InitSync = new object();
 		private static bool _initialized;
+		private static bool _initializing;
 
 		private static readonly Dictionary<string, Func<object, object>> InvokersByKey = new Dictionary<string, Func<object, object>>(StringComparer.Ordinal);
 		private static readonly Dictionary<ControllerScopeKey, ScopeBindings> BindingsByScope = new Dictionary<ControllerScopeKey, ScopeBindings>();
@@ -124,7 +125,12 @@ namespace Core.Infrastructure.Requests
 		/// <param name="scopeKey">Scope key to activate.</param>
 		public static void ActivateScope(ControllerScopeKey scopeKey)
 		{
-			EnsureInitialized();
+			// Only call EnsureInitialized if we're not already in the middle of initialization
+			// to prevent deadlock when BuildBindings calls ActivateScope
+			if (!_initializing)
+			{
+				EnsureInitialized();
+			}
 
 			lock (ScopeSync)
 			{
@@ -153,7 +159,11 @@ namespace Core.Infrastructure.Requests
 		/// <param name="scopeKey">Scope key to deactivate.</param>
 		public static void DeactivateScope(ControllerScopeKey scopeKey)
 		{
-			EnsureInitialized();
+			// Only call EnsureInitialized if we're not already in the middle of initialization
+			if (!_initializing)
+			{
+				EnsureInitialized();
+			}
 
 			bool wasActive;
 			lock (ScopeSync)
@@ -190,8 +200,16 @@ namespace Core.Infrastructure.Requests
 					return;
 				}
 
-				BuildBindings();
-				_initialized = true;
+				_initializing = true;
+				try
+				{
+					BuildBindings();
+					_initialized = true;
+				}
+				finally
+				{
+					_initializing = false;
+				}
 			}
 		}
 

@@ -19,7 +19,8 @@ namespace Features.Player.View
 		/// </summary>
 		public void SendEcho()
 		{
-			SendRequest(PlayerRequests.Echo, _message);
+			int i = SendRequest<int>(PlayerRequests.Echo, _message);
+			Debug.Log("[PlayerView] Echo request returned: " + i, this);
 		}
 
 		/// <summary>

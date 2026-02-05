@@ -33,10 +33,11 @@ namespace Features.Player.Controller
 		/// </summary>
 		/// <param name="payload">Optional payload.</param>
 		[Request(PlayerRequests.Echo)]
-		public static void HandleEcho(object payload)
+		public static int HandleEcho(object payload)
 		{
 			Debug.Log("[PlayerController] Handling Echo request");
 			EventBus.Publish(PlayerEvents.Echoed, payload);
+			return 0;
 		}
 	}
 }
