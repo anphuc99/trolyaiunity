@@ -8,6 +8,7 @@ namespace Core.Infrastructure.Attributes
 	{
 		Global = 0,
 		PlayerGameplay = 1,
-		UserPlayerGameplay = 2
+		UserPlayerGameplay = 2,
+		UserPlayer2Gameplay = 3
 	}
 }

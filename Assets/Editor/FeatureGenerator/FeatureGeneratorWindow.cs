@@ -53,10 +53,14 @@ namespace EditorTools.FeatureGenerator
 			}
 
 			var featureRoot = $"{RootFolder}/{sanitizedName}";
-			if (AssetDatabase.IsValidFolder(featureRoot))
+			var featureExists = AssetDatabase.IsValidFolder(featureRoot);
+			if (featureExists)
 			{
-				EditorUtility.DisplayDialog(WindowTitle, "Feature already exists.", "OK");
-				return;
+				var proceed = EditorUtility.DisplayDialog(WindowTitle, "Feature already exists. Create missing folders/files?", "Yes", "No");
+				if (!proceed)
+				{
+					return;
+				}
 			}
 
 			EnsureFolderExists(RootFolder);
@@ -83,18 +87,18 @@ namespace EditorTools.FeatureGenerator
 			CreateScene(featureRoot, sanitizedName);
 			EnsureScopeKeyExists(sanitizedName + "Gameplay");
 
-			CreateTextFile($"{featureRoot}/Scripts/Requests/{sanitizedName}Requests.cs", BuildRequestsFile(featureNamespace, keyBase, sanitizedName));
-			CreateTextFile($"{featureRoot}/Scripts/Events/{sanitizedName}Events.cs", BuildEventsFile(featureNamespace, keyBase, sanitizedName));
-			CreateTextFile($"{featureRoot}/Scripts/Model/{sanitizedName}Model.cs", BuildModelFile(featureNamespace, sanitizedName));
-			CreateTextFile($"{featureRoot}/Scripts/Controller/{sanitizedName}Controller.cs", BuildControllerFile(featureNamespace, sanitizedName));
-			CreateTextFile($"{featureRoot}/Scripts/View/{sanitizedName}View.cs", BuildViewFile(featureNamespace, sanitizedName));
-			CreateTextFile($"{featureRoot}/Scripts/Infrastructure/RequestController.cs", BuildRequestControllerWrapper(featureNamespace));
-			CreateTextFile($"{featureRoot}/Scripts/Infrastructure/EventBus.cs", BuildEventBusWrapper(featureNamespace));
-			CreateTextFile($"{featureRoot}/Scripts/Infrastructure/ViewEventBinder.cs", BuildViewEventBinderWrapper(featureNamespace));
-			CreateTextFile($"{featureRoot}/Scripts/Infrastructure/ViewEventCache.cs", BuildViewEventCacheWrapper(featureNamespace));
-			CreateTextFile($"{featureRoot}/Scripts/Infrastructure/Attributes/RequestAttribute.cs", BuildRequestAttributeWrapper(featureNamespace));
-			CreateTextFile($"{featureRoot}/Scripts/Infrastructure/Attributes/OnEventAttribute.cs", BuildOnEventAttributeWrapper(featureNamespace));
-			CreateTextFile($"{featureRoot}/Tests/{sanitizedName}ControllerTests.cs", BuildTestsFile(featureNamespace, sanitizedName));
+			CreateTextFileIfMissing($"{featureRoot}/Scripts/Requests/{sanitizedName}Requests.cs", BuildRequestsFile(featureNamespace, keyBase, sanitizedName));
+			CreateTextFileIfMissing($"{featureRoot}/Scripts/Events/{sanitizedName}Events.cs", BuildEventsFile(featureNamespace, keyBase, sanitizedName));
+			CreateTextFileIfMissing($"{featureRoot}/Scripts/Model/{sanitizedName}Model.cs", BuildModelFile(featureNamespace, sanitizedName));
+			CreateTextFileIfMissing($"{featureRoot}/Scripts/Controller/{sanitizedName}Controller.cs", BuildControllerFile(featureNamespace, sanitizedName));
+			CreateTextFileIfMissing($"{featureRoot}/Scripts/View/{sanitizedName}View.cs", BuildViewFile(featureNamespace, sanitizedName));
+			CreateTextFileIfMissing($"{featureRoot}/Scripts/Infrastructure/RequestController.cs", BuildRequestControllerWrapper(featureNamespace));
+			CreateTextFileIfMissing($"{featureRoot}/Scripts/Infrastructure/EventBus.cs", BuildEventBusWrapper(featureNamespace));
+			CreateTextFileIfMissing($"{featureRoot}/Scripts/Infrastructure/ViewEventBinder.cs", BuildViewEventBinderWrapper(featureNamespace));
+			CreateTextFileIfMissing($"{featureRoot}/Scripts/Infrastructure/ViewEventCache.cs", BuildViewEventCacheWrapper(featureNamespace));
+			CreateTextFileIfMissing($"{featureRoot}/Scripts/Infrastructure/Attributes/RequestAttribute.cs", BuildRequestAttributeWrapper(featureNamespace));
+			CreateTextFileIfMissing($"{featureRoot}/Scripts/Infrastructure/Attributes/OnEventAttribute.cs", BuildOnEventAttributeWrapper(featureNamespace));
+			CreateTextFileIfMissing($"{featureRoot}/Tests/{sanitizedName}ControllerTests.cs", BuildTestsFile(featureNamespace, sanitizedName));
 
 			AssetDatabase.Refresh();
 			EditorUtility.DisplayDialog(WindowTitle, "Feature generated successfully.", "OK");
@@ -176,6 +180,12 @@ namespace EditorTools.FeatureGenerator
 		private static void CreateScene(string featureRoot, string featureName)
 		{
 			var scenePath = $"{featureRoot}/Scenes/{featureName}Gameplay.unity";
+			var sceneFullPath = Path.Combine(Application.dataPath, scenePath.Substring("Assets/".Length));
+			if (File.Exists(sceneFullPath))
+			{
+				return;
+			}
+
 			var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 			EditorSceneManager.SaveScene(scene, scenePath);
 		}
@@ -197,7 +207,7 @@ namespace EditorTools.FeatureGenerator
 				"    \"noEngineReferences\": false\n" +
 				"}\n";
 
-			CreateTextFile($"{featureRoot}/{featureName}.asmdef", content);
+			CreateTextFileIfMissing($"{featureRoot}/{featureName}.asmdef", content);
 		}
 
 		private static void CreateTestsAsmdef(string featureRoot, string featureName)
@@ -218,7 +228,7 @@ namespace EditorTools.FeatureGenerator
 				"    \"optionalUnityReferences\": [\"TestAssemblies\"]\n" +
 				"}\n";
 
-			CreateTextFile($"{featureRoot}/Tests/{featureName}.Tests.asmdef", content);
+			CreateTextFileIfMissing($"{featureRoot}/Tests/{featureName}.Tests.asmdef", content);
 		}
 
 		private static void CreateTextFile(string assetPath, string content)
@@ -231,6 +241,17 @@ namespace EditorTools.FeatureGenerator
 			}
 
 			File.WriteAllText(fullPath, content);
+		}
+
+		private static void CreateTextFileIfMissing(string assetPath, string content)
+		{
+			var fullPath = Path.Combine(Application.dataPath, assetPath.Substring("Assets/".Length));
+			if (File.Exists(fullPath))
+			{
+				return;
+			}
+
+			CreateTextFile(assetPath, content);
 		}
 
 		private static void EnsureScopeKeyExists(string scopeKeyName)
