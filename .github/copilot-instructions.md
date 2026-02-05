@@ -37,6 +37,91 @@ Whenever you write or modify code:
 
 ---
 
+## 🏗️ Architecture Rules (MVC + Requests/Events)
+
+This project uses an MVC-inspired, event-driven architecture.
+
+### Definitions
+
+- **Model**
+   - Plain C# classes (no Unity dependencies)
+   - Stores data/state only
+   - **No business logic**
+   - All caching/state must live here (not in Controllers)
+
+- **Controller**
+   - `static` C# classes
+   - Implements feature logic and orchestration
+   - **Must be stateless** (no cached fields, no static mutable state)
+   - Communicates down to Views only via `EventBus.Publish(...)`
+   - Receives input only via `RequestController` endpoints using `[Request("key")]`
+
+- **View**
+   - Unity `MonoBehaviour` (scene/prefab GameObjects)
+   - Displays data, handles Unity interaction, and forwards intent
+   - **No logic/processing** beyond view concerns
+   - **Must NOT update Models directly**
+   - **Must NOT call Controllers directly**
+   - Can only interact with Controllers via `SendRequest(...)` from `BaseView`
+   - Receives data from Controllers by subscribing to events (attribute binding via `[OnEvent("key")]`)
+
+- **Tests**
+   - Unit tests must focus on Controller logic
+   - Every Controller **must have** unit tests, and tests should be thorough
+
+### Hard Rules (Non-negotiable)
+
+1. Controllers MUST NOT reference or call Views
+    - Only publish events (`EventBus.Publish`) for Views to react
+2. Models MUST NOT contain logic
+    - Data only
+3. Views MUST NOT:
+    - Call Controllers directly
+    - Update Models directly
+    - Do gameplay/business calculations
+4. Views MUST request via `BaseView.SendRequest(...)` (or `SendRequest<T>(...)` when expecting a return value)
+5. Controllers MUST be static and stateless
+    - If you need cache/state, introduce or extend a Model
+
+---
+
+## 📁 Feature Folder Structure (Required)
+
+Features live under:
+
+- `Assets/Features/<FeatureName>/`
+
+Expected structure (minimum):
+
+- `Scenes/` (scene name should match a `ControllerScopeKey` value, e.g. `<FeatureName>Gameplay`)
+- `Scripts/`
+   - `Model/` (data-only classes)
+   - `Controller/` (static controllers)
+   - `View/` (Unity view scripts)
+   - `Requests/` (string keys for requests)
+   - `Events/` (string keys for events)
+   - `Infrastructure/` (feature-level wrappers forwarding to Core infrastructure)
+- `Tests/` (unit tests for Controllers)
+
+---
+
+## 🪟 View Structure Rule (One BaseView per Controller)
+
+- Views of the same functionality should be grouped into a subfolder under `View/`.
+- Each feature should have:
+   - Exactly one **BaseView-derived** class that interacts with Controllers via requests/events.
+   - Other view components should inherit `MonoBehaviour` and communicate with the BaseView via DI / references.
+- **Each Controller interacts with exactly one BaseView**.
+
+---
+
+## 🔁 Runtime Scope Rule
+
+- Scene names should match `ControllerScopeKey` enum values.
+- Scoped controllers are activated by scene scope; Views should run controller-dependent logic in `BaseView.OnEnabled()` (not in `Start`) to ensure scope is active.
+
+---
+
 ## 📘 Documentation Requirements
 
 All code changes MUST include documentation:
