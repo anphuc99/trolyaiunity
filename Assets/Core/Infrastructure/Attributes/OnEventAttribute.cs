@@ -6,7 +6,7 @@ namespace Core.Infrastructure.Attributes
 	/// Marks a view instance method as an EventBus handler, bound automatically by <see cref="Core.Infrastructure.Views.ViewEventBinder"/>.
 	/// </summary>
 	[AttributeUsage(AttributeTargets.Method, AllowMultiple = true, Inherited = true)]
-	public sealed class OnEventAttribute : Attribute
+	public class OnEventAttribute : Attribute
 	{
 		/// <summary>
 		/// Gets the event key to bind.

@@ -6,7 +6,7 @@ namespace Core.Infrastructure.Attributes
 	/// Marks a static controller method as a request endpoint, invokable via a string key.
 	/// </summary>
 	[AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
-	public sealed class RequestAttribute : Attribute
+	public class RequestAttribute : Attribute
 	{
 		/// <summary>
 		/// Gets the request key used for routing.

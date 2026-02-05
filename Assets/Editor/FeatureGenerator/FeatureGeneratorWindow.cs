@@ -79,8 +79,8 @@ namespace EditorTools.FeatureGenerator
 			CreateTestsAsmdef(featureRoot, sanitizedName);
 			CreateScene(featureRoot, sanitizedName);
 
-			CreateTextFile($"{featureRoot}/Scripts/Requests/{sanitizedName}Requests.cs", BuildRequestsFile(featureNamespace, keyBase));
-			CreateTextFile($"{featureRoot}/Scripts/Events/{sanitizedName}Events.cs", BuildEventsFile(featureNamespace, keyBase));
+			CreateTextFile($"{featureRoot}/Scripts/Requests/{sanitizedName}Requests.cs", BuildRequestsFile(featureNamespace, keyBase, sanitizedName));
+			CreateTextFile($"{featureRoot}/Scripts/Events/{sanitizedName}Events.cs", BuildEventsFile(featureNamespace, keyBase, sanitizedName));
 			CreateTextFile($"{featureRoot}/Scripts/Model/{sanitizedName}Model.cs", BuildModelFile(featureNamespace, sanitizedName));
 			CreateTextFile($"{featureRoot}/Scripts/Controller/{sanitizedName}Controller.cs", BuildControllerFile(featureNamespace, sanitizedName));
 			CreateTextFile($"{featureRoot}/Scripts/View/{sanitizedName}View.cs", BuildViewFile(featureNamespace, sanitizedName));
@@ -229,7 +229,7 @@ namespace EditorTools.FeatureGenerator
 			File.WriteAllText(fullPath, content);
 		}
 
-		private static string BuildRequestsFile(string ns, string keyBase)
+		private static string BuildRequestsFile(string ns, string keyBase, string featureName)
 		{
 			return "using System;\n\n" +
 				$"namespace {ns}.Requests\n" +
@@ -237,14 +237,14 @@ namespace EditorTools.FeatureGenerator
 				"\t/// <summary>\n" +
 				"\t/// Request keys for this feature.\n" +
 				"\t/// </summary>\n" +
-				"\tpublic static class Requests\n" +
+				$"\tpublic static class {featureName}Requests\n" +
 				"\t{\n" +
 				$"\t\tpublic const string Echo = \"{keyBase}.echo.request\";\n" +
 				"\t}\n" +
 				"}\n";
 		}
 
-		private static string BuildEventsFile(string ns, string keyBase)
+		private static string BuildEventsFile(string ns, string keyBase, string featureName)
 		{
 			return "using System;\n\n" +
 				$"namespace {ns}.Events\n" +
@@ -252,7 +252,7 @@ namespace EditorTools.FeatureGenerator
 				"\t/// <summary>\n" +
 				"\t/// Event keys for this feature.\n" +
 				"\t/// </summary>\n" +
-				"\tpublic static class Events\n" +
+				$"\tpublic static class {featureName}Events\n" +
 				"\t{\n" +
 				$"\t\tpublic const string Echoed = \"{keyBase}.echo.event\";\n" +
 				"\t}\n" +
@@ -278,9 +278,9 @@ namespace EditorTools.FeatureGenerator
 
 		private static string BuildControllerFile(string ns, string featureName)
 		{
-			return "using Core.Infrastructure.Attributes;\n" +
-				"using Core.Infrastructure.Events;\n" +
-				$"using {ns}.Events;\n" +
+			return $"using {ns}.Events;\n" +
+				$"using {ns}.Infrastructure;\n" +
+				$"using {ns}.Infrastructure.Attributes;\n" +
 				$"using {ns}.Requests;\n\n" +
 				$"namespace {ns}.Controller\n" +
 				"{\n" +
@@ -293,10 +293,10 @@ namespace EditorTools.FeatureGenerator
 				"\t\t/// Sample request handler that echoes payload to a view event.\n" +
 				"\t\t/// </summary>\n" +
 				"\t\t/// <param name=\"payload\">Optional payload.</param>\n" +
-				"\t\t[Request(Requests.Echo)]\n" +
+				$"\t\t[Request({featureName}Requests.Echo)]\n" +
 				"\t\tpublic static void HandleEcho(object payload)\n" +
 				"\t\t{\n" +
-				"\t\t\tEventBus.Publish(Events.Echoed, payload);\n" +
+				$"\t\t\tEventBus.Publish({featureName}Events.Echoed, payload);\n" +
 				"\t\t}\n" +
 				"\t}\n" +
 				"}\n";
@@ -304,9 +304,9 @@ namespace EditorTools.FeatureGenerator
 
 		private static string BuildViewFile(string ns, string featureName)
 		{
-			return "using Core.Infrastructure.Attributes;\n" +
-				"using Core.Infrastructure.Views;\n" +
+			return "using Core.Infrastructure.Views;\n" +
 				$"using {ns}.Events;\n" +
+				$"using {ns}.Infrastructure.Attributes;\n" +
 				$"using {ns}.Requests;\n" +
 				"using UnityEngine;\n\n" +
 				$"namespace {ns}.View\n" +
@@ -323,16 +323,16 @@ namespace EditorTools.FeatureGenerator
 				"\t\t/// </summary>\n" +
 				"\t\tpublic void SendEcho()\n" +
 				"\t\t{\n" +
-				"\t\t\tSendRequest(Requests.Echo, _message);\n" +
+				$"\t\t\tSendRequest({featureName}Requests.Echo, _message);\n" +
 				"\t\t}\n\n" +
 				"\t\t/// <summary>\n" +
 				"\t\t/// Example event handler (auto-bound).\n" +
 				"\t\t/// </summary>\n" +
 				"\t\t/// <param name=\"payload\">Payload from controller.</param>\n" +
-				"\t\t[OnEvent(Events.Echoed)]\n" +
+				$"\t\t[OnEvent({featureName}Events.Echoed)]\n" +
 				"\t\tprivate void OnEchoed(object payload)\n" +
 				"\t\t{\n" +
-				"\t\t\tDebug.Log($\"[{featureName}View] Echoed: {payload}\", this);\n" +
+				$"\t\t\tDebug.Log(\"[{featureName}View] Echoed: \" + payload, this);\n" +
 				"\t\t}\n" +
 				"\t}\n" +
 				"}\n";
