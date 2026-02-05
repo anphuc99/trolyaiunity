@@ -7,12 +7,6 @@ namespace Core.Infrastructure.Attributes
 	public enum ControllerScopeKey
 	{
 		Global = 0,
-		PlayerGameplay = 1,
-		UserPlayerGameplay = 2,
-		UserPlayer2Gameplay = 3,
-		UserPlayer3Gameplay = 4,
-		UserPlayer4Gameplay = 5,
-		UserPlayer5Gameplay = 6,
-		UserPlayer6Gameplay = 7
+		PlayerGameplay = 1
 	}
 }
