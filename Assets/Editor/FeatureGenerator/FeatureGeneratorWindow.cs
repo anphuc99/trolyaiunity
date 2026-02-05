@@ -295,7 +295,8 @@ namespace EditorTools.FeatureGenerator
 			var needsComma = checkIndex > enumStart && content[checkIndex] != ',';
 			var nextValue = GetNextScopeKeyValue(content, enumStart, enumClose);
 			var indent = "\t\t";
-			var addition = (needsComma ? "," : string.Empty) + Environment.NewLine + indent + scopeKeyName + " = " + nextValue;
+			var prefix = needsComma ? "," : string.Empty;
+			var addition = prefix + Environment.NewLine + indent + scopeKeyName + " = " + nextValue;
 			var updated = content.Insert(enumClose, addition + Environment.NewLine);
 			File.WriteAllText(enumFullPath, updated);
 		}
