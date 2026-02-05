@@ -278,7 +278,8 @@ namespace EditorTools.FeatureGenerator
 
 		private static string BuildControllerFile(string ns, string featureName)
 		{
-			return $"using {ns}.Events;\n" +
+			return "using Core.Infrastructure.Attributes;\n" +
+				$"using {ns}.Events;\n" +
 				$"using {ns}.Infrastructure;\n" +
 				$"using {ns}.Infrastructure.Attributes;\n" +
 				$"using {ns}.Requests;\n\n" +
@@ -287,8 +288,23 @@ namespace EditorTools.FeatureGenerator
 				"\t/// <summary>\n" +
 				$"\t/// Controller for {featureName}.\n" +
 				"\t/// </summary>\n" +
+				$"\t[ControllerScope(\"{featureName}Gameplay\")]\n" +
 				$"\tpublic static class {featureName}Controller\n" +
 				"\t{\n" +
+				"\t\t/// <summary>\n" +
+				"\t\t/// Called when the controller scope is entered.\n" +
+				"\t\t/// </summary>\n" +
+				"\t\t[ControllerInit]\n" +
+				"\t\tpublic static void OnEnterScope()\n" +
+				"\t\t{\n" +
+				"\t\t}\n\n" +
+				"\t\t/// <summary>\n" +
+				"\t\t/// Called when the controller scope is exited.\n" +
+				"\t\t/// </summary>\n" +
+				"\t\t[ControllerShutdown]\n" +
+				"\t\tpublic static void OnExitScope()\n" +
+				"\t\t{\n" +
+				"\t\t}\n\n" +
 				"\t\t/// <summary>\n" +
 				"\t\t/// Sample request handler that echoes payload to a view event.\n" +
 				"\t\t/// </summary>\n" +

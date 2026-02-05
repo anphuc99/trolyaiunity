@@ -1,3 +1,5 @@
+using Core.Infrastructure.Attributes;
+using UnityEngine;
 using Features.Player.Events;
 using Features.Player.Infrastructure;
 using Features.Player.Infrastructure.Attributes;
@@ -8,8 +10,25 @@ namespace Features.Player.Controller
 	/// <summary>
 	/// Controller for Player.
 	/// </summary>
+	[ControllerScope("PlayerGameplay")]
 	public static class PlayerController
 	{
+		/// <summary>
+		/// Called when the controller scope is entered.
+		/// </summary>
+		[ControllerInit]
+		public static void OnEnterScope()
+		{
+		}
+
+		/// <summary>
+		/// Called when the controller scope is exited.
+		/// </summary>
+		[ControllerShutdown]
+		public static void OnExitScope()
+		{
+		}
+
 		/// <summary>
 		/// Sample request handler that echoes payload to a view event.
 		/// </summary>
@@ -17,6 +36,7 @@ namespace Features.Player.Controller
 		[Request(PlayerRequests.Echo)]
 		public static void HandleEcho(object payload)
 		{
+			Debug.Log("[PlayerController] Handling Echo request");
 			EventBus.Publish(PlayerEvents.Echoed, payload);
 		}
 	}

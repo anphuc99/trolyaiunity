@@ -13,11 +13,15 @@ namespace Core.Infrastructure.Requests
 	public static class RequestController
 	{
 		private const string LogPrefix = "[RequestController]";
+		private const string DefaultScopeKey = "__global__";
 
 		private static readonly object InitSync = new object();
 		private static bool _initialized;
 
 		private static readonly Dictionary<string, Action<object>> InvokersByKey = new Dictionary<string, Action<object>>(StringComparer.Ordinal);
+		private static readonly Dictionary<string, ScopeBindings> BindingsByScope = new Dictionary<string, ScopeBindings>(StringComparer.Ordinal);
+		private static readonly HashSet<string> ActiveScopes = new HashSet<string>(StringComparer.Ordinal);
+		private static readonly object ScopeSync = new object();
 
 		/// <summary>
 		/// Ensures request bindings are initialized.
@@ -59,6 +63,69 @@ namespace Core.Infrastructure.Requests
 			}
 		}
 
+		/// <summary>
+		/// Activates a controller scope by key, registering its request handlers and running init hooks.
+		/// </summary>
+		/// <param name="scopeKey">Scope key to activate.</param>
+		public static void ActivateScope(string scopeKey)
+		{
+			EnsureInitialized();
+
+			if (string.IsNullOrWhiteSpace(scopeKey))
+			{
+				Debug.LogError($"{LogPrefix} ActivateScope failed: scope key is null/empty.");
+				return;
+			}
+
+			lock (ScopeSync)
+			{
+				if (ActiveScopes.Contains(scopeKey))
+				{
+					return;
+				}
+
+				if (!BindingsByScope.TryGetValue(scopeKey, out var bindings))
+				{
+					Debug.LogWarning($"{LogPrefix} ActivateScope: no bindings found for scope '{scopeKey}'.");
+					ActiveScopes.Add(scopeKey);
+					return;
+				}
+
+				RegisterBindings(scopeKey, bindings);
+				ActiveScopes.Add(scopeKey);
+			}
+
+			InvokeInitActions(scopeKey);
+		}
+
+		/// <summary>
+		/// Deactivates a controller scope by key, unregistering its request handlers and running shutdown hooks.
+		/// </summary>
+		/// <param name="scopeKey">Scope key to deactivate.</param>
+		public static void DeactivateScope(string scopeKey)
+		{
+			EnsureInitialized();
+
+			if (string.IsNullOrWhiteSpace(scopeKey))
+			{
+				return;
+			}
+
+			bool wasActive;
+			lock (ScopeSync)
+			{
+				wasActive = ActiveScopes.Remove(scopeKey);
+			}
+
+			if (!wasActive)
+			{
+				return;
+			}
+
+			InvokeShutdownActions(scopeKey);
+			UnregisterBindings(scopeKey);
+		}
+
 		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
 		private static void RuntimeInit()
 		{
@@ -87,6 +154,8 @@ namespace Core.Infrastructure.Requests
 		private static void BuildBindings()
 		{
 			InvokersByKey.Clear();
+			BindingsByScope.Clear();
+			ActiveScopes.Clear();
 
 			var assemblies = AppDomain.CurrentDomain.GetAssemblies();
 			for (var assemblyIndex = 0; assemblyIndex < assemblies.Length; assemblyIndex++)
@@ -124,6 +193,10 @@ namespace Core.Infrastructure.Requests
 						continue;
 					}
 
+					var scopeKey = GetScopeKey(type);
+					var scopeBindings = GetOrCreateScopeBindings(scopeKey);
+					RegisterLifecycleMethods(type, scopeBindings);
+
 					var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
 					for (var methodIndex = 0; methodIndex < methods.Length; methodIndex++)
 					{
@@ -139,13 +212,80 @@ namespace Core.Infrastructure.Requests
 							continue;
 						}
 
-						RegisterMethod(attribute.Key, method);
+						RegisterMethod(scopeBindings, attribute.Key, method);
 					}
+				}
+			}
+
+			ActivateScope(DefaultScopeKey);
+		}
+
+		private static string GetScopeKey(Type type)
+		{
+			var scopeAttribute = type.GetCustomAttribute<ControllerScopeAttribute>(inherit: false);
+			return scopeAttribute != null ? scopeAttribute.ScopeKey : DefaultScopeKey;
+		}
+
+		private static ScopeBindings GetOrCreateScopeBindings(string scopeKey)
+		{
+			if (!BindingsByScope.TryGetValue(scopeKey, out var bindings))
+			{
+				bindings = new ScopeBindings();
+				BindingsByScope[scopeKey] = bindings;
+			}
+
+			return bindings;
+		}
+
+		private static void RegisterLifecycleMethods(Type type, ScopeBindings bindings)
+		{
+			var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+			for (var i = 0; i < methods.Length; i++)
+			{
+				var method = methods[i];
+				if (method == null)
+				{
+					continue;
+				}
+
+				if (method.GetCustomAttribute<ControllerInitAttribute>(inherit: false) != null)
+				{
+					TryRegisterLifecycleAction(bindings.InitActions, method, "init");
+				}
+
+				if (method.GetCustomAttribute<ControllerShutdownAttribute>(inherit: false) != null)
+				{
+					TryRegisterLifecycleAction(bindings.ShutdownActions, method, "shutdown");
 				}
 			}
 		}
 
-		private static void RegisterMethod(string key, MethodInfo method)
+		private static void TryRegisterLifecycleAction(List<Action> target, MethodInfo method, string label)
+		{
+			if (method.ReturnType != typeof(void) || !method.IsStatic)
+			{
+				Debug.LogError($"{LogPrefix} Ignoring {label} hook: method must be static void ({Describe(method)}).");
+				return;
+			}
+
+			if (method.GetParameters().Length != 0)
+			{
+				Debug.LogError($"{LogPrefix} Ignoring {label} hook: method must have 0 parameters ({Describe(method)}).");
+				return;
+			}
+
+			try
+			{
+				var action = (Action)Delegate.CreateDelegate(typeof(Action), method);
+				target.Add(action);
+			}
+			catch (Exception ex)
+			{
+				Debug.LogError($"{LogPrefix} Ignoring {label} hook: cannot bind {Describe(method)}: {ex}");
+			}
+		}
+
+		private static void RegisterMethod(ScopeBindings scopeBindings, string key, MethodInfo method)
 		{
 			if (string.IsNullOrWhiteSpace(key))
 			{
@@ -178,12 +318,6 @@ namespace Core.Infrastructure.Requests
 				return;
 			}
 
-			if (InvokersByKey.ContainsKey(key))
-			{
-				Debug.LogError($"{LogPrefix} Duplicate request key '{key}'. Keeping first registration; ignoring {Describe(method)}.");
-				return;
-			}
-
 			Action<object> invoker;
 			if (parameters.Length == 0)
 			{
@@ -200,7 +334,79 @@ namespace Core.Infrastructure.Requests
 				return;
 			}
 
-			InvokersByKey[key] = invoker;
+			scopeBindings.Requests.Add(new RequestBinding(key, invoker));
+		}
+
+		private static void RegisterBindings(string scopeKey, ScopeBindings bindings)
+		{
+			for (var i = 0; i < bindings.Requests.Count; i++)
+			{
+				var binding = bindings.Requests[i];
+				if (InvokersByKey.ContainsKey(binding.Key))
+				{
+					Debug.LogError($"{LogPrefix} Duplicate request key '{binding.Key}' while activating scope '{scopeKey}'.");
+					continue;
+				}
+
+				InvokersByKey[binding.Key] = binding.Invoker;
+			}
+		}
+
+		private static void UnregisterBindings(string scopeKey)
+		{
+			if (!BindingsByScope.TryGetValue(scopeKey, out var bindings))
+			{
+				return;
+			}
+
+			for (var i = 0; i < bindings.Requests.Count; i++)
+			{
+				var binding = bindings.Requests[i];
+				if (InvokersByKey.TryGetValue(binding.Key, out var current) && ReferenceEquals(current, binding.Invoker))
+				{
+					InvokersByKey.Remove(binding.Key);
+				}
+			}
+		}
+
+		private static void InvokeInitActions(string scopeKey)
+		{
+			if (!BindingsByScope.TryGetValue(scopeKey, out var bindings))
+			{
+				return;
+			}
+
+			for (var i = 0; i < bindings.InitActions.Count; i++)
+			{
+				try
+				{
+					bindings.InitActions[i]?.Invoke();
+				}
+				catch (Exception ex)
+				{
+					Debug.LogError($"{LogPrefix} Init hook threw for scope '{scopeKey}': {ex}");
+				}
+			}
+		}
+
+		private static void InvokeShutdownActions(string scopeKey)
+		{
+			if (!BindingsByScope.TryGetValue(scopeKey, out var bindings))
+			{
+				return;
+			}
+
+			for (var i = 0; i < bindings.ShutdownActions.Count; i++)
+			{
+				try
+				{
+					bindings.ShutdownActions[i]?.Invoke();
+				}
+				catch (Exception ex)
+				{
+					Debug.LogError($"{LogPrefix} Shutdown hook threw for scope '{scopeKey}': {ex}");
+				}
+			}
 		}
 
 		private static Action<object> CreateNoArgInvoker(string key, MethodInfo method)
@@ -299,6 +505,25 @@ namespace Core.Infrastructure.Requests
 
 			var declaring = method.DeclaringType != null ? method.DeclaringType.FullName : "<unknown type>";
 			return $"{declaring}.{method.Name}";
+		}
+
+		private sealed class ScopeBindings
+		{
+			public readonly List<RequestBinding> Requests = new List<RequestBinding>();
+			public readonly List<Action> InitActions = new List<Action>();
+			public readonly List<Action> ShutdownActions = new List<Action>();
+		}
+
+		private readonly struct RequestBinding
+		{
+			public readonly string Key;
+			public readonly Action<object> Invoker;
+
+			public RequestBinding(string key, Action<object> invoker)
+			{
+				Key = key;
+				Invoker = invoker;
+			}
 		}
 	}
 }
