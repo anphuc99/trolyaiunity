@@ -34,6 +34,13 @@ Output root:
 
 - `Assets/Features/<FeatureName>/`
 
+Subfeatures:
+
+- Use the "Generate as Subfeature" toggle in the same window.
+- Output root: `Assets/Features/<Parent>/SubFeatures/<Child>/`
+- Subfeatures share the parent scope (no new scene/scope key is created).
+- Child-to-parent signaling uses Action/Func callbacks injected by the parent.
+
 Note:
 
 - When changing feature-related code patterns or conventions, update the Feature Generator templates accordingly to prevent new features from compiling with outdated code.

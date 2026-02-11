@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -14,10 +15,13 @@ namespace EditorTools.FeatureGenerator
 	public sealed class FeatureGeneratorWindow : EditorWindow
 	{
 		private const string RootFolder = "Assets/Features";
+		private const string SubFeatureFolderName = "SubFeatures";
 		private const string WindowTitle = "Feature Generator";
 		private const string MenuPath = "Tools/Feature Generator";
 
 		private string _featureName = "Player";
+		private bool _generateSubfeature;
+		private int _parentFeatureIndex;
 
 		[MenuItem(MenuPath)]
 		private static void Open()
@@ -27,14 +31,43 @@ namespace EditorTools.FeatureGenerator
 
 		private void OnGUI()
 		{
-			EditorGUILayout.LabelField("Create a new Feature", EditorStyles.boldLabel);
+			EditorGUILayout.LabelField(_generateSubfeature ? "Create a new Subfeature" : "Create a new Feature", EditorStyles.boldLabel);
 			EditorGUILayout.Space();
-			_featureName = EditorGUILayout.TextField("Feature Name", _featureName);
+
+			_generateSubfeature = EditorGUILayout.ToggleLeft("Generate as Subfeature", _generateSubfeature);
+			string parentFeatureName = null;
+			if (_generateSubfeature)
+			{
+				var parentOptions = GetParentFeatureNames();
+				if (parentOptions.Length == 0)
+				{
+					EditorGUILayout.HelpBox("No parent features found under Assets/Features.", MessageType.Warning);
+				}
+				else
+				{
+					_parentFeatureIndex = Mathf.Clamp(_parentFeatureIndex, 0, parentOptions.Length - 1);
+					_parentFeatureIndex = EditorGUILayout.Popup("Parent Feature", _parentFeatureIndex, parentOptions);
+					parentFeatureName = parentOptions[_parentFeatureIndex];
+				}
+			}
+
+			_featureName = EditorGUILayout.TextField(_generateSubfeature ? "Subfeature Name" : "Feature Name", _featureName);
 
 			EditorGUILayout.Space();
-			if (GUILayout.Button("Generate", GUILayout.Height(28f)))
+			var canGenerate = !_generateSubfeature || !string.IsNullOrWhiteSpace(parentFeatureName);
+			using (new EditorGUI.DisabledScope(!canGenerate))
 			{
-				GenerateFeature();
+				if (GUILayout.Button("Generate", GUILayout.Height(28f)))
+				{
+					if (_generateSubfeature)
+					{
+						GenerateSubfeature(parentFeatureName);
+					}
+					else
+					{
+						GenerateFeature();
+					}
+				}
 			}
 		}
 
@@ -64,34 +97,22 @@ namespace EditorTools.FeatureGenerator
 			}
 
 			EnsureFolderExists(RootFolder);
-			CreateFolder(featureRoot, "Scenes");
-			CreateFolder(featureRoot, "Prefabs");
-			CreateFolder(featureRoot, "Assets");
-			CreateFolder(featureRoot, "_GamePlay/Scenes");
-			CreateFolder(featureRoot, "_GamePlay/Prefabs");
-			CreateFolder(featureRoot, "_GamePlay/Art");
-			CreateFolder(featureRoot, "_GamePlay/Audio");
-			CreateFolder(featureRoot, "Scripts/View");
-			CreateFolder(featureRoot, "Scripts/Controller");
-			CreateFolder(featureRoot, "Scripts/Model");
-			CreateFolder(featureRoot, "Scripts/Requests");
-			CreateFolder(featureRoot, "Scripts/Events");
-			CreateFolder(featureRoot, "Scripts/Infrastructure/Attributes");
-			CreateFolder(featureRoot, "Tests");
+			CreateFeatureFolders(featureRoot);
 
 			var featureNamespace = $"Features.{sanitizedName}";
 			var keyBase = ToKeyBase(sanitizedName);
+			var assemblyName = sanitizedName;
 
-			CreateAsmdef(featureRoot, sanitizedName);
-			CreateTestsAsmdef(featureRoot, sanitizedName);
+			CreateAsmdef(featureRoot, assemblyName, new[] { "Core" });
+			CreateTestsAsmdef(featureRoot, assemblyName);
 			CreateScene(featureRoot, sanitizedName);
 			EnsureScopeKeyExists(sanitizedName + "Gameplay");
 
 			CreateTextFileIfMissing($"{featureRoot}/Scripts/Requests/{sanitizedName}Requests.cs", BuildRequestsFile(featureNamespace, keyBase, sanitizedName));
 			CreateTextFileIfMissing($"{featureRoot}/Scripts/Events/{sanitizedName}Events.cs", BuildEventsFile(featureNamespace, keyBase, sanitizedName));
 			CreateTextFileIfMissing($"{featureRoot}/Scripts/Model/{sanitizedName}Model.cs", BuildModelFile(featureNamespace, sanitizedName));
-			CreateTextFileIfMissing($"{featureRoot}/Scripts/Controller/{sanitizedName}Controller.cs", BuildControllerFile(featureNamespace, sanitizedName));
-			CreateTextFileIfMissing($"{featureRoot}/Scripts/View/{sanitizedName}View.cs", BuildViewFile(featureNamespace, sanitizedName));
+			CreateTextFileIfMissing($"{featureRoot}/Scripts/Controller/{sanitizedName}Controller.cs", BuildControllerFile(featureNamespace, sanitizedName, sanitizedName + "Gameplay"));
+			CreateTextFileIfMissing($"{featureRoot}/Scripts/View/{sanitizedName}View.cs", BuildViewFile(featureNamespace, sanitizedName, isSubfeature: false));
 			CreateTextFileIfMissing($"{featureRoot}/Scripts/Infrastructure/RequestController.cs", BuildRequestControllerWrapper(featureNamespace));
 			CreateTextFileIfMissing($"{featureRoot}/Scripts/Infrastructure/EventBus.cs", BuildEventBusWrapper(featureNamespace));
 			CreateTextFileIfMissing($"{featureRoot}/Scripts/Infrastructure/ViewEventBinder.cs", BuildViewEventBinderWrapper(featureNamespace));
@@ -102,6 +123,81 @@ namespace EditorTools.FeatureGenerator
 
 			AssetDatabase.Refresh();
 			EditorUtility.DisplayDialog(WindowTitle, "Feature generated successfully.", "OK");
+		}
+
+		private void GenerateSubfeature(string parentFeatureName)
+		{
+			if (string.IsNullOrWhiteSpace(parentFeatureName))
+			{
+				EditorUtility.DisplayDialog(WindowTitle, "Parent feature is required for subfeatures.", "OK");
+				return;
+			}
+
+			var sanitizedParentName = SanitizeName(parentFeatureName);
+			if (!string.Equals(sanitizedParentName, parentFeatureName, StringComparison.Ordinal))
+			{
+				EditorUtility.DisplayDialog(WindowTitle, $"Parent feature name '{parentFeatureName}' is not a valid identifier.", "OK");
+				return;
+			}
+
+			var sanitizedChildName = SanitizeName(_featureName);
+			if (string.IsNullOrWhiteSpace(sanitizedChildName))
+			{
+				EditorUtility.DisplayDialog(WindowTitle, "Subfeature name is invalid.", "OK");
+				return;
+			}
+
+			if (!string.Equals(sanitizedChildName, _featureName, StringComparison.Ordinal))
+			{
+				EditorUtility.DisplayDialog(WindowTitle, $"Subfeature name was sanitized to '{sanitizedChildName}'.", "OK");
+			}
+
+			var parentRoot = $"{RootFolder}/{parentFeatureName}";
+			if (!AssetDatabase.IsValidFolder(parentRoot))
+			{
+				EditorUtility.DisplayDialog(WindowTitle, $"Parent feature '{parentFeatureName}' does not exist.", "OK");
+				return;
+			}
+
+			var subfeatureRoot = $"{parentRoot}/{SubFeatureFolderName}/{sanitizedChildName}";
+			var subfeatureExists = AssetDatabase.IsValidFolder(subfeatureRoot);
+			if (subfeatureExists)
+			{
+				var proceed = EditorUtility.DisplayDialog(WindowTitle, "Subfeature already exists. Create missing folders/files?", "Yes", "No");
+				if (!proceed)
+				{
+					return;
+				}
+			}
+
+			EnsureFolderExists(parentRoot);
+			CreateFeatureFolders(subfeatureRoot);
+
+			var featureNamespace = $"Features.{sanitizedParentName}.{SubFeatureFolderName}.{sanitizedChildName}";
+			var keyBase = $"{ToKeyBase(sanitizedParentName)}.{ToKeyBase(sanitizedChildName)}";
+			var assemblyName = $"{sanitizedParentName}.{sanitizedChildName}";
+			var scopeKeyName = sanitizedParentName + "Gameplay";
+
+			CreateAsmdef(subfeatureRoot, assemblyName, new[] { "Core" });
+			CreateTestsAsmdef(subfeatureRoot, assemblyName);
+
+			CreateTextFileIfMissing($"{subfeatureRoot}/Scripts/Requests/{sanitizedChildName}Requests.cs", BuildSubfeatureRequestsFile(featureNamespace, keyBase, sanitizedChildName));
+			CreateTextFileIfMissing($"{subfeatureRoot}/Scripts/Events/{sanitizedChildName}Events.cs", BuildEventsFile(featureNamespace, keyBase, sanitizedChildName));
+			CreateTextFileIfMissing($"{subfeatureRoot}/Scripts/Model/{sanitizedChildName}Model.cs", BuildModelFile(featureNamespace, sanitizedChildName));
+			CreateTextFileIfMissing($"{subfeatureRoot}/Scripts/Model/{sanitizedChildName}ParentSignals.cs", BuildParentSignalsFile(featureNamespace, sanitizedChildName));
+			CreateTextFileIfMissing($"{subfeatureRoot}/Scripts/Model/{sanitizedChildName}State.cs", BuildStateFile(featureNamespace, sanitizedChildName));
+			CreateTextFileIfMissing($"{subfeatureRoot}/Scripts/Controller/{sanitizedChildName}Controller.cs", BuildSubfeatureControllerFile(featureNamespace, sanitizedChildName, scopeKeyName));
+			CreateTextFileIfMissing($"{subfeatureRoot}/Scripts/View/{sanitizedChildName}View.cs", BuildViewFile(featureNamespace, sanitizedChildName, isSubfeature: true));
+			CreateTextFileIfMissing($"{subfeatureRoot}/Scripts/Infrastructure/RequestController.cs", BuildRequestControllerWrapper(featureNamespace));
+			CreateTextFileIfMissing($"{subfeatureRoot}/Scripts/Infrastructure/EventBus.cs", BuildEventBusWrapper(featureNamespace));
+			CreateTextFileIfMissing($"{subfeatureRoot}/Scripts/Infrastructure/ViewEventBinder.cs", BuildViewEventBinderWrapper(featureNamespace));
+			CreateTextFileIfMissing($"{subfeatureRoot}/Scripts/Infrastructure/ViewEventCache.cs", BuildViewEventCacheWrapper(featureNamespace));
+			CreateTextFileIfMissing($"{subfeatureRoot}/Scripts/Infrastructure/Attributes/RequestAttribute.cs", BuildRequestAttributeWrapper(featureNamespace));
+			CreateTextFileIfMissing($"{subfeatureRoot}/Scripts/Infrastructure/Attributes/OnEventAttribute.cs", BuildOnEventAttributeWrapper(featureNamespace));
+			CreateTextFileIfMissing($"{subfeatureRoot}/Tests/{sanitizedChildName}ControllerTests.cs", BuildTestsFile(featureNamespace, sanitizedChildName));
+
+			AssetDatabase.Refresh();
+			EditorUtility.DisplayDialog(WindowTitle, "Subfeature generated successfully.", "OK");
 		}
 
 		private static string SanitizeName(string name)
@@ -148,6 +244,34 @@ namespace EditorTools.FeatureGenerator
 			return Regex.Replace(lower, "[^a-z0-9.]+", ".").Trim('.');
 		}
 
+		private static string[] GetParentFeatureNames()
+		{
+			var featureRoot = Path.Combine(Application.dataPath, "Features");
+			if (!Directory.Exists(featureRoot))
+			{
+				return Array.Empty<string>();
+			}
+
+			var directories = Directory.GetDirectories(featureRoot);
+			if (directories.Length == 0)
+			{
+				return Array.Empty<string>();
+			}
+
+			var names = new List<string>(directories.Length);
+			for (var i = 0; i < directories.Length; i++)
+			{
+				var name = Path.GetFileName(directories[i]);
+				if (!string.IsNullOrWhiteSpace(name))
+				{
+					names.Add(name);
+				}
+			}
+
+			names.Sort(StringComparer.Ordinal);
+			return names.ToArray();
+		}
+
 		private static void EnsureFolderExists(string folderPath)
 		{
 			if (!AssetDatabase.IsValidFolder(folderPath))
@@ -177,6 +301,25 @@ namespace EditorTools.FeatureGenerator
 			}
 		}
 
+		private static void CreateFeatureFolders(string featureRoot)
+		{
+			EnsureFolderExists(featureRoot);
+			CreateFolder(featureRoot, "Scenes");
+			CreateFolder(featureRoot, "Prefabs");
+			CreateFolder(featureRoot, "Assets");
+			CreateFolder(featureRoot, "_GamePlay/Scenes");
+			CreateFolder(featureRoot, "_GamePlay/Prefabs");
+			CreateFolder(featureRoot, "_GamePlay/Art");
+			CreateFolder(featureRoot, "_GamePlay/Audio");
+			CreateFolder(featureRoot, "Scripts/View");
+			CreateFolder(featureRoot, "Scripts/Controller");
+			CreateFolder(featureRoot, "Scripts/Model");
+			CreateFolder(featureRoot, "Scripts/Requests");
+			CreateFolder(featureRoot, "Scripts/Events");
+			CreateFolder(featureRoot, "Scripts/Infrastructure/Attributes");
+			CreateFolder(featureRoot, "Tests");
+		}
+
 		private static void CreateScene(string featureRoot, string featureName)
 		{
 			var scenePath = $"{featureRoot}/Scenes/{featureName}Gameplay.unity";
@@ -190,12 +333,13 @@ namespace EditorTools.FeatureGenerator
 			EditorSceneManager.SaveScene(scene, scenePath);
 		}
 
-		private static void CreateAsmdef(string featureRoot, string featureName)
+		private static void CreateAsmdef(string featureRoot, string assemblyName, string[] references)
 		{
+			var referencesContent = BuildAsmdefReferences(references);
 			var content = "{\n" +
-				$"    \"name\": \"{featureName}\",\n" +
+				$"    \"name\": \"{assemblyName}\",\n" +
 				"    \"rootNamespace\": \"\",\n" +
-				"    \"references\": [\"Core\"],\n" +
+				$"    \"references\": {referencesContent},\n" +
 				"    \"includePlatforms\": [],\n" +
 				"    \"excludePlatforms\": [],\n" +
 				"    \"allowUnsafeCode\": false,\n" +
@@ -207,15 +351,15 @@ namespace EditorTools.FeatureGenerator
 				"    \"noEngineReferences\": false\n" +
 				"}\n";
 
-			CreateTextFileIfMissing($"{featureRoot}/{featureName}.asmdef", content);
+			CreateTextFileIfMissing($"{featureRoot}/{assemblyName}.asmdef", content);
 		}
 
-		private static void CreateTestsAsmdef(string featureRoot, string featureName)
+		private static void CreateTestsAsmdef(string featureRoot, string assemblyName)
 		{
 			var content = "{\n" +
-				$"    \"name\": \"{featureName}.Tests\",\n" +
+				$"    \"name\": \"{assemblyName}.Tests\",\n" +
 				"    \"rootNamespace\": \"\",\n" +
-				$"    \"references\": [\"{featureName}\"],\n" +
+				$"    \"references\": [\"{assemblyName}\"],\n" +
 				"    \"includePlatforms\": [\"Editor\"],\n" +
 				"    \"excludePlatforms\": [],\n" +
 				"    \"allowUnsafeCode\": false,\n" +
@@ -228,7 +372,30 @@ namespace EditorTools.FeatureGenerator
 				"    \"optionalUnityReferences\": [\"TestAssemblies\"]\n" +
 				"}\n";
 
-			CreateTextFileIfMissing($"{featureRoot}/Tests/{featureName}.Tests.asmdef", content);
+			CreateTextFileIfMissing($"{featureRoot}/Tests/{assemblyName}.Tests.asmdef", content);
+		}
+
+		private static string BuildAsmdefReferences(string[] references)
+		{
+			if (references == null || references.Length == 0)
+			{
+				return "[]";
+			}
+
+			var builder = new StringBuilder();
+			builder.Append('[');
+			for (var i = 0; i < references.Length; i++)
+			{
+				if (i > 0)
+				{
+					builder.Append(',');
+				}
+				builder.Append('"');
+				builder.Append(references[i]);
+				builder.Append('"');
+			}
+			builder.Append(']');
+			return builder.ToString();
 		}
 
 		private static void CreateTextFile(string assetPath, string content)
@@ -340,6 +507,22 @@ namespace EditorTools.FeatureGenerator
 				"}\n";
 		}
 
+		private static string BuildSubfeatureRequestsFile(string ns, string keyBase, string featureName)
+		{
+			return "using System;\n\n" +
+				$"namespace {ns}.Requests\n" +
+				"{\n" +
+				"\t/// <summary>\n" +
+				"\t/// Request keys for this subfeature.\n" +
+				"\t/// </summary>\n" +
+				$"\tpublic static class {featureName}Requests\n" +
+				"\t{\n" +
+				$"\t\tpublic const string BindParentSignals = \"{keyBase}.bind-parent-signals.request\";\n" +
+				$"\t\tpublic const string Echo = \"{keyBase}.echo.request\";\n" +
+				"\t}\n" +
+				"}\n";
+		}
+
 		private static string BuildEventsFile(string ns, string keyBase, string featureName)
 		{
 			return "using System;\n\n" +
@@ -372,7 +555,7 @@ namespace EditorTools.FeatureGenerator
 				"}\n";
 		}
 
-		private static string BuildControllerFile(string ns, string featureName)
+		private static string BuildControllerFile(string ns, string featureName, string scopeKeyName)
 		{
 			return $"using {ns}.Events;\n" +
 				$"using {ns}.Infrastructure;\n" +
@@ -383,7 +566,7 @@ namespace EditorTools.FeatureGenerator
 				"\t/// <summary>\n" +
 				$"\t/// Controller for {featureName}.\n" +
 				"\t/// </summary>\n" +
-				$"\t[Core.Infrastructure.Attributes.ControllerScope(Core.Infrastructure.Attributes.ControllerScopeKey.{featureName}Gameplay)]\n" +
+				$"\t[Core.Infrastructure.Attributes.ControllerScope(Core.Infrastructure.Attributes.ControllerScopeKey.{scopeKeyName})]\n" +
 				$"\tpublic static class {featureName}Controller\n" +
 				"\t{\n" +
 				"\t\t/// <summary>\n" +
@@ -413,9 +596,92 @@ namespace EditorTools.FeatureGenerator
 				"}\n";
 		}
 
-		private static string BuildViewFile(string ns, string featureName)
+		private static string BuildSubfeatureControllerFile(string ns, string featureName, string scopeKeyName)
 		{
+			return $"using {ns}.Events;\n" +
+				$"using {ns}.Infrastructure;\n" +
+				$"using {ns}.Infrastructure.Attributes;\n" +
+				$"using {ns}.Model;\n" +
+				$"using {ns}.Requests;\n\n" +
+				$"namespace {ns}.Controller\n" +
+				"{\n" +
+				"\t/// <summary>\n" +
+				$"\t/// Controller for {featureName}.\n" +
+				"\t/// </summary>\n" +
+				$"\t[Core.Infrastructure.Attributes.ControllerScope(Core.Infrastructure.Attributes.ControllerScopeKey.{scopeKeyName})]\n" +
+				$"\tpublic static class {featureName}Controller\n" +
+				"\t{\n" +
+				"\t\t/// <summary>\n" +
+				"\t\t/// Called when the controller scope is entered.\n" +
+				"\t\t/// </summary>\n" +
+				"\t\t[Core.Infrastructure.Attributes.ControllerInit]\n" +
+				"\t\tpublic static void OnEnterScope()\n" +
+				"\t\t{\n" +
+				"\t\t}\n\n" +
+				"\t\t/// <summary>\n" +
+				"\t\t/// Called when the controller scope is exited.\n" +
+				"\t\t/// </summary>\n" +
+				"\t\t[Core.Infrastructure.Attributes.ControllerShutdown]\n" +
+				"\t\tpublic static void OnExitScope()\n" +
+				"\t\t{\n" +
+				"\t\t}\n\n" +
+				"\t\t/// <summary>\n" +
+				"\t\t/// Binds parent-provided signals for this subfeature.\n" +
+				"\t\t/// </summary>\n" +
+				"\t\t/// <param name=\"payload\">Expected type: " + featureName + "ParentSignals.</param>\n" +
+				$"\t\t[Request({featureName}Requests.BindParentSignals)]\n" +
+				"\t\tpublic static void BindParentSignals(object payload)\n" +
+				"\t\t{\n" +
+				"\t\t\t" + featureName + "State.ParentSignals = payload as " + featureName + "ParentSignals;\n" +
+				"\t\t}\n\n" +
+				"\t\t/// <summary>\n" +
+				"\t\t/// Sample request handler that echoes payload to a view event and parent signal.\n" +
+				"\t\t/// </summary>\n" +
+				"\t\t/// <param name=\"payload\">Optional payload.</param>\n" +
+				$"\t\t[Request({featureName}Requests.Echo)]\n" +
+				"\t\tpublic static void HandleEcho(object payload)\n" +
+				"\t\t{\n" +
+				$"\t\t\tEventBus.Publish({featureName}Events.Echoed, payload);\n" +
+				"\t\t\t" + featureName + "State.ParentSignals?.OnEchoed?.Invoke(payload);\n" +
+				"\t\t}\n" +
+				"\t}\n" +
+				"}\n";
+		}
+
+		private static string BuildViewFile(string ns, string featureName, bool isSubfeature)
+		{
+			var modelUsing = isSubfeature ? $"using {ns}.Model;\n" : string.Empty;
+			var subfeatureFields = isSubfeature
+				? "\t\tprivate " + featureName + "ParentSignals _parentSignals;\n\n" +
+				  "\t\t/// <summary>\n" +
+				  "\t\t/// Injects parent-provided signal handlers for this subfeature.\n" +
+				  "\t\t/// </summary>\n" +
+				  "\t\t/// <param name=\"signals\">Signals implemented by the parent feature.</param>\n" +
+				  "\t\tpublic void SetParentSignals(" + featureName + "ParentSignals signals)\n" +
+				  "\t\t{\n" +
+				  "\t\t\t_parentSignals = signals;\n" +
+				  "\t\t\tTryBindParentSignals();\n" +
+				  "\t\t}\n\n" +
+				  "\t\t/// <summary>\n" +
+				  "\t\t/// Ensures parent signals are bound after scope activation.\n" +
+				  "\t\t/// </summary>\n" +
+				  "\t\tprotected override void OnEnabled()\n" +
+				  "\t\t{\n" +
+				  "\t\t\tbase.OnEnabled();\n" +
+				  "\t\t\tTryBindParentSignals();\n" +
+				  "\t\t}\n\n" +
+				  "\t\tprivate void TryBindParentSignals()\n" +
+				  "\t\t{\n" +
+				  "\t\t\tif (_parentSignals == null)\n" +
+				  "\t\t\t{\n" +
+				  "\t\t\t\treturn;\n" +
+				  "\t\t\t}\n\n" +
+				  "\t\t\tSendRequest(" + featureName + "Requests.BindParentSignals, _parentSignals);\n" +
+				  "\t\t}\n\n"
+				: string.Empty;
+
 			return "using Core.Infrastructure.Views;\n" +
+				modelUsing +
 				$"using {ns}.Events;\n" +
 				$"using {ns}.Infrastructure.Attributes;\n" +
 				$"using {ns}.Requests;\n" +
@@ -429,6 +695,7 @@ namespace EditorTools.FeatureGenerator
 				"\t{\n" +
 				"\t\t[SerializeField]\n" +
 				"\t\tprivate string _message = \"Hello\";\n\n" +
+				subfeatureFields +
 				"\t\t/// <summary>\n" +
 				"\t\t/// Example method to send a request.\n" +
 				"\t\t/// </summary>\n" +
@@ -445,6 +712,42 @@ namespace EditorTools.FeatureGenerator
 				"\t\t{\n" +
 				$"\t\t\tDebug.Log(\"[{featureName}View] Echoed: \" + payload, this);\n" +
 				"\t\t}\n" +
+				"\t}\n" +
+				"}\n";
+		}
+
+		private static string BuildParentSignalsFile(string ns, string featureName)
+		{
+			return "using System;\n\n" +
+				$"namespace {ns}.Model\n" +
+				"{\n" +
+				"\t/// <summary>\n" +
+				"\t/// Parent-provided callbacks for child-to-parent signaling.\n" +
+				"\t/// </summary>\n" +
+				$"\tpublic sealed class {featureName}ParentSignals\n" +
+				"\t{\n" +
+				"\t\t/// <summary>\n" +
+				"\t\t/// Optional callback invoked when the child echoes a payload.\n" +
+				"\t\t/// </summary>\n" +
+				"\t\tpublic Action<object> OnEchoed { get; set; }\n\n" +
+				"\t\t/// <summary>\n" +
+				"\t\t/// Optional callback for retrieving data from the parent.\n" +
+				"\t\t/// </summary>\n" +
+				"\t\tpublic Func<string> GetParentStatus { get; set; }\n" +
+				"\t}\n" +
+				"}\n";
+		}
+
+		private static string BuildStateFile(string ns, string featureName)
+		{
+			return $"namespace {ns}.Model\n" +
+				"{\n" +
+				"\t/// <summary>\n" +
+				"\t/// Holds subfeature state, including parent signal bindings.\n" +
+				"\t/// </summary>\n" +
+				$"\tpublic static class {featureName}State\n" +
+				"\t{\n" +
+				$"\t\tpublic static {featureName}ParentSignals ParentSignals {{ get; set; }}\n" +
 				"\t}\n" +
 				"}\n";
 		}
