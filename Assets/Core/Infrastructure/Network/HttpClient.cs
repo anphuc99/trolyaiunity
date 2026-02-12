@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Core.Infrastructure.Authentication;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
 using UnityEngine;
@@ -139,7 +140,7 @@ namespace Core.Infrastructure.Network
 				if (request.result != UnityWebRequest.Result.Success)
 				{
 					Debug.LogError($"{LogPrefix} POST '{resolvedUrl}' failed ({request.responseCode}): {request.error}");
-					return null;
+					return request.downloadHandler?.text;
 				}
 
 				return request.downloadHandler?.text;
@@ -168,7 +169,18 @@ namespace Core.Infrastructure.Network
 
 		private static void ApplyHeaders(UnityWebRequest request, Dictionary<string, string> headers)
 		{
-			if (request == null || headers == null || headers.Count == 0)
+			if (request == null)
+			{
+				return;
+			}
+
+			var token = AuthTokenModel.Token;
+			if (!string.IsNullOrWhiteSpace(token))
+			{
+				request.SetRequestHeader("Authorization", $"Bearer {token}");
+			}
+
+			if (headers == null || headers.Count == 0)
 			{
 				return;
 			}
