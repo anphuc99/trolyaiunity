@@ -6,6 +6,7 @@ using Features.Login.Infrastructure;
 using Features.Login.Infrastructure.Attributes;
 using Features.Login.Model;
 using Features.Login.Requests;
+using Newtonsoft.Json;
 using UnityEngine;
 
 namespace Features.Login.Controller
@@ -73,7 +74,7 @@ namespace Features.Login.Controller
 				return;
 			}
 
-			var response = JsonUtility.FromJson<LoginResponsePayload>(responseJson);
+			var response = JsonConvert.DeserializeObject<LoginResponsePayload>(responseJson);
 			if (response != null && !string.IsNullOrWhiteSpace(response.Token))
 			{
 				EventBus.Publish(LoginEvents.LoginSucceeded, response.Token);

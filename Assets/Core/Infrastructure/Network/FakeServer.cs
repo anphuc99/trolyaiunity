@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
+using Newtonsoft.Json;
 
 namespace Core.Infrastructure.Network
 {
@@ -143,7 +143,7 @@ namespace Core.Infrastructure.Network
 
 			try
 			{
-				return JsonUtility.FromJson<LoginPayload>(jsonPayload);
+				return JsonConvert.DeserializeObject<LoginPayload>(jsonPayload);
 			}
 			catch
 			{

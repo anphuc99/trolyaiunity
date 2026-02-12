@@ -3,6 +3,7 @@ using Features.Login.Events;
 using Features.Login.Infrastructure.Attributes;
 using Features.Login.Model;
 using Features.Login.Requests;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -14,13 +15,19 @@ namespace Features.Login.View
 	public sealed class LoginView : BaseView
 	{
 		[SerializeField]
-		private InputField _usernameInput;
+		private TMP_InputField _usernameInput;
 
 		[SerializeField]
-		private InputField _passwordInput;
+		private TMP_InputField _passwordInput;
 
 		[SerializeField]
-		private Text _statusLabel;
+		private TextMeshProUGUI _statusLabel;
+
+        protected override void OnEnabled()
+        {	
+            _statusLabel?.gameObject.SetActive(false);
+        }
+
 
 		/// <summary>
 		/// Sends the login request with the current input values.
@@ -39,8 +46,8 @@ namespace Features.Login.View
 				Password = _passwordInput.text
 			};
 
-			SendRequest(LoginRequests.SubmitLogin, payload);
 			SetStatus("Logging in...");
+			SendRequest(LoginRequests.SubmitLogin, payload);
 		}
 
 		/// <summary>
@@ -72,7 +79,7 @@ namespace Features.Login.View
 			{
 				return;
 			}
-
+			_statusLabel.gameObject.SetActive(true);
 			_statusLabel.text = message;
 		}
 	}

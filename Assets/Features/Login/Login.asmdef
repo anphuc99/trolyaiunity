@@ -1,7 +1,11 @@
 {
     "name": "Login",
     "rootNamespace": "",
-    "references": ["Core", "UniTask"],
+    "references": [
+        "Core",
+        "UniTask",
+        "Unity.TextMeshPro"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

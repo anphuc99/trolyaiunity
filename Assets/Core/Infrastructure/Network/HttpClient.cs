@@ -3,6 +3,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
+using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -102,7 +103,7 @@ namespace Core.Infrastructure.Network
 				return null;
 			}
 
-			var json = payload != null ? JsonUtility.ToJson(payload) : "{}";
+			var json = payload != null ? JsonConvert.SerializeObject(payload) : "{}";
 
 			if (UseFakeResponses())
 			{
