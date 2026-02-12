@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
@@ -14,7 +15,15 @@ namespace Core.Infrastructure.Network
 	{
 		private const string LogPrefix = "[HttpClient]";
 		private const string JsonContentType = "application/json";
-		private const string BaseUrl = "http://localhost:5000";
+		private const string SettingsResourcePath = "NetworkSettings";
+		private const string DefaultBaseUrl = "http://localhost:5000";
+		private static NetworkSettings _settings;
+		private static readonly Dictionary<string, string> FakeResponses = new Dictionary<string, string>(StringComparer.Ordinal)
+		{
+			{ "GET:/health", "{\"status\":\"ok\"}" },
+			{ "GET:/version", "{\"version\":\"0.0.1\"}" },
+			{ "POST:/login", "{\"token\":\"fake-token\"}" }
+		};
 
 		/// <summary>
 		/// Sends a GET request and returns the response text.
@@ -34,6 +43,11 @@ namespace Core.Infrastructure.Network
 			{
 				Debug.LogError($"{LogPrefix} GET failed: url is null/empty.");
 				return null;
+			}
+
+			if (UseFakeResponses())
+			{
+				return await FakeGetAsync(url, cancellationToken);
 			}
 
 			var resolvedUrl = ResolveUrl(url);
@@ -78,6 +92,11 @@ namespace Core.Infrastructure.Network
 			}
 
 			var json = payload != null ? JsonUtility.ToJson(payload) : "{}";
+
+			if (UseFakeResponses())
+			{
+				return await FakePostJsonAsync(url, json, cancellationToken);
+			}
 			var bodyBytes = Encoding.UTF8.GetBytes(json);
 
 			var resolvedUrl = ResolveUrl(url);
@@ -141,11 +160,110 @@ namespace Core.Infrastructure.Network
 				return url;
 			}
 
-			var normalizedBase = BaseUrl?.TrimEnd('/') ?? string.Empty;
+			var baseUrl = ResolveBaseUrl();
+			var normalizedBase = baseUrl?.TrimEnd('/') ?? string.Empty;
 			var normalizedPath = url.TrimStart('/');
 			return string.IsNullOrEmpty(normalizedBase)
 				? normalizedPath
 				: $"{normalizedBase}/{normalizedPath}";
+		}
+
+		private static string ResolveBaseUrl()
+		{
+			if (_settings == null)
+			{
+				_settings = Resources.Load<NetworkSettings>(SettingsResourcePath);
+			}
+
+			if (_settings == null)
+			{
+				return DefaultBaseUrl;
+			}
+
+			var baseUrl = _settings.BaseUrl;
+			if (string.IsNullOrWhiteSpace(baseUrl))
+			{
+				return DefaultBaseUrl;
+			}
+
+			return baseUrl;
+		}
+
+		private static bool UseFakeResponses()
+		{
+			if (_settings == null)
+			{
+				_settings = Resources.Load<NetworkSettings>(SettingsResourcePath);
+			}
+
+			return _settings != null && _settings.UseFakeUrl;
+		}
+
+		private static UniTask<string> FakeGetAsync(string url, CancellationToken cancellationToken)
+		{
+			if (cancellationToken.IsCancellationRequested)
+			{
+				return UniTask.FromCanceled<string>(cancellationToken);
+			}
+
+			var key = BuildFakeKey("GET", url);
+			if (FakeResponses.TryGetValue(key, out var response))
+			{
+				return UniTask.FromResult(response);
+			}
+
+			Debug.LogWarning($"{LogPrefix} Fake GET missing for '{key}'.");
+			return UniTask.FromResult("{}");
+		}
+
+		private static UniTask<string> FakePostJsonAsync(string url, string jsonPayload, CancellationToken cancellationToken)
+		{
+			if (cancellationToken.IsCancellationRequested)
+			{
+				return UniTask.FromCanceled<string>(cancellationToken);
+			}
+
+			var key = BuildFakeKey("POST", url);
+			if (FakeResponses.TryGetValue(key, out var response))
+			{
+				return UniTask.FromResult(response);
+			}
+
+			Debug.LogWarning($"{LogPrefix} Fake POST missing for '{key}'. Returning payload.");
+			return UniTask.FromResult(jsonPayload ?? "{}");
+		}
+
+		private static string BuildFakeKey(string method, string url)
+		{
+			var path = GetPathOnly(url);
+			return $"{method}:{path}";
+		}
+
+		private static string GetPathOnly(string url)
+		{
+			if (string.IsNullOrWhiteSpace(url))
+			{
+				return "/";
+			}
+
+			if (Uri.TryCreate(url, UriKind.Absolute, out var absolute))
+			{
+				return string.IsNullOrWhiteSpace(absolute.AbsolutePath) ? "/" : absolute.AbsolutePath;
+			}
+
+			var trimmed = url.Trim();
+			var queryIndex = trimmed.IndexOf('?', StringComparison.Ordinal);
+			if (queryIndex >= 0)
+			{
+				trimmed = trimmed.Substring(0, queryIndex);
+			}
+
+			if (!trimmed.StartsWith("/", StringComparison.Ordinal))
+			{
+				trimmed = "/" + trimmed;
+			}
+
+			return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
 		}
 	}
 }
