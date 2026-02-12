@@ -1,0 +1,65 @@
+using System.Reflection;
+using System.Threading.Tasks;
+using Core.Infrastructure.Network;
+using Cysharp.Threading.Tasks;
+using NUnit.Framework;
+
+namespace Core.Tests.Network
+{
+	/// <summary>
+	/// Unit tests for <see cref="HttpClient"/> when fake mode is enabled.
+	/// </summary>
+	public sealed class HttpClientTests
+	{
+		/// <summary>
+		/// Verifies GET requests return fake responses when fake mode is enabled.
+		/// </summary>
+		[Test]
+		public async Task GetAsync_ReturnsFakeResponse()
+		{
+			SetHttpClientSettings(new NetworkSettings
+			{
+				UseFakeUrl = true,
+				BaseUrl = "http://localhost:5000"
+			});
+
+			var response = await HttpClient.GetAsync("/health");
+
+			Assert.AreEqual("{\"status\":\"ok\"}", response);
+			SetHttpClientSettings(null);
+		}
+
+		/// <summary>
+		/// Verifies POST requests return fake responses when fake mode is enabled.
+		/// </summary>
+		[Test]
+		public async Task PostJsonAsync_ReturnsFakeResponse()
+		{
+			SetHttpClientSettings(new NetworkSettings
+			{
+				UseFakeUrl = true,
+				BaseUrl = "http://localhost:5000"
+			});
+
+			var response = await HttpClient.PostJsonAsync("/login", new LoginRequest { User = "tester" });
+
+			Assert.AreEqual("{\"token\":\"fake-token\"}", response);
+			SetHttpClientSettings(null);
+		}
+
+		/// <summary>
+		/// Simple payload for JSON serialization.
+		/// </summary>
+		[System.Serializable]
+		private sealed class LoginRequest
+		{
+			public string User;
+		}
+
+		private static void SetHttpClientSettings(NetworkSettings settings)
+		{
+			var field = typeof(HttpClient).GetField("_settings", BindingFlags.NonPublic | BindingFlags.Static);
+			field?.SetValue(null, settings);
+		}
+	}
+}
