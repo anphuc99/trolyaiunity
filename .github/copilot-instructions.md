@@ -173,6 +173,17 @@ Before ending any response that includes code, the AI MUST:
 
 ---
 
+## ✅ Mandatory Full Test Run
+
+**After every code change, the AI MUST run the full test suite.**
+
+1. Run **all tests** (not a subset).
+2. If any test fails, investigate, fix the issue, and run the full suite again.
+3. Repeat until all tests pass.
+4. If the full suite cannot be executed, explicitly state why and request guidance.
+
+---
+
 ## 🔒 Mandatory Git Commit (NON-NEGOTIABLE)
 
 **AFTER EVERY CODE GENERATION OR MODIFICATION:**
