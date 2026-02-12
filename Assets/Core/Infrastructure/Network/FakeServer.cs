@@ -8,12 +8,14 @@ namespace Core.Infrastructure.Network
 	/// </summary>
 	public static class FakeServer
 	{
-		private static readonly Dictionary<string, Func<string, string>> Responses = new Dictionary<string, Func<string, string>>(StringComparer.Ordinal)
+		private static readonly Dictionary<string, Func<string, string>> DefaultResponses = new Dictionary<string, Func<string, string>>(StringComparer.Ordinal)
 		{
 			{ BuildKey("GET", "/health"), _ => "{\"status\":\"ok\"}" },
 			{ BuildKey("GET", "/version"), _ => "{\"version\":\"0.0.1\"}" },
 			{ BuildKey("POST", "/login"), _ => "{\"token\":\"fake-token\"}" }
 		};
+
+		private static readonly Dictionary<string, Func<string, string>> Responses = CloneDefaults();
 
 		/// <summary>
 		/// Attempts to resolve a fake response for the given request.
@@ -50,6 +52,18 @@ namespace Core.Infrastructure.Network
 			}
 
 			Responses[BuildKey(method, path)] = handler;
+		}
+
+		/// <summary>
+		/// Resets all fake responses back to the defaults.
+		/// </summary>
+		public static void ResetToDefaults()
+		{
+			Responses.Clear();
+			foreach (var pair in DefaultResponses)
+			{
+				Responses[pair.Key] = pair.Value;
+			}
 		}
 
 		/// <summary>
@@ -96,6 +110,16 @@ namespace Core.Infrastructure.Network
 			}
 
 			return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
+		}
+
+		private static Dictionary<string, Func<string, string>> CloneDefaults()
+		{
+			var clone = new Dictionary<string, Func<string, string>>(StringComparer.Ordinal);
+			foreach (var pair in DefaultResponses)
+			{
+				clone[pair.Key] = pair.Value;
+			}
+			return clone;
 		}
 	}
 }

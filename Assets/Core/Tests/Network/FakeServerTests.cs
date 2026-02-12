@@ -8,6 +8,18 @@ namespace Core.Tests.Network
 	/// </summary>
 	public sealed class FakeServerTests
 	{
+		[SetUp]
+		public void SetUp()
+		{
+			FakeServer.ResetToDefaults();
+		}
+
+		[TearDown]
+		public void TearDown()
+		{
+			FakeServer.ResetToDefaults();
+		}
+
 		/// <summary>
 		/// Ensures default fake responses are available.
 		/// </summary>

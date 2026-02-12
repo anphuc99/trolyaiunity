@@ -11,6 +11,19 @@ namespace Core.Tests.Network
 	/// </summary>
 	public sealed class HttpClientTests
 	{
+		[SetUp]
+		public void SetUp()
+		{
+			FakeServer.ResetToDefaults();
+		}
+
+		[TearDown]
+		public void TearDown()
+		{
+			SetHttpClientSettings(null);
+			FakeServer.ResetToDefaults();
+		}
+
 		/// <summary>
 		/// Verifies GET requests return fake responses when fake mode is enabled.
 		/// </summary>
@@ -26,7 +39,6 @@ namespace Core.Tests.Network
 			var response = await HttpClient.GetAsync("/health");
 
 			Assert.AreEqual("{\"status\":\"ok\"}", response);
-			SetHttpClientSettings(null);
 		}
 
 		/// <summary>
@@ -44,7 +56,6 @@ namespace Core.Tests.Network
 			var response = await HttpClient.PostJsonAsync("/login", new LoginRequest { User = "tester" });
 
 			Assert.AreEqual("{\"token\":\"fake-token\"}", response);
-			SetHttpClientSettings(null);
 		}
 
 		/// <summary>
