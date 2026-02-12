@@ -43,12 +43,13 @@ namespace Features.Login.Tests
 			string token = null;
 			EventBus.Subscribe(LoginEvents.LoginSucceeded, payload => token = payload as string);
 
-			await LoginController.SubmitLoginAsync(new LoginRequestPayload
+			LoginController.SubmitLogin(new LoginRequestPayload
 			{
 				Username = "mimi",
 				Password = "123456"
 			});
 
+			await UniTask.WaitUntil(() => token != null);
 			Assert.AreEqual("fake-jwt", token);
 			Assert.AreEqual("fake-jwt", AuthTokenModel.Token);
 		}
@@ -59,12 +60,13 @@ namespace Features.Login.Tests
 			string error = null;
 			EventBus.Subscribe(LoginEvents.LoginFailed, payload => error = payload as string);
 
-			await LoginController.SubmitLoginAsync(new LoginRequestPayload
+			LoginController.SubmitLogin(new LoginRequestPayload
 			{
 				Username = "mimi",
 				Password = "wrong"
 			});
 
+			await UniTask.WaitUntil(() => error != null);
 			Assert.AreEqual("Invalid credentials", error);
 			Assert.IsTrue(string.IsNullOrWhiteSpace(AuthTokenModel.Token));
 		}
