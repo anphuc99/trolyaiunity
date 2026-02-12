@@ -40,6 +40,7 @@ Subfeatures:
 - Output root: `Assets/Features/<Parent>/SubFeatures/<Child>/`
 - Subfeatures share the parent scope (no new scene/scope key is created).
 - Child-to-parent signaling uses Action/Func callbacks injected by the parent.
+- The generator updates the parent asmdef to reference the child assembly.
 
 Note:
 
