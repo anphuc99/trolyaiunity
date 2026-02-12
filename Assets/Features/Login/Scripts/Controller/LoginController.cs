@@ -124,6 +124,5 @@ namespace Features.Login.Controller
 				LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay);
 			}
 		}
-		}
 	}
 }
