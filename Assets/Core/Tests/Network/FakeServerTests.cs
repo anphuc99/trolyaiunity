@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using Core.Infrastructure.Network;
+using Newtonsoft.Json;
 
 namespace Core.Tests.Network
 {
@@ -70,6 +71,61 @@ namespace Core.Tests.Network
 
 			Assert.IsTrue(found);
 			Assert.AreEqual("{\"token\":\"override\"}", response);
+		}
+
+		/// <summary>
+		/// Ensures token validation accepts valid tokens.
+		/// </summary>
+		[Test]
+		public void TryGetResponse_ValidatesTokenAccepted()
+		{
+			var payload = "{\"Token\":\"fake-jwt\"}";
+
+			var found = FakeServer.TryGetResponse("POST", "/token/validate", payload, out var response);
+
+			Assert.IsTrue(found);
+			var validation = JsonConvert.DeserializeObject<TokenValidationResponse>(response);
+			Assert.IsTrue(validation.Valid);
+			Assert.IsTrue(string.IsNullOrWhiteSpace(validation.Error));
+		}
+
+		/// <summary>
+		/// Ensures token validation rejects invalid tokens.
+		/// </summary>
+		[Test]
+		public void TryGetResponse_ValidatesTokenRejected()
+		{
+			var payload = "{\"Token\":\"bad-token\"}";
+
+			var found = FakeServer.TryGetResponse("POST", "/token/validate", payload, out var response);
+
+			Assert.IsTrue(found);
+			var validation = JsonConvert.DeserializeObject<TokenValidationResponse>(response);
+			Assert.IsFalse(validation.Valid);
+			Assert.AreEqual("Invalid token", validation.Error);
+		}
+
+		/// <summary>
+		/// Ensures token validation rejects expired tokens.
+		/// </summary>
+		[Test]
+		public void TryGetResponse_ValidatesTokenExpired()
+		{
+			var payload = "{\"Token\":\"fake-jwt-expired\"}";
+
+			var found = FakeServer.TryGetResponse("POST", "/token/validate", payload, out var response);
+
+			Assert.IsTrue(found);
+			var validation = JsonConvert.DeserializeObject<TokenValidationResponse>(response);
+			Assert.IsFalse(validation.Valid);
+			Assert.AreEqual("Token expired", validation.Error);
+		}
+
+		[System.Serializable]
+		private sealed class TokenValidationResponse
+		{
+			public bool Valid;
+			public string Error;
 		}
 	}
 }

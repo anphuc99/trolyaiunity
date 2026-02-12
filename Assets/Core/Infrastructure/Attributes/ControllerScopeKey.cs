@@ -13,6 +13,8 @@ namespace Core.Infrastructure.Attributes
 
 		CreateCharaterGameplay = 3,
 
-		GamePlayGameplay = 4
+		GamePlayGameplay = 4,
+
+		StartSceneGameplay = 5
 	}
 }

@@ -1,5 +1,6 @@
 using Core.Infrastructure.Network;
 using Core.Infrastructure.Scenes;
+using Core.Infrastructure.Authentication;
 using System.Threading.Tasks;
 using Features.Login.Events;
 using Features.Login.Infrastructure;
@@ -70,6 +71,7 @@ namespace Features.Login.Controller
 			var responseJson = await HttpClient.PostJsonTaskAsync("/login", payload);
 			if (string.IsNullOrWhiteSpace(responseJson))
 			{
+				AuthTokenModel.Token = null;
 				EventBus.Publish(LoginEvents.LoginFailed, "Empty server response.");
 				return;
 			}
@@ -77,6 +79,7 @@ namespace Features.Login.Controller
 			var response = JsonConvert.DeserializeObject<LoginResponsePayload>(responseJson);
 			if (response != null && !string.IsNullOrWhiteSpace(response.Token))
 			{
+				AuthTokenModel.Token = response.Token;
 				EventBus.Publish(LoginEvents.LoginSucceeded, response.Token);
 				if (Application.isPlaying)
 				{
@@ -85,6 +88,7 @@ namespace Features.Login.Controller
 				return;
 			}
 
+			AuthTokenModel.Token = null;
 			var errorMessage = response != null && !string.IsNullOrWhiteSpace(response.Error)
 				? response.Error
 				: "Invalid credentials.";

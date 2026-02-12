@@ -12,6 +12,9 @@ EditorBuildSettings:
     path: Assets/Features/Player/Scenes/PlayerGameplay.unity
     guid: 3355b8553743a2a4f9b07523648a756e
   - enabled: 1
+    path: Assets/Features/GamePlay/Scenes/GamePlayGameplay.unity
+    guid: f129ea17cde3b2247893f6627985cae5
+  - enabled: 0
     path: Assets/Features/UIController/Scenes/UIControllerGameplay.unity
     guid: ae4c9a47703033442a24eff17e45d3b8
   m_configObjects:

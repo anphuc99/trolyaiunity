@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Threading.Tasks;
+using Core.Infrastructure.Authentication;
 using Core.Infrastructure.Events;
 using Core.Infrastructure.Network;
 using Cysharp.Threading.Tasks;
@@ -20,6 +21,7 @@ namespace Features.Login.Tests
 		{
 			EventBus.ClearAll();
 			FakeServer.ResetToDefaults();
+			AuthTokenModel.Token = null;
 			SetHttpClientSettings(new NetworkSettings
 			{
 				UseFakeUrl = true,
@@ -32,6 +34,7 @@ namespace Features.Login.Tests
 		{
 			EventBus.ClearAll();
 			FakeServer.ResetToDefaults();
+			AuthTokenModel.Token = null;
 			SetHttpClientSettings(null);
 		}
 
@@ -50,6 +53,7 @@ namespace Features.Login.Tests
 			await UniTask.Yield();
 
 			Assert.AreEqual("fake-jwt", token);
+			Assert.AreEqual("fake-jwt", AuthTokenModel.Token);
 		}
 
 		[Test]
@@ -67,6 +71,7 @@ namespace Features.Login.Tests
 			await UniTask.Yield();
 
 			Assert.AreEqual("Invalid credentials", error);
+			Assert.IsTrue(string.IsNullOrWhiteSpace(AuthTokenModel.Token));
 		}
 
 		private static void SetHttpClientSettings(NetworkSettings settings)

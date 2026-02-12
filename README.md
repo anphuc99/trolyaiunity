@@ -23,6 +23,7 @@ It provides:
 - Scene names should match `ControllerScopeKey` enum values for auto activation.
 - Simple HTTP helpers via `Core.Infrastructure.Network.HttpClient` (GET + JSON POST with UniTask).
 - Network URL toggle tool via `Tools/Network Settings` (fake in-code responses vs real server calls).
+- Start scene flow validates the stored auth token via `/token/validate` and routes to Login or GamePlay.
 
 ## Feature Generator Tool
 

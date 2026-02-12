@@ -9,11 +9,15 @@ namespace Core.Infrastructure.Network
 	/// </summary>
 	public static class FakeServer
 	{
+		private static readonly TimeSpan TokenTimeToLive = TimeSpan.FromMinutes(30);
+		private static readonly Dictionary<string, DateTime> TokenExpirations = new Dictionary<string, DateTime>(StringComparer.Ordinal);
+
 		private static readonly Dictionary<string, Func<string, string>> DefaultResponses = new Dictionary<string, Func<string, string>>(StringComparer.Ordinal)
 		{
 			{ BuildKey("GET", "/health"), _ => "{\"status\":\"ok\"}" },
 			{ BuildKey("GET", "/version"), _ => "{\"version\":\"0.0.1\"}" },
-			{ BuildKey("POST", "/login"), BuildLoginResponse }
+			{ BuildKey("POST", "/login"), BuildLoginResponse },
+			{ BuildKey("POST", "/token/validate"), BuildTokenValidationResponse }
 		};
 
 		private static readonly Dictionary<string, Func<string, string>> Responses = CloneDefaults();
@@ -65,6 +69,8 @@ namespace Core.Infrastructure.Network
 			{
 				Responses[pair.Key] = pair.Value;
 			}
+
+			TokenExpirations.Clear();
 		}
 
 		/// <summary>
@@ -85,10 +91,33 @@ namespace Core.Infrastructure.Network
 			var request = ParseLoginPayload(jsonPayload);
 			if (request != null && IsValidLogin(request))
 			{
+				var token = "fake-jwt";
+				RegisterToken(token);
 				return "{\"Token\":\"fake-jwt\"}";
 			}
 
 			return "{\"Error\":\"Invalid credentials\"}";
+		}
+
+		private static string BuildTokenValidationResponse(string jsonPayload)
+		{
+			var request = ParseTokenValidationPayload(jsonPayload);
+			if (request == null || string.IsNullOrWhiteSpace(request.Token))
+			{
+				return SerializeTokenValidationResponse(false, "Missing token");
+			}
+
+			if (!IsTokenKnown(request.Token))
+			{
+				return SerializeTokenValidationResponse(false, "Invalid token");
+			}
+
+			if (IsTokenExpired(request.Token))
+			{
+				return SerializeTokenValidationResponse(false, "Token expired");
+			}
+
+			return SerializeTokenValidationResponse(true, null);
 		}
 
 		private static string GetDefaultResponse(string method, string jsonPayload)
@@ -151,6 +180,23 @@ namespace Core.Infrastructure.Network
 			}
 		}
 
+		private static TokenValidationPayload ParseTokenValidationPayload(string jsonPayload)
+		{
+			if (string.IsNullOrWhiteSpace(jsonPayload))
+			{
+				return null;
+			}
+
+			try
+			{
+				return JsonConvert.DeserializeObject<TokenValidationPayload>(jsonPayload);
+			}
+			catch
+			{
+				return null;
+			}
+		}
+
 		private static bool IsValidLogin(LoginPayload payload)
 		{
 			var password = !string.IsNullOrWhiteSpace(payload.Password)
@@ -161,12 +207,72 @@ namespace Core.Infrastructure.Network
 				&& string.Equals(password, "123456", StringComparison.Ordinal);
 		}
 
+		private static void RegisterToken(string token)
+		{
+			if (string.IsNullOrWhiteSpace(token))
+			{
+				return;
+			}
+
+			TokenExpirations[token] = DateTime.UtcNow.Add(TokenTimeToLive);
+		}
+
+		private static bool IsTokenKnown(string token)
+		{
+			return TokenExpirations.ContainsKey(token)
+				|| string.Equals(token, "fake-jwt", StringComparison.Ordinal)
+				|| token.EndsWith("-expired", StringComparison.Ordinal);
+		}
+
+		private static bool IsTokenExpired(string token)
+		{
+			if (string.IsNullOrWhiteSpace(token))
+			{
+				return true;
+			}
+
+			if (token.EndsWith("-expired", StringComparison.Ordinal))
+			{
+				return true;
+			}
+
+			if (TokenExpirations.TryGetValue(token, out var expiresAtUtc))
+			{
+				return DateTime.UtcNow > expiresAtUtc;
+			}
+
+			return false;
+		}
+
+		private static string SerializeTokenValidationResponse(bool valid, string error)
+		{
+			var response = new TokenValidationResponse
+			{
+				Valid = valid,
+				Error = error
+			};
+			return JsonConvert.SerializeObject(response);
+		}
+
 		[Serializable]
 		private sealed class LoginPayload
 		{
 			public string Username;
 			public string Password;
 			public string Passwork;
+		}
+
+		[Serializable]
+		private sealed class TokenValidationPayload
+		{
+			public string Token;
+		}
+
+		[Serializable]
+		private sealed class TokenValidationResponse
+		{
+			public bool Valid;
+			public string Error;
 		}
 	}
 }
