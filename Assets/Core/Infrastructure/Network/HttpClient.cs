@@ -14,11 +14,12 @@ namespace Core.Infrastructure.Network
 	{
 		private const string LogPrefix = "[HttpClient]";
 		private const string JsonContentType = "application/json";
+		private const string BaseUrl = "http://localhost:5000";
 
 		/// <summary>
 		/// Sends a GET request and returns the response text.
 		/// </summary>
-		/// <param name="url">Request URL.</param>
+		/// <param name="url">Request URL or relative path.</param>
 		/// <param name="headers">Optional headers.</param>
 		/// <param name="timeoutSeconds">Optional timeout in seconds (0 means default).</param>
 		/// <param name="cancellationToken">Cancellation token.</param>
@@ -35,7 +36,8 @@ namespace Core.Infrastructure.Network
 				return null;
 			}
 
-			using (var request = UnityWebRequest.Get(url))
+			var resolvedUrl = ResolveUrl(url);
+			using (var request = UnityWebRequest.Get(resolvedUrl))
 			{
 				ApplyHeaders(request, headers);
 				ApplyTimeout(request, timeoutSeconds);
@@ -44,7 +46,7 @@ namespace Core.Infrastructure.Network
 
 				if (request.result != UnityWebRequest.Result.Success)
 				{
-					Debug.LogError($"{LogPrefix} GET '{url}' failed: {request.error}");
+					Debug.LogError($"{LogPrefix} GET '{resolvedUrl}' failed: {request.error}");
 					return null;
 				}
 
@@ -56,7 +58,7 @@ namespace Core.Infrastructure.Network
 		/// Sends a JSON POST request and returns the response text.
 		/// </summary>
 		/// <typeparam name="T">Payload type to serialize to JSON.</typeparam>
-		/// <param name="url">Request URL.</param>
+		/// <param name="url">Request URL or relative path.</param>
 		/// <param name="payload">Payload object. If null, an empty JSON object is sent.</param>
 		/// <param name="headers">Optional headers.</param>
 		/// <param name="timeoutSeconds">Optional timeout in seconds (0 means default).</param>
@@ -78,7 +80,8 @@ namespace Core.Infrastructure.Network
 			var json = payload != null ? JsonUtility.ToJson(payload) : "{}";
 			var bodyBytes = Encoding.UTF8.GetBytes(json);
 
-			using (var request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST))
+			var resolvedUrl = ResolveUrl(url);
+			using (var request = new UnityWebRequest(resolvedUrl, UnityWebRequest.kHttpVerbPOST))
 			{
 				request.uploadHandler = new UploadHandlerRaw(bodyBytes);
 				request.downloadHandler = new DownloadHandlerBuffer();
@@ -90,7 +93,7 @@ namespace Core.Infrastructure.Network
 
 				if (request.result != UnityWebRequest.Result.Success)
 				{
-					Debug.LogError($"{LogPrefix} POST '{url}' failed: {request.error}");
+					Debug.LogError($"{LogPrefix} POST '{resolvedUrl}' failed: {request.error}");
 					return null;
 				}
 
@@ -124,6 +127,25 @@ namespace Core.Infrastructure.Network
 			}
 
 			request.timeout = timeoutSeconds;
+		}
+
+		private static string ResolveUrl(string url)
+		{
+			if (string.IsNullOrWhiteSpace(url))
+			{
+				return url;
+			}
+
+			if (url.StartsWith("http://") || url.StartsWith("https://"))
+			{
+				return url;
+			}
+
+			var normalizedBase = BaseUrl?.TrimEnd('/') ?? string.Empty;
+			var normalizedPath = url.TrimStart('/');
+			return string.IsNullOrEmpty(normalizedBase)
+				? normalizedPath
+				: $"{normalizedBase}/{normalizedPath}";
 		}
 	}
 }
