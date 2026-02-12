@@ -21,6 +21,7 @@ It provides:
 - Attribute-based view binding via `[OnEvent("key")]` and `BaseView`.
 - Controller scoping via `[ControllerScope(ControllerScopeKey.ScopeName)]` with `[ControllerInit]` / `[ControllerShutdown]` hooks.
 - Scene names should match `ControllerScopeKey` enum values for auto activation.
+- Simple HTTP helpers via `Core.Infrastructure.Network.HttpClient` (GET + JSON POST with UniTask).
 
 ## Feature Generator Tool
 
