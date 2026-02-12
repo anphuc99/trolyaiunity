@@ -45,6 +45,20 @@ namespace Core.Tests.Network
 		}
 
 		/// <summary>
+		/// Ensures login credentials are validated by the fake server.
+		/// </summary>
+		[Test]
+		public void TryGetResponse_ValidatesLoginCredentials()
+		{
+			var payload = "{\"Username\":\"mimi\",\"Password\":\"123456\"}";
+
+			var found = FakeServer.TryGetResponse("POST", "/login", payload, out var response);
+
+			Assert.IsTrue(found);
+			Assert.AreEqual("{\"Token\":\"fake-jwt\"}", response);
+		}
+
+		/// <summary>
 		/// Ensures a custom fake handler can be registered and resolved.
 		/// </summary>
 		[Test]

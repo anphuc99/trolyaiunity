@@ -1,7 +1,7 @@
 {
     "name": "Login.Tests",
     "rootNamespace": "",
-    "references": ["Login"],
+    "references": ["Login", "Core", "UniTask"],
     "includePlatforms": ["Editor"],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace Core.Infrastructure.Network
 {
@@ -12,7 +13,7 @@ namespace Core.Infrastructure.Network
 		{
 			{ BuildKey("GET", "/health"), _ => "{\"status\":\"ok\"}" },
 			{ BuildKey("GET", "/version"), _ => "{\"version\":\"0.0.1\"}" },
-			{ BuildKey("POST", "/login"), _ => "{\"token\":\"fake-token\"}" }
+			{ BuildKey("POST", "/login"), BuildLoginResponse }
 		};
 
 		private static readonly Dictionary<string, Func<string, string>> Responses = CloneDefaults();
@@ -79,6 +80,17 @@ namespace Core.Infrastructure.Network
 			return $"{normalizedMethod}:{path}";
 		}
 
+		private static string BuildLoginResponse(string jsonPayload)
+		{
+			var request = ParseLoginPayload(jsonPayload);
+			if (request != null && IsValidLogin(request))
+			{
+				return "{\"Token\":\"fake-jwt\"}";
+			}
+
+			return "{\"Error\":\"Invalid credentials\"}";
+		}
+
 		private static string GetDefaultResponse(string method, string jsonPayload)
 		{
 			var normalizedMethod = string.IsNullOrWhiteSpace(method) ? "GET" : method.Trim().ToUpperInvariant();
@@ -120,6 +132,41 @@ namespace Core.Infrastructure.Network
 				clone[pair.Key] = pair.Value;
 			}
 			return clone;
+		}
+
+		private static LoginPayload ParseLoginPayload(string jsonPayload)
+		{
+			if (string.IsNullOrWhiteSpace(jsonPayload))
+			{
+				return null;
+			}
+
+			try
+			{
+				return JsonUtility.FromJson<LoginPayload>(jsonPayload);
+			}
+			catch
+			{
+				return null;
+			}
+		}
+
+		private static bool IsValidLogin(LoginPayload payload)
+		{
+			var password = !string.IsNullOrWhiteSpace(payload.Password)
+				? payload.Password
+				: payload.Passwork;
+
+			return string.Equals(payload.Username, "mimi", StringComparison.Ordinal)
+				&& string.Equals(password, "123456", StringComparison.Ordinal);
+		}
+
+		[Serializable]
+		private sealed class LoginPayload
+		{
+			public string Username;
+			public string Password;
+			public string Passwork;
 		}
 	}
 }

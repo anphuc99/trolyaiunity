@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -62,6 +63,23 @@ namespace Core.Infrastructure.Network
 		}
 
 		/// <summary>
+		/// Sends a GET request and returns the response text as a Task.
+		/// </summary>
+		/// <param name="url">Request URL or relative path.</param>
+		/// <param name="headers">Optional headers.</param>
+		/// <param name="timeoutSeconds">Optional timeout in seconds (0 means default).</param>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <returns>Response text or null on failure.</returns>
+		public static Task<string> GetTaskAsync(
+			string url,
+			Dictionary<string, string> headers = null,
+			int timeoutSeconds = 0,
+			CancellationToken cancellationToken = default)
+		{
+			return GetAsync(url, headers, timeoutSeconds, cancellationToken).AsTask();
+		}
+
+		/// <summary>
 		/// Sends a JSON POST request and returns the response text.
 		/// </summary>
 		/// <typeparam name="T">Payload type to serialize to JSON.</typeparam>
@@ -111,6 +129,26 @@ namespace Core.Infrastructure.Network
 
 				return request.downloadHandler?.text;
 			}
+		}
+
+		/// <summary>
+		/// Sends a JSON POST request and returns the response text as a Task.
+		/// </summary>
+		/// <typeparam name="T">Payload type to serialize to JSON.</typeparam>
+		/// <param name="url">Request URL or relative path.</param>
+		/// <param name="payload">Payload object. If null, an empty JSON object is sent.</param>
+		/// <param name="headers">Optional headers.</param>
+		/// <param name="timeoutSeconds">Optional timeout in seconds (0 means default).</param>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <returns>Response text or null on failure.</returns>
+		public static Task<string> PostJsonTaskAsync<T>(
+			string url,
+			T payload,
+			Dictionary<string, string> headers = null,
+			int timeoutSeconds = 0,
+			CancellationToken cancellationToken = default)
+		{
+			return PostJsonAsync(url, payload, headers, timeoutSeconds, cancellationToken).AsTask();
 		}
 
 		private static void ApplyHeaders(UnityWebRequest request, Dictionary<string, string> headers)

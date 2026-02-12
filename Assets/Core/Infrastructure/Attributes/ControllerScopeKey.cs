@@ -9,6 +9,10 @@ namespace Core.Infrastructure.Attributes
 		Global = 0,
 		PlayerGameplay = 1,
 
-		LoginGameplay = 2
+		LoginGameplay = 2,
+
+		CreateCharaterGameplay = 3,
+
+		GamePlayGameplay = 4
 	}
 }

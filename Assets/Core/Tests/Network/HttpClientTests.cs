@@ -53,9 +53,13 @@ namespace Core.Tests.Network
 				BaseUrl = "http://localhost:5000"
 			});
 
-			var response = await HttpClient.PostJsonAsync("/login", new LoginRequest { User = "tester" });
+			var response = await HttpClient.PostJsonAsync("/login", new LoginRequest
+			{
+				Username = "mimi",
+				Password = "123456"
+			});
 
-			Assert.AreEqual("{\"token\":\"fake-token\"}", response);
+			Assert.AreEqual("{\"Token\":\"fake-jwt\"}", response);
 		}
 
 		/// <summary>
@@ -64,7 +68,8 @@ namespace Core.Tests.Network
 		[System.Serializable]
 		private sealed class LoginRequest
 		{
-			public string User;
+			public string Username;
+			public string Password;
 		}
 
 		private static void SetHttpClientSettings(NetworkSettings settings)
