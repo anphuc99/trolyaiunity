@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Threading.Tasks;
 using Core.Infrastructure.Authentication;
 using Core.Infrastructure.Events;
 using Core.Infrastructure.Network;
@@ -20,11 +21,10 @@ namespace Features.StartScene.Tests
 			EventBus.ClearAll();
 			FakeServer.ResetToDefaults();
 			AuthTokenModel.Token = null;
-			SetHttpClientSettings(new NetworkSettings
-			{
-				UseFakeUrl = true,
-				BaseUrl = "http://localhost:5000"
-			});
+			var settings = UnityEngine.ScriptableObject.CreateInstance<NetworkSettings>();
+			settings.UseFakeUrl = true;
+			settings.BaseUrl = "http://localhost:5000";
+			SetHttpClientSettings(settings);
 		}
 
 		[TearDown]
@@ -37,43 +37,37 @@ namespace Features.StartScene.Tests
 		}
 
 		[Test]
-		public async UniTask CheckToken_PublishesAcceptedForValidToken()
+		public async Task CheckToken_PublishesAcceptedForValidToken()
 		{
 			string acceptedToken = null;
 			EventBus.Subscribe(StartSceneEvents.TokenAccepted, payload => acceptedToken = payload as string);
 
 			AuthTokenModel.Token = "fake-jwt";
-			StartSceneController.CheckToken();
-
-			await UniTask.Yield();
+			await StartSceneController.CheckTokenAsync();
 
 			Assert.AreEqual("fake-jwt", acceptedToken);
 		}
 
 		[Test]
-		public async UniTask CheckToken_PublishesRejectedForMissingToken()
+		public async Task CheckToken_PublishesRejectedForMissingToken()
 		{
 			string error = null;
 			EventBus.Subscribe(StartSceneEvents.TokenRejected, payload => error = payload as string);
 
 			AuthTokenModel.Token = null;
-			StartSceneController.CheckToken();
-
-			await UniTask.Yield();
+			await StartSceneController.CheckTokenAsync();
 
 			Assert.AreEqual("Missing token.", error);
 		}
 
 		[Test]
-		public async UniTask CheckToken_PublishesRejectedForExpiredToken()
+		public async Task CheckToken_PublishesRejectedForExpiredToken()
 		{
 			string error = null;
 			EventBus.Subscribe(StartSceneEvents.TokenRejected, payload => error = payload as string);
 
 			AuthTokenModel.Token = "fake-jwt-expired";
-			StartSceneController.CheckToken();
-
-			await UniTask.Yield();
+			await StartSceneController.CheckTokenAsync();
 
 			Assert.AreEqual("Token expired", error);
 		}

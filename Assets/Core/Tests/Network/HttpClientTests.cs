@@ -30,11 +30,10 @@ namespace Core.Tests.Network
 		[Test]
 		public async Task GetAsync_ReturnsFakeResponse()
 		{
-			SetHttpClientSettings(new NetworkSettings
-			{
-				UseFakeUrl = true,
-				BaseUrl = "http://localhost:5000"
-			});
+			var settings = UnityEngine.ScriptableObject.CreateInstance<NetworkSettings>();
+			settings.UseFakeUrl = true;
+			settings.BaseUrl = "http://localhost:5000";
+			SetHttpClientSettings(settings);
 
 			var response = await HttpClient.GetAsync("/health");
 
@@ -47,11 +46,10 @@ namespace Core.Tests.Network
 		[Test]
 		public async Task PostJsonAsync_ReturnsFakeResponse()
 		{
-			SetHttpClientSettings(new NetworkSettings
-			{
-				UseFakeUrl = true,
-				BaseUrl = "http://localhost:5000"
-			});
+			var settings = UnityEngine.ScriptableObject.CreateInstance<NetworkSettings>();
+			settings.UseFakeUrl = true;
+			settings.BaseUrl = "http://localhost:5000";
+			SetHttpClientSettings(settings);
 
 			var response = await HttpClient.PostJsonAsync("/login", new LoginRequest
 			{

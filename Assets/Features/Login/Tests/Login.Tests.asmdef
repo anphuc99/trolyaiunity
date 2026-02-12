@@ -1,15 +1,27 @@
 {
     "name": "Login.Tests",
     "rootNamespace": "",
-    "references": ["Login", "Core", "UniTask"],
-    "includePlatforms": ["Editor"],
+    "references": [
+        "Login",
+        "Core",
+        "UniTask",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
-    "overrideReferences": false,
-    "precompiledReferences": [],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll",
+        "Newtonsoft.Json.dll"
+    ],
     "autoReferenced": false,
-    "defineConstraints": [],
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
     "versionDefines": [],
-    "noEngineReferences": false,
-    "optionalUnityReferences": ["TestAssemblies"]
+    "noEngineReferences": false
 }

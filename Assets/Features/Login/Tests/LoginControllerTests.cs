@@ -22,11 +22,10 @@ namespace Features.Login.Tests
 			EventBus.ClearAll();
 			FakeServer.ResetToDefaults();
 			AuthTokenModel.Token = null;
-			SetHttpClientSettings(new NetworkSettings
-			{
-				UseFakeUrl = true,
-				BaseUrl = "http://localhost:5000"
-			});
+			var settings = UnityEngine.ScriptableObject.CreateInstance<NetworkSettings>();
+			settings.UseFakeUrl = true;
+			settings.BaseUrl = "http://localhost:5000";
+			SetHttpClientSettings(settings);
 		}
 
 		[TearDown]
@@ -44,13 +43,11 @@ namespace Features.Login.Tests
 			string token = null;
 			EventBus.Subscribe(LoginEvents.LoginSucceeded, payload => token = payload as string);
 
-			LoginController.SubmitLogin(new LoginRequestPayload
+			await LoginController.SubmitLoginAsync(new LoginRequestPayload
 			{
 				Username = "mimi",
 				Password = "123456"
 			});
-
-			await UniTask.Yield();
 
 			Assert.AreEqual("fake-jwt", token);
 			Assert.AreEqual("fake-jwt", AuthTokenModel.Token);
@@ -62,13 +59,11 @@ namespace Features.Login.Tests
 			string error = null;
 			EventBus.Subscribe(LoginEvents.LoginFailed, payload => error = payload as string);
 
-			LoginController.SubmitLogin(new LoginRequestPayload
+			await LoginController.SubmitLoginAsync(new LoginRequestPayload
 			{
 				Username = "mimi",
 				Password = "wrong"
 			});
-
-			await UniTask.Yield();
 
 			Assert.AreEqual("Invalid credentials", error);
 			Assert.IsTrue(string.IsNullOrWhiteSpace(AuthTokenModel.Token));
