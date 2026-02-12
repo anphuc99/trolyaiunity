@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
@@ -18,12 +17,6 @@ namespace Core.Infrastructure.Network
 		private const string SettingsResourcePath = "NetworkSettings";
 		private const string DefaultBaseUrl = "http://localhost:5000";
 		private static NetworkSettings _settings;
-		private static readonly Dictionary<string, string> FakeResponses = new Dictionary<string, string>(StringComparer.Ordinal)
-		{
-			{ "GET:/health", "{\"status\":\"ok\"}" },
-			{ "GET:/version", "{\"version\":\"0.0.1\"}" },
-			{ "POST:/login", "{\"token\":\"fake-token\"}" }
-		};
 
 		/// <summary>
 		/// Sends a GET request and returns the response text.
@@ -206,14 +199,14 @@ namespace Core.Infrastructure.Network
 				return UniTask.FromCanceled<string>(cancellationToken);
 			}
 
-			var key = BuildFakeKey("GET", url);
-			if (FakeResponses.TryGetValue(key, out var response))
+			if (FakeServer.TryGetResponse("GET", url, null, out var response))
 			{
 				return UniTask.FromResult(response);
 			}
 
+			var key = FakeServer.BuildKey("GET", url);
 			Debug.LogWarning($"{LogPrefix} Fake GET missing for '{key}'.");
-			return UniTask.FromResult("{}");
+			return UniTask.FromResult(response);
 		}
 
 		private static UniTask<string> FakePostJsonAsync(string url, string jsonPayload, CancellationToken cancellationToken)
@@ -223,47 +216,14 @@ namespace Core.Infrastructure.Network
 				return UniTask.FromCanceled<string>(cancellationToken);
 			}
 
-			var key = BuildFakeKey("POST", url);
-			if (FakeResponses.TryGetValue(key, out var response))
+			if (FakeServer.TryGetResponse("POST", url, jsonPayload, out var response))
 			{
 				return UniTask.FromResult(response);
 			}
 
-			Debug.LogWarning($"{LogPrefix} Fake POST missing for '{key}'. Returning payload.");
-			return UniTask.FromResult(jsonPayload ?? "{}");
-		}
-
-		private static string BuildFakeKey(string method, string url)
-		{
-			var path = GetPathOnly(url);
-			return $"{method}:{path}";
-		}
-
-		private static string GetPathOnly(string url)
-		{
-			if (string.IsNullOrWhiteSpace(url))
-			{
-				return "/";
-			}
-
-			if (Uri.TryCreate(url, UriKind.Absolute, out var absolute))
-			{
-				return string.IsNullOrWhiteSpace(absolute.AbsolutePath) ? "/" : absolute.AbsolutePath;
-			}
-
-			var trimmed = url.Trim();
-			var queryIndex = trimmed.IndexOf('?', StringComparison.Ordinal);
-			if (queryIndex >= 0)
-			{
-				trimmed = trimmed.Substring(0, queryIndex);
-			}
-
-			if (!trimmed.StartsWith("/", StringComparison.Ordinal))
-			{
-				trimmed = "/" + trimmed;
-			}
-
-			return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
+			var key = FakeServer.BuildKey("POST", url);
+			Debug.LogWarning($"{LogPrefix} Fake POST missing for '{key}'. Returning fallback.");
+			return UniTask.FromResult(response);
 		}
 	}
 }

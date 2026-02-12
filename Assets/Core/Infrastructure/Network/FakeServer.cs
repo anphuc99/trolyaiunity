@@ -1,0 +1,101 @@
+using System;
+using System.Collections.Generic;
+
+namespace Core.Infrastructure.Network
+{
+	/// <summary>
+	/// In-code fake server for offline testing without real HTTP calls.
+	/// </summary>
+	public static class FakeServer
+	{
+		private static readonly Dictionary<string, Func<string, string>> Responses = new Dictionary<string, Func<string, string>>(StringComparer.Ordinal)
+		{
+			{ BuildKey("GET", "/health"), _ => "{\"status\":\"ok\"}" },
+			{ BuildKey("GET", "/version"), _ => "{\"version\":\"0.0.1\"}" },
+			{ BuildKey("POST", "/login"), _ => "{\"token\":\"fake-token\"}" }
+		};
+
+		/// <summary>
+		/// Attempts to resolve a fake response for the given request.
+		/// </summary>
+		/// <param name="method">HTTP method (GET/POST).</param>
+		/// <param name="url">Request URL or relative path.</param>
+		/// <param name="jsonPayload">Optional JSON payload.</param>
+		/// <param name="response">Resolved fake response.</param>
+		/// <returns>True when a specific fake response was found.</returns>
+		public static bool TryGetResponse(string method, string url, string jsonPayload, out string response)
+		{
+			var key = BuildKey(method, url);
+			if (Responses.TryGetValue(key, out var handler) && handler != null)
+			{
+				response = handler(jsonPayload);
+				return true;
+			}
+
+			response = GetDefaultResponse(method, jsonPayload);
+			return false;
+		}
+
+		/// <summary>
+		/// Registers or replaces a fake response handler for a method/path.
+		/// </summary>
+		/// <param name="method">HTTP method (GET/POST).</param>
+		/// <param name="path">Absolute path (e.g. /login).</param>
+		/// <param name="handler">Handler producing response JSON.</param>
+		public static void Register(string method, string path, Func<string, string> handler)
+		{
+			if (string.IsNullOrWhiteSpace(method) || string.IsNullOrWhiteSpace(path))
+			{
+				return;
+			}
+
+			Responses[BuildKey(method, path)] = handler;
+		}
+
+		/// <summary>
+		/// Builds a normalized fake response key for logging.
+		/// </summary>
+		/// <param name="method">HTTP method (GET/POST).</param>
+		/// <param name="url">Request URL or relative path.</param>
+		/// <returns>Normalized key in the form METHOD:/path.</returns>
+		public static string BuildKey(string method, string url)
+		{
+			var normalizedMethod = string.IsNullOrWhiteSpace(method) ? "GET" : method.Trim().ToUpperInvariant();
+			var path = GetPathOnly(url);
+			return $"{normalizedMethod}:{path}";
+		}
+
+		private static string GetDefaultResponse(string method, string jsonPayload)
+		{
+			var normalizedMethod = string.IsNullOrWhiteSpace(method) ? "GET" : method.Trim().ToUpperInvariant();
+			return normalizedMethod == "POST" ? (jsonPayload ?? "{}") : "{}";
+		}
+
+		private static string GetPathOnly(string url)
+		{
+			if (string.IsNullOrWhiteSpace(url))
+			{
+				return "/";
+			}
+
+			if (Uri.TryCreate(url, UriKind.Absolute, out var absolute))
+			{
+				return string.IsNullOrWhiteSpace(absolute.AbsolutePath) ? "/" : absolute.AbsolutePath;
+			}
+
+			var trimmed = url.Trim();
+			var queryIndex = trimmed.IndexOf('?', StringComparison.Ordinal);
+			if (queryIndex >= 0)
+			{
+				trimmed = trimmed.Substring(0, queryIndex);
+			}
+
+			if (!trimmed.StartsWith("/", StringComparison.Ordinal))
+			{
+				trimmed = "/" + trimmed;
+			}
+
+			return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
+		}
+	}
+}
