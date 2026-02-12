@@ -35,7 +35,7 @@ namespace Core.Tests.Network
 			settings.BaseUrl = "http://localhost:5000";
 			SetHttpClientSettings(settings);
 
-			var response = await HttpClient.GetAsync("/health");
+			var response = await HttpClient.GetAsync(NetworkEndpoints.Health);
 
 			Assert.AreEqual("{\"status\":\"ok\"}", response);
 		}
@@ -51,7 +51,7 @@ namespace Core.Tests.Network
 			settings.BaseUrl = "http://localhost:5000";
 			SetHttpClientSettings(settings);
 
-			var response = await HttpClient.PostJsonAsync("/login", new LoginRequest
+			var response = await HttpClient.PostJsonAsync(NetworkEndpoints.Login, new LoginRequest
 			{
 				Username = "mimi",
 				Password = "123456"

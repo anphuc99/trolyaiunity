@@ -68,7 +68,7 @@ namespace Features.Login.Controller
 
 		private static async Task PerformLoginInternalAsync(LoginRequestPayload payload)
 		{
-			var responseJson = await HttpClient.PostJsonTaskAsync("/login", payload);
+			var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.Login, payload);
 			if (string.IsNullOrWhiteSpace(responseJson))
 			{
 				AuthTokenModel.Token = null;

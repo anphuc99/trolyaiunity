@@ -76,7 +76,7 @@ namespace Features.StartScene.Controller
 				Token = token
 			};
 
-			var responseJson = await HttpClient.PostJsonTaskAsync("/token/validate", payload);
+			var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.TokenValidate, payload);
 			if (string.IsNullOrWhiteSpace(responseJson))
 			{
 				RejectToken("Empty validation response.");

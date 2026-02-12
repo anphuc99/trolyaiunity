@@ -27,7 +27,7 @@ namespace Core.Tests.Network
 		[Test]
 		public void TryGetResponse_ReturnsDefaultEntry()
 		{
-			var found = FakeServer.TryGetResponse("GET", "/health", null, out var response);
+			var found = FakeServer.TryGetResponse("GET", NetworkEndpoints.Health, null, out var response);
 
 			Assert.IsTrue(found);
 			Assert.AreEqual("{\"status\":\"ok\"}", response);
@@ -53,7 +53,7 @@ namespace Core.Tests.Network
 		{
 			var payload = "{\"Username\":\"mimi\",\"Password\":\"123456\"}";
 
-			var found = FakeServer.TryGetResponse("POST", "/login", payload, out var response);
+			var found = FakeServer.TryGetResponse("POST", NetworkEndpoints.Login, payload, out var response);
 
 			Assert.IsTrue(found);
 			Assert.AreEqual("{\"Token\":\"fake-jwt\"}", response);
@@ -65,9 +65,9 @@ namespace Core.Tests.Network
 		[Test]
 		public void Register_OverridesResponse()
 		{
-			FakeServer.Register("POST", "/login", _ => "{\"token\":\"override\"}");
+			FakeServer.Register("POST", NetworkEndpoints.Login, _ => "{\"token\":\"override\"}");
 
-			var found = FakeServer.TryGetResponse("POST", "/login", "{}", out var response);
+			var found = FakeServer.TryGetResponse("POST", NetworkEndpoints.Login, "{}", out var response);
 
 			Assert.IsTrue(found);
 			Assert.AreEqual("{\"token\":\"override\"}", response);
@@ -81,7 +81,7 @@ namespace Core.Tests.Network
 		{
 			var payload = "{\"Token\":\"fake-jwt\"}";
 
-			var found = FakeServer.TryGetResponse("POST", "/token/validate", payload, out var response);
+			var found = FakeServer.TryGetResponse("POST", NetworkEndpoints.TokenValidate, payload, out var response);
 
 			Assert.IsTrue(found);
 			var validation = JsonConvert.DeserializeObject<TokenValidationResponse>(response);
@@ -97,7 +97,7 @@ namespace Core.Tests.Network
 		{
 			var payload = "{\"Token\":\"bad-token\"}";
 
-			var found = FakeServer.TryGetResponse("POST", "/token/validate", payload, out var response);
+			var found = FakeServer.TryGetResponse("POST", NetworkEndpoints.TokenValidate, payload, out var response);
 
 			Assert.IsTrue(found);
 			var validation = JsonConvert.DeserializeObject<TokenValidationResponse>(response);
@@ -113,7 +113,7 @@ namespace Core.Tests.Network
 		{
 			var payload = "{\"Token\":\"fake-jwt-expired\"}";
 
-			var found = FakeServer.TryGetResponse("POST", "/token/validate", payload, out var response);
+			var found = FakeServer.TryGetResponse("POST", NetworkEndpoints.TokenValidate, payload, out var response);
 
 			Assert.IsTrue(found);
 			var validation = JsonConvert.DeserializeObject<TokenValidationResponse>(response);

@@ -14,10 +14,10 @@ namespace Core.Infrastructure.Network
 
 		private static readonly Dictionary<string, Func<string, string>> DefaultResponses = new Dictionary<string, Func<string, string>>(StringComparer.Ordinal)
 		{
-			{ BuildKey("GET", "/health"), _ => "{\"status\":\"ok\"}" },
-			{ BuildKey("GET", "/version"), _ => "{\"version\":\"0.0.1\"}" },
-			{ BuildKey("POST", "/login"), BuildLoginResponse },
-			{ BuildKey("POST", "/token/validate"), BuildTokenValidationResponse }
+			{ BuildKey("GET", NetworkEndpoints.Health), _ => "{\"status\":\"ok\"}" },
+			{ BuildKey("GET", NetworkEndpoints.Version), _ => "{\"version\":\"0.0.1\"}" },
+			{ BuildKey("POST", NetworkEndpoints.Login), BuildLoginResponse },
+			{ BuildKey("POST", NetworkEndpoints.TokenValidate), BuildTokenValidationResponse }
 		};
 
 		private static readonly Dictionary<string, Func<string, string>> Responses = CloneDefaults();
@@ -47,7 +47,7 @@ namespace Core.Infrastructure.Network
 		/// Registers or replaces a fake response handler for a method/path.
 		/// </summary>
 		/// <param name="method">HTTP method (GET/POST).</param>
-		/// <param name="path">Absolute path (e.g. /login).</param>
+		/// <param name="path">Absolute path (e.g. NetworkEndpoints.Login).</param>
 		/// <param name="handler">Handler producing response JSON.</param>
 		public static void Register(string method, string path, Func<string, string> handler)
 		{
