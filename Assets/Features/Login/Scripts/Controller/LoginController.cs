@@ -1,6 +1,7 @@
 using Core.Infrastructure.Network;
 using Core.Infrastructure.Scenes;
 using Core.Infrastructure.Authentication;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Features.Login.Events;
 using Features.Login.Infrastructure;
@@ -81,9 +82,10 @@ namespace Features.Login.Controller
 			{
 				AuthTokenModel.Token = response.Token;
 				EventBus.Publish(LoginEvents.LoginSucceeded, response.Token);
+				
 				if (Application.isPlaying)
 				{
-					LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.GamePlayGameplay);
+					_ = FetchCharactersAndRedirectAsync();
 				}
 				return;
 			}
@@ -93,6 +95,35 @@ namespace Features.Login.Controller
 				? response.Error
 				: "Invalid credentials.";
 			EventBus.Publish(LoginEvents.LoginFailed, errorMessage);
+		}
+
+		private static async Task FetchCharactersAndRedirectAsync()
+		{
+			var ResponseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.Characters);
+			if (string.IsNullOrWhiteSpace(ResponseJson))
+			{
+				// If we can't fetch characters, default to creation
+				LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay);
+				return;
+			}
+
+			try
+			{
+				var characters = JsonConvert.DeserializeObject<List<object>>(ResponseJson);
+				if (characters != null && characters.Count > 0)
+				{
+					LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.GamePlayGameplay);
+				}
+				else
+				{
+					LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay);
+				}
+			}
+			catch
+			{
+				LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay);
+			}
+		}
 		}
 	}
 }

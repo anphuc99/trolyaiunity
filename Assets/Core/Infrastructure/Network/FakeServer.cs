@@ -17,7 +17,8 @@ namespace Core.Infrastructure.Network
 			{ BuildKey("GET", NetworkEndpoints.Health), _ => "{\"status\":\"ok\"}" },
 			{ BuildKey("GET", NetworkEndpoints.Version), _ => "{\"version\":\"0.0.1\"}" },
 			{ BuildKey("POST", NetworkEndpoints.Login), BuildLoginResponse },
-			{ BuildKey("POST", NetworkEndpoints.TokenValidate), BuildTokenValidationResponse }
+			{ BuildKey("POST", NetworkEndpoints.TokenValidate), BuildTokenValidationResponse },
+			{ BuildKey("GET", NetworkEndpoints.Characters), _ => "[]" }
 		};
 
 		private static readonly Dictionary<string, Func<string, string>> Responses = CloneDefaults();

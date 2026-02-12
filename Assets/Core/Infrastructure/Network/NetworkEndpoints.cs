@@ -9,5 +9,6 @@ namespace Core.Infrastructure.Network
 		public const string Version = "/version";
 		public const string Login = "/login";
 		public const string TokenValidate = "/token/validate";
+		public const string Characters = "/characters";
 	}
 }

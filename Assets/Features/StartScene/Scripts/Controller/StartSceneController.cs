@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Core.Infrastructure.Authentication;
 using Core.Infrastructure.Network;
@@ -101,7 +102,34 @@ namespace Features.StartScene.Controller
 			EventBus.Publish(StartSceneEvents.TokenAccepted, token);
 			if (Application.isPlaying)
 			{
-				LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.GamePlayGameplay);
+				_ = FetchCharactersAndRedirectAsync();
+			}
+		}
+
+		private static async Task FetchCharactersAndRedirectAsync()
+		{
+			var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.Characters);
+			if (string.IsNullOrWhiteSpace(responseJson))
+			{
+				LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay);
+				return;
+			}
+
+			try
+			{
+				var characters = JsonConvert.DeserializeObject<List<object>>(responseJson);
+				if (characters != null && characters.Count > 0)
+				{
+					LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.GamePlayGameplay);
+				}
+				else
+				{
+					LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay);
+				}
+			}
+			catch
+			{
+				LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay);
 			}
 		}
 
