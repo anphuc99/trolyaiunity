@@ -180,6 +180,7 @@ namespace EditorTools.FeatureGenerator
 
 			CreateAsmdef(subfeatureRoot, assemblyName, new[] { "Core" });
 			CreateTestsAsmdef(subfeatureRoot, assemblyName);
+			EnsureParentAsmdefReferencesSubfeature(parentRoot, sanitizedParentName, assemblyName);
 
 			CreateTextFileIfMissing($"{subfeatureRoot}/Scripts/Requests/{sanitizedChildName}Requests.cs", BuildSubfeatureRequestsFile(featureNamespace, keyBase, sanitizedChildName));
 			CreateTextFileIfMissing($"{subfeatureRoot}/Scripts/Events/{sanitizedChildName}Events.cs", BuildEventsFile(featureNamespace, keyBase, sanitizedChildName));
@@ -352,6 +353,115 @@ namespace EditorTools.FeatureGenerator
 				"}\n";
 
 			CreateTextFileIfMissing($"{featureRoot}/{assemblyName}.asmdef", content);
+		}
+
+		/// <summary>
+		/// Ensures the parent asmdef references the newly generated subfeature assembly.
+		/// </summary>
+		/// <param name="parentRoot">Asset path to the parent feature root.</param>
+		/// <param name="parentAssemblyName">Parent assembly name.</param>
+		/// <param name="subfeatureAssemblyName">Child assembly name to add as reference.</param>
+		private static void EnsureParentAsmdefReferencesSubfeature(string parentRoot, string parentAssemblyName, string subfeatureAssemblyName)
+		{
+			var primaryAsmdefAssetPath = $"{parentRoot}/{parentAssemblyName}.asmdef";
+			if (AddReferenceToAsmdef(primaryAsmdefAssetPath, subfeatureAssemblyName))
+			{
+				return;
+			}
+
+			var parentFullPath = Path.Combine(Application.dataPath, parentRoot.Substring("Assets/".Length));
+			if (!Directory.Exists(parentFullPath))
+			{
+				return;
+			}
+
+			var asmdefs = Directory.GetFiles(parentFullPath, "*.asmdef", SearchOption.TopDirectoryOnly);
+			if (asmdefs.Length == 1)
+			{
+				var singleAssetPath = "Assets/" + asmdefs[0].Substring(Application.dataPath.Length + 1).Replace('\\', '/');
+				AddReferenceToAsmdef(singleAssetPath, subfeatureAssemblyName);
+				return;
+			}
+
+			Debug.LogWarning($"[FeatureGenerator] Could not determine parent asmdef to update for '{parentAssemblyName}'.");
+		}
+
+		/// <summary>
+		/// Adds a reference to an asmdef if missing.
+		/// </summary>
+		/// <param name="asmdefAssetPath">Asset path to the asmdef file.</param>
+		/// <param name="referenceName">Assembly reference name to add.</param>
+		/// <returns>True if the asmdef was found and updated or already contained the reference.</returns>
+		private static bool AddReferenceToAsmdef(string asmdefAssetPath, string referenceName)
+		{
+			if (string.IsNullOrWhiteSpace(asmdefAssetPath) || string.IsNullOrWhiteSpace(referenceName))
+			{
+				return false;
+			}
+
+			var fullPath = Path.Combine(Application.dataPath, asmdefAssetPath.Substring("Assets/".Length));
+			if (!File.Exists(fullPath))
+			{
+				return false;
+			}
+
+			var content = File.ReadAllText(fullPath);
+			var referencesMatch = Regex.Match(content, "\\\"references\\\"\\s*:\\s*\\[(?<body>[^\\]]*)\\]", RegexOptions.Singleline);
+			if (!referencesMatch.Success)
+			{
+				return false;
+			}
+
+			var body = referencesMatch.Groups["body"].Value;
+			var referenceMatches = Regex.Matches(body, "\\\"([^\\\"]+)\\\"");
+			var references = new List<string>(referenceMatches.Count + 1);
+			for (var i = 0; i < referenceMatches.Count; i++)
+			{
+				var value = referenceMatches[i].Groups[1].Value;
+				if (!string.IsNullOrWhiteSpace(value))
+				{
+					references.Add(value);
+				}
+			}
+
+			if (references.Contains(referenceName))
+			{
+				return true;
+			}
+
+			references.Add(referenceName);
+
+			var keyLineStart = content.LastIndexOf('\n', referencesMatch.Index);
+			var keyIndentLength = 0;
+			if (keyLineStart >= 0)
+			{
+				var index = keyLineStart + 1;
+				while (index < content.Length && content[index] == ' ')
+				{
+					keyIndentLength++;
+					index++;
+				}
+			}
+
+			var keyIndent = new string(' ', keyIndentLength);
+			var entryIndent = keyIndent + "    ";
+			var entryBuilder = new StringBuilder();
+			for (var i = 0; i < references.Count; i++)
+			{
+				entryBuilder.Append(entryIndent);
+				entryBuilder.Append('"');
+				entryBuilder.Append(references[i]);
+				entryBuilder.Append('"');
+				if (i < references.Count - 1)
+				{
+					entryBuilder.Append(",\n");
+				}
+			}
+
+			var replacement = "\"references\": [\n" + entryBuilder + "\n" + keyIndent + "]";
+			var updated = content.Remove(referencesMatch.Index, referencesMatch.Length).Insert(referencesMatch.Index, replacement);
+			File.WriteAllText(fullPath, updated);
+			return true;
 		}
 
 		private static void CreateTestsAsmdef(string featureRoot, string assemblyName)
