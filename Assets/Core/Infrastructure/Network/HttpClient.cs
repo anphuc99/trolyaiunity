@@ -51,11 +51,18 @@ namespace Core.Infrastructure.Network
 				ApplyHeaders(request, headers);
 				ApplyTimeout(request, timeoutSeconds);
 
-				await request.SendWebRequest().ToUniTask(cancellationToken: cancellationToken);
+				try
+				{
+					await request.SendWebRequest().ToUniTask(cancellationToken: cancellationToken);
+				}
+				catch (System.Exception ex) when (!(ex is System.OperationCanceledException))
+				{
+					// Exception is caught to allow checking request.result below.
+				}
 
 				if (request.result != UnityWebRequest.Result.Success)
 				{
-					Debug.LogError($"{LogPrefix} GET '{resolvedUrl}' failed: {request.error}");
+					Debug.LogError($"{LogPrefix} GET '{resolvedUrl}' failed ({request.responseCode}): {request.error}");
 					return null;
 				}
 
@@ -120,11 +127,18 @@ namespace Core.Infrastructure.Network
 				ApplyHeaders(request, headers);
 				ApplyTimeout(request, timeoutSeconds);
 
-				await request.SendWebRequest().ToUniTask(cancellationToken: cancellationToken);
+				try
+				{
+					await request.SendWebRequest().ToUniTask(cancellationToken: cancellationToken);
+				}
+				catch (System.Exception ex) when (!(ex is System.OperationCanceledException))
+				{
+					// Exception is caught to allow checking request.result below.
+				}
 
 				if (request.result != UnityWebRequest.Result.Success)
 				{
-					Debug.LogError($"{LogPrefix} POST '{resolvedUrl}' failed: {request.error}");
+					Debug.LogError($"{LogPrefix} POST '{resolvedUrl}' failed ({request.responseCode}): {request.error}");
 					return null;
 				}
 
