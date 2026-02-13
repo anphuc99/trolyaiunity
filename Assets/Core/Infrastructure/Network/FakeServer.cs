@@ -94,9 +94,11 @@ namespace Core.Infrastructure.Network
 			var request = ParseLoginPayload(jsonPayload);
 			if (request != null && IsValidLogin(request))
 			{
-				var token = "fake-jwt";
-				RegisterToken(token);
-				return "{\"Token\":\"fake-jwt\"}";
+				var accessToken = "fake-access-token";
+				var refreshToken = "fake-refresh-token";
+				RegisterToken(accessToken);
+				RegisterToken(refreshToken);
+				return "{\"AccessToken\":\"fake-access-token\",\"RefreshToken\":\"fake-refresh-token\",\"Role\":1}";
 			}
 
 			return "{\"Error\":\"Invalid credentials\"}";
@@ -107,20 +109,25 @@ namespace Core.Infrastructure.Network
 			var request = ParseTokenValidationPayload(jsonPayload);
 			if (request == null || string.IsNullOrWhiteSpace(request.Token))
 			{
-				return SerializeTokenValidationResponse(false, "Missing token");
+				return SerializeTokenValidationResponse(false, "Missing token", null, null);
 			}
 
 			if (!IsTokenKnown(request.Token))
 			{
-				return SerializeTokenValidationResponse(false, "Invalid token");
+				return SerializeTokenValidationResponse(false, "Invalid token", null, null);
 			}
 
 			if (IsTokenExpired(request.Token))
 			{
-				return SerializeTokenValidationResponse(false, "Token expired");
+				return SerializeTokenValidationResponse(false, "Token expired", null, null);
 			}
 
-			return SerializeTokenValidationResponse(true, null);
+			var newAccessToken = "new-access-token";
+			var newRefreshToken = "new-refresh-token";
+			RegisterToken(newAccessToken);
+			RegisterToken(newRefreshToken);
+
+			return SerializeTokenValidationResponse(true, null, newAccessToken, newRefreshToken);
 		}
 
 		private static string BuildPersonalitiesResponse()
@@ -252,14 +259,25 @@ namespace Core.Infrastructure.Network
 			return false;
 		}
 
-		private static string SerializeTokenValidationResponse(bool valid, string error)
+		private static string SerializeTokenValidationResponse(bool valid, string error, string accessToken, string refreshToken)
 		{
 			var response = new TokenValidationResponse
 			{
 				Valid = valid,
-				Error = error
+				Error = error,
+				AccessToken = accessToken,
+				RefreshToken = refreshToken,
+				User = valid ? new FakeUser { id = 1, username = "admin", role = 1 } : null
 			};
 			return JsonConvert.SerializeObject(response);
+		}
+
+		[Serializable]
+		private sealed class FakeUser
+		{
+			public int id;
+			public string username;
+			public int role;
 		}
 
 		[Serializable]
@@ -281,6 +299,9 @@ namespace Core.Infrastructure.Network
 		{
 			public bool Valid;
 			public string Error;
+			public string AccessToken;
+			public string RefreshToken;
+			public FakeUser User;
 		}
 	}
 }

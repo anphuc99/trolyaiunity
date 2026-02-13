@@ -21,7 +21,8 @@ namespace Features.Login.Tests
 		{
 			EventBus.ClearAll();
 			FakeServer.ResetToDefaults();
-			AuthTokenModel.Token = null;
+			AuthTokenModel.AccessToken = null;
+			AuthTokenModel.RefreshToken = null;
 			var settings = UnityEngine.ScriptableObject.CreateInstance<NetworkSettings>();
 			settings.UseFakeUrl = true;
 			settings.BaseUrl = "http://localhost:5000";
@@ -33,7 +34,8 @@ namespace Features.Login.Tests
 		{
 			EventBus.ClearAll();
 			FakeServer.ResetToDefaults();
-			AuthTokenModel.Token = null;
+			AuthTokenModel.AccessToken = null;
+			AuthTokenModel.RefreshToken = null;
 			SetHttpClientSettings(null);
 		}
 
@@ -50,8 +52,9 @@ namespace Features.Login.Tests
 			});
 
 			await UniTask.WaitUntil(() => token != null);
-			Assert.AreEqual("fake-jwt", token);
-			Assert.AreEqual("fake-jwt", AuthTokenModel.Token);
+			Assert.AreEqual("fake-access-token", token);
+			Assert.AreEqual("fake-access-token", AuthTokenModel.AccessToken);
+			Assert.AreEqual("fake-refresh-token", AuthTokenModel.RefreshToken);
 		}
 
 		[Test]
@@ -68,7 +71,8 @@ namespace Features.Login.Tests
 
 			await UniTask.WaitUntil(() => error != null);
 			Assert.AreEqual("Invalid credentials", error);
-			Assert.IsTrue(string.IsNullOrWhiteSpace(AuthTokenModel.Token));
+			Assert.IsTrue(string.IsNullOrWhiteSpace(AuthTokenModel.AccessToken));
+			Assert.IsTrue(string.IsNullOrWhiteSpace(AuthTokenModel.RefreshToken));
 		}
 
 		private static void SetHttpClientSettings(NetworkSettings settings)

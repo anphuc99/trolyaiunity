@@ -1045,7 +1045,7 @@ MonoBehaviour:
   _genderToggleGroup: {fileID: 1690933853}
   _descriptionInput: {fileID: 21285209}
   _personalityContainer: {fileID: 627653284}
-  _personalityButtonPrefab: {fileID: 0}
+  _personalityButtonPrefab: {fileID: 8999035175853812166, guid: a437d863f96f5694583dd206f1063daf, type: 3}
   _selectedColor: {r: 0, g: 1, b: 0, a: 1}
   _normalColor: {r: 1, g: 1, b: 1, a: 1}
   _submitButton: {fileID: 769332142}

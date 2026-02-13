@@ -7,35 +7,55 @@ namespace Core.Infrastructure.Authentication
 	/// </summary>
 	public static class AuthTokenModel
 	{
-		private const string TokenKey = "AuthToken";
-		private static string _token;
+		private const string RefreshTokenKey = "RefreshToken";
+		private static string _accessToken;
+		private static string _refreshToken;
 
 		/// <summary>
-		/// Current JWT token value.
+		/// Short-lived JWT token value (not persisted).
 		/// </summary>
-		public static string Token
+		public static string AccessToken
+		{
+			get => _accessToken;
+			set => _accessToken = value;
+		}
+
+		/// <summary>
+		/// Long-lived Refresh token value (persisted).
+		/// </summary>
+		public static string RefreshToken
 		{
 			get
 			{
-				if (_token == null)
+				if (_refreshToken == null)
 				{
-					_token = PlayerPrefs.GetString(TokenKey, null);
+					_refreshToken = PlayerPrefs.GetString(RefreshTokenKey, null);
 				}
-				return _token;
+				return _refreshToken;
 			}
 			set
 			{
-				_token = value;
+				_refreshToken = value;
 				if (string.IsNullOrEmpty(value))
 				{
-					PlayerPrefs.DeleteKey(TokenKey);
+					PlayerPrefs.DeleteKey(RefreshTokenKey);
 				}
 				else
 				{
-					PlayerPrefs.SetString(TokenKey, value);
+					PlayerPrefs.SetString(RefreshTokenKey, value);
 				}
 				PlayerPrefs.Save();
 			}
+		}
+
+		/// <summary>
+		/// Backward compatibility for existing code using .Token.
+		/// Maps to RefreshToken.
+		/// </summary>
+		public static string Token
+		{
+			get => RefreshToken;
+			set => RefreshToken = value;
 		}
 	}
 }

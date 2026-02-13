@@ -65,16 +65,16 @@ namespace Features.StartScene.Controller
 
 		private static async Task CheckTokenInternalAsync()
 		{
-			var token = AuthTokenModel.Token;
-			if (string.IsNullOrWhiteSpace(token))
+			var refreshToken = AuthTokenModel.RefreshToken;
+			if (string.IsNullOrWhiteSpace(refreshToken))
 			{
-				RejectToken("Missing token.");
+				RejectToken("Missing refresh token.");
 				return;
 			}
 
 			var payload = new TokenValidationRequestPayload
 			{
-				Token = token
+				Token = refreshToken
 			};
 
 			var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.TokenValidate, payload);
@@ -87,7 +87,9 @@ namespace Features.StartScene.Controller
 			var response = JsonConvert.DeserializeObject<TokenValidationResponsePayload>(responseJson);
 			if (response != null && response.Valid)
 			{
-				AcceptToken(token);
+				AuthTokenModel.AccessToken = response.AccessToken;
+				AuthTokenModel.RefreshToken = response.RefreshToken;
+				AcceptToken(response.AccessToken);
 				return;
 			}
 

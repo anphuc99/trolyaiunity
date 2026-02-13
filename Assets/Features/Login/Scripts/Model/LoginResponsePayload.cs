@@ -7,9 +7,24 @@ namespace Features.Login.Model
 	public sealed class LoginResponsePayload
 	{
 		/// <summary>
-		/// JWT token when login succeeds.
+		/// Short-lived JWT token.
 		/// </summary>
-		public string Token;
+		public string AccessToken;
+
+		/// <summary>
+		/// Long-lived refresh token.
+		/// </summary>
+		public string RefreshToken;
+
+		/// <summary>
+		/// User role.
+		/// </summary>
+		public int Role;
+
+		/// <summary>
+		/// Backward compatibility for existing code using .Token.
+		/// </summary>
+		public string Token => AccessToken;
 
 		/// <summary>
 		/// Error message when login fails.

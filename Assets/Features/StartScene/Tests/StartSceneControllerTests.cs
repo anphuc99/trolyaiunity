@@ -20,7 +20,8 @@ namespace Features.StartScene.Tests
 		{
 			EventBus.ClearAll();
 			FakeServer.ResetToDefaults();
-			AuthTokenModel.Token = null;
+			AuthTokenModel.AccessToken = null;
+			AuthTokenModel.RefreshToken = null;
 			var settings = UnityEngine.ScriptableObject.CreateInstance<NetworkSettings>();
 			settings.UseFakeUrl = true;
 			settings.BaseUrl = "http://localhost:5000";
@@ -32,7 +33,8 @@ namespace Features.StartScene.Tests
 		{
 			EventBus.ClearAll();
 			FakeServer.ResetToDefaults();
-			AuthTokenModel.Token = null;
+			AuthTokenModel.AccessToken = null;
+			AuthTokenModel.RefreshToken = null;
 			SetHttpClientSettings(null);
 		}
 
@@ -42,10 +44,12 @@ namespace Features.StartScene.Tests
 			string acceptedToken = null;
 			EventBus.Subscribe(StartSceneEvents.TokenAccepted, payload => acceptedToken = payload as string);
 
-			AuthTokenModel.Token = "fake-jwt";
+			AuthTokenModel.RefreshToken = "fake-refresh-token";
 			await StartSceneController.CheckTokenAsync();
 
-			Assert.AreEqual("fake-jwt", acceptedToken);
+			Assert.AreEqual("new-access-token", acceptedToken);
+			Assert.AreEqual("new-access-token", AuthTokenModel.AccessToken);
+			Assert.AreEqual("new-refresh-token", AuthTokenModel.RefreshToken);
 		}
 
 		[Test]
@@ -54,10 +58,10 @@ namespace Features.StartScene.Tests
 			string error = null;
 			EventBus.Subscribe(StartSceneEvents.TokenRejected, payload => error = payload as string);
 
-			AuthTokenModel.Token = null;
+			AuthTokenModel.RefreshToken = null;
 			await StartSceneController.CheckTokenAsync();
 
-			Assert.AreEqual("Missing token.", error);
+			Assert.AreEqual("Missing refresh token.", error);
 		}
 
 		[Test]
@@ -66,7 +70,7 @@ namespace Features.StartScene.Tests
 			string error = null;
 			EventBus.Subscribe(StartSceneEvents.TokenRejected, payload => error = payload as string);
 
-			AuthTokenModel.Token = "fake-jwt-expired";
+			AuthTokenModel.RefreshToken = "fake-jwt-expired";
 			await StartSceneController.CheckTokenAsync();
 
 			Assert.AreEqual("Token expired", error);

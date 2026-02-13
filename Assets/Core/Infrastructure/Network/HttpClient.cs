@@ -174,7 +174,7 @@ namespace Core.Infrastructure.Network
 				return;
 			}
 
-			var token = AuthTokenModel.Token;
+			var token = AuthTokenModel.AccessToken;
 			if (!string.IsNullOrWhiteSpace(token))
 			{
 				request.SetRequestHeader("Authorization", $"Bearer {token}");

@@ -72,16 +72,18 @@ namespace Features.Login.Controller
 			var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.Login, payload);
 			if (string.IsNullOrWhiteSpace(responseJson))
 			{
-				AuthTokenModel.Token = null;
+				AuthTokenModel.AccessToken = null;
+				AuthTokenModel.RefreshToken = null;
 				EventBus.Publish(LoginEvents.LoginFailed, "Empty server response.");
 				return;
 			}
 
 			var response = JsonConvert.DeserializeObject<LoginResponsePayload>(responseJson);
-			if (response != null && !string.IsNullOrWhiteSpace(response.Token))
+			if (response != null && !string.IsNullOrWhiteSpace(response.AccessToken))
 			{
-				AuthTokenModel.Token = response.Token;
-				EventBus.Publish(LoginEvents.LoginSucceeded, response.Token);
+				AuthTokenModel.AccessToken = response.AccessToken;
+				AuthTokenModel.RefreshToken = response.RefreshToken;
+				EventBus.Publish(LoginEvents.LoginSucceeded, response.AccessToken);
 				
 				if (Application.isPlaying)
 				{
@@ -90,7 +92,8 @@ namespace Features.Login.Controller
 				return;
 			}
 
-			AuthTokenModel.Token = null;
+			AuthTokenModel.AccessToken = null;
+			AuthTokenModel.RefreshToken = null;
 			var errorMessage = response != null && !string.IsNullOrWhiteSpace(response.Error)
 				? response.Error
 				: "Invalid credentials.";
