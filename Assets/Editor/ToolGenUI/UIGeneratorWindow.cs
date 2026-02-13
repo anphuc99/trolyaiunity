@@ -58,7 +58,7 @@ namespace EditorTools.UIGenerator
         private float _brightnessAdjust = 0f;
 
         // Brush/Eraser tools
-        private enum ToolMode { None, Brush, Eraser, Restore }
+        private enum ToolMode { None, Brush, Eraser, Restore, Unprotect }
         private ToolMode _currentTool = ToolMode.None;
         private Color _brushColor = Color.white;
         private int _brushSize = 10;
@@ -605,10 +605,10 @@ namespace EditorTools.UIGenerator
             EditorGUILayout.LabelField("Preview", EditorStyles.boldLabel);
 
             // Show _editingTexture directly while painting for immediate feedback (Brush/Eraser)
-            // For Restore tool, keep showing _previewTexture so users see where BG was removed
+            // For Restore/Unprotect tools, keep showing _previewTexture so users see the effect
             // Show _previewTexture when not painting (with processed effects)
             Texture2D previewTex;
-            if (_isPainting && _currentTool != ToolMode.Restore)
+            if (_isPainting && _currentTool != ToolMode.Restore && _currentTool != ToolMode.Unprotect)
             {
                 previewTex = _editingTexture;
             }
@@ -704,6 +704,12 @@ namespace EditorTools.UIGenerator
                 _currentTool = ToolMode.Restore;
             }
 
+            GUI.backgroundColor = _currentTool == ToolMode.Unprotect ? Color.red : Color.white;
+            if (GUILayout.Button("Unprotect", GUILayout.Height(25)))
+            {
+                _currentTool = ToolMode.Unprotect;
+            }
+
             GUI.backgroundColor = Color.white;
             EditorGUILayout.EndHorizontal();
 
@@ -715,6 +721,11 @@ namespace EditorTools.UIGenerator
                 {
                     ClearProtectionMask();
                 }
+            }
+
+            if (_currentTool == ToolMode.Unprotect)
+            {
+                EditorGUILayout.HelpBox("Tô lên vùng đã restore để xóa bảo vệ, cho phép BG Removal xóa lại.", MessageType.Info);
             }
 
             if (_currentTool == ToolMode.Brush)
@@ -932,6 +943,21 @@ namespace EditorTools.UIGenerator
                                 if (_previewTexture != null)
                                     _previewTexture.SetPixel(px, py, ApplyColorAdjustments(originalColor));
                             }
+                            else if (_currentTool == ToolMode.Unprotect)
+                            {
+                                // Remove protection from this pixel
+                                if (_protectionMask != null)
+                                    _protectionMask.SetPixel(px, py, Color.black);
+                                // Re-apply background removal logic to this pixel
+                                var currentPixel = _editingTexture.GetPixel(px, py);
+                                if (_previewTexture != null)
+                                {
+                                    if (_enableBackgroundRemoval && IsBackgroundColor(currentPixel))
+                                        _previewTexture.SetPixel(px, py, Color.clear);
+                                    else
+                                        _previewTexture.SetPixel(px, py, ApplyColorAdjustments(currentPixel));
+                                }
+                            }
                         }
                     }
                 }
@@ -940,8 +966,8 @@ namespace EditorTools.UIGenerator
             _editingTexture.Apply();
             if (_protectionMask != null)
                 _protectionMask.Apply();
-            // Apply preview texture updates for Restore/Eraser tools
-            if (_previewTexture != null && (_currentTool == ToolMode.Restore || _currentTool == ToolMode.Eraser))
+            // Apply preview texture updates for Restore/Eraser/Unprotect tools
+            if (_previewTexture != null && (_currentTool == ToolMode.Restore || _currentTool == ToolMode.Eraser || _currentTool == ToolMode.Unprotect))
                 _previewTexture.Apply();
             Repaint();
         }
