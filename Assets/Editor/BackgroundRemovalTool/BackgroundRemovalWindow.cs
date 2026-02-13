@@ -6,7 +6,7 @@ using UnityEngine;
 namespace EditorTools.BackgroundRemoval
 {
     /// <summary>
-    /// Editor window to remove background color from images.
+    /// Editor window to remove background color from images using GPU acceleration.
     /// Supports backgrounds with color variations using HSV color space matching.
     /// Handles semi-transparent elements that were blended with the background.
     /// </summary>
@@ -14,6 +14,7 @@ namespace EditorTools.BackgroundRemoval
     {
         private const string WindowTitle = "Background Removal Tool";
         private const string MenuPath = "Tools/Background Removal Tool";
+        private const string ComputeShaderName = "BackgroundRemovalShader";
 
         private Texture2D _sourceTexture;
         private Color _backgroundColor = Color.green;
@@ -40,11 +41,60 @@ namespace EditorTools.BackgroundRemoval
         // Track if preview needs regeneration
         private bool _needsPreviewUpdate;
 
+        // GPU compute shader
+        private ComputeShader _computeShader;
+        private ComputeBuffer _sampledColorsBuffer;
+        private bool _useGpu = true;
+
         [MenuItem(MenuPath)]
         private static void Open()
         {
             var window = GetWindow<BackgroundRemovalWindow>(WindowTitle);
             window.minSize = new Vector2(420, 600);
+        }
+
+        private void OnEnable()
+        {
+            LoadComputeShader();
+        }
+
+        private void OnDisable()
+        {
+            ReleaseSampledColorsBuffer();
+        }
+
+        /// <summary>
+        /// Loads the compute shader from the Editor folder.
+        /// </summary>
+        private void LoadComputeShader()
+        {
+            if (_computeShader != null) return;
+
+            // Find the compute shader in the same folder
+            var guids = AssetDatabase.FindAssets($"t:ComputeShader {ComputeShaderName}");
+            if (guids.Length > 0)
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guids[0]);
+                _computeShader = AssetDatabase.LoadAssetAtPath<ComputeShader>(path);
+            }
+
+            if (_computeShader == null)
+            {
+                Debug.LogWarning("BackgroundRemovalShader.compute not found. Falling back to CPU processing.");
+                _useGpu = false;
+            }
+        }
+
+        /// <summary>
+        /// Releases the sampled colors compute buffer.
+        /// </summary>
+        private void ReleaseSampledColorsBuffer()
+        {
+            if (_sampledColorsBuffer != null)
+            {
+                _sampledColorsBuffer.Release();
+                _sampledColorsBuffer = null;
+            }
         }
 
         private void OnGUI()
@@ -352,11 +402,121 @@ namespace EditorTools.BackgroundRemoval
 
         /// <summary>
         /// Processes the source texture, removing background and restoring transparency.
-        /// Uses HSV color space for better matching of similar colors.
+        /// Uses GPU compute shader for fast processing, falls back to CPU if unavailable.
         /// </summary>
         /// <param name="source">Source texture to process.</param>
         /// <returns>New texture with background removed.</returns>
         private Texture2D ProcessTexture(Texture2D source)
+        {
+            if (_useGpu && _computeShader != null && SystemInfo.supportsComputeShaders)
+            {
+                return ProcessTextureGPU(source);
+            }
+            else
+            {
+                return ProcessTextureCPU(source);
+            }
+        }
+
+        /// <summary>
+        /// GPU-accelerated texture processing using compute shader.
+        /// </summary>
+        /// <param name="source">Source texture to process.</param>
+        /// <returns>New texture with background removed.</returns>
+        private Texture2D ProcessTextureGPU(Texture2D source)
+        {
+            var width = source.width;
+            var height = source.height;
+
+            // Create source RenderTexture
+            var sourceRT = new RenderTexture(width, height, 0, RenderTextureFormat.ARGB32);
+            sourceRT.enableRandomWrite = true;
+            sourceRT.Create();
+            Graphics.Blit(source, sourceRT);
+
+            // Create result RenderTexture
+            var resultRT = new RenderTexture(width, height, 0, RenderTextureFormat.ARGB32);
+            resultRT.enableRandomWrite = true;
+            resultRT.Create();
+
+            // Setup sampled colors buffer
+            SetupSampledColorsBuffer();
+
+            // Get kernel
+            var kernelIndex = _computeShader.FindKernel("RemoveBackground");
+
+            // Set textures
+            _computeShader.SetTexture(kernelIndex, "SourceTexture", sourceRT);
+            _computeShader.SetTexture(kernelIndex, "ResultTexture", resultRT);
+
+            // Set parameters
+            _computeShader.SetVector("BackgroundColor", _backgroundColor);
+            _computeShader.SetVector("AvgBackgroundHSV", new Vector4(_avgBackgroundHsv.x, _avgBackgroundHsv.y, _avgBackgroundHsv.z, 0));
+
+            _computeShader.SetFloat("HueTolerance", _hueTolerance);
+            _computeShader.SetFloat("SaturationTolerance", _saturationTolerance);
+            _computeShader.SetFloat("ValueTolerance", _valueTolerance);
+            _computeShader.SetFloat("RGBTolerance", _rgbTolerance);
+
+            _computeShader.SetInt("UseHSVMatching", _useHsvMatching ? 1 : 0);
+            _computeShader.SetInt("RestoreTransparency", _restoreTransparency ? 1 : 0);
+            _computeShader.SetFloat("AlphaThreshold", _alphaThreshold);
+
+            _computeShader.SetBuffer(kernelIndex, "SampledColors", _sampledColorsBuffer);
+            _computeShader.SetInt("SampledColorsCount", _sampledColors.Count);
+
+            // Dispatch compute shader
+            var threadGroupsX = Mathf.CeilToInt(width / 8f);
+            var threadGroupsY = Mathf.CeilToInt(height / 8f);
+            _computeShader.Dispatch(kernelIndex, threadGroupsX, threadGroupsY, 1);
+
+            // Read result back to Texture2D
+            var result = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            RenderTexture.active = resultRT;
+            result.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+            result.Apply();
+            RenderTexture.active = null;
+
+            // Cleanup
+            sourceRT.Release();
+            resultRT.Release();
+            DestroyImmediate(sourceRT);
+            DestroyImmediate(resultRT);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Creates or updates the sampled colors compute buffer.
+        /// </summary>
+        private void SetupSampledColorsBuffer()
+        {
+            ReleaseSampledColorsBuffer();
+
+            // Ensure at least 1 color in buffer (use background color)
+            var colors = new Vector4[Mathf.Max(64, _sampledColors.Count)];
+            for (var i = 0; i < _sampledColors.Count; i++)
+            {
+                var c = _sampledColors[i];
+                colors[i] = new Vector4(c.r, c.g, c.b, c.a);
+            }
+
+            // Fill remaining with background color
+            for (var i = _sampledColors.Count; i < colors.Length; i++)
+            {
+                colors[i] = new Vector4(_backgroundColor.r, _backgroundColor.g, _backgroundColor.b, 1f);
+            }
+
+            _sampledColorsBuffer = new ComputeBuffer(colors.Length, sizeof(float) * 4);
+            _sampledColorsBuffer.SetData(colors);
+        }
+
+        /// <summary>
+        /// CPU-based texture processing (fallback when GPU is unavailable).
+        /// </summary>
+        /// <param name="source">Source texture to process.</param>
+        /// <returns>New texture with background removed.</returns>
+        private Texture2D ProcessTextureCPU(Texture2D source)
         {
             var width = source.width;
             var height = source.height;
@@ -651,6 +811,7 @@ namespace EditorTools.BackgroundRemoval
         private void OnDestroy()
         {
             ClearPreview();
+            ReleaseSampledColorsBuffer();
         }
     }
 }

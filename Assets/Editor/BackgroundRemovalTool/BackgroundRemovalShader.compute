@@ -1,0 +1,187 @@
+// Compute shader for GPU-accelerated background removal
+#pragma kernel RemoveBackground
+
+// Input/Output textures
+Texture2D<float4> SourceTexture;
+RWTexture2D<float4> ResultTexture;
+
+// Background color settings
+float4 BackgroundColor;
+float3 AvgBackgroundHSV;
+
+// Tolerance settings
+float HueTolerance;
+float SaturationTolerance;
+float ValueTolerance;
+float RGBTolerance;
+
+// Flags
+int UseHSVMatching;
+int RestoreTransparency;
+float AlphaThreshold;
+
+// Sampled colors buffer (max 64 colors)
+StructuredBuffer<float4> SampledColors;
+int SampledColorsCount;
+
+// Convert RGB to HSV
+float3 RGBToHSV(float3 rgb)
+{
+    float4 K = float4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    float4 p = lerp(float4(rgb.bg, K.wz), float4(rgb.gb, K.xy), step(rgb.b, rgb.g));
+    float4 q = lerp(float4(p.xyw, rgb.r), float4(rgb.r, p.yzx), step(p.x, rgb.r));
+    
+    float d = q.x - min(q.w, q.y);
+    float e = 1.0e-10;
+    return float3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+// Check if pixel matches background using HSV
+bool IsBackgroundColorHSV(float3 pixelRGB)
+{
+    float3 hsv = RGBToHSV(pixelRGB);
+    
+    // Check against average background HSV
+    float hueDiff = abs(hsv.x - AvgBackgroundHSV.x);
+    // Hue wraps around (0 and 1 are the same)
+    if (hueDiff > 0.5) hueDiff = 1.0 - hueDiff;
+    
+    float satDiff = abs(hsv.y - AvgBackgroundHSV.y);
+    float valDiff = abs(hsv.z - AvgBackgroundHSV.z);
+    
+    if (hueDiff <= HueTolerance && satDiff <= SaturationTolerance && valDiff <= ValueTolerance)
+    {
+        return true;
+    }
+    
+    // Also check against sampled colors
+    for (int i = 0; i < SampledColorsCount && i < 64; i++)
+    {
+        float3 sampledHSV = RGBToHSV(SampledColors[i].rgb);
+        hueDiff = abs(hsv.x - sampledHSV.x);
+        if (hueDiff > 0.5) hueDiff = 1.0 - hueDiff;
+        
+        satDiff = abs(hsv.y - sampledHSV.y);
+        valDiff = abs(hsv.z - sampledHSV.z);
+        
+        if (hueDiff <= HueTolerance && satDiff <= SaturationTolerance && valDiff <= ValueTolerance)
+        {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+// Check if pixel matches background using RGB distance
+bool IsBackgroundColorRGB(float3 pixelRGB)
+{
+    float dist = distance(pixelRGB, BackgroundColor.rgb);
+    if (dist <= RGBTolerance)
+    {
+        return true;
+    }
+    
+    // Also check against sampled colors
+    for (int i = 0; i < SampledColorsCount && i < 64; i++)
+    {
+        if (distance(pixelRGB, SampledColors[i].rgb) <= RGBTolerance)
+        {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+// Check if color is background
+bool IsBackgroundColor(float3 pixelRGB)
+{
+    if (UseHSVMatching == 1)
+    {
+        return IsBackgroundColorHSV(pixelRGB);
+    }
+    else
+    {
+        return IsBackgroundColorRGB(pixelRGB);
+    }
+}
+
+// Try to restore original transparency from blended color
+float4 TryRestoreTransparency(float3 blendedRGB)
+{
+    // Try different alpha values to see if this could be a blended color
+    // Formula: blended = foreground * alpha + background * (1 - alpha)
+    // Solving for foreground: foreground = (blended - background * (1 - alpha)) / alpha
+    
+    for (float alpha = AlphaThreshold; alpha >= 0.1; alpha -= 0.05)
+    {
+        float invAlpha = 1.0 - alpha;
+        
+        // Calculate potential original foreground color
+        float3 fg;
+        fg.r = (blendedRGB.r - BackgroundColor.r * invAlpha) / alpha;
+        fg.g = (blendedRGB.g - BackgroundColor.g * invAlpha) / alpha;
+        fg.b = (blendedRGB.b - BackgroundColor.b * invAlpha) / alpha;
+        
+        // Check if the calculated color is valid (within 0-1 range with small tolerance)
+        if (fg.r >= -0.01 && fg.r <= 1.01 &&
+            fg.g >= -0.01 && fg.g <= 1.01 &&
+            fg.b >= -0.01 && fg.b <= 1.01)
+        {
+            // Verify by reversing: does this foreground + alpha recreate the blended color?
+            float3 testRGB;
+            testRGB.r = saturate(fg.r) * alpha + BackgroundColor.r * invAlpha;
+            testRGB.g = saturate(fg.g) * alpha + BackgroundColor.g * invAlpha;
+            testRGB.b = saturate(fg.b) * alpha + BackgroundColor.b * invAlpha;
+            
+            float error = abs(testRGB.r - blendedRGB.r) +
+                          abs(testRGB.g - blendedRGB.g) +
+                          abs(testRGB.b - blendedRGB.b);
+            
+            if (error < 0.02)
+            {
+                // Check if original color is not background
+                float3 origColor = saturate(fg);
+                if (!IsBackgroundColor(origColor))
+                {
+                    return float4(origColor, alpha);
+                }
+            }
+        }
+    }
+    
+    // Return original color with full alpha if no valid restoration found
+    return float4(blendedRGB, 1.0);
+}
+
+[numthreads(8, 8, 1)]
+void RemoveBackground(uint3 id : SV_DispatchThreadID)
+{
+    uint width, height;
+    SourceTexture.GetDimensions(width, height);
+    
+    if (id.x >= width || id.y >= height)
+        return;
+    
+    float4 pixel = SourceTexture[id.xy];
+    float4 result;
+    
+    if (IsBackgroundColor(pixel.rgb))
+    {
+        // Background match - make fully transparent
+        result = float4(0, 0, 0, 0);
+    }
+    else if (RestoreTransparency == 1)
+    {
+        // Try to restore original transparency
+        result = TryRestoreTransparency(pixel.rgb);
+    }
+    else
+    {
+        // Keep original pixel
+        result = pixel;
+    }
+    
+    ResultTexture[id.xy] = result;
+}
