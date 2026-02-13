@@ -597,15 +597,48 @@ namespace EditorTools.UIGenerator
 
                 var rect = GUILayoutUtility.GetRect(previewWidth, previewHeight);
 
+                // Calculate actual texture rect within the allocated rect (accounting for aspect ratio)
+                var textureRect = CalculateScaledTextureRect(rect, previewTex);
+
                 // Draw checkerboard background
-                DrawCheckerboard(rect);
+                DrawCheckerboard(textureRect);
 
-                // Draw preview
-                GUI.DrawTexture(rect, previewTex, ScaleMode.ScaleToFit);
+                // Draw preview - use StretchToFill since we calculated the exact rect
+                GUI.DrawTexture(textureRect, previewTex, ScaleMode.StretchToFill);
 
-                // Handle painting
-                HandlePainting(rect);
+                // Handle painting with the actual texture rect
+                HandlePainting(textureRect);
             }
+        }
+
+        /// <summary>
+        /// Calculates the actual rect where the texture will be drawn with ScaleToFit behavior.
+        /// </summary>
+        private Rect CalculateScaledTextureRect(Rect containerRect, Texture2D texture)
+        {
+            var texAspect = (float)texture.width / texture.height;
+            var rectAspect = containerRect.width / containerRect.height;
+
+            float width, height, x, y;
+
+            if (texAspect > rectAspect)
+            {
+                // Texture is wider - fit to width
+                width = containerRect.width;
+                height = width / texAspect;
+                x = containerRect.x;
+                y = containerRect.y + (containerRect.height - height) / 2f;
+            }
+            else
+            {
+                // Texture is taller - fit to height
+                height = containerRect.height;
+                width = height * texAspect;
+                x = containerRect.x + (containerRect.width - width) / 2f;
+                y = containerRect.y;
+            }
+
+            return new Rect(x, y, width, height);
         }
 
         private void DrawToolsSection()
@@ -784,13 +817,15 @@ namespace EditorTools.UIGenerator
 
         private Vector2 GetTextureCoordinate(Vector2 mousePos, Rect previewRect)
         {
-            var tex = _previewTexture ?? _editingTexture;
+            // Always use _editingTexture dimensions since that's what we paint on
+            if (_editingTexture == null) return Vector2.zero;
+            
             var normalizedX = (mousePos.x - previewRect.x) / previewRect.width;
             var normalizedY = 1f - (mousePos.y - previewRect.y) / previewRect.height;
 
             return new Vector2(
-                normalizedX * tex.width,
-                normalizedY * tex.height
+                Mathf.Clamp(normalizedX * _editingTexture.width, 0, _editingTexture.width - 1),
+                Mathf.Clamp(normalizedY * _editingTexture.height, 0, _editingTexture.height - 1)
             );
         }
 
