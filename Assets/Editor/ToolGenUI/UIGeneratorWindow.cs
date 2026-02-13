@@ -33,6 +33,9 @@ namespace EditorTools.UIGenerator
         private int _selectedImageIndex = -1;
         private Vector2 _generatedImagesScroll;
 
+        // Direct image editing
+        private Texture2D _directEditImage;
+
         // Editing settings (Right panel - 2/3)
         private Texture2D _editingTexture;
         private Texture2D _previewTexture;
@@ -178,6 +181,10 @@ namespace EditorTools.UIGenerator
             DrawReferenceBackgroundSection();
             EditorGUILayout.Space(10);
 
+            // Direct Edit Image
+            DrawDirectEditSection();
+            EditorGUILayout.Space(10);
+
             // Generate Button
             DrawGenerateButton();
             EditorGUILayout.Space(10);
@@ -277,6 +284,118 @@ namespace EditorTools.UIGenerator
                     "AI will consider this background when generating to ensure visual compatibility.",
                     MessageType.Info);
             }
+        }
+
+        private void DrawDirectEditSection()
+        {
+            EditorGUILayout.LabelField("Edit Existing Image", EditorStyles.boldLabel);
+
+            EditorGUI.BeginChangeCheck();
+            _directEditImage = (Texture2D)EditorGUILayout.ObjectField(
+                "Image to Edit", _directEditImage, typeof(Texture2D), false);
+
+            if (EditorGUI.EndChangeCheck() && _directEditImage != null)
+            {
+                LoadDirectImageForEditing(_directEditImage);
+            }
+
+            EditorGUILayout.BeginHorizontal();
+
+            using (new EditorGUI.DisabledScope(_directEditImage == null))
+            {
+                if (GUILayout.Button("Load for Editing"))
+                {
+                    LoadDirectImageForEditing(_directEditImage);
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(_targetImage == null || _targetImage.sprite == null))
+            {
+                if (GUILayout.Button("Load Target Sprite"))
+                {
+                    _directEditImage = _targetImage.sprite.texture;
+                    LoadDirectImageForEditing(_directEditImage);
+                }
+            }
+
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.HelpBox(
+                "Drag an image here to edit it directly without generating new images.",
+                MessageType.Info);
+        }
+
+        /// <summary>
+        /// Loads an existing image directly into the editing panel.
+        /// </summary>
+        private void LoadDirectImageForEditing(Texture2D sourceTexture)
+        {
+            if (sourceTexture == null) return;
+
+            // Get readable version of the texture
+            var readableSource = GetReadableTexture(sourceTexture);
+
+            // Create editing texture
+            _editingTexture = new Texture2D(readableSource.width, readableSource.height, TextureFormat.RGBA32, false);
+            _editingTexture.SetPixels(readableSource.GetPixels());
+            _editingTexture.Apply();
+
+            // Store original for undo
+            _originalTexture = new Texture2D(readableSource.width, readableSource.height, TextureFormat.RGBA32, false);
+            _originalTexture.SetPixels(readableSource.GetPixels());
+            _originalTexture.Apply();
+
+            // Clean up temporary texture if created
+            if (readableSource != sourceTexture)
+            {
+                DestroyImmediate(readableSource);
+            }
+
+            // Reset editing state
+            _sampledColors.Clear();
+            _currentTool = ToolMode.None;
+            _needsPreviewUpdate = true;
+            _selectedImageIndex = -1;
+
+            // Sample background colors
+            if (_autoSampleBackground)
+            {
+                SampleBackgroundColors();
+            }
+
+            _generationStatus = $"Loaded image for editing: {sourceTexture.width}x{sourceTexture.height}";
+            Repaint();
+        }
+
+        /// <summary>
+        /// Gets a readable copy of the texture. If already readable, returns the original.
+        /// </summary>
+        private Texture2D GetReadableTexture(Texture2D source)
+        {
+            if (source == null) return null;
+            if (source.isReadable) return source;
+
+            // Create a temporary RenderTexture to copy the texture
+            var renderTex = RenderTexture.GetTemporary(
+                source.width,
+                source.height,
+                0,
+                RenderTextureFormat.ARGB32,
+                RenderTextureReadWrite.sRGB);
+
+            Graphics.Blit(source, renderTex);
+
+            var previousActive = RenderTexture.active;
+            RenderTexture.active = renderTex;
+
+            var readableTexture = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
+            readableTexture.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0);
+            readableTexture.Apply();
+
+            RenderTexture.active = previousActive;
+            RenderTexture.ReleaseTemporary(renderTex);
+
+            return readableTexture;
         }
 
         private void DrawGenerateButton()
