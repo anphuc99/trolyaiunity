@@ -498,16 +498,24 @@ namespace EditorTools.UIGenerator
 
             if (index >= 0 && index < _generatedImages.Count)
             {
-                // Copy to editing texture
+                // Copy to editing texture using GetReadableTexture to handle format differences
                 var source = _generatedImages[index];
-                _editingTexture = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
-                Graphics.CopyTexture(source, _editingTexture);
+                var readableSource = GetReadableTexture(source);
+
+                _editingTexture = new Texture2D(readableSource.width, readableSource.height, TextureFormat.RGBA32, false);
+                _editingTexture.SetPixels(readableSource.GetPixels());
                 _editingTexture.Apply();
 
                 // Store original for undo
-                _originalTexture = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
-                Graphics.CopyTexture(source, _originalTexture);
+                _originalTexture = new Texture2D(readableSource.width, readableSource.height, TextureFormat.RGBA32, false);
+                _originalTexture.SetPixels(readableSource.GetPixels());
                 _originalTexture.Apply();
+
+                // Clean up if we created a copy
+                if (readableSource != source)
+                {
+                    DestroyImmediate(readableSource);
+                }
 
                 // Reset editing state
                 _sampledColors.Clear();
