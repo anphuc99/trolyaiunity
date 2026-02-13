@@ -40,6 +40,7 @@ namespace EditorTools.UIGenerator
         private Texture2D _editingTexture;
         private Texture2D _previewTexture;
         private Texture2D _originalTexture; // For undo
+        private Texture2D _protectionMask; // Tracks manually edited pixels to protect from BG removal
         private Vector2 _editingScroll;
         private bool _needsPreviewUpdate;
 
@@ -346,6 +347,14 @@ namespace EditorTools.UIGenerator
             _originalTexture.SetPixels(readableSource.GetPixels());
             _originalTexture.Apply();
 
+            // Initialize protection mask (all black = no protection)
+            if (_protectionMask != null) DestroyImmediate(_protectionMask);
+            _protectionMask = new Texture2D(readableSource.width, readableSource.height, TextureFormat.RGBA32, false);
+            var clearPixels = new Color[readableSource.width * readableSource.height];
+            for (int i = 0; i < clearPixels.Length; i++) clearPixels[i] = Color.black;
+            _protectionMask.SetPixels(clearPixels);
+            _protectionMask.Apply();
+
             // Clean up temporary texture if created
             if (readableSource != sourceTexture)
             {
@@ -510,6 +519,14 @@ namespace EditorTools.UIGenerator
                 _originalTexture = new Texture2D(readableSource.width, readableSource.height, TextureFormat.RGBA32, false);
                 _originalTexture.SetPixels(readableSource.GetPixels());
                 _originalTexture.Apply();
+
+                // Initialize protection mask (all black = no protection)
+                if (_protectionMask != null) DestroyImmediate(_protectionMask);
+                _protectionMask = new Texture2D(readableSource.width, readableSource.height, TextureFormat.RGBA32, false);
+                var clearPixels = new Color[readableSource.width * readableSource.height];
+                for (int i = 0; i < clearPixels.Length; i++) clearPixels[i] = Color.black;
+                _protectionMask.SetPixels(clearPixels);
+                _protectionMask.Apply();
 
                 // Clean up if we created a copy
                 if (readableSource != source)
@@ -774,6 +791,16 @@ namespace EditorTools.UIGenerator
                     _hueShift = 0f;
                     _saturationAdjust = 0f;
                     _brightnessAdjust = 0f;
+                    
+                    // Reset protection mask
+                    if (_protectionMask != null)
+                    {
+                        var clearPixels = new Color[_protectionMask.width * _protectionMask.height];
+                        for (int i = 0; i < clearPixels.Length; i++) clearPixels[i] = Color.black;
+                        _protectionMask.SetPixels(clearPixels);
+                        _protectionMask.Apply();
+                    }
+                    
                     _needsPreviewUpdate = true;
                 }
             }
@@ -864,16 +891,25 @@ namespace EditorTools.UIGenerator
                             if (_currentTool == ToolMode.Brush)
                             {
                                 _editingTexture.SetPixel(px, py, _brushColor);
+                                // Mark as protected so BG removal doesn't affect it
+                                if (_protectionMask != null)
+                                    _protectionMask.SetPixel(px, py, Color.white);
                             }
                             else if (_currentTool == ToolMode.Eraser)
                             {
                                 _editingTexture.SetPixel(px, py, Color.clear);
+                                // Mark as protected (user explicitly erased)
+                                if (_protectionMask != null)
+                                    _protectionMask.SetPixel(px, py, Color.white);
                             }
                             else if (_currentTool == ToolMode.Restore && _originalTexture != null)
                             {
                                 // Restore original pixel color from before any edits
                                 var originalColor = _originalTexture.GetPixel(px, py);
                                 _editingTexture.SetPixel(px, py, originalColor);
+                                // Mark as protected so BG removal won't remove it again
+                                if (_protectionMask != null)
+                                    _protectionMask.SetPixel(px, py, Color.white);
                             }
                         }
                     }
@@ -881,6 +917,8 @@ namespace EditorTools.UIGenerator
             }
 
             _editingTexture.Apply();
+            if (_protectionMask != null)
+                _protectionMask.Apply();
             Repaint();
         }
 
@@ -990,14 +1028,18 @@ namespace EditorTools.UIGenerator
             var height = source.height;
             var result = new Texture2D(width, height, TextureFormat.RGBA32, false);
             var sourcePixels = source.GetPixels();
+            var maskPixels = _protectionMask != null ? _protectionMask.GetPixels() : null;
             var resultPixels = new Color[sourcePixels.Length];
 
             for (var i = 0; i < sourcePixels.Length; i++)
             {
                 var pixel = sourcePixels[i];
+                
+                // Check if pixel is protected (manually edited by user)
+                var isProtected = maskPixels != null && maskPixels[i].r > 0.5f;
 
-                // Only remove background if enabled
-                if (_enableBackgroundRemoval && IsBackgroundColor(pixel))
+                // Only remove background if enabled AND pixel is not protected
+                if (_enableBackgroundRemoval && !isProtected && IsBackgroundColor(pixel))
                 {
                     resultPixels[i] = Color.clear;
                 }
