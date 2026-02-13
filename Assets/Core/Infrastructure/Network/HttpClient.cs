@@ -43,12 +43,6 @@ namespace Core.Infrastructure.Network
 				return null;
 			}
 
-			// Pre-emptive refresh check
-			if (IsAccessTokenExpired())
-			{
-				await TryRefreshTokenAsync(cancellationToken);
-			}
-
 			if (UseFakeResponses())
 			{
 				return await FakeGetAsync(url, cancellationToken);
@@ -102,12 +96,6 @@ namespace Core.Infrastructure.Network
 			{
 				Debug.LogError($"{LogPrefix} POST failed: url is null/empty.");
 				return null;
-			}
-
-			// Pre-emptive refresh check
-			if (IsAccessTokenExpired())
-			{
-				await TryRefreshTokenAsync(cancellationToken);
 			}
 
 			var json = payload != null ? JsonConvert.SerializeObject(payload) : "{}";
@@ -292,8 +280,6 @@ namespace Core.Infrastructure.Network
 			// If 401, potentially expired token, try refresh once
 			if (code == 401 && !UseFakeResponses())
 			{
-				Debug.Log($"{LogPrefix} Received 401. Checking for TOKEN_EXPIRED code or attempting refresh...");
-
 				// Check if it's explicitly TOKEN_EXPIRED
 				bool isTokenExpired = false;
 				try
@@ -306,14 +292,19 @@ namespace Core.Infrastructure.Network
 				}
 				catch { /* ignored */ }
 
-				if (isTokenExpired || code == 401) // Always try once on 401 if we haven't already
+				if (isTokenExpired) 
 				{
+					Debug.Log($"{LogPrefix} Received 401 with TOKEN_EXPIRED. Attempting refresh...");
 					bool refreshed = await TryRefreshTokenAsync(cancellationToken);
 					if (refreshed)
 					{
 						Debug.Log($"{LogPrefix} Token refreshed successfully. Retrying original request...");
 						(response, code) = await SendSingleRequestAsync(createRequest, headers, timeoutSeconds, cancellationToken);
 					}
+				}
+				else
+				{
+					Debug.LogWarning($"{LogPrefix} Received 401 but not TOKEN_EXPIRED. Returning error to user.");
 				}
 			}
 
@@ -361,12 +352,6 @@ namespace Core.Infrastructure.Network
 			await _refreshSemaphore.WaitAsync(cancellationToken);
 			try
 			{
-				// Check if another thread already refreshed while we were waiting
-				if (!IsAccessTokenExpired())
-				{
-					return true;
-				}
-
 				if (_isRefreshing)
 				{
 					// This should not happen with semaphore, but just in case
