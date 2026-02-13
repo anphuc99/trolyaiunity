@@ -82,6 +82,15 @@ namespace Core.Infrastructure.Views
 		protected virtual void Awake()
 		{
 			_binder = new ViewEventBinder(this);
+			EnsureScopeActiveForThisViewScene();
+			_binder.Bind();
+			_enabledAfterScope = true;
+
+			if (!_visible && Application.isPlaying)
+			{
+				ApplyVisibility(true);
+				gameObject.SetActive(false);
+			}
 		}
 
 		/// <summary>
@@ -89,20 +98,7 @@ namespace Core.Infrastructure.Views
 		/// </summary>
 		protected virtual void OnEnable()
 		{
-			if (_binder == null)
-			{
-				_binder = new ViewEventBinder(this);
-			}
-
-			EnsureScopeActiveForThisViewScene();
-			_binder.Bind();
-			_enabledAfterScope = true;
 			OnEnabled();
-
-			if (!_visible && Application.isPlaying)
-			{
-				ApplyVisibility(false);
-			}
 		}
 
 		/// <summary>
@@ -118,12 +114,7 @@ namespace Core.Infrastructure.Views
 		/// </summary>
 		protected virtual void OnDisable()
 		{
-			_binder?.Unbind();
-			if (_enabledAfterScope)
-			{
-				OnDisabled();
-				_enabledAfterScope = false;
-			}
+			OnDisabled();
 		}
 
 		/// <summary>
