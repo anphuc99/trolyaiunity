@@ -619,7 +619,7 @@ namespace EditorTools.UIGenerator
                 _zoomLevel = 1f;
                 _panOffset = Vector2.zero;
             }
-            EditorGUILayout.LabelField("[Z + Drag] to zoom", EditorStyles.miniLabel);
+            EditorGUILayout.LabelField("[Z+Drag] zoom | [Select+Drag] pan", EditorStyles.miniLabel);
             EditorGUILayout.EndHorizontal();
 
             // Show _editingTexture directly while painting for immediate feedback (Brush/Eraser)
@@ -726,6 +726,14 @@ namespace EditorTools.UIGenerator
             
             // Pan with middle mouse button
             if (e.type == EventType.MouseDrag && e.button == 2 && containerRect.Contains(e.mousePosition))
+            {
+                _panOffset += e.delta;
+                e.Use();
+                Repaint();
+            }
+            
+            // Pan with left mouse button in Select mode (ToolMode.None)
+            if (_currentTool == ToolMode.None && e.type == EventType.MouseDrag && e.button == 0 && containerRect.Contains(e.mousePosition))
             {
                 _panOffset += e.delta;
                 e.Use();
