@@ -82,7 +82,6 @@ namespace Core.Infrastructure.Views
 		protected virtual void Awake()
 		{
 			_binder = new ViewEventBinder(this);
-			EnsureScopeActiveForThisViewScene();
 			_binder.Bind();
 			_enabledAfterScope = true;
 
@@ -131,22 +130,6 @@ namespace Core.Infrastructure.Views
 		{
 			_binder?.Unbind();
 			_enabledAfterScope = false;
-		}
-
-		private void EnsureScopeActiveForThisViewScene()
-		{
-			var scene = gameObject.scene;
-			if (!scene.IsValid() || string.IsNullOrWhiteSpace(scene.name))
-			{
-				return;
-			}
-
-			if (!System.Enum.TryParse(scene.name, ignoreCase: false, out ControllerScopeKey scopeKey))
-			{
-				return;
-			}
-
-			RequestController.ActivateScope(scopeKey);
 		}
 	}
 }
