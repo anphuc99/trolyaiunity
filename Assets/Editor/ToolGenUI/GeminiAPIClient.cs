@@ -19,8 +19,8 @@ namespace EditorTools.UIGenerator
 
         public static string[] AvailableModels = new[]
         {
-            "gemini-2.0-flash-preview-image",
-            "imagen-3.0-generate-002"
+            "gemini-2.5-flash-image",
+            "gemini-3-pro-image-preview"
         };
 
         /// <summary>
@@ -190,6 +190,44 @@ namespace EditorTools.UIGenerator
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Gets a readable copy of the texture. If already readable, returns the original.
+        /// Caller must destroy the returned texture if it's different from the input.
+        /// </summary>
+        private static Texture2D GetReadableTexture(Texture2D source)
+        {
+            if (source == null) return null;
+            
+            // Check if texture is already readable
+            if (source.isReadable) return source;
+            
+            // Create a temporary RenderTexture to copy the texture
+            var renderTex = RenderTexture.GetTemporary(
+                source.width,
+                source.height,
+                0,
+                RenderTextureFormat.ARGB32,
+                RenderTextureReadWrite.sRGB);
+            
+            // Copy the source texture to the RenderTexture
+            Graphics.Blit(source, renderTex);
+            
+            // Store the active RenderTexture and set ours
+            var previousActive = RenderTexture.active;
+            RenderTexture.active = renderTex;
+            
+            // Create a new readable Texture2D
+            var readableTexture = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
+            readableTexture.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0);
+            readableTexture.Apply();
+            
+            // Restore previous RenderTexture
+            RenderTexture.active = previousActive;
+            RenderTexture.ReleaseTemporary(renderTex);
+            
+            return readableTexture;
+        }
+
         private static string BuildRequestBody(string prompt, Texture2D referenceImage)
         {
             var parts = new List<string>();
@@ -200,9 +238,16 @@ namespace EditorTools.UIGenerator
             // Add reference image if provided
             if (referenceImage != null)
             {
-                var imageBytes = referenceImage.EncodeToPNG();
+                var readableTexture = GetReadableTexture(referenceImage);
+                var imageBytes = readableTexture.EncodeToPNG();
                 var base64Image = Convert.ToBase64String(imageBytes);
                 parts.Add($"{{\"inline_data\": {{\"mime_type\": \"image/png\", \"data\": \"{base64Image}\"}}}}");
+                
+                // Clean up if we created a copy
+                if (readableTexture != referenceImage)
+                {
+                    UnityEngine.Object.DestroyImmediate(readableTexture);
+                }
             }
 
             var partsJson = string.Join(",", parts);
