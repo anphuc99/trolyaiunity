@@ -55,7 +55,7 @@ namespace Features.CreateCharater.Controller
 
 		private static async Task FetchPersonalitiesAsync()
 		{
-			var json = await HttpClient.GetJsonTaskAsync(NetworkEndpoints.Personalities);
+			var json = await HttpClient.GetTaskAsync(NetworkEndpoints.Personalities);
 			if (string.IsNullOrWhiteSpace(json))
 			{
 				EventBus.Publish(CreateCharaterEvents.PersonalitiesLoaded, null);
