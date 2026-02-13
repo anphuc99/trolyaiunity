@@ -627,7 +627,6 @@ namespace EditorTools.FeatureGenerator
 				"\t/// </summary>\n" +
 				$"\tpublic static class {featureName}Requests\n" +
 				"\t{\n" +
-				$"\t\tpublic const string BindParentSignals = \"{keyBase}.bind-parent-signals.request\";\n" +
 				$"\t\tpublic const string Echo = \"{keyBase}.echo.request\";\n" +
 				"\t}\n" +
 				"}\n";
@@ -738,11 +737,10 @@ namespace EditorTools.FeatureGenerator
 				"\t\t/// <summary>\n" +
 				"\t\t/// Binds parent-provided signals for this subfeature.\n" +
 				"\t\t/// </summary>\n" +
-				"\t\t/// <param name=\"payload\">Expected type: " + featureName + "ParentSignals.</param>\n" +
-				$"\t\t[Request({featureName}Requests.BindParentSignals)]\n" +
-				"\t\tpublic static void BindParentSignals(object payload)\n" +
+				"\t\t/// <param name=\"signals\">Signals implemented by the parent feature.</param>\n" +
+				$"\t\tpublic static void SetParentSignals({featureName}ParentSignals signals)\n" +
 				"\t\t{\n" +
-				"\t\t\t" + featureName + "State.ParentSignals = payload as " + featureName + "ParentSignals;\n" +
+				$"\t\t\t{featureName}State.ParentSignals = signals;\n" +
 				"\t\t}\n\n" +
 				"\t\t/// <summary>\n" +
 				"\t\t/// Sample request handler that echoes payload to a view event and parent signal.\n" +
@@ -760,38 +758,7 @@ namespace EditorTools.FeatureGenerator
 
 		private static string BuildViewFile(string ns, string featureName, bool isSubfeature)
 		{
-			var modelUsing = isSubfeature ? $"using {ns}.Model;\n" : string.Empty;
-			var subfeatureFields = isSubfeature
-				? "\t\tprivate " + featureName + "ParentSignals _parentSignals;\n\n" +
-				  "\t\t/// <summary>\n" +
-				  "\t\t/// Injects parent-provided signal handlers for this subfeature.\n" +
-				  "\t\t/// </summary>\n" +
-				  "\t\t/// <param name=\"signals\">Signals implemented by the parent feature.</param>\n" +
-				  "\t\tpublic void SetParentSignals(" + featureName + "ParentSignals signals)\n" +
-				  "\t\t{\n" +
-				  "\t\t\t_parentSignals = signals;\n" +
-				  "\t\t\tTryBindParentSignals();\n" +
-				  "\t\t}\n\n" +
-				  "\t\t/// <summary>\n" +
-				  "\t\t/// Ensures parent signals are bound after scope activation.\n" +
-				  "\t\t/// </summary>\n" +
-				  "\t\tprotected override void OnEnabled()\n" +
-				  "\t\t{\n" +
-				  "\t\t\tbase.OnEnabled();\n" +
-				  "\t\t\tTryBindParentSignals();\n" +
-				  "\t\t}\n\n" +
-				  "\t\tprivate void TryBindParentSignals()\n" +
-				  "\t\t{\n" +
-				  "\t\t\tif (_parentSignals == null)\n" +
-				  "\t\t\t{\n" +
-				  "\t\t\t\treturn;\n" +
-				  "\t\t\t}\n\n" +
-				  "\t\t\tSendRequest(" + featureName + "Requests.BindParentSignals, _parentSignals);\n" +
-				  "\t\t}\n\n"
-				: string.Empty;
-
 			return "using Core.Infrastructure.Views;\n" +
-				modelUsing +
 				$"using {ns}.Events;\n" +
 				$"using {ns}.Infrastructure.Attributes;\n" +
 				$"using {ns}.Requests;\n" +
@@ -805,7 +772,6 @@ namespace EditorTools.FeatureGenerator
 				"\t{\n" +
 				"\t\t[SerializeField]\n" +
 				"\t\tprivate string _message = \"Hello\";\n\n" +
-				subfeatureFields +
 				"\t\t/// <summary>\n" +
 				"\t\t/// Example method to send a request.\n" +
 				"\t\t/// </summary>\n" +
