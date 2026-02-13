@@ -138,6 +138,9 @@ namespace EditorTools.UIGenerator
 
         private void OnGUI()
         {
+            // Handle keyboard shortcuts for tools
+            HandleToolShortcuts();
+
             EditorGUILayout.BeginHorizontal();
 
             // Left panel (1/3) - Generation
@@ -742,6 +745,53 @@ namespace EditorTools.UIGenerator
         }
 
         /// <summary>
+        /// Handles keyboard shortcuts for tool selection.
+        /// 1=Select, 2=Brush, 3=Eraser, 4=Restore, 5=Unprotect
+        /// </summary>
+        private void HandleToolShortcuts()
+        {
+            var e = Event.current;
+            if (e.type != EventType.KeyDown) return;
+            
+            // Only handle if not typing in a text field
+            if (GUIUtility.keyboardControl != 0) return;
+            
+            switch (e.keyCode)
+            {
+                case KeyCode.Alpha1:
+                case KeyCode.Keypad1:
+                    _currentTool = ToolMode.None;
+                    e.Use();
+                    Repaint();
+                    break;
+                case KeyCode.Alpha2:
+                case KeyCode.Keypad2:
+                    _currentTool = ToolMode.Brush;
+                    e.Use();
+                    Repaint();
+                    break;
+                case KeyCode.Alpha3:
+                case KeyCode.Keypad3:
+                    _currentTool = ToolMode.Eraser;
+                    e.Use();
+                    Repaint();
+                    break;
+                case KeyCode.Alpha4:
+                case KeyCode.Keypad4:
+                    _currentTool = ToolMode.Restore;
+                    e.Use();
+                    Repaint();
+                    break;
+                case KeyCode.Alpha5:
+                case KeyCode.Keypad5:
+                    _currentTool = ToolMode.Unprotect;
+                    e.Use();
+                    Repaint();
+                    break;
+            }
+        }
+
+        /// <summary>
         /// Calculates the actual rect where the texture will be drawn with ScaleToFit behavior.
         /// </summary>
         private Rect CalculateScaledTextureRect(Rect containerRect, Texture2D texture)
@@ -777,36 +827,32 @@ namespace EditorTools.UIGenerator
 
             EditorGUILayout.BeginHorizontal();
 
-            var noneStyle = _currentTool == ToolMode.None ? "Button" : "Button";
-            var brushStyle = _currentTool == ToolMode.Brush ? "Button" : "Button";
-            var eraserStyle = _currentTool == ToolMode.Eraser ? "Button" : "Button";
-
             GUI.backgroundColor = _currentTool == ToolMode.None ? Color.cyan : Color.white;
-            if (GUILayout.Button("Select", GUILayout.Height(25)))
+            if (GUILayout.Button("1: Select", GUILayout.Height(25)))
             {
                 _currentTool = ToolMode.None;
             }
 
             GUI.backgroundColor = _currentTool == ToolMode.Brush ? Color.cyan : Color.white;
-            if (GUILayout.Button("Brush (Paint)", GUILayout.Height(25)))
+            if (GUILayout.Button("2: Brush", GUILayout.Height(25)))
             {
                 _currentTool = ToolMode.Brush;
             }
 
             GUI.backgroundColor = _currentTool == ToolMode.Eraser ? Color.cyan : Color.white;
-            if (GUILayout.Button("Eraser", GUILayout.Height(25)))
+            if (GUILayout.Button("3: Eraser", GUILayout.Height(25)))
             {
                 _currentTool = ToolMode.Eraser;
             }
 
             GUI.backgroundColor = _currentTool == ToolMode.Restore ? Color.green : Color.white;
-            if (GUILayout.Button("Restore", GUILayout.Height(25)))
+            if (GUILayout.Button("4: Restore", GUILayout.Height(25)))
             {
                 _currentTool = ToolMode.Restore;
             }
 
             GUI.backgroundColor = _currentTool == ToolMode.Unprotect ? Color.red : Color.white;
-            if (GUILayout.Button("Unprotect", GUILayout.Height(25)))
+            if (GUILayout.Button("5: Unprotect", GUILayout.Height(25)))
             {
                 _currentTool = ToolMode.Unprotect;
             }
