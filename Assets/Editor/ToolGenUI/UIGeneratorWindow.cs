@@ -65,6 +65,13 @@ namespace EditorTools.UIGenerator
         private bool _isPainting;
         private Vector2 _lastPaintPos;
 
+        // Zoom and pan
+        private float _zoomLevel = 1f;
+        private Vector2 _panOffset = Vector2.zero;
+        private bool _isZooming;
+        private float _zoomStartX;
+        private float _zoomStartLevel;
+
         // Canvas for painting
         private RenderTexture _paintCanvas;
         private Texture2D _paintTexture;
@@ -604,6 +611,17 @@ namespace EditorTools.UIGenerator
         {
             EditorGUILayout.LabelField("Preview", EditorStyles.boldLabel);
 
+            // Zoom info and controls
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField($"Zoom: {(_zoomLevel * 100f):F0}%", GUILayout.Width(80));
+            if (GUILayout.Button("Reset", GUILayout.Width(50)))
+            {
+                _zoomLevel = 1f;
+                _panOffset = Vector2.zero;
+            }
+            EditorGUILayout.LabelField("[Z + Drag] to zoom", EditorStyles.miniLabel);
+            EditorGUILayout.EndHorizontal();
+
             // Show _editingTexture directly while painting for immediate feedback (Brush/Eraser)
             // For Restore/Unprotect tools, keep showing _previewTexture so users see the effect
             // Show _previewTexture when not painting (with processed effects)
@@ -621,22 +639,97 @@ namespace EditorTools.UIGenerator
             {
                 var maxSize = Mathf.Min(position.width * 2f / 3f - 40f, 400f);
                 var aspect = (float)previewTex.height / previewTex.width;
-                var previewWidth = Mathf.Min(maxSize, previewTex.width);
-                var previewHeight = previewWidth * aspect;
+                var basePreviewWidth = Mathf.Min(maxSize, previewTex.width);
+                var basePreviewHeight = basePreviewWidth * aspect;
 
-                var rect = GUILayoutUtility.GetRect(previewWidth, previewHeight);
+                // Apply zoom
+                var zoomedWidth = basePreviewWidth * _zoomLevel;
+                var zoomedHeight = basePreviewHeight * _zoomLevel;
 
-                // Calculate actual texture rect within the allocated rect (accounting for aspect ratio)
-                var textureRect = CalculateScaledTextureRect(rect, previewTex);
+                // Create scrollable area for zoomed content
+                var containerRect = GUILayoutUtility.GetRect(basePreviewWidth, basePreviewHeight);
+                
+                // Clip to container
+                GUI.BeginClip(containerRect);
+                
+                // Calculate texture rect with pan offset
+                var textureRect = new Rect(
+                    (containerRect.width - zoomedWidth) / 2f + _panOffset.x,
+                    (containerRect.height - zoomedHeight) / 2f + _panOffset.y,
+                    zoomedWidth,
+                    zoomedHeight
+                );
 
                 // Draw checkerboard background
                 DrawCheckerboard(textureRect);
 
-                // Draw preview - use StretchToFill since we calculated the exact rect
+                // Draw preview
                 GUI.DrawTexture(textureRect, previewTex, ScaleMode.StretchToFill);
+                
+                GUI.EndClip();
 
-                // Handle painting with the actual texture rect
-                HandlePainting(textureRect);
+                // Handle zoom and pan (use container rect for input)
+                HandleZoomAndPan(containerRect, textureRect);
+
+                // Handle painting with the actual texture rect (adjusted for clip)
+                var paintRect = new Rect(
+                    containerRect.x + textureRect.x,
+                    containerRect.y + textureRect.y,
+                    textureRect.width,
+                    textureRect.height
+                );
+                HandlePainting(paintRect);
+            }
+        }
+
+        /// <summary>
+        /// Handles zoom (Z + drag) and pan (middle mouse or space + drag) for the preview.
+        /// </summary>
+        private void HandleZoomAndPan(Rect containerRect, Rect textureRect)
+        {
+            var e = Event.current;
+            
+            // Check if Z key is held
+            var zKeyHeld = e.keyCode == KeyCode.Z || (e.modifiers & EventModifiers.None) == 0 && Event.current.type == EventType.KeyDown && e.keyCode == KeyCode.Z;
+            
+            // Zoom with Z + drag
+            if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Z && containerRect.Contains(e.mousePosition))
+            {
+                _isZooming = true;
+                _zoomStartX = e.mousePosition.x;
+                _zoomStartLevel = _zoomLevel;
+                e.Use();
+            }
+            else if (e.type == EventType.KeyUp && e.keyCode == KeyCode.Z)
+            {
+                _isZooming = false;
+                e.Use();
+            }
+            
+            if (_isZooming && e.type == EventType.MouseDrag)
+            {
+                var deltaX = e.mousePosition.x - _zoomStartX;
+                var zoomDelta = deltaX * 0.01f; // Sensitivity
+                _zoomLevel = Mathf.Clamp(_zoomStartLevel + zoomDelta, 0.1f, 10f);
+                e.Use();
+                Repaint();
+            }
+            
+            // Also handle scroll wheel for zoom
+            if (e.type == EventType.ScrollWheel && containerRect.Contains(e.mousePosition))
+            {
+                var zoomDelta = -e.delta.y * 0.1f;
+                _zoomLevel = Mathf.Clamp(_zoomLevel + zoomDelta, 0.1f, 10f);
+                e.Use();
+                Repaint();
+            }
+            
+            // Pan with middle mouse button
+            if (e.type == EventType.MouseDrag && e.button == 2 && containerRect.Contains(e.mousePosition))
+            {
+                _panOffset += e.delta;
+                e.Use();
+                Repaint();
             }
         }
 
