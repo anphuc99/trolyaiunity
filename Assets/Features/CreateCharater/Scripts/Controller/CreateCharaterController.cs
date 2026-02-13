@@ -1,7 +1,13 @@
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Core.Infrastructure.Network;
 using Features.CreateCharater.Events;
 using Features.CreateCharater.Infrastructure;
 using Features.CreateCharater.Infrastructure.Attributes;
+using Features.CreateCharater.Model;
 using Features.CreateCharater.Requests;
+using Newtonsoft.Json;
+using UnityEngine;
 
 namespace Features.CreateCharater.Controller
 {
@@ -25,6 +31,7 @@ namespace Features.CreateCharater.Controller
 		[Core.Infrastructure.Attributes.ControllerShutdown]
 		public static void OnExitScope()
 		{
+			CreateCharaterModel.AvailablePersonalities.Clear();
 		}
 
 		/// <summary>
@@ -35,6 +42,67 @@ namespace Features.CreateCharater.Controller
 		public static void HandleEcho(object payload)
 		{
 			EventBus.Publish(CreateCharaterEvents.Echoed, payload);
+		}
+
+		/// <summary>
+		/// Fetches personalities from the server.
+		/// </summary>
+		[Request(CreateCharaterRequests.FetchPersonalities)]
+		public static void FetchPersonalities()
+		{
+			_ = FetchPersonalitiesAsync();
+		}
+
+		private static async Task FetchPersonalitiesAsync()
+		{
+			var json = await HttpClient.GetJsonTaskAsync(NetworkEndpoints.Personalities);
+			if (string.IsNullOrWhiteSpace(json))
+			{
+				EventBus.Publish(CreateCharaterEvents.PersonalitiesLoaded, null);
+				return;
+			}
+
+			try
+			{
+				var data = JsonConvert.DeserializeObject<List<PersonalityData>>(json);
+				CreateCharaterModel.AvailablePersonalities = data ?? new List<PersonalityData>();
+				EventBus.Publish(CreateCharaterEvents.PersonalitiesLoaded, CreateCharaterModel.AvailablePersonalities);
+			}
+			catch (System.Exception e)
+			{
+				Debug.LogError($"[CreateCharaterController] Failed to parse personalities: {e.Message}");
+				EventBus.Publish(CreateCharaterEvents.PersonalitiesLoaded, null);
+			}
+		}
+
+		/// <summary>
+		/// Submits a new character to the server.
+		/// </summary>
+		/// <param name="payload">Character creation payload.</param>
+		[Request(CreateCharaterRequests.SubmitCharacter)]
+		public static void SubmitCharacter(CreateCharacterPayload payload)
+		{
+			if (payload == null)
+			{
+				EventBus.Publish(CreateCharaterEvents.CharacterCreationFailed, "Dữ liệu không hợp lệ.");
+				return;
+			}
+
+			_ = SubmitCharacterAsync(payload);
+		}
+
+		private static async Task SubmitCharacterAsync(CreateCharacterPayload payload)
+		{
+			var result = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.Characters, payload);
+			if (string.IsNullOrWhiteSpace(result))
+			{
+				EventBus.Publish(CreateCharaterEvents.CharacterCreationFailed, "Server không phản hồi.");
+				return;
+			}
+
+			// Assuming a simple success/fail check based on response content or similar
+			// For now, if we got a response, we'll treat it as success per fake server
+			EventBus.Publish(CreateCharaterEvents.CharacterCreationSucceeded);
 		}
 	}
 }

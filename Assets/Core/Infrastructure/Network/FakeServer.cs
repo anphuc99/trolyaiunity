@@ -18,7 +18,9 @@ namespace Core.Infrastructure.Network
 			{ BuildKey("GET", NetworkEndpoints.Version), _ => "{\"version\":\"0.0.1\"}" },
 			{ BuildKey("POST", NetworkEndpoints.Login), BuildLoginResponse },
 			{ BuildKey("POST", NetworkEndpoints.TokenValidate), BuildTokenValidationResponse },
-			{ BuildKey("GET", NetworkEndpoints.Characters), _ => "[]" }
+			{ BuildKey("GET", NetworkEndpoints.Characters), _ => "[]" },
+			{ BuildKey("POST", NetworkEndpoints.Characters), _ => "{\"status\":\"success\"}" },
+			{ BuildKey("GET", NetworkEndpoints.Personalities), _ => BuildPersonalitiesResponse() }
 		};
 
 		private static readonly Dictionary<string, Func<string, string>> Responses = CloneDefaults();
@@ -119,6 +121,11 @@ namespace Core.Infrastructure.Network
 			}
 
 			return SerializeTokenValidationResponse(true, null);
+		}
+
+		private static string BuildPersonalitiesResponse()
+		{
+			return "[{\"id\":1,\"name\":\"Dũng cảm\",\"description\":\"Không sợ hãi trước khó khăn và nguy hiểm.\"},{\"id\":2,\"name\":\"Thông thái\",\"description\":\"Có kiến thức sâu rộng và sáng suốt.\"},{\"id\":3,\"name\":\"Lãnh đạo\",\"description\":\"Có khả năng dẫn dắt và truyền cảm hứng.\"}]";
 		}
 
 		private static string GetDefaultResponse(string method, string jsonPayload)

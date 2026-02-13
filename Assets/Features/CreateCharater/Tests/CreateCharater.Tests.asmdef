@@ -1,7 +1,7 @@
 {
     "name": "CreateCharater.Tests",
     "rootNamespace": "",
-    "references": ["CreateCharater"],
+    "references": ["CreateCharater", "Core", "UniTask"],
     "includePlatforms": ["Editor"],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

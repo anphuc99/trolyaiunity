@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31937cb0c68c0c04db1ef24b5f20ae35, type: 3}
   m_Name: NetworkSettings
   m_EditorClassIdentifier: 
-  UseFakeUrl: 1
+  UseFakeUrl: 0
   BaseUrl: http://localhost:5000
