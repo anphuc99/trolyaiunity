@@ -604,9 +604,19 @@ namespace EditorTools.UIGenerator
         {
             EditorGUILayout.LabelField("Preview", EditorStyles.boldLabel);
 
-            // Show _editingTexture directly while painting for immediate feedback
+            // Show _editingTexture directly while painting for immediate feedback (Brush/Eraser)
+            // For Restore tool, keep showing _previewTexture so users see where BG was removed
             // Show _previewTexture when not painting (with processed effects)
-            var previewTex = _isPainting ? _editingTexture : (_previewTexture ?? _editingTexture);
+            Texture2D previewTex;
+            if (_isPainting && _currentTool != ToolMode.Restore)
+            {
+                previewTex = _editingTexture;
+            }
+            else
+            {
+                previewTex = _previewTexture ?? _editingTexture;
+            }
+            
             if (previewTex != null)
             {
                 var maxSize = Mathf.Min(position.width * 2f / 3f - 40f, 400f);
@@ -833,6 +843,13 @@ namespace EditorTools.UIGenerator
                 _isPainting = true;
                 _lastPaintPos = GetTextureCoordinate(e.mousePosition, previewRect);
                 PaintAt(_lastPaintPos);
+                
+                // For Restore tool, update preview immediately so user sees restored pixels
+                if (_currentTool == ToolMode.Restore)
+                {
+                    UpdatePreview();
+                }
+                
                 e.Use();
             }
             else if (e.type == EventType.MouseDrag && _isPainting)
@@ -840,6 +857,13 @@ namespace EditorTools.UIGenerator
                 var currentPos = GetTextureCoordinate(e.mousePosition, previewRect);
                 PaintLine(_lastPaintPos, currentPos);
                 _lastPaintPos = currentPos;
+                
+                // For Restore tool, update preview during drag so user sees restored pixels
+                if (_currentTool == ToolMode.Restore)
+                {
+                    UpdatePreview();
+                }
+                
                 e.Use();
             }
             else if (e.type == EventType.MouseUp && _isPainting)
