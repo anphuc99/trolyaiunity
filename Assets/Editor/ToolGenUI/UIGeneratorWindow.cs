@@ -710,6 +710,11 @@ namespace EditorTools.UIGenerator
             if (_currentTool == ToolMode.Restore)
             {
                 EditorGUILayout.HelpBox("Tô lên vùng bị xóa nhầm để khôi phục màu gốc.", MessageType.Info);
+                
+                if (GUILayout.Button("Clear All Protected Areas"))
+                {
+                    ClearProtectionMask();
+                }
             }
 
             if (_currentTool == ToolMode.Brush)
@@ -952,6 +957,23 @@ namespace EditorTools.UIGenerator
                 var pos = Vector2.Lerp(from, to, t);
                 PaintAt(pos);
             }
+        }
+
+        /// <summary>
+        /// Clears the protection mask, allowing background removal to re-process all pixels.
+        /// </summary>
+        private void ClearProtectionMask()
+        {
+            if (_protectionMask == null) return;
+
+            var clearPixels = new Color[_protectionMask.width * _protectionMask.height];
+            for (int i = 0; i < clearPixels.Length; i++)
+                clearPixels[i] = Color.black;
+            
+            _protectionMask.SetPixels(clearPixels);
+            _protectionMask.Apply();
+            
+            _needsPreviewUpdate = true;
         }
 
         #endregion
