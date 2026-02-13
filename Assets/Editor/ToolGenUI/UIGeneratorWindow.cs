@@ -57,7 +57,7 @@ namespace EditorTools.UIGenerator
         private float _brightnessAdjust = 0f;
 
         // Brush/Eraser tools
-        private enum ToolMode { None, Brush, Eraser }
+        private enum ToolMode { None, Brush, Eraser, Restore }
         private ToolMode _currentTool = ToolMode.None;
         private Color _brushColor = Color.white;
         private int _brushSize = 10;
@@ -671,8 +671,19 @@ namespace EditorTools.UIGenerator
                 _currentTool = ToolMode.Eraser;
             }
 
+            GUI.backgroundColor = _currentTool == ToolMode.Restore ? Color.green : Color.white;
+            if (GUILayout.Button("Restore", GUILayout.Height(25)))
+            {
+                _currentTool = ToolMode.Restore;
+            }
+
             GUI.backgroundColor = Color.white;
             EditorGUILayout.EndHorizontal();
+
+            if (_currentTool == ToolMode.Restore)
+            {
+                EditorGUILayout.HelpBox("Tô lên vùng bị xóa nhầm để khôi phục màu gốc.", MessageType.Info);
+            }
 
             if (_currentTool == ToolMode.Brush)
             {
@@ -857,6 +868,12 @@ namespace EditorTools.UIGenerator
                             else if (_currentTool == ToolMode.Eraser)
                             {
                                 _editingTexture.SetPixel(px, py, Color.clear);
+                            }
+                            else if (_currentTool == ToolMode.Restore && _originalTexture != null)
+                            {
+                                // Restore original pixel color from before any edits
+                                var originalColor = _originalTexture.GetPixel(px, py);
+                                _editingTexture.SetPixel(px, py, originalColor);
                             }
                         }
                     }
