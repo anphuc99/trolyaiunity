@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Core.Infrastructure.Network;
+using Core.Infrastructure.Scenes;
 using Features.CreateCharater.Events;
 using Features.CreateCharater.Infrastructure;
 using Features.CreateCharater.Infrastructure.Attributes;
@@ -103,6 +104,11 @@ namespace Features.CreateCharater.Controller
 			// Assuming a simple success/fail check based on response content or similar
 			// For now, if we got a response, we'll treat it as success per fake server
 			EventBus.Publish(CreateCharaterEvents.CharacterCreationSucceeded);
+
+			if (Application.isPlaying)
+			{
+				LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.GamePlayGameplay);
+			}
 		}
 	}
 }
