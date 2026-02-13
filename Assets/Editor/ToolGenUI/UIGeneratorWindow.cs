@@ -587,7 +587,9 @@ namespace EditorTools.UIGenerator
         {
             EditorGUILayout.LabelField("Preview", EditorStyles.boldLabel);
 
-            var previewTex = _previewTexture ?? _editingTexture;
+            // Show _editingTexture directly while painting for immediate feedback
+            // Show _previewTexture when not painting (with processed effects)
+            var previewTex = _isPainting ? _editingTexture : (_previewTexture ?? _editingTexture);
             if (previewTex != null)
             {
                 var maxSize = Mathf.Min(position.width * 2f / 3f - 40f, 400f);
