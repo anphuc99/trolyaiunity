@@ -1,0 +1,494 @@
+fileFormatVersion: 2
+guid: 851982499b656c9489f2acf9c886a858
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -7071326524401880512
+    second: Generated Image February 13, 2026 - 8_02PM_nobg_0
+  - first:
+      213: -6928837507210606115
+    second: Generated Image February 13, 2026 - 8_02PM_nobg_1
+  - first:
+      213: -674678907044042971
+    second: Generated Image February 13, 2026 - 8_02PM_nobg_2
+  - first:
+      213: 807489400578739724
+    second: Generated Image February 13, 2026 - 8_02PM_nobg_3
+  - first:
+      213: 5706474369323268638
+    second: Generated Image February 13, 2026 - 8_02PM_nobg_4
+  - first:
+      213: 7136214490124287711
+    second: Generated Image February 13, 2026 - 8_02PM_nobg_5
+  - first:
+      213: -5386015733506902875
+    second: Generated Image February 13, 2026 - 8_02PM_nobg_6
+  - first:
+      213: 7673843417843997799
+    second: Generated Image February 13, 2026 - 8_02PM_nobg_7
+  - first:
+      213: 1274588309143679775
+    second: Generated Image February 13, 2026 - 8_02PM_nobg_8
+  - first:
+      213: 2676340615353352447
+    second: Generated Image February 13, 2026 - 8_02PM_nobg_9
+  - first:
+      213: -4134191601924476066
+    second: Generated Image February 13, 2026 - 8_02PM_nobg_10
+  - first:
+      213: -8473545584456591372
+    second: Generated Image February 13, 2026 - 8_02PM_nobg_11
+  - first:
+      213: -2792956256215521895
+    second: Generated Image February 13, 2026 - 8_02PM_nobg_12
+  - first:
+      213: -3902944637919691047
+    second: Generated Image February 13, 2026 - 8_02PM_nobg_13
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Generated Image February 13, 2026 - 8_02PM_nobg_0
+      rect:
+        serializedVersion: 2
+        x: 117
+        y: 858
+        width: 533
+        height: 79
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0427a36ddf99ddd90800000000000000
+      internalID: -7071326524401880512
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Generated Image February 13, 2026 - 8_02PM_nobg_1
+      rect:
+        serializedVersion: 2
+        x: 63
+        y: 564
+        width: 640
+        height: 254
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dd90f4c6ff2d7df90800000000000000
+      internalID: -6928837507210606115
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Generated Image February 13, 2026 - 8_02PM_nobg_2
+      rect:
+        serializedVersion: 2
+        x: 141
+        y: 485
+        width: 50
+        height: 50
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 527e030db1f03a6f0800000000000000
+      internalID: -674678907044042971
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Generated Image February 13, 2026 - 8_02PM_nobg_3
+      rect:
+        serializedVersion: 2
+        x: 207
+        y: 494
+        width: 33
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c0e8361e457c43b00800000000000000
+      internalID: 807489400578739724
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Generated Image February 13, 2026 - 8_02PM_nobg_4
+      rect:
+        serializedVersion: 2
+        x: 244
+        y: 494
+        width: 20
+        height: 25
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e1a72676438713f40800000000000000
+      internalID: 5706474369323268638
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Generated Image February 13, 2026 - 8_02PM_nobg_5
+      rect:
+        serializedVersion: 2
+        x: 268
+        y: 494
+        width: 6
+        height: 35
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fde7adcf44de80360800000000000000
+      internalID: 7136214490124287711
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Generated Image February 13, 2026 - 8_02PM_nobg_6
+      rect:
+        serializedVersion: 2
+        x: 277
+        y: 494
+        width: 22
+        height: 25
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5a4f7a90a370145b0800000000000000
+      internalID: -5386015733506902875
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Generated Image February 13, 2026 - 8_02PM_nobg_7
+      rect:
+        serializedVersion: 2
+        x: 421
+        y: 485
+        width: 51
+        height: 51
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 76c9f864ee7fe7a60800000000000000
+      internalID: 7673843417843997799
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Generated Image February 13, 2026 - 8_02PM_nobg_8
+      rect:
+        serializedVersion: 2
+        x: 488
+        y: 494
+        width: 21
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f13ff59605f30b110800000000000000
+      internalID: 1274588309143679775
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Generated Image February 13, 2026 - 8_02PM_nobg_9
+      rect:
+        serializedVersion: 2
+        x: 509
+        y: 494
+        width: 22
+        height: 25
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ff0461c1c95442520800000000000000
+      internalID: 2676340615353352447
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Generated Image February 13, 2026 - 8_02PM_nobg_10
+      rect:
+        serializedVersion: 2
+        x: 533
+        y: 494
+        width: 34
+        height: 25
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e5373e554a660a6c0800000000000000
+      internalID: -4134191601924476066
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Generated Image February 13, 2026 - 8_02PM_nobg_11
+      rect:
+        serializedVersion: 2
+        x: 570
+        y: 494
+        width: 20
+        height: 25
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4f7926a8f2be76a80800000000000000
+      internalID: -8473545584456591372
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Generated Image February 13, 2026 - 8_02PM_nobg_12
+      rect:
+        serializedVersion: 2
+        x: 594
+        y: 494
+        width: 7
+        height: 35
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 995a11b251d6d39d0800000000000000
+      internalID: -2792956256215521895
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Generated Image February 13, 2026 - 8_02PM_nobg_13
+      rect:
+        serializedVersion: 2
+        x: 604
+        y: 494
+        width: 21
+        height: 25
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9def7cec784f5d9c0800000000000000
+      internalID: -3902944637919691047
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      Generated Image February 13, 2026 - 8_02PM_nobg_0: -7071326524401880512
+      Generated Image February 13, 2026 - 8_02PM_nobg_1: -6928837507210606115
+      Generated Image February 13, 2026 - 8_02PM_nobg_10: -4134191601924476066
+      Generated Image February 13, 2026 - 8_02PM_nobg_11: -8473545584456591372
+      Generated Image February 13, 2026 - 8_02PM_nobg_12: -2792956256215521895
+      Generated Image February 13, 2026 - 8_02PM_nobg_13: -3902944637919691047
+      Generated Image February 13, 2026 - 8_02PM_nobg_2: -674678907044042971
+      Generated Image February 13, 2026 - 8_02PM_nobg_3: 807489400578739724
+      Generated Image February 13, 2026 - 8_02PM_nobg_4: 5706474369323268638
+      Generated Image February 13, 2026 - 8_02PM_nobg_5: 7136214490124287711
+      Generated Image February 13, 2026 - 8_02PM_nobg_6: -5386015733506902875
+      Generated Image February 13, 2026 - 8_02PM_nobg_7: 7673843417843997799
+      Generated Image February 13, 2026 - 8_02PM_nobg_8: 1274588309143679775
+      Generated Image February 13, 2026 - 8_02PM_nobg_9: 2676340615353352447
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

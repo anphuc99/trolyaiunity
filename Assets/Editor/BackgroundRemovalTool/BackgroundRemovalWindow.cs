@@ -31,6 +31,11 @@ namespace EditorTools.BackgroundRemoval
         private bool _autoSampleEdges = true;
         private string _outputSuffix = "_nobg";
 
+        // Color adjustment settings
+        private float _hueShift = 0f;
+        private float _saturationAdjust = 0f;
+        private float _brightnessAdjust = 0f;
+
         private Texture2D _previewTexture;
         private Vector2 _scrollPosition;
 
@@ -218,6 +223,34 @@ namespace EditorTools.BackgroundRemoval
                     new GUIContent("Alpha Detection Threshold",
                         "Minimum alpha to consider for transparency restoration (0-1)"),
                     _alphaThreshold, 0.5f, 1f);
+            }
+
+            EditorGUILayout.Space(10);
+
+            // Color adjustment settings
+            EditorGUILayout.LabelField("Color Adjustments", EditorStyles.boldLabel);
+
+            _hueShift = EditorGUILayout.Slider(
+                new GUIContent("Hue Shift (Chuyển màu)",
+                    "Shift the hue of non-background pixels (-0.5 to 0.5)"),
+                _hueShift, -0.5f, 0.5f);
+
+            _saturationAdjust = EditorGUILayout.Slider(
+                new GUIContent("Saturation (Độ tươi)",
+                    "Adjust saturation of non-background pixels (-1 to 1)"),
+                _saturationAdjust, -1f, 1f);
+
+            _brightnessAdjust = EditorGUILayout.Slider(
+                new GUIContent("Brightness (Độ sáng)",
+                    "Adjust brightness of non-background pixels (-1 to 1)"),
+                _brightnessAdjust, -1f, 1f);
+
+            if (GUILayout.Button("Reset Color Adjustments"))
+            {
+                _hueShift = 0f;
+                _saturationAdjust = 0f;
+                _brightnessAdjust = 0f;
+                _needsPreviewUpdate = true;
             }
 
             // Check if any settings changed
@@ -462,6 +495,11 @@ namespace EditorTools.BackgroundRemoval
             _computeShader.SetInt("RestoreTransparency", _restoreTransparency ? 1 : 0);
             _computeShader.SetFloat("AlphaThreshold", _alphaThreshold);
 
+            // Color adjustment parameters
+            _computeShader.SetFloat("HueShift", _hueShift);
+            _computeShader.SetFloat("SaturationAdjust", _saturationAdjust);
+            _computeShader.SetFloat("BrightnessAdjust", _brightnessAdjust);
+
             _computeShader.SetBuffer(kernelIndex, "SampledColors", _sampledColorsBuffer);
             _computeShader.SetInt("SampledColorsCount", _sampledColors.Count);
 
@@ -536,18 +574,41 @@ namespace EditorTools.BackgroundRemoval
                 else if (_restoreTransparency && IsBlendedWithBackground(pixel, out var originalColor, out var originalAlpha))
                 {
                     // This pixel appears to be a semi-transparent color blended with background
-                    resultPixels[i] = new Color(originalColor.r, originalColor.g, originalColor.b, originalAlpha);
+                    var adjustedColor = ApplyColorAdjustments(originalColor);
+                    resultPixels[i] = new Color(adjustedColor.r, adjustedColor.g, adjustedColor.b, originalAlpha);
                 }
                 else
                 {
-                    // Keep original pixel
-                    resultPixels[i] = pixel;
+                    // Apply color adjustments to original pixel
+                    var adjustedColor = ApplyColorAdjustments(pixel);
+                    resultPixels[i] = new Color(adjustedColor.r, adjustedColor.g, adjustedColor.b, pixel.a);
                 }
             }
 
             result.SetPixels(resultPixels);
             result.Apply();
             return result;
+        }
+
+        /// <summary>
+        /// Applies hue shift, saturation, and brightness adjustments to a color.
+        /// </summary>
+        /// <param name="color">The color to adjust.</param>
+        /// <returns>The adjusted color.</returns>
+        private Color ApplyColorAdjustments(Color color)
+        {
+            Color.RGBToHSV(color, out var h, out var s, out var v);
+
+            // Apply hue shift (wrap around 0-1)
+            h = (h + _hueShift + 1f) % 1f;
+
+            // Apply saturation adjustment
+            s = Mathf.Clamp01(s + _saturationAdjust);
+
+            // Apply brightness adjustment
+            v = Mathf.Clamp01(v + _brightnessAdjust);
+
+            return Color.HSVToRGB(h, s, v);
         }
 
         /// <summary>

@@ -20,6 +20,11 @@ int UseHSVMatching;
 int RestoreTransparency;
 float AlphaThreshold;
 
+// Color adjustment settings
+float HueShift;           // -0.5 to 0.5 (chuyển màu)
+float SaturationAdjust;   // -1 to 1 (độ tươi)
+float BrightnessAdjust;   // -1 to 1 (độ sáng)
+
 // Sampled colors buffer (max 64 colors)
 StructuredBuffer<float4> SampledColors;
 int SampledColorsCount;
@@ -34,6 +39,33 @@ float3 RGBToHSV(float3 rgb)
     float d = q.x - min(q.w, q.y);
     float e = 1.0e-10;
     return float3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+// Convert HSV to RGB
+float3 HSVToRGB(float3 hsv)
+{
+    float4 K = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    float3 p = abs(frac(hsv.xxx + K.xyz) * 6.0 - K.www);
+    return hsv.z * lerp(K.xxx, saturate(p - K.xxx), hsv.y);
+}
+
+// Apply color adjustments (hue shift, saturation, brightness)
+float3 ApplyColorAdjustments(float3 rgb)
+{
+    // Convert to HSV
+    float3 hsv = RGBToHSV(rgb);
+    
+    // Apply hue shift (wrap around 0-1)
+    hsv.x = frac(hsv.x + HueShift + 1.0);
+    
+    // Apply saturation adjustment
+    hsv.y = saturate(hsv.y + SaturationAdjust);
+    
+    // Apply brightness adjustment
+    hsv.z = saturate(hsv.z + BrightnessAdjust);
+    
+    // Convert back to RGB
+    return HSVToRGB(hsv);
 }
 
 // Check if pixel matches background using HSV
@@ -176,11 +208,13 @@ void RemoveBackground(uint3 id : SV_DispatchThreadID)
     {
         // Try to restore original transparency
         result = TryRestoreTransparency(pixel.rgb);
+        // Apply color adjustments to restored color
+        result.rgb = ApplyColorAdjustments(result.rgb);
     }
     else
     {
-        // Keep original pixel
-        result = pixel;
+        // Apply color adjustments to original pixel
+        result = float4(ApplyColorAdjustments(pixel.rgb), pixel.a);
     }
     
     ResultTexture[id.xy] = result;
