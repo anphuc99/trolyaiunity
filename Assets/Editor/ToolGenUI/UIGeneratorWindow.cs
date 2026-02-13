@@ -44,6 +44,7 @@ namespace EditorTools.UIGenerator
         private bool _needsPreviewUpdate;
 
         // Background removal
+        private bool _enableBackgroundRemoval = false;
         private Color _backgroundColor = Color.green;
         private float _hueTolerance = 0.15f;
         private float _saturationTolerance = 0.5f;
@@ -651,7 +652,11 @@ namespace EditorTools.UIGenerator
         {
             EditorGUILayout.LabelField("Background Removal", EditorStyles.boldLabel);
 
-            _autoSampleBackground = EditorGUILayout.Toggle("Auto Sample Background", _autoSampleBackground);
+            _enableBackgroundRemoval = EditorGUILayout.Toggle("Enable Background Removal", _enableBackgroundRemoval);
+
+            using (new EditorGUI.DisabledScope(!_enableBackgroundRemoval))
+            {
+                _autoSampleBackground = EditorGUILayout.Toggle("Auto Sample Background", _autoSampleBackground);
 
             if (GUILayout.Button("Sample Background Colors"))
             {
@@ -669,6 +674,7 @@ namespace EditorTools.UIGenerator
             {
                 EditorGUILayout.LabelField($"Sampled {_sampledColors.Count} background colors");
             }
+            } // End disabled scope
         }
 
         private void DrawColorAdjustmentsSection()
@@ -928,7 +934,8 @@ namespace EditorTools.UIGenerator
             {
                 var pixel = sourcePixels[i];
 
-                if (IsBackgroundColor(pixel))
+                // Only remove background if enabled
+                if (_enableBackgroundRemoval && IsBackgroundColor(pixel))
                 {
                     resultPixels[i] = Color.clear;
                 }
