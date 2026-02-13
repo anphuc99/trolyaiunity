@@ -1,7 +1,7 @@
 /// <summary>
-/// Chroma Key Shader - Removes green screen background
+/// White Background Removal Shader
 /// Works on both PC and Mobile platforms
-/// Uses HSV-based color matching for better accuracy
+/// Optimized for removing white/light backgrounds using luminance-based detection
 /// </summary>
 Shader "Custom/ChromaKey"
 {
@@ -9,17 +9,19 @@ Shader "Custom/ChromaKey"
     {
         _MainTex ("Texture", 2D) = "white" {}
         
-        [Header(Chroma Key Settings)]
-        _KeyColor ("Key Color", Color) = (0, 1, 0, 1)
-        _HueTolerance ("Hue Tolerance", Range(0, 0.5)) = 0.1
-        _SaturationTolerance ("Saturation Tolerance", Range(0, 1)) = 0.3
-        _ValueTolerance ("Value Tolerance", Range(0, 1)) = 0.3
-        _Smoothness ("Edge Smoothness", Range(0, 0.5)) = 0.05
+        [Header(White Background Settings)]
+        _LuminanceThreshold ("Luminance Threshold", Range(0.5, 1)) = 0.85
+        _SaturationMax ("Max Saturation (white)", Range(0, 0.5)) = 0.15
+        _Smoothness ("Edge Smoothness", Range(0, 0.3)) = 0.1
+        
+        [Header(Edge Detection)]
+        _EdgeSensitivity ("Edge Sensitivity", Range(0, 5)) = 2
+        _EdgeThickness ("Edge Thickness", Range(0.001, 0.01)) = 0.003
         
         [Header(Color Correction)]
-        _SpillRemoval ("Spill Removal", Range(0, 1)) = 0.5
         _Brightness ("Brightness", Range(0.5, 2)) = 1
         _Contrast ("Contrast", Range(0.5, 2)) = 1
+        _Saturation ("Saturation Boost", Range(0.5, 2)) = 1
     }
     
     SubShader
@@ -65,93 +67,98 @@ Shader "Custom/ChromaKey"
             
             sampler2D _MainTex;
             float4 _MainTex_ST;
+            float4 _MainTex_TexelSize;
             
-            fixed4 _KeyColor;
-            half _HueTolerance;
-            half _SaturationTolerance;
-            half _ValueTolerance;
+            half _LuminanceThreshold;
+            half _SaturationMax;
             half _Smoothness;
-            half _SpillRemoval;
+            half _EdgeSensitivity;
+            half _EdgeThickness;
             half _Brightness;
             half _Contrast;
+            half _Saturation;
             
             /// <summary>
-            /// Converts RGB color to HSV color space
-            /// More efficient for chroma key detection
+            /// Calculates luminance from RGB color
+            /// Uses standard NTSC/Rec601 weights
             /// </summary>
             /// <param name="rgb">Input RGB color</param>
-            /// <returns>HSV color (x=Hue, y=Saturation, z=Value)</returns>
-            float3 RGBtoHSV(float3 rgb)
+            /// <returns>Luminance value 0-1</returns>
+            half GetLuminance(fixed3 rgb)
             {
-                float4 K = float4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
-                float4 p = lerp(float4(rgb.bg, K.wz), float4(rgb.gb, K.xy), step(rgb.b, rgb.g));
-                float4 q = lerp(float4(p.xyw, rgb.r), float4(rgb.r, p.yzx), step(p.x, rgb.r));
-                
-                float d = q.x - min(q.w, q.y);
-                float e = 1.0e-10;
-                
-                return float3(
-                    abs(q.z + (q.w - q.y) / (6.0 * d + e)),
-                    d / (q.x + e),
-                    q.x
-                );
+                return dot(rgb, half3(0.299, 0.587, 0.114));
             }
             
             /// <summary>
-            /// Calculates the chroma key mask based on HSV comparison
-            /// Returns 0 for pixels to remove, 1 for pixels to keep
+            /// Calculates saturation from RGB color
             /// </summary>
-            /// <param name="pixelHSV">HSV of current pixel</param>
-            /// <param name="keyHSV">HSV of key color</param>
-            /// <returns>Alpha mask value</returns>
-            half CalculateChromaMask(float3 pixelHSV, float3 keyHSV)
+            /// <param name="rgb">Input RGB color</param>
+            /// <returns>Saturation value 0-1</returns>
+            half GetSaturation(fixed3 rgb)
             {
-                // Calculate hue difference (handle wraparound at 0/1)
-                float hueDiff = abs(pixelHSV.x - keyHSV.x);
-                hueDiff = min(hueDiff, 1.0 - hueDiff);
+                float maxC = max(rgb.r, max(rgb.g, rgb.b));
+                float minC = min(rgb.r, min(rgb.g, rgb.b));
+                return (maxC - minC) / (maxC + 0.0001);
+            }
+            
+            /// <summary>
+            /// Detects edges using Sobel operator for better edge preservation
+            /// </summary>
+            /// <param name="uv">Current UV coordinates</param>
+            /// <returns>Edge strength 0-1</returns>
+            half DetectEdge(float2 uv)
+            {
+                float2 offset = _EdgeThickness;
                 
-                // Calculate saturation and value differences
-                float satDiff = abs(pixelHSV.y - keyHSV.y);
-                float valDiff = abs(pixelHSV.z - keyHSV.z);
+                // Sample 3x3 neighborhood luminances
+                half tl = GetLuminance(tex2D(_MainTex, uv + float2(-offset.x, offset.y)).rgb);
+                half t  = GetLuminance(tex2D(_MainTex, uv + float2(0, offset.y)).rgb);
+                half tr = GetLuminance(tex2D(_MainTex, uv + float2(offset.x, offset.y)).rgb);
+                half l  = GetLuminance(tex2D(_MainTex, uv + float2(-offset.x, 0)).rgb);
+                half r  = GetLuminance(tex2D(_MainTex, uv + float2(offset.x, 0)).rgb);
+                half bl = GetLuminance(tex2D(_MainTex, uv + float2(-offset.x, -offset.y)).rgb);
+                half b  = GetLuminance(tex2D(_MainTex, uv + float2(0, -offset.y)).rgb);
+                half br = GetLuminance(tex2D(_MainTex, uv + float2(offset.x, -offset.y)).rgb);
                 
-                // Check if pixel matches key color within tolerance
-                // Weight saturation more heavily as green screens are usually saturated
-                float hueMatch = smoothstep(_HueTolerance + _Smoothness, _HueTolerance, hueDiff);
-                float satMatch = smoothstep(_SaturationTolerance + _Smoothness, _SaturationTolerance, satDiff);
-                float valMatch = smoothstep(_ValueTolerance + _Smoothness, _ValueTolerance, valDiff);
+                // Sobel operators
+                half sobelX = (tr + 2*r + br) - (tl + 2*l + bl);
+                half sobelY = (tl + 2*t + tr) - (bl + 2*b + br);
                 
-                // Require minimum saturation to be considered green screen
-                // This prevents low-saturation grey/white pixels from being removed
-                float saturationGate = smoothstep(0.1, 0.2, pixelHSV.y);
+                // Edge magnitude
+                return saturate(sqrt(sobelX * sobelX + sobelY * sobelY) * _EdgeSensitivity);
+            }
+            
+            /// <summary>
+            /// Calculates mask for white background removal
+            /// High luminance + low saturation = white background
+            /// </summary>
+            /// <param name="rgb">Pixel color</param>
+            /// <param name="uv">UV coordinates for edge detection</param>
+            /// <returns>Alpha mask (0 = remove, 1 = keep)</returns>
+            half CalculateWhiteMask(fixed3 rgb, float2 uv)
+            {
+                half luminance = GetLuminance(rgb);
+                half saturation = GetSaturation(rgb);
                 
-                // Combine all matches - pixel is keyed if all conditions match
-                float keyMatch = hueMatch * satMatch * valMatch * saturationGate;
+                // White detection: high luminance AND low saturation
+                half isWhite = smoothstep(_LuminanceThreshold - _Smoothness, _LuminanceThreshold + _Smoothness, luminance);
+                half isDesaturated = smoothstep(_SaturationMax + _Smoothness, _SaturationMax - _Smoothness, saturation);
+                
+                // Combine conditions - pixel is white background if both match
+                half whiteMatch = isWhite * isDesaturated;
+                
+                // Detect edges to preserve subject boundaries
+                half edge = DetectEdge(uv);
+                
+                // Reduce removal at edges to preserve subject outline
+                whiteMatch *= (1.0 - edge);
                 
                 // Return inverted (1 = keep, 0 = remove)
-                return 1.0 - keyMatch;
+                return 1.0 - whiteMatch;
             }
             
             /// <summary>
-            /// Removes green color spill from edges of keyed objects
-            /// Common issue when green reflects onto subjects
-            /// </summary>
-            /// <param name="color">Original pixel color</param>
-            /// <param name="keyColor">Key color to remove spill of</param>
-            /// <param name="amount">Spill removal strength</param>
-            /// <returns>Color with reduced green spill</returns>
-            fixed3 RemoveSpill(fixed3 color, fixed3 keyColor, half amount)
-            {
-                // Calculate how much the pixel is tinted toward key color
-                float spillAmount = max(0, color.g - max(color.r, color.b));
-                
-                // Reduce the green channel to remove spill
-                color.g = lerp(color.g, max(color.r, color.b), amount * spillAmount * 2);
-                
-                return color;
-            }
-            
-            /// <summary>
-            /// Applies brightness and contrast adjustments
+            /// Applies brightness, contrast, and saturation adjustments
             /// </summary>
             /// <param name="color">Input color</param>
             /// <returns>Adjusted color</returns>
@@ -162,6 +169,10 @@ Shader "Custom/ChromaKey"
                 
                 // Apply brightness
                 color *= _Brightness;
+                
+                // Apply saturation boost
+                half lum = GetLuminance(color);
+                color = lerp(half3(lum, lum, lum), color, _Saturation);
                 
                 return saturate(color);
             }
@@ -184,15 +195,8 @@ Shader "Custom/ChromaKey"
                 // Sample the texture
                 fixed4 col = tex2D(_MainTex, i.uv);
                 
-                // Convert pixel and key color to HSV
-                float3 pixelHSV = RGBtoHSV(col.rgb);
-                float3 keyHSV = RGBtoHSV(_KeyColor.rgb);
-                
-                // Calculate the chroma key mask
-                half mask = CalculateChromaMask(pixelHSV, keyHSV);
-                
-                // Remove green spill from edges
-                col.rgb = RemoveSpill(col.rgb, _KeyColor.rgb, _SpillRemoval);
+                // Calculate the white background mask
+                half mask = CalculateWhiteMask(col.rgb, i.uv);
                 
                 // Apply color correction
                 col.rgb = ApplyColorCorrection(col.rgb);
