@@ -843,13 +843,6 @@ namespace EditorTools.UIGenerator
                 _isPainting = true;
                 _lastPaintPos = GetTextureCoordinate(e.mousePosition, previewRect);
                 PaintAt(_lastPaintPos);
-                
-                // For Restore tool, update preview immediately so user sees restored pixels
-                if (_currentTool == ToolMode.Restore)
-                {
-                    UpdatePreview();
-                }
-                
                 e.Use();
             }
             else if (e.type == EventType.MouseDrag && _isPainting)
@@ -857,13 +850,6 @@ namespace EditorTools.UIGenerator
                 var currentPos = GetTextureCoordinate(e.mousePosition, previewRect);
                 PaintLine(_lastPaintPos, currentPos);
                 _lastPaintPos = currentPos;
-                
-                // For Restore tool, update preview during drag so user sees restored pixels
-                if (_currentTool == ToolMode.Restore)
-                {
-                    UpdatePreview();
-                }
-                
                 e.Use();
             }
             else if (e.type == EventType.MouseUp && _isPainting)
@@ -925,6 +911,9 @@ namespace EditorTools.UIGenerator
                                 // Mark as protected (user explicitly erased)
                                 if (_protectionMask != null)
                                     _protectionMask.SetPixel(px, py, Color.white);
+                                // Also update preview texture directly for immediate feedback
+                                if (_previewTexture != null)
+                                    _previewTexture.SetPixel(px, py, Color.clear);
                             }
                             else if (_currentTool == ToolMode.Restore && _originalTexture != null)
                             {
@@ -934,6 +923,9 @@ namespace EditorTools.UIGenerator
                                 // Mark as protected so BG removal won't remove it again
                                 if (_protectionMask != null)
                                     _protectionMask.SetPixel(px, py, Color.white);
+                                // Also update preview texture directly for immediate feedback (with color adjustments)
+                                if (_previewTexture != null)
+                                    _previewTexture.SetPixel(px, py, ApplyColorAdjustments(originalColor));
                             }
                         }
                     }
@@ -943,6 +935,9 @@ namespace EditorTools.UIGenerator
             _editingTexture.Apply();
             if (_protectionMask != null)
                 _protectionMask.Apply();
+            // Apply preview texture updates for Restore/Eraser tools
+            if (_previewTexture != null && (_currentTool == ToolMode.Restore || _currentTool == ToolMode.Eraser))
+                _previewTexture.Apply();
             Repaint();
         }
 
