@@ -19,7 +19,7 @@ namespace Features.CreateCharater.View
 		[Header("Input Fields")]
 		[SerializeField] private TMP_InputField _nameInput;
 		[SerializeField] private TMP_InputField _ageInput;
-		[SerializeField] private TMP_InputField _genderInput;
+		[SerializeField] private ToggleGroup _genderToggleGroup;
 		[SerializeField] private TMP_InputField _descriptionInput;
 
 		[Header("Personalities")]
@@ -114,13 +114,29 @@ namespace Features.CreateCharater.View
 			}
 		}
 
+		private string GetSelectedGender()
+		{
+			if (_genderToggleGroup == null) return "Unknown";
+			
+			foreach (var toggle in _genderToggleGroup.ActiveToggles())
+			{
+				if (toggle.isOn)
+				{
+					// Assuming the toggle name or a component on it identifies the gender
+					// Using name as a simple default
+					return toggle.name;
+				}
+			}
+			return "Unknown";
+		}
+
 		private void OnSubmitClicked()
 		{
 			var payload = new CreateCharacterPayload
 			{
 				name = _nameInput != null ? _nameInput.text : string.Empty,
 				age = _ageInput != null && int.TryParse(_ageInput.text, out var age) ? age : 0,
-				gender = _genderInput != null ? _genderInput.text : string.Empty,
+				gender = GetSelectedGender(),
 				description = _descriptionInput != null ? _descriptionInput.text : string.Empty,
 				personality = new List<string>(_selectedPersonalities)
 			};
