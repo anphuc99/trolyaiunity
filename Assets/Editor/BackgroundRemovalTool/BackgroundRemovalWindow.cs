@@ -37,6 +37,9 @@ namespace EditorTools.BackgroundRemoval
         private List<Color> _sampledColors = new List<Color>();
         private Vector3 _avgBackgroundHsv;
 
+        // Track if preview needs regeneration
+        private bool _needsPreviewUpdate;
+
         [MenuItem(MenuPath)]
         private static void Open()
         {
@@ -51,10 +54,13 @@ namespace EditorTools.BackgroundRemoval
             EditorGUILayout.LabelField("Background Removal Tool", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
                 "Remove background with color variations using HSV matching.\n" +
-                "Handles similar shades and semi-transparent elements.",
+                "Preview updates automatically when settings change.",
                 MessageType.Info);
 
             EditorGUILayout.Space(10);
+
+            // Begin tracking changes for auto-preview
+            EditorGUI.BeginChangeCheck();
 
             // Source texture selection
             EditorGUILayout.LabelField("Source Image", EditorStyles.boldLabel);
@@ -66,6 +72,7 @@ namespace EditorTools.BackgroundRemoval
                 _sourceTexture = newTexture;
                 _sampledColors.Clear();
                 ClearPreview();
+                _needsPreviewUpdate = true;
             }
 
             if (_sourceTexture != null)
@@ -93,6 +100,7 @@ namespace EditorTools.BackgroundRemoval
                 if (GUILayout.Button("Sample Background Colors", GUILayout.Height(25)))
                 {
                     SampleBackgroundColorsFromEdges();
+                    _needsPreviewUpdate = true;
                 }
 
                 if (_sampledColors.Count > 0)
@@ -106,6 +114,7 @@ namespace EditorTools.BackgroundRemoval
             if (GUILayout.Button("Sample From Top-Left Corner"))
             {
                 SampleBackgroundColor();
+                _needsPreviewUpdate = true;
             }
 
             EditorGUILayout.Space(10);
@@ -161,26 +170,30 @@ namespace EditorTools.BackgroundRemoval
                     _alphaThreshold, 0.5f, 1f);
             }
 
+            // Check if any settings changed
+            if (EditorGUI.EndChangeCheck())
+            {
+                _needsPreviewUpdate = true;
+            }
+
             _outputSuffix = EditorGUILayout.TextField("Output Suffix", _outputSuffix);
 
             EditorGUILayout.Space(10);
 
-            // Action buttons
+            // Action button - only Save
             using (new EditorGUI.DisabledScope(_sourceTexture == null))
             {
-                EditorGUILayout.BeginHorizontal();
-
-                if (GUILayout.Button("Preview", GUILayout.Height(30)))
-                {
-                    GeneratePreview();
-                }
-
                 if (GUILayout.Button("Process & Save", GUILayout.Height(30)))
                 {
                     ProcessAndSave();
                 }
+            }
 
-                EditorGUILayout.EndHorizontal();
+            // Auto-generate preview if needed
+            if (_needsPreviewUpdate && _sourceTexture != null)
+            {
+                _needsPreviewUpdate = false;
+                GeneratePreview();
             }
 
             // Preview display
