@@ -13,8 +13,32 @@ namespace EditorTools.UIGenerator
     /// </summary>
     public sealed class UIGeneratorWindow : EditorWindow
     {
+        /// <summary>
+        /// Snapshot state for undo/redo operations.
+        /// </summary>
+        private sealed class EditHistoryState
+        {
+            public int EditingWidth;
+            public int EditingHeight;
+            public Color[] EditingPixels;
+            public int ProtectionWidth;
+            public int ProtectionHeight;
+            public Color[] ProtectionPixels;
+            public bool EnableBackgroundRemoval;
+            public Color BackgroundColor;
+            public float HueTolerance;
+            public float SaturationTolerance;
+            public float ValueTolerance;
+            public float HueShift;
+            public float SaturationAdjust;
+            public float BrightnessAdjust;
+            public List<Color> SampledColors;
+            public Vector3 AvgBackgroundHsv;
+        }
+
         private const string WindowTitle = "AI UI Generator";
         private const string MenuPath = "Tools/AI UI Generator";
+        private const int MaxHistorySteps = 30;
 
         // Target Image component
         private Image _targetImage;
@@ -75,6 +99,10 @@ namespace EditorTools.UIGenerator
         // Canvas for painting
         private RenderTexture _paintCanvas;
         private Texture2D _paintTexture;
+
+        // Undo/Redo history
+        private readonly List<EditHistoryState> _undoHistory = new List<EditHistoryState>();
+        private readonly List<EditHistoryState> _redoHistory = new List<EditHistoryState>();
 
         // Sampled colors for background removal
         private List<Color> _sampledColors = new List<Color>();
@@ -138,6 +166,9 @@ namespace EditorTools.UIGenerator
 
         private void OnGUI()
         {
+            // Handle undo/redo shortcuts first
+            HandleUndoRedoShortcuts();
+
             // Handle keyboard shortcuts for tools
             HandleToolShortcuts();
 
@@ -376,6 +407,7 @@ namespace EditorTools.UIGenerator
             _currentTool = ToolMode.None;
             _needsPreviewUpdate = true;
             _selectedImageIndex = -1;
+            ClearHistory();
 
             // Sample background colors
             if (_autoSampleBackground)
@@ -548,6 +580,7 @@ namespace EditorTools.UIGenerator
                 _sampledColors.Clear();
                 _currentTool = ToolMode.None;
                 _needsPreviewUpdate = true;
+                ClearHistory();
 
                 // Sample background colors
                 if (_autoSampleBackground)
@@ -745,6 +778,31 @@ namespace EditorTools.UIGenerator
         }
 
         /// <summary>
+        /// Handles keyboard shortcuts for undo/redo.
+        /// Ctrl/Cmd + Z = Undo, Ctrl/Cmd + Shift + Z = Redo.
+        /// </summary>
+        private void HandleUndoRedoShortcuts()
+        {
+            var e = Event.current;
+            if (e.type != EventType.KeyDown) return;
+            if (EditorGUIUtility.editingTextField) return;
+
+            var hasUndoModifier = e.control || e.command;
+            if (!hasUndoModifier || e.keyCode != KeyCode.Z) return;
+
+            if (e.shift)
+            {
+                RedoLastEdit();
+            }
+            else
+            {
+                UndoLastEdit();
+            }
+
+            e.Use();
+        }
+
+        /// <summary>
         /// Handles keyboard shortcuts for tool selection.
         /// 1=Select, 2=Brush, 3=Eraser, 4=Restore, 5=Unprotect
         /// </summary>
@@ -753,8 +811,11 @@ namespace EditorTools.UIGenerator
             var e = Event.current;
             if (e.type != EventType.KeyDown) return;
             
-            // Only handle if not typing in a text field
-            if (GUIUtility.keyboardControl != 0) return;
+            // Ignore shortcuts only while actively typing in text fields
+            if (EditorGUIUtility.editingTextField) return;
+
+            // Ignore combinations with modifiers to avoid clashing with editor/system shortcuts
+            if (e.alt || e.control || e.command) return;
             
             switch (e.keyCode)
             {
@@ -904,6 +965,7 @@ namespace EditorTools.UIGenerator
 
             if (GUILayout.Button("Sample Background Colors"))
             {
+                SaveUndoState();
                 SampleBackgroundColors();
                 _needsPreviewUpdate = true;
             }
@@ -931,6 +993,7 @@ namespace EditorTools.UIGenerator
 
             if (GUILayout.Button("Reset Adjustments"))
             {
+                SaveUndoState();
                 _hueShift = 0f;
                 _saturationAdjust = 0f;
                 _brightnessAdjust = 0f;
@@ -945,6 +1008,7 @@ namespace EditorTools.UIGenerator
 
             if (GUILayout.Button("Auto Crop to Alpha"))
             {
+                SaveUndoState();
                 AutoCropToAlpha();
             }
         }
@@ -959,6 +1023,7 @@ namespace EditorTools.UIGenerator
             {
                 if (_originalTexture != null)
                 {
+                    SaveUndoState();
                     Graphics.CopyTexture(_originalTexture, _editingTexture);
                     _editingTexture.Apply();
                     _hueShift = 0f;
@@ -1003,6 +1068,7 @@ namespace EditorTools.UIGenerator
 
             if (e.type == EventType.MouseDown && e.button == 0)
             {
+                SaveUndoState();
                 _isPainting = true;
                 _lastPaintPos = GetTextureCoordinate(e.mousePosition, previewRect);
                 PaintAt(_lastPaintPos);
@@ -1130,6 +1196,158 @@ namespace EditorTools.UIGenerator
                 var pos = Vector2.Lerp(from, to, t);
                 PaintAt(pos);
             }
+        }
+
+        /// <summary>
+        /// Clears undo/redo history for the current editing session.
+        /// </summary>
+        private void ClearHistory()
+        {
+            _undoHistory.Clear();
+            _redoHistory.Clear();
+        }
+
+        /// <summary>
+        /// Saves current state to undo history and clears redo history.
+        /// </summary>
+        private void SaveUndoState()
+        {
+            var snapshot = CaptureCurrentState();
+            if (snapshot == null) return;
+
+            _undoHistory.Add(snapshot);
+            if (_undoHistory.Count > MaxHistorySteps)
+            {
+                _undoHistory.RemoveAt(0);
+            }
+
+            _redoHistory.Clear();
+        }
+
+        /// <summary>
+        /// Restores the latest undo snapshot.
+        /// </summary>
+        private void UndoLastEdit()
+        {
+            if (_undoHistory.Count == 0) return;
+
+            var current = CaptureCurrentState();
+            if (current != null)
+            {
+                _redoHistory.Add(current);
+                if (_redoHistory.Count > MaxHistorySteps)
+                {
+                    _redoHistory.RemoveAt(0);
+                }
+            }
+
+            var targetIndex = _undoHistory.Count - 1;
+            var snapshot = _undoHistory[targetIndex];
+            _undoHistory.RemoveAt(targetIndex);
+            RestoreState(snapshot);
+        }
+
+        /// <summary>
+        /// Restores the latest redo snapshot.
+        /// </summary>
+        private void RedoLastEdit()
+        {
+            if (_redoHistory.Count == 0) return;
+
+            var current = CaptureCurrentState();
+            if (current != null)
+            {
+                _undoHistory.Add(current);
+                if (_undoHistory.Count > MaxHistorySteps)
+                {
+                    _undoHistory.RemoveAt(0);
+                }
+            }
+
+            var targetIndex = _redoHistory.Count - 1;
+            var snapshot = _redoHistory[targetIndex];
+            _redoHistory.RemoveAt(targetIndex);
+            RestoreState(snapshot);
+        }
+
+        /// <summary>
+        /// Captures the current editable state into a history snapshot.
+        /// </summary>
+        private EditHistoryState CaptureCurrentState()
+        {
+            if (_editingTexture == null) return null;
+
+            return new EditHistoryState
+            {
+                EditingWidth = _editingTexture.width,
+                EditingHeight = _editingTexture.height,
+                EditingPixels = _editingTexture.GetPixels(),
+                ProtectionWidth = _protectionMask != null ? _protectionMask.width : 0,
+                ProtectionHeight = _protectionMask != null ? _protectionMask.height : 0,
+                ProtectionPixels = _protectionMask != null ? _protectionMask.GetPixels() : null,
+                EnableBackgroundRemoval = _enableBackgroundRemoval,
+                BackgroundColor = _backgroundColor,
+                HueTolerance = _hueTolerance,
+                SaturationTolerance = _saturationTolerance,
+                ValueTolerance = _valueTolerance,
+                HueShift = _hueShift,
+                SaturationAdjust = _saturationAdjust,
+                BrightnessAdjust = _brightnessAdjust,
+                SampledColors = new List<Color>(_sampledColors),
+                AvgBackgroundHsv = _avgBackgroundHsv
+            };
+        }
+
+        /// <summary>
+        /// Restores a history snapshot to current editing state.
+        /// </summary>
+        private void RestoreState(EditHistoryState state)
+        {
+            if (state == null) return;
+
+            if (_editingTexture == null ||
+                _editingTexture.width != state.EditingWidth ||
+                _editingTexture.height != state.EditingHeight)
+            {
+                if (_editingTexture != null) DestroyImmediate(_editingTexture);
+                _editingTexture = new Texture2D(state.EditingWidth, state.EditingHeight, TextureFormat.RGBA32, false);
+            }
+
+            _editingTexture.SetPixels(state.EditingPixels);
+            _editingTexture.Apply();
+
+            if (state.ProtectionPixels != null)
+            {
+                if (_protectionMask == null ||
+                    _protectionMask.width != state.ProtectionWidth ||
+                    _protectionMask.height != state.ProtectionHeight)
+                {
+                    if (_protectionMask != null) DestroyImmediate(_protectionMask);
+                    _protectionMask = new Texture2D(state.ProtectionWidth, state.ProtectionHeight, TextureFormat.RGBA32, false);
+                }
+
+                _protectionMask.SetPixels(state.ProtectionPixels);
+                _protectionMask.Apply();
+            }
+            else if (_protectionMask != null)
+            {
+                DestroyImmediate(_protectionMask);
+                _protectionMask = null;
+            }
+
+            _enableBackgroundRemoval = state.EnableBackgroundRemoval;
+            _backgroundColor = state.BackgroundColor;
+            _hueTolerance = state.HueTolerance;
+            _saturationTolerance = state.SaturationTolerance;
+            _valueTolerance = state.ValueTolerance;
+            _hueShift = state.HueShift;
+            _saturationAdjust = state.SaturationAdjust;
+            _brightnessAdjust = state.BrightnessAdjust;
+            _sampledColors = new List<Color>(state.SampledColors ?? new List<Color>());
+            _avgBackgroundHsv = state.AvgBackgroundHsv;
+
+            _needsPreviewUpdate = true;
+            Repaint();
         }
 
         /// <summary>
@@ -1323,12 +1541,14 @@ namespace EditorTools.UIGenerator
 
         private void AutoCropToAlpha()
         {
-            if (_previewTexture == null && _editingTexture == null) return;
+            if (_editingTexture == null) return;
 
-            var source = _previewTexture ?? _editingTexture;
-            var pixels = source.GetPixels();
-            var width = source.width;
-            var height = source.height;
+            // Use preview alpha (if available) to detect visible area,
+            // but always crop the editable source textures consistently.
+            var boundsSource = _previewTexture ?? _editingTexture;
+            var pixels = boundsSource.GetPixels();
+            var width = boundsSource.width;
+            var height = boundsSource.height;
 
             // Find bounds
             int minX = width, maxX = 0, minY = height, maxY = 0;
@@ -1363,23 +1583,35 @@ namespace EditorTools.UIGenerator
             var newWidth = maxX - minX + 1;
             var newHeight = maxY - minY + 1;
 
-            var cropped = new Texture2D(newWidth, newHeight, TextureFormat.RGBA32, false);
-            var croppedPixels = new Color[newWidth * newHeight];
+            var croppedEditing = CropTextureRegion(_editingTexture, minX, minY, newWidth, newHeight);
+            Texture2D croppedOriginal = null;
+            Texture2D croppedMask = null;
 
-            for (int y = 0; y < newHeight; y++)
+            if (_originalTexture != null)
             {
-                for (int x = 0; x < newWidth; x++)
-                {
-                    croppedPixels[y * newWidth + x] = pixels[(minY + y) * width + (minX + x)];
-                }
+                croppedOriginal = CropTextureRegion(_originalTexture, minX, minY, newWidth, newHeight);
             }
 
-            cropped.SetPixels(croppedPixels);
-            cropped.Apply();
+            if (_protectionMask != null)
+            {
+                croppedMask = CropTextureRegion(_protectionMask, minX, minY, newWidth, newHeight);
+            }
 
             // Replace editing texture
             DestroyImmediate(_editingTexture);
-            _editingTexture = cropped;
+            _editingTexture = croppedEditing;
+
+            if (_originalTexture != null)
+            {
+                DestroyImmediate(_originalTexture);
+                _originalTexture = croppedOriginal;
+            }
+
+            if (_protectionMask != null)
+            {
+                DestroyImmediate(_protectionMask);
+                _protectionMask = croppedMask;
+            }
 
             if (_previewTexture != null)
             {
@@ -1390,6 +1622,30 @@ namespace EditorTools.UIGenerator
             _needsPreviewUpdate = true;
 
             EditorUtility.DisplayDialog("Auto Crop", $"Cropped from {width}x{height} to {newWidth}x{newHeight}", "OK");
+        }
+
+        /// <summary>
+        /// Creates a cropped copy of a texture region.
+        /// </summary>
+        private Texture2D CropTextureRegion(Texture2D source, int minX, int minY, int newWidth, int newHeight)
+        {
+            var sourcePixels = source.GetPixels();
+            var sourceWidth = source.width;
+
+            var cropped = new Texture2D(newWidth, newHeight, TextureFormat.RGBA32, false);
+            var croppedPixels = new Color[newWidth * newHeight];
+
+            for (int y = 0; y < newHeight; y++)
+            {
+                for (int x = 0; x < newWidth; x++)
+                {
+                    croppedPixels[y * newWidth + x] = sourcePixels[(minY + y) * sourceWidth + (minX + x)];
+                }
+            }
+
+            cropped.SetPixels(croppedPixels);
+            cropped.Apply();
+            return cropped;
         }
 
         private void ApplyToTargetImage()

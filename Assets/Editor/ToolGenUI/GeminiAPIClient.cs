@@ -166,9 +166,10 @@ namespace EditorTools.UIGenerator
 
             if (generateUI)
             {
-                sb.AppendLine("Generate a game UI element image with transparent background (PNG with alpha).");
+                sb.AppendLine("Generate a game UI element image on a solid color background.");
                 sb.AppendLine("The UI should be clean, modern, and suitable for mobile games.");
                 sb.AppendLine("Style: 2D cartoon/anime style, vibrant colors, clear outlines.");
+                sb.AppendLine("CRITICAL: The background color MUST be a solid, uniform color that is completely different from ANY color used inside the UI element itself, to allow for easy chroma-keying/background removal.");
             }
             else
             {
