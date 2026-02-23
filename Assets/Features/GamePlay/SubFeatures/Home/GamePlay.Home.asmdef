@@ -1,11 +1,7 @@
 {
-    "name": "GamePlay",
+    "name": "GamePlay.Home",
     "rootNamespace": "",
-    "references": [
-        "Core",
-        "GamePlay.Homework",
-        "GamePlay.Home"
-    ],
+    "references": ["Core"],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
