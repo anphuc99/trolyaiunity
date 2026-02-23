@@ -11,6 +11,7 @@ interface CharacterPayload {
   name: string;
   personality: string;
   gender: CharacterGender;
+  age?: number | null;
   appearance?: string | null;
   avatar?: string | null;
   voiceModel?: "openai" | null;
@@ -124,6 +125,7 @@ const toResponse = (entity: CharacterEntity): CharacterResponse => ({
   name: entity.name,
   personality: entity.personality,
   gender: entity.gender,
+  age: entity.age ?? null,
   appearance: entity.appearance ?? null,
   avatar: entity.avatar ?? null,
   voiceModel: entity.voiceModel === "openai" ? "openai" : null,
@@ -137,6 +139,20 @@ const toResponse = (entity: CharacterEntity): CharacterResponse => ({
 const parseId = (value: string) => {
   const id = Number.parseInt(value, 10);
   return Number.isNaN(id) ? null : id;
+};
+
+const parseAge = (value: unknown) => {
+  if (value == null || value === "") {
+    return { value: null, valid: true as const };
+  }
+
+  const parsed = typeof value === "number" ? value : Number.parseInt(String(value), 10);
+
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 150) {
+    return { value: null, valid: false as const };
+  }
+
+  return { value: parsed, valid: true as const };
 };
 
 /**
@@ -184,12 +200,13 @@ export const createCharactersController = (dataSource: DataSource): CharactersCo
     const name = typeof payload?.name === "string" ? payload.name.trim() : "";
     const personality = typeof payload?.personality === "string" ? payload.personality.trim() : "";
     const gender = payload?.gender;
+    const age = parseAge(payload?.age);
     const voiceName = normalizeVoiceName(payload?.voiceName);
     const voiceModel = resolveVoiceModel(payload?.voiceModel, voiceName);
 
-    if (!name || !personality || !isValidGender(gender) || voiceModel === "invalid") {
+    if (!name || !personality || !isValidGender(gender) || voiceModel === "invalid" || !age.valid) {
       response.status(400).json({
-        message: "Name, personality, and gender are required"
+        message: "Name, personality, gender, and age are invalid"
       });
       return;
     }
@@ -199,6 +216,7 @@ export const createCharactersController = (dataSource: DataSource): CharactersCo
         name,
         personality,
         gender,
+        age: age.value,
         appearance: payload?.appearance ?? null,
         avatar: payload?.avatar ?? null,
         voiceModel,
@@ -239,12 +257,13 @@ export const createCharactersController = (dataSource: DataSource): CharactersCo
     const name = typeof payload?.name === "string" ? payload.name.trim() : "";
     const personality = typeof payload?.personality === "string" ? payload.personality.trim() : "";
     const gender = payload?.gender;
+    const age = parseAge(payload?.age);
     const voiceName = normalizeVoiceName(payload?.voiceName);
     const voiceModel = resolveVoiceModel(payload?.voiceModel, voiceName);
 
-    if (!name || !personality || !isValidGender(gender) || voiceModel === "invalid") {
+    if (!name || !personality || !isValidGender(gender) || voiceModel === "invalid" || !age.valid) {
       response.status(400).json({
-        message: "Name, personality, and gender are required"
+        message: "Name, personality, gender, and age are invalid"
       });
       return;
     }
@@ -267,6 +286,7 @@ export const createCharactersController = (dataSource: DataSource): CharactersCo
       character.name = name;
       character.personality = personality;
       character.gender = gender;
+      character.age = age.value;
       character.appearance = payload?.appearance ?? null;
       character.avatar = payload?.avatar ?? null;
       character.voiceModel = voiceModel;

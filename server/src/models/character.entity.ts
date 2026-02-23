@@ -26,6 +26,9 @@ class CharacterEntity {
   @Column({ type: "varchar", length: 12 })
   gender!: "male" | "female";
 
+  @Column({ type: "int", nullable: true })
+  age?: number | null;
+
   @Column({ type: "text", nullable: true })
   appearance?: string | null;
 
@@ -35,7 +38,7 @@ class CharacterEntity {
   @Column({ type: "varchar", length: 32, nullable: true })
   voiceModel?: string | null;
 
-  @Column({ type: "varchar", length: 64, nullable: true })
+  @Column({ type: "varchar", length: 64, nullable: true, default: "openai" })
   voiceName?: string | null;
 
   @Column({ type: "float", nullable: true })

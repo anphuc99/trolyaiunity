@@ -124,6 +124,8 @@ export const createChatController = (
     const name = typeof character.name === "string" ? character.name.trim() : "";
     const personality = typeof character.personality === "string" ? character.personality.trim() : "";
     const gender = typeof character.gender === "string" ? character.gender.trim() : "";
+    const ageRaw = typeof character.age === "number" ? character.age : Number.parseInt(String(character.age ?? ""), 10);
+    const age = Number.isInteger(ageRaw) && ageRaw >= 0 && ageRaw <= 150 ? ageRaw : null;
     const appearance = typeof character.appearance === "string" ? character.appearance.trim() : "";
 
     if (!name) {
@@ -134,6 +136,10 @@ export const createChatController = (
 
     if (gender) {
       lines.push(`Gender: ${gender}`);
+    }
+
+    if (age != null) {
+      lines.push(`Age: ${age}`);
     }
 
     if (personality) {

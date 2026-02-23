@@ -159,6 +159,7 @@ ${maybe("STORY PLOT", params.storyPlot)}${maybe("STORY DESCRIPTION", params.stor
 DIALOGUE RULES
 ====================================
 - Prefer 1-10 short sentences per reply.
+- Keep character traits consistent with any profile provided in developer/context messages (name, gender, age, personality, appearance).
 - If the user mixes Vietnamese/Korean, still respond in Korean.
 - If the user asks for translation/explanation, keep it short and at the same level.
 
