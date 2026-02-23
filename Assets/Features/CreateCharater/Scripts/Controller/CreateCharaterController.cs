@@ -18,6 +18,19 @@ namespace Features.CreateCharater.Controller
 	[Core.Infrastructure.Attributes.ControllerScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay)]
 	public static class CreateCharaterController
 	{
+		private sealed class CharacterCreateResponse
+		{
+			public int id;
+			public string message;
+			public string status;
+		}
+
+		private sealed class AvatarUploadResponse
+		{
+			public string url;
+			public string message;
+		}
+
 		/// <summary>
 		/// Called when the controller scope is entered.
 		/// </summary>
@@ -89,7 +102,85 @@ namespace Features.CreateCharater.Controller
 				return;
 			}
 
-			_ = SubmitCharacterAsync(payload);
+			var normalizedPayload = NormalizePayload(payload);
+			if (normalizedPayload == null)
+			{
+				EventBus.Publish(CreateCharaterEvents.CharacterCreationFailed, "Vui lòng nhập tên, mô tả và giới tính hợp lệ.");
+				return;
+			}
+
+			_ = SubmitCharacterAsync(normalizedPayload);
+		}
+
+		/// <summary>
+		/// Uploads avatar image to server and publishes resulting URL.
+		/// </summary>
+		/// <param name="payload">Avatar upload payload containing base64 data URL.</param>
+		[Request(CreateCharaterRequests.UploadAvatar)]
+		public static void UploadAvatar(AvatarUploadPayload payload)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.image))
+			{
+				EventBus.Publish(CreateCharaterEvents.AvatarUploadFailed, "Thiếu dữ liệu ảnh avatar.");
+				return;
+			}
+
+			_ = UploadAvatarAsync(payload);
+		}
+
+		private static CreateCharacterPayload NormalizePayload(CreateCharacterPayload payload)
+		{
+			var name = (payload.name ?? string.Empty).Trim();
+			var personality = (payload.personality ?? string.Empty).Trim();
+			var genderRaw = (payload.gender ?? string.Empty).Trim().ToLowerInvariant();
+
+			if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(personality))
+			{
+				return null;
+			}
+
+			var gender = string.Empty;
+			if (genderRaw == "male" || genderRaw == "nam")
+			{
+				gender = "male";
+			}
+			else if (genderRaw == "female" || genderRaw == "nu" || genderRaw == "nữ")
+			{
+				gender = "female";
+			}
+
+			if (string.IsNullOrWhiteSpace(gender))
+			{
+				return null;
+			}
+
+			int? age = null;
+			if (payload.age.HasValue)
+			{
+				var parsed = payload.age.Value;
+				if (parsed < 0 || parsed > 150)
+				{
+					return null;
+				}
+
+				age = parsed;
+			}
+
+			var voiceName = string.IsNullOrWhiteSpace(payload.voiceName) ? null : payload.voiceName.Trim();
+
+			return new CreateCharacterPayload
+			{
+				name = name,
+				age = age,
+				personality = personality,
+				gender = gender,
+				appearance = string.IsNullOrWhiteSpace(payload.appearance) ? null : payload.appearance.Trim(),
+				avatar = string.IsNullOrWhiteSpace(payload.avatar) ? null : payload.avatar.Trim(),
+				voiceModel = string.IsNullOrWhiteSpace(voiceName) ? null : "openai",
+				voiceName = voiceName,
+				pitch = payload.pitch,
+				speakingRate = payload.speakingRate
+			};
 		}
 
 		private static async Task SubmitCharacterAsync(CreateCharacterPayload payload)
@@ -101,13 +192,63 @@ namespace Features.CreateCharater.Controller
 				return;
 			}
 
-			// Assuming a simple success/fail check based on response content or similar
-			// For now, if we got a response, we'll treat it as success per fake server
+			try
+			{
+				var response = JsonConvert.DeserializeObject<CharacterCreateResponse>(result);
+				var isSuccess = response != null && (response.id > 0 || response.status == "success");
+
+				if (!isSuccess)
+				{
+					var message = response != null && !string.IsNullOrWhiteSpace(response.message)
+						? response.message
+						: "Tạo nhân vật thất bại.";
+					EventBus.Publish(CreateCharaterEvents.CharacterCreationFailed, message);
+					return;
+				}
+			}
+			catch (System.Exception)
+			{
+				if (!result.Contains("\"id\"") && !result.Contains("\"status\":\"success\""))
+				{
+					EventBus.Publish(CreateCharaterEvents.CharacterCreationFailed, "Tạo nhân vật thất bại.");
+					return;
+				}
+			}
+
 			EventBus.Publish(CreateCharaterEvents.CharacterCreationSucceeded);
 
 			if (Application.isPlaying)
 			{
 				LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.GamePlayGameplay);
+			}
+		}
+
+		private static async Task UploadAvatarAsync(AvatarUploadPayload payload)
+		{
+			var result = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.CharactersUploadAvatar, payload);
+			if (string.IsNullOrWhiteSpace(result))
+			{
+				EventBus.Publish(CreateCharaterEvents.AvatarUploadFailed, "Server không phản hồi khi upload avatar.");
+				return;
+			}
+
+			try
+			{
+				var response = JsonConvert.DeserializeObject<AvatarUploadResponse>(result);
+				if (response == null || string.IsNullOrWhiteSpace(response.url))
+				{
+					var message = response != null && !string.IsNullOrWhiteSpace(response.message)
+						? response.message
+						: "Upload avatar thất bại.";
+					EventBus.Publish(CreateCharaterEvents.AvatarUploadFailed, message);
+					return;
+				}
+
+				EventBus.Publish(CreateCharaterEvents.AvatarUploadSucceeded, response.url);
+			}
+			catch (System.Exception)
+			{
+				EventBus.Publish(CreateCharaterEvents.AvatarUploadFailed, "Upload avatar thất bại.");
 			}
 		}
 	}

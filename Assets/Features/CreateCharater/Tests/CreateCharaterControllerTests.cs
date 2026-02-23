@@ -62,9 +62,13 @@ namespace Features.CreateCharater.Tests
 			{
 				name = "Test Hero",
 				age = 25,
-				gender = "Male",
-				personality = new List<string> { "Dũng cảm" },
-				description = "A brave tester."
+				gender = "male",
+				personality = "A brave tester.",
+				appearance = "Blue jacket",
+				voiceModel = "openai",
+				voiceName = "alloy",
+				pitch = 0.2f,
+				speakingRate = 1.0f
 			};
 
 			CreateCharaterController.SubmitCharacter(payload);
@@ -72,6 +76,24 @@ namespace Features.CreateCharater.Tests
 			await UniTask.Delay(100);
 
 			Assert.IsTrue(success);
+		}
+
+		[Test]
+		public async UniTask UploadAvatar_PublishesSuccessEvent()
+		{
+			string uploadedUrl = null;
+			EventBus.Subscribe(CreateCharaterEvents.AvatarUploadSucceeded, payload => uploadedUrl = payload as string);
+
+			var payload = new AvatarUploadPayload
+			{
+				image = "data:image/png;base64,ZmFrZS1pbWFnZQ==",
+				filename = "avatar.png"
+			};
+
+			CreateCharaterController.UploadAvatar(payload);
+			await UniTask.Delay(100);
+
+			Assert.IsFalse(string.IsNullOrWhiteSpace(uploadedUrl));
 		}
 
 		private static void SetHttpClientSettings(NetworkSettings settings)

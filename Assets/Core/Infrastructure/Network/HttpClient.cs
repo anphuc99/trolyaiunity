@@ -289,6 +289,23 @@ namespace Core.Infrastructure.Network
 			int timeoutSeconds,
 			CancellationToken cancellationToken)
 		{
+			if (!UseFakeResponses() && string.IsNullOrWhiteSpace(AuthTokenModel.AccessToken))
+			{
+				if (!string.IsNullOrWhiteSpace(AuthTokenModel.RefreshToken))
+				{
+					Debug.LogWarning($"{LogPrefix} Access token is missing. Attempting refresh before request...");
+					var refreshed = await TryRefreshTokenAsync(cancellationToken);
+					if (!refreshed)
+					{
+						Debug.LogWarning($"{LogPrefix} Unable to refresh access token before request.");
+					}
+				}
+				else
+				{
+					Debug.LogWarning($"{LogPrefix} Access token and refresh token are both missing.");
+				}
+			}
+
 			// Try 1
 			var (response, code) = await SendSingleRequestAsync(createRequest, headers, timeoutSeconds, cancellationToken);
 

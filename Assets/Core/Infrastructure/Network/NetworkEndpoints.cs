@@ -11,6 +11,7 @@ namespace Core.Infrastructure.Network
 		public const string TokenValidate = "/api/token/validate";
 		public const string TokenRefresh = "/api/token/refresh";
 		public const string Characters = "/api/characters";
+		public const string CharactersUploadAvatar = "/api/characters/upload-avatar";
 		public const string Personalities = "/personalities";
 	}
 }
