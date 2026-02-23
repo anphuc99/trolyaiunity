@@ -1,4 +1,4 @@
-import jwt, { TokenExpiredError } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import type { AuthUser } from "../types/user.js";
 
 /** Access token expires in 1 hour. */
@@ -19,6 +19,10 @@ interface RefreshTokenPayload extends AuthUser {
 
 interface AccessTokenPayload extends AuthUser {
   type: typeof ACCESS_TOKEN_TYPE;
+}
+
+interface JwtTokenExpiredError extends Error {
+  name: "TokenExpiredError";
 }
 
 export interface AuthTokenPair {
@@ -138,6 +142,16 @@ export const verifyAuthToken = (token: string): AuthUser => {
  * @param error - The error to check.
  * @returns True if the error is a TokenExpiredError.
  */
-export const isTokenExpiredError = (error: unknown): error is TokenExpiredError => {
-  return error instanceof TokenExpiredError;
+export const isTokenExpiredError = (error: unknown): error is JwtTokenExpiredError => {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const tokenExpiredCtor = (jwt as unknown as { TokenExpiredError?: new (...args: unknown[]) => Error }).TokenExpiredError;
+
+  if (typeof tokenExpiredCtor === "function" && error instanceof tokenExpiredCtor) {
+    return true;
+  }
+
+  return error.name === "TokenExpiredError";
 };

@@ -1,5 +1,7 @@
 namespace Features.StartScene.Model
 {
+	using Newtonsoft.Json;
+
 	/// <summary>
 	/// Response payload returned by token validation.
 	/// </summary>
@@ -9,26 +11,31 @@ namespace Features.StartScene.Model
 		/// <summary>
 		/// True when token is valid.
 		/// </summary>
+		[JsonProperty("valid")]
 		public bool Valid;
-
-		/// <summary>
-		/// New access token returned after validation.
-		/// </summary>
-		public string AccessToken;
 
 		/// <summary>
 		/// New refresh token returned after validation.
 		/// </summary>
+		[JsonProperty("refreshToken")]
 		public string RefreshToken;
 
 		/// <summary>
-		/// User data returned upon successful validation.
+		/// Error text in server error shape.
 		/// </summary>
-		public UserData User;
+		[JsonProperty("error")]
+		public string Error;
 
 		/// <summary>
-		/// Error message when token is rejected.
+		/// Error text in server message shape.
 		/// </summary>
-		public string Error;
+		[JsonProperty("message")]
+		public string Message;
+
+		/// <summary>
+		/// User data returned upon successful validation (if present).
+		/// </summary>
+		[JsonProperty("user")]
+		public UserData User;
 	}
 }

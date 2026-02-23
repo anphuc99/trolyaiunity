@@ -1,5 +1,7 @@
 namespace Features.Login.Model
 {
+	using Newtonsoft.Json;
+
 	/// <summary>
 	/// Payload used to submit login credentials.
 	/// </summary>
@@ -9,11 +11,13 @@ namespace Features.Login.Model
 		/// <summary>
 		/// Username value.
 		/// </summary>
+		[JsonProperty("username")]
 		public string Username;
 
 		/// <summary>
 		/// Password value.
 		/// </summary>
+		[JsonProperty("password")]
 		public string Password;
 	}
 }

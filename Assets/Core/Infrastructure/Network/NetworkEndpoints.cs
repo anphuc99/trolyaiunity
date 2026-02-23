@@ -5,12 +5,12 @@ namespace Core.Infrastructure.Network
 	/// </summary>
 	public static class NetworkEndpoints
 	{
-		public const string Health = "/health";
-		public const string Version = "/version";
-		public const string Login = "/login";
-		public const string TokenValidate = "/token/validate";
-		public const string TokenRefresh = "/token/refresh";
-		public const string Characters = "/characters";
+		public const string Health = "/api/health";
+		public const string Version = "/api/version";
+		public const string Login = "/api/users/login";
+		public const string TokenValidate = "/api/token/validate";
+		public const string TokenRefresh = "/api/token/refresh";
+		public const string Characters = "/api/characters";
 		public const string Personalities = "/personalities";
 	}
 }

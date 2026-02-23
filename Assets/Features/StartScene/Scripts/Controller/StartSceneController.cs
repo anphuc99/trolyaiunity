@@ -74,7 +74,7 @@ namespace Features.StartScene.Controller
 
 			var payload = new TokenValidationRequestPayload
 			{
-				Token = refreshToken
+				RefreshToken = refreshToken
 			};
 
 			var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.TokenValidate, payload);
@@ -85,16 +85,47 @@ namespace Features.StartScene.Controller
 			}
 
 			var response = JsonConvert.DeserializeObject<TokenValidationResponsePayload>(responseJson);
-			if (response != null && response.Valid)
+			if (response != null && response.Valid && !string.IsNullOrWhiteSpace(response.RefreshToken))
 			{
-				AuthTokenModel.AccessToken = response.AccessToken;
 				AuthTokenModel.RefreshToken = response.RefreshToken;
-				AcceptToken(response.AccessToken);
+
+				var refreshPayload = new TokenRefreshRequest
+				{
+					RefreshToken = response.RefreshToken
+				};
+
+				var refreshResponseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.TokenRefresh, refreshPayload);
+				if (string.IsNullOrWhiteSpace(refreshResponseJson))
+				{
+					RejectToken("Empty refresh response.");
+					return;
+				}
+
+				var refreshResponse = JsonConvert.DeserializeObject<TokenRefreshResponse>(refreshResponseJson);
+				if (refreshResponse != null && !string.IsNullOrWhiteSpace(refreshResponse.AccessToken))
+				{
+					AuthTokenModel.AccessToken = refreshResponse.AccessToken;
+					if (!string.IsNullOrWhiteSpace(refreshResponse.RefreshToken))
+					{
+						AuthTokenModel.RefreshToken = refreshResponse.RefreshToken;
+					}
+					AcceptToken(refreshResponse.AccessToken);
+					return;
+				}
+
+				var refreshError = refreshResponse != null && !string.IsNullOrWhiteSpace(refreshResponse.Error)
+					? refreshResponse.Error
+					: refreshResponse != null && !string.IsNullOrWhiteSpace(refreshResponse.Message)
+						? refreshResponse.Message
+						: "Token refresh rejected.";
+				RejectToken(refreshError);
 				return;
 			}
 
 			var errorMessage = response != null && !string.IsNullOrWhiteSpace(response.Error)
 				? response.Error
+				: response != null && !string.IsNullOrWhiteSpace(response.Message)
+					? response.Message
 				: "Token rejected.";
 			RejectToken(errorMessage);
 		}

@@ -51,12 +51,13 @@ namespace Core.Tests.Network
 		[Test]
 		public void TryGetResponse_ValidatesLoginCredentials()
 		{
-			var payload = "{\"Username\":\"mimi\",\"Password\":\"123456\"}";
+			var payload = "{\"username\":\"mimi\",\"password\":\"123456\"}";
 
 			var found = FakeServer.TryGetResponse("POST", NetworkEndpoints.Login, payload, out var response);
 
 			Assert.IsTrue(found);
-			Assert.AreEqual("{\"Token\":\"fake-jwt\"}", response);
+			StringAssert.Contains("\"accessToken\":\"fake-access-token\"", response);
+			StringAssert.Contains("\"refreshToken\":\"fake-refresh-token\"", response);
 		}
 
 		/// <summary>
@@ -79,14 +80,15 @@ namespace Core.Tests.Network
 		[Test]
 		public void TryGetResponse_ValidatesTokenAccepted()
 		{
-			var payload = "{\"Token\":\"fake-jwt\"}";
+			var payload = "{\"refreshToken\":\"fake-refresh-token\"}";
 
 			var found = FakeServer.TryGetResponse("POST", NetworkEndpoints.TokenValidate, payload, out var response);
 
 			Assert.IsTrue(found);
 			var validation = JsonConvert.DeserializeObject<TokenValidationResponse>(response);
 			Assert.IsTrue(validation.Valid);
-			Assert.IsTrue(string.IsNullOrWhiteSpace(validation.Error));
+			Assert.AreEqual("new-refresh-token", validation.RefreshToken);
+			Assert.IsTrue(string.IsNullOrWhiteSpace(validation.Message));
 		}
 
 		/// <summary>
@@ -95,14 +97,14 @@ namespace Core.Tests.Network
 		[Test]
 		public void TryGetResponse_ValidatesTokenRejected()
 		{
-			var payload = "{\"Token\":\"bad-token\"}";
+			var payload = "{\"refreshToken\":\"bad-token\"}";
 
 			var found = FakeServer.TryGetResponse("POST", NetworkEndpoints.TokenValidate, payload, out var response);
 
 			Assert.IsTrue(found);
 			var validation = JsonConvert.DeserializeObject<TokenValidationResponse>(response);
 			Assert.IsFalse(validation.Valid);
-			Assert.AreEqual("Invalid token", validation.Error);
+			Assert.AreEqual("Invalid refresh token", validation.Message);
 		}
 
 		/// <summary>
@@ -111,21 +113,22 @@ namespace Core.Tests.Network
 		[Test]
 		public void TryGetResponse_ValidatesTokenExpired()
 		{
-			var payload = "{\"Token\":\"fake-jwt-expired\"}";
+			var payload = "{\"refreshToken\":\"fake-refresh-token-expired\"}";
 
 			var found = FakeServer.TryGetResponse("POST", NetworkEndpoints.TokenValidate, payload, out var response);
 
 			Assert.IsTrue(found);
 			var validation = JsonConvert.DeserializeObject<TokenValidationResponse>(response);
 			Assert.IsFalse(validation.Valid);
-			Assert.AreEqual("Token expired", validation.Error);
+			Assert.AreEqual("Refresh token has expired", validation.Message);
 		}
 
 		[System.Serializable]
 		private sealed class TokenValidationResponse
 		{
 			public bool Valid;
-			public string Error;
+			public string Message;
+			public string RefreshToken;
 		}
 	}
 }

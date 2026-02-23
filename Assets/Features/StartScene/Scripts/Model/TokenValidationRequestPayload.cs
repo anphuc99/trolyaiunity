@@ -1,5 +1,7 @@
 namespace Features.StartScene.Model
 {
+	using Newtonsoft.Json;
+
 	/// <summary>
 	/// Payload used to validate an auth token.
 	/// </summary>
@@ -7,8 +9,9 @@ namespace Features.StartScene.Model
 	public sealed class TokenValidationRequestPayload
 	{
 		/// <summary>
-		/// JWT token to validate.
+		/// Refresh token to validate.
 		/// </summary>
-		public string Token;
+		[JsonProperty("refreshToken")]
+		public string RefreshToken;
 	}
 }

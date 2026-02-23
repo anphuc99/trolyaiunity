@@ -18,7 +18,7 @@ namespace Core.Infrastructure.Network
 		private const string LogPrefix = "[HttpClient]";
 		private const string JsonContentType = "application/json";
 		private const string SettingsResourcePath = "NetworkSettings";
-		private const string DefaultBaseUrl = "http://localhost:5000";
+		private const string DefaultBaseUrl = "http://localhost:4000";
 		private static NetworkSettings _settings;
 		private static readonly SemaphoreSlim _refreshSemaphore = new SemaphoreSlim(1, 1);
 		private static bool _isRefreshing;
@@ -198,9 +198,24 @@ namespace Core.Infrastructure.Network
 			var baseUrl = ResolveBaseUrl();
 			var normalizedBase = baseUrl?.TrimEnd('/') ?? string.Empty;
 			var normalizedPath = url.TrimStart('/');
+
+			if (normalizedBase.EndsWith("/api", System.StringComparison.OrdinalIgnoreCase))
+			{
+				if (normalizedPath.Equals("api", System.StringComparison.OrdinalIgnoreCase))
+				{
+					normalizedPath = string.Empty;
+				}
+				else if (normalizedPath.StartsWith("api/", System.StringComparison.OrdinalIgnoreCase))
+				{
+					normalizedPath = normalizedPath.Substring(4);
+				}
+			}
+
 			return string.IsNullOrEmpty(normalizedBase)
 				? normalizedPath
-				: $"{normalizedBase}/{normalizedPath}";
+				: string.IsNullOrEmpty(normalizedPath)
+					? normalizedBase
+					: $"{normalizedBase}/{normalizedPath}";
 		}
 
 		private static string ResolveBaseUrl()

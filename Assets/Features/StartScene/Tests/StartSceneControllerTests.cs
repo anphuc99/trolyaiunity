@@ -70,10 +70,10 @@ namespace Features.StartScene.Tests
 			string error = null;
 			EventBus.Subscribe(StartSceneEvents.TokenRejected, payload => error = payload as string);
 
-			AuthTokenModel.RefreshToken = "fake-jwt-expired";
+			AuthTokenModel.RefreshToken = "fake-refresh-token-expired";
 			await StartSceneController.CheckTokenAsync();
 
-			Assert.AreEqual("Token expired", error);
+			Assert.AreEqual("Refresh token has expired", error);
 		}
 
 		private static void SetHttpClientSettings(NetworkSettings settings)

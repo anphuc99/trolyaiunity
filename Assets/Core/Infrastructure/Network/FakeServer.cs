@@ -18,6 +18,7 @@ namespace Core.Infrastructure.Network
 			{ BuildKey("GET", NetworkEndpoints.Version), _ => "{\"version\":\"0.0.1\"}" },
 			{ BuildKey("POST", NetworkEndpoints.Login), BuildLoginResponse },
 			{ BuildKey("POST", NetworkEndpoints.TokenValidate), BuildTokenValidationResponse },
+			{ BuildKey("POST", NetworkEndpoints.TokenRefresh), BuildTokenRefreshResponse },
 			{ BuildKey("GET", NetworkEndpoints.Characters), _ => "[]" },
 			{ BuildKey("POST", NetworkEndpoints.Characters), _ => "{\"status\":\"success\"}" },
 			{ BuildKey("GET", NetworkEndpoints.Personalities), _ => BuildPersonalitiesResponse() }
@@ -98,36 +99,57 @@ namespace Core.Infrastructure.Network
 				var refreshToken = "fake-refresh-token";
 				RegisterToken(accessToken);
 				RegisterToken(refreshToken);
-				return "{\"AccessToken\":\"fake-access-token\",\"RefreshToken\":\"fake-refresh-token\",\"Role\":1}";
+				return "{\"accessToken\":\"fake-access-token\",\"refreshToken\":\"fake-refresh-token\",\"role\":1}";
 			}
 
-			return "{\"Error\":\"Invalid credentials\"}";
+			return "{\"message\":\"Invalid credentials\"}";
 		}
 
 		private static string BuildTokenValidationResponse(string jsonPayload)
 		{
 			var request = ParseTokenValidationPayload(jsonPayload);
-			if (request == null || string.IsNullOrWhiteSpace(request.Token))
+			if (request == null || string.IsNullOrWhiteSpace(request.RefreshToken))
 			{
-				return SerializeTokenValidationResponse(false, "Missing token", null, null);
+				return SerializeTokenValidationResponse(false, "Refresh token is required", null);
 			}
 
-			if (!IsTokenKnown(request.Token))
+			if (!IsTokenKnown(request.RefreshToken))
 			{
-				return SerializeTokenValidationResponse(false, "Invalid token", null, null);
+				return SerializeTokenValidationResponse(false, "Invalid refresh token", null);
 			}
 
-			if (IsTokenExpired(request.Token))
+			if (IsTokenExpired(request.RefreshToken))
 			{
-				return SerializeTokenValidationResponse(false, "Token expired", null, null);
+				return SerializeTokenValidationResponse(false, "Refresh token has expired", null);
+			}
+
+			var newRefreshToken = "new-refresh-token";
+			RegisterToken(newRefreshToken);
+
+			return SerializeTokenValidationResponse(true, null, newRefreshToken);
+		}
+
+		private static string BuildTokenRefreshResponse(string jsonPayload)
+		{
+			var request = ParseTokenValidationPayload(jsonPayload);
+			if (request == null || string.IsNullOrWhiteSpace(request.RefreshToken))
+			{
+				return "{\"message\":\"Refresh token is required\"}";
+			}
+
+			if (!IsTokenKnown(request.RefreshToken))
+			{
+				return "{\"message\":\"Invalid refresh token\"}";
+			}
+
+			if (IsTokenExpired(request.RefreshToken))
+			{
+				return "{\"code\":\"TOKEN_EXPIRED\",\"message\":\"Refresh token has expired\"}";
 			}
 
 			var newAccessToken = "new-access-token";
-			var newRefreshToken = "new-refresh-token";
 			RegisterToken(newAccessToken);
-			RegisterToken(newRefreshToken);
-
-			return SerializeTokenValidationResponse(true, null, newAccessToken, newRefreshToken);
+			return "{\"accessToken\":\"new-access-token\"}";
 		}
 
 		private static string BuildPersonalitiesResponse()
@@ -236,6 +258,8 @@ namespace Core.Infrastructure.Network
 		{
 			return TokenExpirations.ContainsKey(token)
 				|| string.Equals(token, "fake-jwt", StringComparison.Ordinal)
+				|| string.Equals(token, "fake-refresh-token", StringComparison.Ordinal)
+				|| string.Equals(token, "new-refresh-token", StringComparison.Ordinal)
 				|| token.EndsWith("-expired", StringComparison.Ordinal);
 		}
 
@@ -259,13 +283,12 @@ namespace Core.Infrastructure.Network
 			return false;
 		}
 
-		private static string SerializeTokenValidationResponse(bool valid, string error, string accessToken, string refreshToken)
+		private static string SerializeTokenValidationResponse(bool valid, string message, string refreshToken)
 		{
 			var response = new TokenValidationResponse
 			{
 				Valid = valid,
-				Error = error,
-				AccessToken = accessToken,
+				Message = message,
 				RefreshToken = refreshToken,
 				User = valid ? new FakeUser { id = 1, username = "admin", role = 1 } : null
 			};
@@ -283,24 +306,31 @@ namespace Core.Infrastructure.Network
 		[Serializable]
 		private sealed class LoginPayload
 		{
+			[JsonProperty("username")]
 			public string Username;
+			[JsonProperty("password")]
 			public string Password;
+			[JsonProperty("passwork")]
 			public string Passwork;
 		}
 
 		[Serializable]
 		private sealed class TokenValidationPayload
 		{
-			public string Token;
+			[JsonProperty("refreshToken")]
+			public string RefreshToken;
 		}
 
 		[Serializable]
 		private sealed class TokenValidationResponse
 		{
+			[JsonProperty("valid")]
 			public bool Valid;
-			public string Error;
-			public string AccessToken;
+			[JsonProperty("message")]
+			public string Message;
+			[JsonProperty("refreshToken")]
 			public string RefreshToken;
+			[JsonProperty("user")]
 			public FakeUser User;
 		}
 	}

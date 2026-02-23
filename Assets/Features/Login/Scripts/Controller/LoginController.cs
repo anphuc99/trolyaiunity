@@ -96,6 +96,8 @@ namespace Features.Login.Controller
 			AuthTokenModel.RefreshToken = null;
 			var errorMessage = response != null && !string.IsNullOrWhiteSpace(response.Error)
 				? response.Error
+				: response != null && !string.IsNullOrWhiteSpace(response.Message)
+					? response.Message
 				: "Invalid credentials.";
 			EventBus.Publish(LoginEvents.LoginFailed, errorMessage);
 		}
