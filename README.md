@@ -20,7 +20,21 @@ It provides:
 - Event publishing from Controller to View via `EventBus.Publish("key", payload)`.
 - Attribute-based view binding via `[OnEvent("key")]` and `BaseView`.
 - Controller scoping via `[ControllerScope(ControllerScopeKey.ScopeName)]` with `[ControllerInit]` / `[ControllerShutdown]` hooks.
+- Cross-scope shared state via `Core.Infrastructure.State.GlobalVariables`.
 - Scene names should match `ControllerScopeKey` enum values for auto activation.
+
+### GlobalVariables (Cross-scope shared data)
+
+`Core.Infrastructure.State.GlobalVariables` is a process-wide key-value store for passing data between scopes.
+
+- Read access: available to any scope.
+- Write access (`Set`, `Remove`, `Clear`): allowed only when called from Controller code.
+- Key API:
+	- `Set(string key, object value)`
+	- `TryGet<T>(string key, out T value)`
+	- `GetOrDefault<T>(string key, T fallback = default)`
+	- `Remove(string key)`
+	- `Clear()`
 
 ## Feature Generator Tool
 
