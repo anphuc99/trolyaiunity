@@ -43,7 +43,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private AudioSource _characterVoiceAudioSource;
 
 		private readonly Queue<ChatAssistantTurnPayload> _pendingCharacterTurns = new Queue<ChatAssistantTurnPayload>();
-		private readonly HashSet<string> _reloadingTtsMessageIds = new HashSet<string>(StringComparer.Ordinal);
+		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
 		private bool _isProcessingCharacterTurns;
 		private NetworkSettings _networkSettings;
 
@@ -155,7 +155,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_messageContainer.OnMessageSpeakerLongPressed = null;
 				_messageContainer.OnMessageTranslateClicked = null;
 			}
-			_reloadingTtsMessageIds.Clear();
+			_reloadingTtsMessageIndices.Clear();
 			if (_characterVoiceAudioSource != null)
 			{
 				_characterVoiceAudioSource.Stop();
@@ -516,7 +516,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			if (_reloadingTtsMessageIds.Contains(messageData.MessageId) || messageData.IsTtsReloading)
+			if (_reloadingTtsMessageIndices.Contains(messageData.MessageIndex) || messageData.IsTtsReloading)
 			{
 				return;
 			}
@@ -542,7 +542,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			if (string.IsNullOrWhiteSpace(messageData.MessageId) || _reloadingTtsMessageIds.Contains(messageData.MessageId))
+			if (messageData.MessageIndex < 0 || _reloadingTtsMessageIndices.Contains(messageData.MessageIndex))
 			{
 				return;
 			}
@@ -552,20 +552,20 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		private IEnumerator ForceReloadMessageTts(MessageBubbleData messageData)
 		{
-			if (_messageContainer == null || messageData == null || string.IsNullOrWhiteSpace(messageData.MessageId))
+			if (_messageContainer == null || messageData == null || messageData.MessageIndex < 0)
 			{
 				yield break;
 			}
 
-			var messageId = messageData.MessageId;
-			_reloadingTtsMessageIds.Add(messageId);
-			_messageContainer.SetMessageTtsReloading(messageId, true);
+			var messageIndex = messageData.MessageIndex;
+			_reloadingTtsMessageIndices.Add(messageIndex);
+			_messageContainer.SetMessageTtsReloading(messageIndex, true);
 
 			var baseText = string.IsNullOrWhiteSpace(messageData.OriginalMessage) ? messageData.Message : messageData.OriginalMessage;
 			if (string.IsNullOrWhiteSpace(baseText))
 			{
-				_messageContainer.SetMessageTtsReloading(messageId, false);
-				_reloadingTtsMessageIds.Remove(messageId);
+				_messageContainer.SetMessageTtsReloading(messageIndex, false);
+				_reloadingTtsMessageIndices.Remove(messageIndex);
 				yield break;
 			}
 
@@ -583,8 +583,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				yield return StartCoroutine(PlayCharacterVoiceAsync(clip));
 			}
 
-			_messageContainer.SetMessageTtsReloading(messageId, false);
-			_reloadingTtsMessageIds.Remove(messageId);
+			_messageContainer.SetMessageTtsReloading(messageIndex, false);
+			_reloadingTtsMessageIndices.Remove(messageIndex);
 		}
 
 		private void HandleMessageTranslateClicked(MessageBubbleData messageData)
@@ -594,7 +594,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			if (string.IsNullOrWhiteSpace(messageData.MessageId) && string.IsNullOrWhiteSpace(messageData.Translation))
+			if (messageData.MessageIndex < 0 && string.IsNullOrWhiteSpace(messageData.Translation))
 			{
 				return;
 			}

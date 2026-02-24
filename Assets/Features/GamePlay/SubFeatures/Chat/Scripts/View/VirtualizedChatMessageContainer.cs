@@ -46,6 +46,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[Min(1)]
 		private int _maxSpawnedObjects = 24;
 
+		[SerializeField]
 		private List<MessageBubbleData> _messages = new();
 
 		private readonly List<MessageBubble> _characterPool = new();
@@ -98,6 +99,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			_scrollOffset = 0f;
+			SyncMessageIndices();
 			EnsureMeasureBubbles();
 			RebuildMetrics();
 			RefreshVisible();
@@ -110,6 +112,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		public void AddNewMessage(MessageBubbleData message)
 		{
 			_messages.Add(message ?? new MessageBubbleData());
+			SyncMessageIndices();
 			RebuildMetrics();
 			_scrollOffset = GetMaxScrollOffset();
 			RefreshVisible();
@@ -157,21 +160,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		}
 
 		/// <summary>
-		/// Toggles translation display for one message by id.
-		/// </summary>
-		/// <param name="messageId">Target message id.</param>
-		/// <param name="translation">Translation text.</param>
-		public void ToggleMessageTranslation(string messageId, string translation)
-		{
-			if (string.IsNullOrWhiteSpace(messageId))
-			{
-				return;
-			}
-
-			ToggleMessageTranslationInternal(null, messageId, translation);
-		}
-
-		/// <summary>
 		/// Toggles translation display for a specific message instance.
 		/// </summary>
 		/// <param name="messageData">Message instance from bubble callback.</param>
@@ -182,12 +170,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			ToggleMessageTranslationInternal(messageData, messageData.MessageId, messageData.Translation);
+			ToggleMessageTranslationInternal(messageData, messageData.MessageIndex, messageData.Translation);
 		}
 
-		private void ToggleMessageTranslationInternal(MessageBubbleData targetMessage, string messageId, string translation)
+		private void ToggleMessageTranslationInternal(MessageBubbleData targetMessage, int messageIndex, string translation)
 		{
-			if (targetMessage == null && string.IsNullOrWhiteSpace(messageId))
+			if (targetMessage == null && messageIndex < 0)
 			{
 				return;
 			}
@@ -204,7 +192,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					continue;
 				}
 
-				if (!ReferenceEquals(message, targetMessage) && !string.Equals(message.MessageId, messageId, StringComparison.Ordinal))
+				if (!ReferenceEquals(message, targetMessage) && message.MessageIndex != messageIndex)
 				{
 					continue;
 				}
@@ -250,11 +238,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		/// <summary>
 		/// Sets TTS reloading state for a message and refreshes visible bubbles.
 		/// </summary>
-		/// <param name="messageId">Target message id.</param>
+		/// <param name="messageIndex">Target message index.</param>
 		/// <param name="isReloading">Reloading state.</param>
-		public void SetMessageTtsReloading(string messageId, bool isReloading)
+		public void SetMessageTtsReloading(int messageIndex, bool isReloading)
 		{
-			if (string.IsNullOrWhiteSpace(messageId))
+			if (messageIndex < 0)
 			{
 				return;
 			}
@@ -268,7 +256,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					continue;
 				}
 
-				if (!string.Equals(message.MessageId, messageId, StringComparison.Ordinal))
+				if (message.MessageIndex != messageIndex)
 				{
 					continue;
 				}
@@ -296,6 +284,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		public void AddOldMessage(MessageBubbleData message)
 		{
 			_messages.Insert(0, message ?? new MessageBubbleData());
+			SyncMessageIndices();
 			RebuildMetrics();
 			if (_messageHeights.Count > 0)
 			{
@@ -577,6 +566,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		private void RebuildMetrics()
 		{
+			SyncMessageIndices();
 			_messageHeights.Clear();
 			_prefixHeights.Clear();
 			_prefixHeights.Add(0f);
@@ -595,6 +585,19 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_messageHeights.Add(itemHeight);
 				_totalHeight += itemHeight;
 				_prefixHeights.Add(_totalHeight);
+			}
+		}
+
+		private void SyncMessageIndices()
+		{
+			for (var i = 0; i < _messages.Count; i++)
+			{
+				if (_messages[i] == null)
+				{
+					continue;
+				}
+
+				_messages[i].MessageIndex = i;
 			}
 		}
 

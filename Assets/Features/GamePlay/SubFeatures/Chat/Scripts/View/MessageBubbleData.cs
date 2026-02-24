@@ -50,6 +50,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[SerializeField]
 		private bool _isTtsReloading;
 
+		[SerializeField]
+		private int _messageIndex = -1;
+
 		/// <summary>
 		/// Unique message identifier.
 		/// </summary>
@@ -138,6 +141,15 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			get => _isTtsReloading;
 			set => _isTtsReloading = value;
+		}
+
+		/// <summary>
+		/// Runtime index of message in current container list.
+		/// </summary>
+		public int MessageIndex
+		{
+			get => _messageIndex;
+			set => _messageIndex = value;
 		}
 	}
 }
