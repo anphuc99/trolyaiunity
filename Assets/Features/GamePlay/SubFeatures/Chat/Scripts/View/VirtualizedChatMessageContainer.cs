@@ -192,6 +192,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
+			var previousMaxScrollOffset = GetMaxScrollOffset();
+			var wasPinnedToBottom = Mathf.Abs(_scrollOffset - previousMaxScrollOffset) <= 2f;
+
 			var updated = false;
 			for (var i = 0; i < _messages.Count; i++)
 			{
@@ -236,6 +239,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (updated)
 			{
 				RebuildMetrics();
+				if (wasPinnedToBottom)
+				{
+					_scrollOffset = GetMaxScrollOffset();
+				}
 				RefreshVisible();
 			}
 		}
