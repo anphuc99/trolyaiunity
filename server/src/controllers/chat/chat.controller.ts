@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { randomUUID } from "crypto";
 import type { DataSource } from "typeorm";
 import { createOpenAIChatService, type OpenAIChatService } from "../../services/openai.service.js";
 import { createGeminiChatService, isGeminiModel, type GeminiChatService } from "../../services/gemini.service.js";
@@ -261,6 +262,61 @@ export const createChatController = (
     return [];
   };
 
+  const collectAssistantMessageIds = (messages: { role: string; content: string }[]) => {
+    const ids = new Set<string>();
+
+    for (const message of messages) {
+      if (message.role !== "assistant") {
+        continue;
+      }
+
+      const turns = parseAssistantReply(message.content);
+      for (const turn of turns) {
+        const messageId = typeof turn.MessageId === "string" ? turn.MessageId.trim() : "";
+        if (!messageId) {
+          continue;
+        }
+
+        ids.add(messageId);
+      }
+    }
+
+    return ids;
+  };
+
+  const normalizeAssistantReplyMessageIds = (reply: string, usedIds: Set<string>) => {
+    const turns = parseAssistantReply(reply);
+    if (!turns.length) {
+      return reply;
+    }
+
+    let hasChanged = false;
+    const normalizedTurns = turns.map((turn) => {
+      const currentId = typeof turn.MessageId === "string" ? turn.MessageId.trim() : "";
+      const shouldReplaceId = !currentId || usedIds.has(currentId);
+
+      if (!shouldReplaceId) {
+        usedIds.add(currentId);
+        return turn;
+      }
+
+      let nextId = randomUUID();
+      while (usedIds.has(nextId)) {
+        nextId = randomUUID();
+      }
+
+      usedIds.add(nextId);
+      hasChanged = true;
+      return { ...turn, MessageId: nextId };
+    });
+
+    if (!hasChanged) {
+      return reply;
+    }
+
+    return JSON.stringify(normalizedTurns);
+  };
+
   /**
    * Finds the history index for the Nth user message.
    *
@@ -452,13 +508,17 @@ export const createChatController = (
         modelOverride || undefined
       );
 
+      const normalizedReply = useGemini
+        ? normalizeAssistantReplyMessageIds(result.reply, collectAssistantMessageIds(history))
+        : result.reply;
+
       await historyStore.append(request.user.id, [
         { role: "user", content: message },
-        { role: "assistant", content: result.reply }
+        { role: "assistant", content: normalizedReply }
       ]);
 
       response.json({
-        reply: result.reply,
+        reply: normalizedReply,
         model: result.model
       });
     } catch (error) {
@@ -634,17 +694,21 @@ export const createChatController = (
         historyForAI,
         modelOverride || undefined
       );
+
+      const normalizedReply = useGemini
+        ? normalizeAssistantReplyMessageIds(result.reply, collectAssistantMessageIds(prefixWithoutSystem))
+        : result.reply;
       const nextMessages: ChatHistoryMessage[] = [
         ...prefixWithoutSystem,
         { role: "user", content: editedContent },
-        { role: "assistant", content: result.reply }
+        { role: "assistant", content: normalizedReply }
       ];
 
       await historyStore.append(request.user.id, nextMessages);
 
       response.json({
         messages: nextMessages.filter((message) => message.role !== "system" && message.role !== "developer"),
-        reply: result.reply,
+        reply: normalizedReply,
         model: result.model
       });
     } catch (error) {
