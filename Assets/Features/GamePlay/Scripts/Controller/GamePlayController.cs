@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using Features.GamePlay.Events;
 using Features.GamePlay.Infrastructure;
 using Features.GamePlay.Infrastructure.Attributes;
@@ -30,9 +31,10 @@ namespace Features.GamePlay.Controller
 		/// Called when the controller scope is entered.
 		/// </summary>
 		[Core.Infrastructure.Attributes.ControllerInit]
-		public static void OnEnterScope()
+		public static async void OnEnterScope()
 		{
 			SetAllSubControllerSignals();
+			await Task.Yield();
 			InstallSubController(GamePlaySubControllerType.Home);
 		}
 
