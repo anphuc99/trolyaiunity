@@ -8,5 +8,7 @@ namespace Features.GamePlay.SubFeatures.Home.Events
 	public static class HomeEvents
 	{
 		public const string Echoed = "game.play.home.echo.event";
+		public const string Installed = "game.play.home.installed.event";
+		public const string Uninstalled = "game.play.home.uninstalled.event";
 	}
 }

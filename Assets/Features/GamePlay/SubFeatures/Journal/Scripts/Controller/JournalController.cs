@@ -33,6 +33,7 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		/// </summary>
 		public static void Install()
 		{
+			EventBus.Publish(JournalEvents.Installed, null);
 		}
 
 		/// <summary>
@@ -40,6 +41,7 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		/// </summary>
 		public static void Uninstall()
 		{
+			EventBus.Publish(JournalEvents.Uninstalled, null);
 		}
 
 		/// <summary>

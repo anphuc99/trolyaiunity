@@ -33,6 +33,7 @@ namespace Features.GamePlay.SubFeatures.Story.Controller
 		/// </summary>
 		public static void Install()
 		{
+			EventBus.Publish(StoryEvents.Installed, null);
 		}
 
 		/// <summary>
@@ -40,6 +41,7 @@ namespace Features.GamePlay.SubFeatures.Story.Controller
 		/// </summary>
 		public static void Uninstall()
 		{
+			EventBus.Publish(StoryEvents.Uninstalled, null);
 		}
 
 		/// <summary>

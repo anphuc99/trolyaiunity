@@ -8,5 +8,7 @@ namespace Features.GamePlay.SubFeatures.Practice.Events
 	public static class PracticeEvents
 	{
 		public const string Echoed = "game.play.practice.echo.event";
+		public const string Installed = "game.play.practice.installed.event";
+		public const string Uninstalled = "game.play.practice.uninstalled.event";
 	}
 }

@@ -33,6 +33,7 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 		/// </summary>
 		public static void Install()
 		{
+			EventBus.Publish(PracticeEvents.Installed, null);
 		}
 
 		/// <summary>
@@ -40,6 +41,7 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 		/// </summary>
 		public static void Uninstall()
 		{
+			EventBus.Publish(PracticeEvents.Uninstalled, null);
 		}
 
 		/// <summary>

@@ -31,5 +31,25 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			Debug.Log("[ChatView] Echoed: " + payload, this);
 		}
+
+		/// <summary>
+		/// Shows this subfeature view when its controller is installed.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[OnEvent(ChatEvents.Installed)]
+		private void OnInstalled(object payload)
+		{
+			gameObject.SetActive(true);
+		}
+
+		/// <summary>
+		/// Hides this subfeature view when its controller is uninstalled.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[OnEvent(ChatEvents.Uninstalled)]
+		private void OnUninstalled(object payload)
+		{
+			gameObject.SetActive(false);
+		}
 	}
 }

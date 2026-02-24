@@ -33,6 +33,7 @@ namespace Features.GamePlay.SubFeatures.Home.Controller
 		/// </summary>
 		public static void Install()
 		{
+			EventBus.Publish(HomeEvents.Installed, null);
 		}
 
 		/// <summary>
@@ -40,6 +41,7 @@ namespace Features.GamePlay.SubFeatures.Home.Controller
 		/// </summary>
 		public static void Uninstall()
 		{
+			EventBus.Publish(HomeEvents.Uninstalled, null);
 		}
 
 		/// <summary>

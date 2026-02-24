@@ -31,5 +31,25 @@ namespace Features.GamePlay.SubFeatures.Story.View
 		{
 			Debug.Log("[StoryView] Echoed: " + payload, this);
 		}
+
+		/// <summary>
+		/// Shows this subfeature view when its controller is installed.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[OnEvent(StoryEvents.Installed)]
+		private void OnInstalled(object payload)
+		{
+			gameObject.SetActive(true);
+		}
+
+		/// <summary>
+		/// Hides this subfeature view when its controller is uninstalled.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[OnEvent(StoryEvents.Uninstalled)]
+		private void OnUninstalled(object payload)
+		{
+			gameObject.SetActive(false);
+		}
 	}
 }

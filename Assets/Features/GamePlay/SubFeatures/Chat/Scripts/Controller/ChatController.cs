@@ -33,6 +33,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		/// </summary>
 		public static void Install()
 		{
+			EventBus.Publish(ChatEvents.Installed, null);
 		}
 
 		/// <summary>
@@ -40,6 +41,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		/// </summary>
 		public static void Uninstall()
 		{
+			EventBus.Publish(ChatEvents.Uninstalled, null);
 		}
 
 		/// <summary>

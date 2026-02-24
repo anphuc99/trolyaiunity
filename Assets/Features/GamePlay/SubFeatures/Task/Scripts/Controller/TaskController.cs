@@ -33,6 +33,7 @@ namespace Features.GamePlay.SubFeatures.Task.Controller
 		/// </summary>
 		public static void Install()
 		{
+			EventBus.Publish(TaskEvents.Installed, null);
 		}
 
 		/// <summary>
@@ -40,6 +41,7 @@ namespace Features.GamePlay.SubFeatures.Task.Controller
 		/// </summary>
 		public static void Uninstall()
 		{
+			EventBus.Publish(TaskEvents.Uninstalled, null);
 		}
 
 		/// <summary>

@@ -31,5 +31,25 @@ namespace Features.GamePlay.SubFeatures.Home.View
 		{
 			Debug.Log("[HomeView] Echoed: " + payload, this);
 		}
+
+		/// <summary>
+		/// Shows this subfeature view when its controller is installed.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[OnEvent(HomeEvents.Installed)]
+		private void OnInstalled(object payload)
+		{
+			gameObject.SetActive(true);
+		}
+
+		/// <summary>
+		/// Hides this subfeature view when its controller is uninstalled.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[OnEvent(HomeEvents.Uninstalled)]
+		private void OnUninstalled(object payload)
+		{
+			gameObject.SetActive(false);
+		}
 	}
 }

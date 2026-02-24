@@ -33,6 +33,7 @@ namespace Features.GamePlay.SubFeatures.Character.Controller
 		/// </summary>
 		public static void Install()
 		{
+			EventBus.Publish(CharacterEvents.Installed, null);
 		}
 
 		/// <summary>
@@ -40,6 +41,7 @@ namespace Features.GamePlay.SubFeatures.Character.Controller
 		/// </summary>
 		public static void Uninstall()
 		{
+			EventBus.Publish(CharacterEvents.Uninstalled, null);
 		}
 
 		/// <summary>
