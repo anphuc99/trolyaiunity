@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace Features.GamePlay.SubFeatures.Chat.Model
 {
@@ -16,5 +17,15 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// Optional callback for retrieving data from the parent.
 		/// </summary>
 		public Func<string> GetParentStatus { get; set; }
+
+		/// <summary>
+		/// Optional callback for getting cached character avatar by name.
+		/// </summary>
+		public Func<string, Sprite> GetCharacterAvatarByName { get; set; }
+
+		/// <summary>
+		/// Optional callback for getting cached character voice name by character name.
+		/// </summary>
+		public Func<string, string> GetCharacterVoiceNameByName { get; set; }
 	}
 }

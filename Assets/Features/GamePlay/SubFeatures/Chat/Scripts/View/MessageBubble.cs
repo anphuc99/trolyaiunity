@@ -192,5 +192,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			Canvas.ForceUpdateCanvases();
 			LayoutRebuilder.ForceRebuildLayoutImmediate(_rootRect);
 		}
+
+        
 	}
 }

@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Features.GamePlay.Events;
 using Features.GamePlay.Infrastructure;
 using Features.GamePlay.Infrastructure.Attributes;
@@ -18,6 +19,9 @@ using Features.GamePlay.SubFeatures.Story.Controller;
 using Features.GamePlay.SubFeatures.Story.Model;
 using Features.GamePlay.SubFeatures.Task.Controller;
 using Features.GamePlay.SubFeatures.Task.Model;
+using Core.Infrastructure.Network;
+using Newtonsoft.Json;
+using UnityEngine.Networking;
 
 namespace Features.GamePlay.Controller
 {
@@ -33,6 +37,7 @@ namespace Features.GamePlay.Controller
 		[Core.Infrastructure.Attributes.ControllerInit]
 		public static async void OnEnterScope()
 		{
+			await LoadChatCharactersCacheAsync();
 			SetAllSubControllerSignals();
 			await Task.Yield();
 			InstallSubController(GamePlaySubControllerType.Home);
@@ -46,6 +51,7 @@ namespace Features.GamePlay.Controller
 		{
 			CloseCurrentSubControllerInternal();
 			ClearAllSubControllerSignals();
+			ClearChatCharacterCache();
 		}
 
 		/// <summary>
@@ -142,11 +148,195 @@ namespace Features.GamePlay.Controller
 		{
 			HomeController.SetParentSignals(new HomeParentSignals { OnEchoed = OnSubControllerEchoed });
 			CharacterController.SetParentSignals(new CharacterParentSignals { OnEchoed = OnSubControllerEchoed });
-			ChatController.SetParentSignals(new ChatParentSignals { OnEchoed = OnSubControllerEchoed });
+			ChatController.SetParentSignals(new ChatParentSignals
+			{
+				OnEchoed = OnSubControllerEchoed,
+				GetCharacterAvatarByName = GetChatCharacterAvatar,
+				GetCharacterVoiceNameByName = GetChatCharacterVoiceName,
+			});
 			JournalController.SetParentSignals(new JournalParentSignals { OnEchoed = OnSubControllerEchoed });
 			PracticeController.SetParentSignals(new PracticeParentSignals { OnEchoed = OnSubControllerEchoed });
 			StoryController.SetParentSignals(new StoryParentSignals { OnEchoed = OnSubControllerEchoed });
 			TaskController.SetParentSignals(new TaskParentSignals { OnEchoed = OnSubControllerEchoed });
+		}
+
+		private static UnityEngine.Sprite GetChatCharacterAvatar(string characterName)
+		{
+			if (string.IsNullOrWhiteSpace(characterName))
+			{
+				return null;
+			}
+
+			return GamePlayState.ChatCharacterByName.TryGetValue(characterName.Trim(), out var cachedCharacter)
+				? cachedCharacter.AvatarSprite
+				: null;
+		}
+
+		private static string GetChatCharacterVoiceName(string characterName)
+		{
+			if (string.IsNullOrWhiteSpace(characterName))
+			{
+				return null;
+			}
+
+			return GamePlayState.ChatCharacterByName.TryGetValue(characterName.Trim(), out var cachedCharacter)
+				? cachedCharacter.VoiceName
+				: null;
+		}
+
+		private static void ClearChatCharacterCache()
+		{
+			GamePlayState.ChatCharacterByName.Clear();
+		}
+
+		private static async Task LoadChatCharactersCacheAsync()
+		{
+			ClearChatCharacterCache();
+
+			try
+			{
+				var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.Characters);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					return;
+				}
+
+				var characters = JsonConvert.DeserializeObject<List<GamePlayChatCharacterPayload>>(responseJson);
+				if (characters == null)
+				{
+					return;
+				}
+
+				for (var i = 0; i < characters.Count; i++)
+				{
+					var character = characters[i];
+					if (character == null || string.IsNullOrWhiteSpace(character.Name))
+					{
+						continue;
+					}
+
+					UnityEngine.Sprite sprite = null;
+					if (!string.IsNullOrWhiteSpace(character.Avatar))
+					{
+						try
+						{
+							sprite = await LoadSpriteFromUrlAsync(character.Avatar.Trim());
+						}
+						catch (System.Exception exception)
+						{
+							UnityEngine.Debug.LogError("[GamePlayController] Failed to load avatar for character '" + character.Name + "' from URL '" + character.Avatar + "': " + exception);
+						}
+					}
+
+					var key = character.Name.Trim();
+					if (string.IsNullOrWhiteSpace(key))
+					{
+						continue;
+					}
+
+					GamePlayState.ChatCharacterByName[key] = new GamePlayChatCharacterCache
+					{
+						Id = character.Id,
+						Name = key,
+						Personality = character.Personality,
+						Gender = character.Gender,
+						Age = character.Age,
+						Appearance = character.Appearance,
+						AvatarUrl = character.Avatar,
+						VoiceModel = character.VoiceModel,
+						VoiceName = character.VoiceName,
+						Pitch = character.Pitch,
+						SpeakingRate = character.SpeakingRate,
+						CreatedAt = character.CreatedAt,
+						UpdatedAt = character.UpdatedAt,
+						AvatarSprite = sprite,
+					};
+				}
+			}
+			catch (System.Exception exception)
+			{
+				UnityEngine.Debug.LogError("[GamePlayController] Failed to load chat character cache: " + exception);
+			}
+		}
+
+		private static async Task<UnityEngine.Sprite> LoadSpriteFromUrlAsync(string avatarUrl)
+		{
+			if (string.IsNullOrWhiteSpace(avatarUrl))
+			{
+				return null;
+			}
+
+			using var request = UnityWebRequestTexture.GetTexture(avatarUrl);
+			UnityWebRequestAsyncOperation operation;
+			try
+			{
+				operation = request.SendWebRequest();
+			}
+			catch (System.Exception exception)
+			{
+				UnityEngine.Debug.LogError("[GamePlayController] Failed to start avatar request for URL '" + avatarUrl + "': " + exception);
+				return null;
+			}
+			while (!operation.isDone)
+			{
+				await Task.Yield();
+			}
+
+			if (request.result != UnityWebRequest.Result.Success)
+			{
+				UnityEngine.Debug.LogError("[GamePlayController] Failed to load avatar sprite from URL '" + avatarUrl + "': " + request.error);
+				return null;
+			}
+
+			var texture = DownloadHandlerTexture.GetContent(request);
+			if (texture == null)
+			{
+				return null;
+			}
+
+			return UnityEngine.Sprite.Create(texture, new UnityEngine.Rect(0f, 0f, texture.width, texture.height), new UnityEngine.Vector2(0.5f, 0.5f));
+		}
+
+		private sealed class GamePlayChatCharacterPayload
+		{
+			[JsonProperty("id")]
+			public int Id { get; set; }
+
+			[JsonProperty("name")]
+			public string Name { get; set; }
+
+			[JsonProperty("personality")]
+			public string Personality { get; set; }
+
+			[JsonProperty("gender")]
+			public string Gender { get; set; }
+
+			[JsonProperty("age")]
+			public int? Age { get; set; }
+
+			[JsonProperty("appearance")]
+			public string Appearance { get; set; }
+
+			[JsonProperty("avatar")]
+			public string Avatar { get; set; }
+
+			[JsonProperty("voiceModel")]
+			public string VoiceModel { get; set; }
+
+			[JsonProperty("voiceName")]
+			public string VoiceName { get; set; }
+
+			[JsonProperty("pitch")]
+			public float? Pitch { get; set; }
+
+			[JsonProperty("speakingRate")]
+			public float? SpeakingRate { get; set; }
+
+			[JsonProperty("createdAt")]
+			public string CreatedAt { get; set; }
+
+			[JsonProperty("updatedAt")]
+			public string UpdatedAt { get; set; }
 		}
 
 		/// <summary>

@@ -421,7 +421,7 @@ export const createChatController = (
 
     const message = typeof request.body?.message === "string" ? request.body.message.trim() : "";
     const sessionId = getSessionId(request.body?.sessionId);
-    const modelOverride = getOptionalString(request.body?.model);
+    const modelOverride = "gemini-3-flash-preview";
 
     if (!message) {
       response.status(400).json({

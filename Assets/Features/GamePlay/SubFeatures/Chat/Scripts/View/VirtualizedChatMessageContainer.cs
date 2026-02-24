@@ -39,20 +39,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[Min(1)]
 		private int _maxSpawnedObjects = 24;
 
-		[Header("Cheat Settings")]
-		[SerializeField]
-		private MessageBubbleType _cheatBubbleType = MessageBubbleType.User;
-
-		[SerializeField]
-		private string _cheatSenderName = "Sender";
-
-		[SerializeField]
-		private Sprite _cheatAvatar;
-
-		[SerializeField]
-		[TextArea(1, 4)]
-		private string _cheatMessageText = "Hello, this is a test message.";
-
 		private List<MessageBubbleData> _messages = new();
 
 		private readonly List<MessageBubble> _characterPool = new();
@@ -65,7 +51,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private float _scrollOffset;
 		private bool _isDragging;
 		private float _totalHeight;
-		private int _cheatSequence;
 
 		/// <summary>
 		/// Returns current total message count.
@@ -76,27 +61,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		/// Maximum pooled object count that can be spawned per bubble type.
 		/// </summary>
 		public int MaxSpawnedObjects => _maxSpawnedObjects;
-
-		/// <summary>
-		/// Adds one cheat message for quick testing from inspector button.
-		/// </summary>
-		public void CheatAddMessage()
-		{
-			_cheatSequence += 1;
-
-			var payload = new MessageBubbleData
-			{
-				MessageId = "cheat-" + _cheatSequence,
-				Type = _cheatBubbleType,
-				SenderName = _cheatSenderName,
-				Message = string.IsNullOrWhiteSpace(_cheatMessageText)
-					? "Cheat message #" + _cheatSequence
-					: _cheatMessageText,
-				Avatar = _cheatAvatar,
-			};
-
-			AddNewMessage(payload);
-		}
 
 		private void Awake()
 		{
@@ -140,7 +104,49 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			_messages.Add(message ?? new MessageBubbleData());
 			RebuildMetrics();
+			_scrollOffset = GetMaxScrollOffset();
 			RefreshVisible();
+		}
+
+		/// <summary>
+		/// Updates avatar sprite for all character messages with matching sender name.
+		/// </summary>
+		/// <param name="characterName">Character display name.</param>
+		/// <param name="avatar">Avatar sprite.</param>
+		public void UpdateCharacterAvatar(string characterName, Sprite avatar)
+		{
+			if (string.IsNullOrWhiteSpace(characterName) || avatar == null)
+			{
+				return;
+			}
+
+			var updated = false;
+			for (var i = 0; i < _messages.Count; i++)
+			{
+				var message = _messages[i];
+				if (message == null || message.Type != MessageBubbleType.Character)
+				{
+					continue;
+				}
+
+				if (!string.Equals(message.SenderName, characterName, System.StringComparison.OrdinalIgnoreCase))
+				{
+					continue;
+				}
+
+				if (message.Avatar == avatar)
+				{
+					continue;
+				}
+
+				message.Avatar = avatar;
+				updated = true;
+			}
+
+			if (updated)
+			{
+				RefreshVisible();
+			}
 		}
 
 		/// <summary>
