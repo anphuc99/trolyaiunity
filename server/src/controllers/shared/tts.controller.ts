@@ -1,5 +1,7 @@
 import type { Request, Response } from "express";
 import fs from "fs/promises";
+import type { DataSource } from "typeorm";
+import CharacterEntity from "../../models/character.entity.js";
 import { buildAudioId, createTtsAudio, getAudioPath } from "../../services/tts.service.js";
 
 interface TtsController {
@@ -9,21 +11,44 @@ interface TtsController {
 /**
  * Builds the shared TTS controller.
  *
+ * @param dataSource - Initialized TypeORM data source.
  * @returns The TTS controller handlers.
  */
-export const createTtsController = (): TtsController => {
+export const createTtsController = (dataSource: DataSource): TtsController => {
+  const characterRepository = dataSource.getRepository(CharacterEntity);
+
+  const resolveCharacterVoiceSettings = async (userId: number, characterName: string) => {
+    if (!characterName) {
+      return {
+        voiceName: undefined,
+        pitch: undefined,
+        speakingRate: undefined
+      };
+    }
+
+    const character = await characterRepository
+      .createQueryBuilder("character")
+      .where("character.userId = :userId", { userId })
+      .andWhere("LOWER(character.name) = LOWER(:name)", { name: characterName })
+      .getOne();
+
+    return {
+      voiceName: character?.voiceName?.trim() || undefined,
+      pitch: character?.pitch ?? undefined,
+      speakingRate: character?.speakingRate ?? undefined
+    };
+  };
+
   const getTextToSpeech: TtsController["getTextToSpeech"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
     const text = typeof request.query.text === "string" ? request.query.text.trim() : "";
     const tone = typeof request.query.tone === "string" ? request.query.tone.trim() : "neutral, medium pitch";
-    const voice = typeof request.query.voice === "string" ? request.query.voice.trim() : "";
-    const pitch =
-      typeof request.query.pitch === "string" && Number.isFinite(Number(request.query.pitch))
-        ? Number(request.query.pitch)
-        : undefined;
-    const speakingRate =
-      typeof request.query.speakingRate === "string" && Number.isFinite(Number(request.query.speakingRate))
-        ? Number(request.query.speakingRate)
-        : undefined;
+    const characterName =
+      typeof request.query.characterName === "string" ? request.query.characterName.trim() : "";
     const force = request.query.force === "true";
 
     if (!text) {
@@ -31,7 +56,21 @@ export const createTtsController = (): TtsController => {
       return;
     }
 
-    const audioId = buildAudioId(text, tone, voice || undefined, pitch, speakingRate);
+    if (!characterName) {
+      response.status(400).json({ message: "characterName is required" });
+      return;
+    }
+
+    const userId = request.user.id;
+
+    const resolvedSettings = await resolveCharacterVoiceSettings(userId, characterName);
+    const audioId = buildAudioId(
+      text,
+      tone,
+      resolvedSettings.voiceName,
+      resolvedSettings.pitch,
+      resolvedSettings.speakingRate
+    );
     const audioPath = getAudioPath(audioId);
 
     try {
@@ -45,7 +84,7 @@ export const createTtsController = (): TtsController => {
 
       try {
         await fs.access(audioPath);
-        response.json({ success: true, output: audioId, url: `/audio/${audioId}.wav` });
+				response.json({ success: true, output: audioId, url: `/audio/${audioId}.wav` });
         return;
       } catch (error) {
         if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
@@ -54,7 +93,14 @@ export const createTtsController = (): TtsController => {
         }
       }
 
-      await createTtsAudio(text, tone, audioId, voice || undefined, pitch, speakingRate);
+      await createTtsAudio(
+        text,
+        tone,
+        audioId,
+        resolvedSettings.voiceName,
+        resolvedSettings.pitch,
+        resolvedSettings.speakingRate
+      );
       response.json({ success: true, output: audioId, url: `/audio/${audioId}.wav` });
     } catch (error) {
       console.error("Failed to generate TTS.", error);

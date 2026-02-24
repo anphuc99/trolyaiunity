@@ -57,6 +57,7 @@ const clampPlaybackRate = (value: number) => Math.min(MAX_PLAYBACK_RATE, Math.ma
 
 /**
  * Applies Web Audio API playbackRate + detune transform on a wav buffer.
+ * Formula matches legacy client behavior: playbackRate = speakingRate, detune = pitch * 50.
  *
  * @param wavBuffer - Input wav buffer.
  * @param pitch - Pitch value used for detune calculation.

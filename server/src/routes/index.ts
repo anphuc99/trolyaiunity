@@ -35,7 +35,7 @@ export const createApiRouter = (dataSource: DataSource) => {
   router.use("/translation", createTranslationRoutes(dataSource));
   router.use("/users", createUsersRoutes(dataSource));
   router.use("/vocabulary", createVocabularyRoutes(dataSource));
-  router.use("/", createSharedRoutes());
+  router.use("/", createSharedRoutes(dataSource));
 
   return router;
 };
