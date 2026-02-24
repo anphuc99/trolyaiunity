@@ -16,6 +16,14 @@ export const createTtsController = (): TtsController => {
     const text = typeof request.query.text === "string" ? request.query.text.trim() : "";
     const tone = typeof request.query.tone === "string" ? request.query.tone.trim() : "neutral, medium pitch";
     const voice = typeof request.query.voice === "string" ? request.query.voice.trim() : "";
+    const pitch =
+      typeof request.query.pitch === "string" && Number.isFinite(Number(request.query.pitch))
+        ? Number(request.query.pitch)
+        : undefined;
+    const speakingRate =
+      typeof request.query.speakingRate === "string" && Number.isFinite(Number(request.query.speakingRate))
+        ? Number(request.query.speakingRate)
+        : undefined;
     const force = request.query.force === "true";
 
     if (!text) {
@@ -23,7 +31,7 @@ export const createTtsController = (): TtsController => {
       return;
     }
 
-    const audioId = buildAudioId(text, tone, voice || undefined);
+    const audioId = buildAudioId(text, tone, voice || undefined, pitch, speakingRate);
     const audioPath = getAudioPath(audioId);
 
     try {
@@ -37,7 +45,7 @@ export const createTtsController = (): TtsController => {
 
       try {
         await fs.access(audioPath);
-        response.json({ success: true, output: audioId, url: `/audio/${audioId}.mp3` });
+        response.json({ success: true, output: audioId, url: `/audio/${audioId}.wav` });
         return;
       } catch (error) {
         if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
@@ -46,8 +54,8 @@ export const createTtsController = (): TtsController => {
         }
       }
 
-      await createTtsAudio(text, tone, audioId, voice || undefined);
-      response.json({ success: true, output: audioId, url: `/audio/${audioId}.mp3` });
+      await createTtsAudio(text, tone, audioId, voice || undefined, pitch, speakingRate);
+      response.json({ success: true, output: audioId, url: `/audio/${audioId}.wav` });
     } catch (error) {
       console.error("Failed to generate TTS.", error);
       response.status(500).json({
