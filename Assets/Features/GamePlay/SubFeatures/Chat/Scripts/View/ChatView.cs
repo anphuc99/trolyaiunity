@@ -22,6 +22,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private const string DefaultUserDisplayName = "You";
 		private const string DefaultCharacterDisplayName = "Mimi";
 		private const string DefaultTtsTone = "neutral";
+		private const float DefaultSpeakingRate = 1f;
+		private const float DefaultPitch = 0f;
 
 		[SerializeField]
 		private TMP_InputField _inputField;
@@ -323,6 +325,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? DefaultTtsTone : turn.Tone.Trim();
 				var voiceName = SendRequest<string>(ChatRequests.GetCharacterVoiceName, characterName);
+				var characterPitch = SendRequest<float?>(ChatRequests.GetCharacterPitch, characterName);
+				var characterSpeakingRate = SendRequest<float?>(ChatRequests.GetCharacterSpeakingRate, characterName);
 
 				AudioClip clip = null;
 				yield return StartCoroutine(RequestCharacterTtsClip(messageText, tone, voiceName, loadedClip =>
@@ -342,7 +346,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 				if (clip != null)
 				{
-					yield return StartCoroutine(PlayCharacterVoiceAsync(clip));
+					yield return StartCoroutine(PlayCharacterVoiceAsync(clip, characterPitch, characterSpeakingRate));
 				}
 			}
 
@@ -407,7 +411,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			onCompleted?.Invoke(clip);
 		}
 
-		private IEnumerator PlayCharacterVoiceAsync(AudioClip clip)
+		private IEnumerator PlayCharacterVoiceAsync(AudioClip clip, float? pitch = null, float? speakingRate = null)
 		{
 			if (clip == null)
 			{
@@ -420,6 +424,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				yield break;
 			}
 
+			var originalPitch = _characterVoiceAudioSource.pitch;
+			_characterVoiceAudioSource.pitch = CalculateUnityPitchFromWebStyle(pitch, speakingRate);
 			_characterVoiceAudioSource.Stop();
 			_characterVoiceAudioSource.clip = clip;
 			_characterVoiceAudioSource.Play();
@@ -427,6 +433,19 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				yield return null;
 			}
+
+			_characterVoiceAudioSource.pitch = originalPitch;
+		}
+
+		private static float CalculateUnityPitchFromWebStyle(float? pitch, float? speakingRate)
+		{
+			var resolvedSpeakingRate = speakingRate ?? DefaultSpeakingRate;
+			var resolvedPitch = pitch ?? DefaultPitch;
+
+			var detuneCents = resolvedPitch * 50f;
+			var detuneFactor = Mathf.Pow(2f, detuneCents / 1200f);
+			var unityPitch = resolvedSpeakingRate * detuneFactor;
+			return Mathf.Clamp(unityPitch, 0.1f, 3f);
 		}
 
 		private void EnsureDependencies()
@@ -502,7 +521,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				yield break;
 			}
 
-			yield return StartCoroutine(PlayCharacterVoiceAsync(clip));
+			yield return StartCoroutine(PlayCharacterVoiceAsync(clip, playback.Pitch, playback.SpeakingRate));
 		}
 
 		private string BuildTextToSpeechRequestUrl(string text, string tone, string voiceName)

@@ -27,5 +27,15 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// Optional callback for getting cached character voice name by character name.
 		/// </summary>
 		public Func<string, string> GetCharacterVoiceNameByName { get; set; }
+
+		/// <summary>
+		/// Optional callback for getting cached character pitch by character name.
+		/// </summary>
+		public Func<string, float?> GetCharacterPitchByName { get; set; }
+
+		/// <summary>
+		/// Optional callback for getting cached character speaking rate by character name.
+		/// </summary>
+		public Func<string, float?> GetCharacterSpeakingRateByName { get; set; }
 	}
 }

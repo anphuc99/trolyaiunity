@@ -130,6 +130,38 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
+		/// Gets cached character pitch from parent signal.
+		/// </summary>
+		/// <param name="payload">Character name payload.</param>
+		/// <returns>Pitch when available; otherwise null.</returns>
+		[Request(ChatRequests.GetCharacterPitch)]
+		public static float? HandleGetCharacterPitch(object payload)
+		{
+			if (payload is not string characterName || string.IsNullOrWhiteSpace(characterName))
+			{
+				return null;
+			}
+
+			return ChatState.ParentSignals?.GetCharacterPitchByName?.Invoke(characterName.Trim());
+		}
+
+		/// <summary>
+		/// Gets cached character speaking rate from parent signal.
+		/// </summary>
+		/// <param name="payload">Character name payload.</param>
+		/// <returns>Speaking rate when available; otherwise null.</returns>
+		[Request(ChatRequests.GetCharacterSpeakingRate)]
+		public static float? HandleGetCharacterSpeakingRate(object payload)
+		{
+			if (payload is not string characterName || string.IsNullOrWhiteSpace(characterName))
+			{
+				return null;
+			}
+
+			return ChatState.ParentSignals?.GetCharacterSpeakingRateByName?.Invoke(characterName.Trim());
+		}
+
+		/// <summary>
 		/// Handles replay request from chat view and publishes playback event.
 		/// </summary>
 		/// <param name="payload">Replay request payload.</param>
@@ -153,6 +185,14 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				? null
 				: ChatState.ParentSignals?.GetCharacterVoiceNameByName?.Invoke(characterName);
 
+			var pitch = string.IsNullOrWhiteSpace(characterName)
+				? null
+				: ChatState.ParentSignals?.GetCharacterPitchByName?.Invoke(characterName);
+
+			var speakingRate = string.IsNullOrWhiteSpace(characterName)
+				? null
+				: ChatState.ParentSignals?.GetCharacterSpeakingRateByName?.Invoke(characterName);
+
 			EventBus.Publish(ChatEvents.MessageAudioPlayRequested, new ChatPlayMessageAudioPayload
 			{
 				MessageId = payload.MessageId,
@@ -160,6 +200,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				Text = payload.Text,
 				Tone = payload.Tone,
 				VoiceName = voiceName,
+				Pitch = pitch,
+				SpeakingRate = speakingRate,
 			});
 		}
 

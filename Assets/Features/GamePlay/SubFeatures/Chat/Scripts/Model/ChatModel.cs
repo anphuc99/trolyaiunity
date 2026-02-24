@@ -99,6 +99,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// Voice name resolved by controller from cache/signals.
 		/// </summary>
 		public string VoiceName { get; set; }
+
+		/// <summary>
+		/// Character pitch value from cache.
+		/// </summary>
+		public float? Pitch { get; set; }
+
+		/// <summary>
+		/// Character speaking rate value from cache.
+		/// </summary>
+		public float? SpeakingRate { get; set; }
 	}
 
 	/// <summary>

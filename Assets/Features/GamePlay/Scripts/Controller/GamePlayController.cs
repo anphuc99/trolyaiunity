@@ -153,6 +153,8 @@ namespace Features.GamePlay.Controller
 				OnEchoed = OnSubControllerEchoed,
 				GetCharacterAvatarByName = GetChatCharacterAvatar,
 				GetCharacterVoiceNameByName = GetChatCharacterVoiceName,
+				GetCharacterPitchByName = GetChatCharacterPitch,
+				GetCharacterSpeakingRateByName = GetChatCharacterSpeakingRate,
 			});
 			JournalController.SetParentSignals(new JournalParentSignals { OnEchoed = OnSubControllerEchoed });
 			PracticeController.SetParentSignals(new PracticeParentSignals { OnEchoed = OnSubControllerEchoed });
@@ -181,6 +183,30 @@ namespace Features.GamePlay.Controller
 
 			return GamePlayState.ChatCharacterByName.TryGetValue(characterName.Trim(), out var cachedCharacter)
 				? cachedCharacter.VoiceName
+				: null;
+		}
+
+		private static float? GetChatCharacterPitch(string characterName)
+		{
+			if (string.IsNullOrWhiteSpace(characterName))
+			{
+				return null;
+			}
+
+			return GamePlayState.ChatCharacterByName.TryGetValue(characterName.Trim(), out var cachedCharacter)
+				? cachedCharacter.Pitch
+				: null;
+		}
+
+		private static float? GetChatCharacterSpeakingRate(string characterName)
+		{
+			if (string.IsNullOrWhiteSpace(characterName))
+			{
+				return null;
+			}
+
+			return GamePlayState.ChatCharacterByName.TryGetValue(characterName.Trim(), out var cachedCharacter)
+				? cachedCharacter.SpeakingRate
 				: null;
 		}
 
