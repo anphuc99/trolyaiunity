@@ -1,5 +1,6 @@
 using Core.Infrastructure.Views;
 using Core.Infrastructure.Network;
+using Core.Infrastructure.Authentication;
 using Features.GamePlay.SubFeatures.Chat.Events;
 using Features.GamePlay.SubFeatures.Chat.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.Chat.Model;
@@ -40,21 +41,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		[SerializeField]
 		private AudioSource _characterVoiceAudioSource;
-
-		[SerializeField]
-		private float _defaultSpeakingRate = 1f;
-
-		[SerializeField]
-		private float _defaultPitch = 0f;
-
-		[SerializeField]
-		private float _detunePerPitchUnit = 50f;
-
-		[SerializeField]
-		private float _minUnityPitch = 0.1f;
-
-		[SerializeField]
-		private float _maxUnityPitch = 3f;
 
 		private readonly Queue<ChatAssistantTurnPayload> _pendingCharacterTurns = new Queue<ChatAssistantTurnPayload>();
 		private bool _isProcessingCharacterTurns;
@@ -337,12 +323,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				}
 
 				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? DefaultTtsTone : turn.Tone.Trim();
-				var voiceName = SendRequest<string>(ChatRequests.GetCharacterVoiceName, characterName);
-				var characterPitch = SendRequest<float?>(ChatRequests.GetCharacterPitch, characterName);
-				var characterSpeakingRate = SendRequest<float?>(ChatRequests.GetCharacterSpeakingRate, characterName);
 
 				AudioClip clip = null;
-				yield return StartCoroutine(RequestCharacterTtsClip(messageText, tone, voiceName, loadedClip =>
+				yield return StartCoroutine(RequestCharacterTtsClip(messageText, tone, characterName, loadedClip =>
 				{
 					clip = loadedClip;
 				}));
@@ -359,14 +342,14 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 				if (clip != null)
 				{
-					yield return StartCoroutine(PlayCharacterVoiceAsync(clip, characterPitch, characterSpeakingRate));
+					yield return StartCoroutine(PlayCharacterVoiceAsync(clip));
 				}
 			}
 
 			_isProcessingCharacterTurns = false;
 		}
 
-		private IEnumerator RequestCharacterTtsClip(string text, string tone, string voiceName, Action<AudioClip> onCompleted)
+		private IEnumerator RequestCharacterTtsClip(string text, string tone, string characterName, Action<AudioClip> onCompleted)
 		{
 			if (string.IsNullOrWhiteSpace(text))
 			{
@@ -374,7 +357,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				yield break;
 			}
 
-			var requestUrl = BuildTextToSpeechRequestUrl(text, tone, voiceName);
+			var requestUrl = BuildTextToSpeechRequestUrl(text, tone, characterName);
 			if (string.IsNullOrWhiteSpace(requestUrl))
 			{
 				onCompleted?.Invoke(null);
@@ -382,6 +365,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			using var request = UnityWebRequest.Get(requestUrl);
+			var accessToken = AuthTokenModel.AccessToken;
+			if (!string.IsNullOrWhiteSpace(accessToken))
+			{
+				request.SetRequestHeader("Authorization", "Bearer " + accessToken);
+			}
 			yield return request.SendWebRequest();
 
 			if (request.result != UnityWebRequest.Result.Success)
@@ -424,7 +412,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			onCompleted?.Invoke(clip);
 		}
 
-		private IEnumerator PlayCharacterVoiceAsync(AudioClip clip, float? pitch = null, float? speakingRate = null)
+		private IEnumerator PlayCharacterVoiceAsync(AudioClip clip)
 		{
 			if (clip == null)
 			{
@@ -437,8 +425,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				yield break;
 			}
 
-			var originalPitch = _characterVoiceAudioSource.pitch;
-			_characterVoiceAudioSource.pitch = CalculateUnityPitchFromWebStyle(pitch, speakingRate);
 			_characterVoiceAudioSource.Stop();
 			_characterVoiceAudioSource.clip = clip;
 			_characterVoiceAudioSource.Play();
@@ -447,21 +433,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				yield return null;
 			}
 
-			_characterVoiceAudioSource.pitch = originalPitch;
-		}
-
-		private float CalculateUnityPitchFromWebStyle(float? pitch, float? speakingRate)
-		{
-			var resolvedSpeakingRate = speakingRate ?? _defaultSpeakingRate;
-			var resolvedPitch = pitch ?? _defaultPitch;
-
-			var detuneCents = resolvedPitch * _detunePerPitchUnit;
-			var detuneFactor = Mathf.Pow(2f, detuneCents / 1200f);
-			var unityPitch = resolvedSpeakingRate * detuneFactor;
-
-			var minPitch = Mathf.Min(_minUnityPitch, _maxUnityPitch);
-			var maxPitch = Mathf.Max(_minUnityPitch, _maxUnityPitch);
-			return Mathf.Clamp(unityPitch, minPitch, maxPitch);
 		}
 
 		private void EnsureDependencies()
@@ -527,7 +498,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			var tone = string.IsNullOrWhiteSpace(playback.Tone) ? DefaultTtsTone : playback.Tone.Trim();
 			AudioClip clip = null;
-			yield return StartCoroutine(RequestCharacterTtsClip(playback.Text, tone, playback.VoiceName, loadedClip =>
+			yield return StartCoroutine(RequestCharacterTtsClip(playback.Text, tone, playback.CharacterName, loadedClip =>
 			{
 				clip = loadedClip;
 			}));
@@ -537,10 +508,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				yield break;
 			}
 
-			yield return StartCoroutine(PlayCharacterVoiceAsync(clip, playback.Pitch, playback.SpeakingRate));
+			yield return StartCoroutine(PlayCharacterVoiceAsync(clip));
 		}
 
-		private string BuildTextToSpeechRequestUrl(string text, string tone, string voiceName)
+		private string BuildTextToSpeechRequestUrl(string text, string tone, string characterName)
 		{
 			var baseUrl = NormalizeServerBaseUrl(GetServerBaseUrl());
 			if (string.IsNullOrWhiteSpace(baseUrl))
@@ -553,12 +524,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				"text=" + UnityWebRequest.EscapeURL(text),
 				"tone=" + UnityWebRequest.EscapeURL(string.IsNullOrWhiteSpace(tone) ? DefaultTtsTone : tone),
+				"characterName=" + UnityWebRequest.EscapeURL(string.IsNullOrWhiteSpace(characterName) ? DefaultCharacterDisplayName : characterName),
 			};
-
-			if (!string.IsNullOrWhiteSpace(voiceName))
-			{
-				queryParts.Add("voiceName=" + UnityWebRequest.EscapeURL(voiceName.Trim()));
-			}
 
 			return endpoint + "?" + string.Join("&", queryParts);
 		}
