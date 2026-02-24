@@ -31,9 +31,13 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[SerializeField]
 		private Button _speakerButton;
 
+		[SerializeField]
+		private Button _translateButton;
+
 		private string _messageId;
 		private MessageBubbleData _boundData;
 		private Action<MessageBubbleData> _onSpeakerClicked;
+		private Action<MessageBubbleData> _onTranslateClicked;
 
 		/// <summary>
 		/// Type that this prefab instance represents.
@@ -64,6 +68,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				_speakerButton.onClick.AddListener(HandleSpeakerClicked);
 			}
+
+			if (_translateButton != null)
+			{
+				_translateButton.onClick.AddListener(HandleTranslateClicked);
+			}
 		}
 
 		private void OnDestroy()
@@ -71,6 +80,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_speakerButton != null)
 			{
 				_speakerButton.onClick.RemoveListener(HandleSpeakerClicked);
+			}
+
+			if (_translateButton != null)
+			{
+				_translateButton.onClick.RemoveListener(HandleTranslateClicked);
 			}
 		}
 
@@ -81,6 +95,15 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		public void SetSpeakerClickHandler(Action<MessageBubbleData> onSpeakerClicked)
 		{
 			_onSpeakerClicked = onSpeakerClicked;
+		}
+
+		/// <summary>
+		/// Configures callback for translate-button click.
+		/// </summary>
+		/// <param name="onTranslateClicked">Callback invoked with currently bound message data.</param>
+		public void SetTranslateClickHandler(Action<MessageBubbleData> onTranslateClicked)
+		{
+			_onTranslateClicked = onTranslateClicked;
 		}
 
 		/// <summary>
@@ -123,6 +146,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_speakerButton != null)
 			{
 				_speakerButton.interactable = !string.IsNullOrWhiteSpace(data.Message);
+			}
+
+			if (_translateButton != null)
+			{
+				_translateButton.interactable = !string.IsNullOrWhiteSpace(data.Translation);
 			}
 
 			ForceRebuild();
@@ -238,6 +266,16 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			_onSpeakerClicked?.Invoke(_boundData);
+		}
+
+		private void HandleTranslateClicked()
+		{
+			if (_boundData == null)
+			{
+				return;
+			}
+
+			_onTranslateClicked?.Invoke(_boundData);
 		}
 
         

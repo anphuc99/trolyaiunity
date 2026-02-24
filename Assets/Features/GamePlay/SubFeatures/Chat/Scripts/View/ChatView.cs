@@ -158,6 +158,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_messageContainer != null)
 			{
 				_messageContainer.OnMessageSpeakerClicked = null;
+				_messageContainer.OnMessageTranslateClicked = null;
 			}
 			if (_characterVoiceAudioSource != null)
 			{
@@ -203,6 +204,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 						Type = MessageBubbleType.User,
 						SenderName = DefaultUserDisplayName,
 						Message = item.Content ?? string.Empty,
+						OriginalMessage = item.Content ?? string.Empty,
 						Avatar = null,
 					});
 					continue;
@@ -217,6 +219,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 						Type = MessageBubbleType.Character,
 						SenderName = DefaultCharacterDisplayName,
 						Message = item.Content ?? string.Empty,
+						OriginalMessage = item.Content ?? string.Empty,
 						Tone = DefaultTtsTone,
 						Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, DefaultCharacterDisplayName),
 					});
@@ -239,6 +242,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 						Type = MessageBubbleType.Character,
 						SenderName = characterName,
 						Message = text,
+						OriginalMessage = text,
+						Translation = turn.Translation,
 						Tone = string.IsNullOrWhiteSpace(turn.Tone) ? DefaultTtsTone : turn.Tone.Trim(),
 						Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, characterName),
 					});
@@ -275,6 +280,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					Type = MessageBubbleType.Character,
 					SenderName = DefaultCharacterDisplayName,
 					Message = response.Reply,
+					OriginalMessage = response.Reply,
 					Tone = DefaultTtsTone,
 					Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, DefaultCharacterDisplayName),
 				});
@@ -336,6 +342,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					Type = MessageBubbleType.Character,
 					SenderName = characterName,
 					Message = messageText,
+					OriginalMessage = messageText,
+					Translation = turn.Translation,
 					Tone = tone,
 					Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, characterName),
 				});
@@ -454,6 +462,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_messageContainer != null)
 			{
 				_messageContainer.OnMessageSpeakerClicked = HandleMessageSpeakerClicked;
+				_messageContainer.OnMessageTranslateClicked = HandleMessageTranslateClicked;
 			}
 		}
 
@@ -473,9 +482,24 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				MessageId = messageData.MessageId,
 				CharacterName = messageData.SenderName,
-				Text = messageData.Message,
+				Text = string.IsNullOrWhiteSpace(messageData.OriginalMessage) ? messageData.Message : messageData.OriginalMessage,
 				Tone = string.IsNullOrWhiteSpace(messageData.Tone) ? DefaultTtsTone : messageData.Tone,
 			});
+		}
+
+		private void HandleMessageTranslateClicked(MessageBubbleData messageData)
+		{
+			if (_messageContainer == null || messageData == null)
+			{
+				return;
+			}
+
+			if (string.IsNullOrWhiteSpace(messageData.MessageId) || string.IsNullOrWhiteSpace(messageData.Translation))
+			{
+				return;
+			}
+
+			_messageContainer.ToggleMessageTranslation(messageData.MessageId, messageData.Translation);
 		}
 
 		/// <summary>

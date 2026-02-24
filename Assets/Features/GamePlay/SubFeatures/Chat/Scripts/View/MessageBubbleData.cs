@@ -37,6 +37,16 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[SerializeField]
 		private string _tone;
 
+		[SerializeField]
+		private string _originalMessage;
+
+		[SerializeField]
+		[TextArea(1, 6)]
+		private string _translation;
+
+		[SerializeField]
+		private bool _isTranslationExpanded;
+
 		/// <summary>
 		/// Unique message identifier.
 		/// </summary>
@@ -89,6 +99,33 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			get => _tone;
 			set => _tone = value;
+		}
+
+		/// <summary>
+		/// Original message text before translation expansion.
+		/// </summary>
+		public string OriginalMessage
+		{
+			get => _originalMessage;
+			set => _originalMessage = value;
+		}
+
+		/// <summary>
+		/// Translation text for this message.
+		/// </summary>
+		public string Translation
+		{
+			get => _translation;
+			set => _translation = value;
+		}
+
+		/// <summary>
+		/// Indicates whether translation is currently expanded.
+		/// </summary>
+		public bool IsTranslationExpanded
+		{
+			get => _isTranslationExpanded;
+			set => _isTranslationExpanded = value;
 		}
 	}
 }

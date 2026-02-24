@@ -13,6 +13,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 	public sealed class VirtualizedChatMessageContainer : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IScrollHandler
 	{
 		public Action<MessageBubbleData> OnMessageSpeakerClicked { get; set; }
+		public Action<MessageBubbleData> OnMessageTranslateClicked { get; set; }
+
+		private const string TranslationSeparator = "---------------------";
 
 		[SerializeField]
 		private RectTransform _viewport;
@@ -148,6 +151,60 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			if (updated)
 			{
+				RefreshVisible();
+			}
+		}
+
+		/// <summary>
+		/// Toggles translation display for one message by id.
+		/// </summary>
+		/// <param name="messageId">Target message id.</param>
+		/// <param name="translation">Translation text.</param>
+		public void ToggleMessageTranslation(string messageId, string translation)
+		{
+			if (string.IsNullOrWhiteSpace(messageId) || string.IsNullOrWhiteSpace(translation))
+			{
+				return;
+			}
+
+			var updated = false;
+			for (var i = 0; i < _messages.Count; i++)
+			{
+				var message = _messages[i];
+				if (message == null)
+				{
+					continue;
+				}
+
+				if (!string.Equals(message.MessageId, messageId, StringComparison.Ordinal))
+				{
+					continue;
+				}
+
+				var originalText = string.IsNullOrWhiteSpace(message.OriginalMessage)
+					? (message.Message ?? string.Empty)
+					: message.OriginalMessage;
+
+				if (message.IsTranslationExpanded)
+				{
+					message.Message = originalText;
+					message.IsTranslationExpanded = false;
+				}
+				else
+				{
+					message.OriginalMessage = originalText;
+					message.Translation = translation;
+					message.Message = originalText + "\n" + TranslationSeparator + "\n" + translation;
+					message.IsTranslationExpanded = true;
+				}
+
+				updated = true;
+				break;
+			}
+
+			if (updated)
+			{
+				RebuildMetrics();
 				RefreshVisible();
 			}
 		}
@@ -367,6 +424,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			var bubble = Instantiate(prefab, _itemsRoot);
 			bubble.name = prefab.name + "_Virtualized_" + suffix;
 			bubble.SetSpeakerClickHandler(HandleBubbleSpeakerClicked);
+			bubble.SetTranslateClickHandler(HandleBubbleTranslateClicked);
 
 			bubble.gameObject.SetActive(false);
 			return bubble;
@@ -401,6 +459,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			bubble.name = bubble.name + "_Measure_" + suffix;
 			bubble.SetSpeakerClickHandler(null);
+			bubble.SetTranslateClickHandler(null);
 			bubble.gameObject.SetActive(true);
 			var rect = bubble.RootRect;
 			if (rect != null)
@@ -422,6 +481,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private void HandleBubbleSpeakerClicked(MessageBubbleData messageData)
 		{
 			OnMessageSpeakerClicked?.Invoke(messageData);
+		}
+
+		private void HandleBubbleTranslateClicked(MessageBubbleData messageData)
+		{
+			OnMessageTranslateClicked?.Invoke(messageData);
 		}
 
 		private void RebuildMetrics()
