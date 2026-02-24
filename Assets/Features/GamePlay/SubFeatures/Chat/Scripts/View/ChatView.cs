@@ -60,16 +60,14 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			SendChatMessage(_inputField.text);
 		}
 
-		protected override void Awake()
+		protected override void OnEnabled()
 		{
-			base.Awake();
 			BindInputFieldEvents();
 		}
 
-		protected override void OnDestroy()
+		protected override void OnDisabled()
 		{
 			UnbindInputFieldEvents();
-			base.OnDestroy();
 		}
 
 		/// <summary>

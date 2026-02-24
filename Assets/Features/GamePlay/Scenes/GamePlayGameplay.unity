@@ -1676,17 +1676,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1566700639}
   m_CullTransparentMesh: 1
---- !u!114 &1690515224 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 5214725106307399974, guid: ed40a0b4ab6a74f4a8879dbe2f60e5f2, type: 3}
-  m_PrefabInstance: {fileID: 5094539397486971511}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7a3f38c46894d644dac3a7821ca3e45f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!224 &1796858397 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 4467398981661087964, guid: 231e04d3259011544992a3dc281d588c, type: 3}
@@ -1913,34 +1902,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Chat
       objectReference: {fileID: 0}
-    - target: {fileID: 6475588344285969042, guid: ed40a0b4ab6a74f4a8879dbe2f60e5f2, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.size
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 6475588344285969042, guid: ed40a0b4ab6a74f4a8879dbe2f60e5f2, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Mode
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 6475588344285969042, guid: ed40a0b4ab6a74f4a8879dbe2f60e5f2, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target
-      value: 
-      objectReference: {fileID: 1690515224}
-    - target: {fileID: 6475588344285969042, guid: ed40a0b4ab6a74f4a8879dbe2f60e5f2, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_CallState
-      value: 2
-      objectReference: {fileID: 0}
-    - target: {fileID: 6475588344285969042, guid: ed40a0b4ab6a74f4a8879dbe2f60e5f2, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
-      value: SendInputMessage
-      objectReference: {fileID: 0}
-    - target: {fileID: 6475588344285969042, guid: ed40a0b4ab6a74f4a8879dbe2f60e5f2, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
-      value: Features.GamePlay.SubFeatures.Chat.View.ChatView, GamePlay.Chat
-      objectReference: {fileID: 0}
-    - target: {fileID: 6475588344285969042, guid: ed40a0b4ab6a74f4a8879dbe2f60e5f2, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgumentAssemblyTypeName
-      value: UnityEngine.Object, UnityEngine
-      objectReference: {fileID: 0}
     - target: {fileID: 6817557089762402203, guid: ed40a0b4ab6a74f4a8879dbe2f60e5f2, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -2020,6 +1981,10 @@ PrefabInstance:
     - target: {fileID: 6817557089762402203, guid: ed40a0b4ab6a74f4a8879dbe2f60e5f2, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8350644651634444711, guid: ed40a0b4ab6a74f4a8879dbe2f60e5f2, type: 3}
+      propertyPath: m_Enabled
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
