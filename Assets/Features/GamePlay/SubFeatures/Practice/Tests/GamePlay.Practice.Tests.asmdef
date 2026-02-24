@@ -1,0 +1,15 @@
+{
+    "name": "GamePlay.Practice.Tests",
+    "rootNamespace": "",
+    "references": ["GamePlay.Practice"],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": ["TestAssemblies"]
+}

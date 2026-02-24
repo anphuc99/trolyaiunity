@@ -8,5 +8,6 @@ namespace Features.GamePlay.Events
 	public static class GamePlayEvents
 	{
 		public const string Echoed = "game.play.echo.event";
+		public const string SubControllerChanged = "game.play.subcontroller.changed.event";
 	}
 }

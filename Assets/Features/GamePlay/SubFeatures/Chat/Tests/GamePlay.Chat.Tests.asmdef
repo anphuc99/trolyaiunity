@@ -1,0 +1,15 @@
+{
+    "name": "GamePlay.Chat.Tests",
+    "rootNamespace": "",
+    "references": ["GamePlay.Chat"],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": ["TestAssemblies"]
+}

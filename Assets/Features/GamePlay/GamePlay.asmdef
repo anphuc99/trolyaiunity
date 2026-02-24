@@ -3,8 +3,13 @@
     "rootNamespace": "",
     "references": [
         "Core",
-        "GamePlay.Homework",
-        "GamePlay.Home"
+        "GamePlay.Home",
+        "GamePlay.Journal",
+        "GamePlay.Character",
+        "GamePlay.Story",
+        "GamePlay.Practice",
+        "GamePlay.Task",
+        "GamePlay.Chat"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

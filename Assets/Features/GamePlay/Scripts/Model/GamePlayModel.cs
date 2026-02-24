@@ -1,6 +1,20 @@
 namespace Features.GamePlay.Model
 {
 	/// <summary>
+	/// Available GamePlay subcontrollers.
+	/// </summary>
+	public enum GamePlaySubControllerType
+	{
+		Home,
+		Character,
+		Chat,
+		Journal,
+		Practice,
+		Story,
+		Task
+	}
+
+	/// <summary>
 	/// Data model for GamePlay.
 	/// </summary>
 	public sealed class GamePlayModel

@@ -18,7 +18,6 @@ namespace Features.GamePlay.SubFeatures.Home.Controller
 		[Core.Infrastructure.Attributes.ControllerInit]
 		public static void OnEnterScope()
 		{
-			
 		}
 
 		/// <summary>
@@ -26,6 +25,20 @@ namespace Features.GamePlay.SubFeatures.Home.Controller
 		/// </summary>
 		[Core.Infrastructure.Attributes.ControllerShutdown]
 		public static void OnExitScope()
+		{
+		}
+
+		/// <summary>
+		/// Installs the subcontroller.
+		/// </summary>
+		public static void Install()
+		{
+		}
+
+		/// <summary>
+		/// Uninstalls the subcontroller and clears bound parent signals.
+		/// </summary>
+		public static void Uninstall()
 		{
 		}
 

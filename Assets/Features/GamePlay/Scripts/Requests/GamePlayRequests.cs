@@ -8,5 +8,8 @@ namespace Features.GamePlay.Requests
 	public static class GamePlayRequests
 	{
 		public const string Echo = "game.play.echo.request";
+		public const string OpenSubController = "game.play.open.subcontroller.request";
+		public const string CloseCurrentSubController = "game.play.close.current.subcontroller.request";
+		public const string GetCurrentSubController = "game.play.get.current.subcontroller.request";
 	}
 }
