@@ -60,17 +60,16 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			SendChatMessage(_inputField.text);
 		}
 
-		private void Update()
+		protected override void Awake()
 		{
-			if (_inputField == null || !_inputField.isFocused)
-			{
-				return;
-			}
+			base.Awake();
+			BindInputFieldEvents();
+		}
 
-			if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
-			{
-				SendInputMessage();
-			}
+		protected override void OnDestroy()
+		{
+			UnbindInputFieldEvents();
+			base.OnDestroy();
 		}
 
 		/// <summary>
@@ -473,6 +472,47 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_messageContainer.OnMessageSpeakerLongPressed = HandleMessageSpeakerLongPressed;
 				_messageContainer.OnMessageTranslateClicked = HandleMessageTranslateClicked;
 			}
+
+			BindInputFieldEvents();
+		}
+
+		private void BindInputFieldEvents()
+		{
+			if (_inputField == null)
+			{
+				return;
+			}
+
+			_inputField.onSubmit.RemoveListener(HandleInputSubmitted);
+			_inputField.onSubmit.AddListener(HandleInputSubmitted);
+			_inputField.onEndEdit.RemoveListener(HandleInputEndEdit);
+			_inputField.onEndEdit.AddListener(HandleInputEndEdit);
+		}
+
+		private void UnbindInputFieldEvents()
+		{
+			if (_inputField == null)
+			{
+				return;
+			}
+
+			_inputField.onSubmit.RemoveListener(HandleInputSubmitted);
+			_inputField.onEndEdit.RemoveListener(HandleInputEndEdit);
+		}
+
+		private void HandleInputSubmitted(string value)
+		{
+			SendInputMessage();
+		}
+
+		private void HandleInputEndEdit(string value)
+		{
+			if (!Input.GetKeyDown(KeyCode.Return) && !Input.GetKeyDown(KeyCode.KeypadEnter))
+			{
+				return;
+			}
+
+			SendInputMessage();
 		}
 
 		private void HandleMessageSpeakerClicked(MessageBubbleData messageData)
