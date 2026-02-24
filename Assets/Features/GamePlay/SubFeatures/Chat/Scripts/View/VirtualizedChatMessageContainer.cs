@@ -43,6 +43,14 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private float _mouseWheelStep = 48f;
 
 		[SerializeField]
+		[Min(0f)]
+		private float _contentPaddingTop = 0f;
+
+		[SerializeField]
+		[Min(0f)]
+		private float _contentPaddingBottom = 0f;
+
+		[SerializeField]
 		[Min(1)]
 		private int _maxSpawnedObjects = 24;
 
@@ -569,8 +577,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			SyncMessageIndices();
 			_messageHeights.Clear();
 			_prefixHeights.Clear();
-			_prefixHeights.Add(0f);
-			_totalHeight = 0f;
+			_prefixHeights.Add(_contentPaddingTop);
+			_totalHeight = _contentPaddingTop;
 
 			if (_viewport == null)
 			{
@@ -586,6 +594,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_totalHeight += itemHeight;
 				_prefixHeights.Add(_totalHeight);
 			}
+
+			_totalHeight += _contentPaddingBottom;
 		}
 
 		private void SyncMessageIndices()

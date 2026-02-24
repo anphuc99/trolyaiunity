@@ -12,7 +12,6 @@ GameObject:
   - component: {fileID: 6460851045300307250}
   - component: {fileID: 2968729141038185583}
   - component: {fileID: 2899326179164948076}
-  - component: {fileID: 4955942868733925947}
   m_Layer: 5
   m_Name: MessageBubbleUser
   m_TagString: Untagged
@@ -97,24 +96,6 @@ MonoBehaviour:
   _paddingBottom: 16
   _paddingLeft: 20
   _paddingRight: 25
---- !u!114 &4955942868733925947
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1462251686785181700}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9992572fe31be464fabba9f1232285f6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _bubbleType: 0
-  _rootRect: {fileID: 6355584328932641566}
-  _nameText: {fileID: 0}
-  _messageText: {fileID: 7997876051903750430}
-  _avatarImage: {fileID: 0}
-  _messageAutoResize: {fileID: 2899326179164948076}
 --- !u!1 &1844274526414327212
 GameObject:
   m_ObjectHideFlags: 0
@@ -179,6 +160,9 @@ MonoBehaviour:
   _messageText: {fileID: 7997876051903750430}
   _avatarImage: {fileID: 0}
   _messageAutoResize: {fileID: 2899326179164948076}
+  _speakerButton: {fileID: 0}
+  _translateButton: {fileID: 0}
+  _speakerLongPressSeconds: 0.45
 --- !u!1 &4737207016468362131
 GameObject:
   m_ObjectHideFlags: 0
