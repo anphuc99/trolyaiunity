@@ -22,8 +22,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private const string DefaultUserDisplayName = "You";
 		private const string DefaultCharacterDisplayName = "Mimi";
 		private const string DefaultTtsTone = "neutral";
-		private const float DefaultSpeakingRate = 1f;
-		private const float DefaultPitch = 0f;
 
 		[SerializeField]
 		private TMP_InputField _inputField;
@@ -42,6 +40,21 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		[SerializeField]
 		private AudioSource _characterVoiceAudioSource;
+
+		[SerializeField]
+		private float _defaultSpeakingRate = 1f;
+
+		[SerializeField]
+		private float _defaultPitch = 0f;
+
+		[SerializeField]
+		private float _detunePerPitchUnit = 50f;
+
+		[SerializeField]
+		private float _minUnityPitch = 0.1f;
+
+		[SerializeField]
+		private float _maxUnityPitch = 3f;
 
 		private readonly Queue<ChatAssistantTurnPayload> _pendingCharacterTurns = new Queue<ChatAssistantTurnPayload>();
 		private bool _isProcessingCharacterTurns;
@@ -437,15 +450,18 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_characterVoiceAudioSource.pitch = originalPitch;
 		}
 
-		private static float CalculateUnityPitchFromWebStyle(float? pitch, float? speakingRate)
+		private float CalculateUnityPitchFromWebStyle(float? pitch, float? speakingRate)
 		{
-			var resolvedSpeakingRate = speakingRate ?? DefaultSpeakingRate;
-			var resolvedPitch = pitch ?? DefaultPitch;
+			var resolvedSpeakingRate = speakingRate ?? _defaultSpeakingRate;
+			var resolvedPitch = pitch ?? _defaultPitch;
 
-			var detuneCents = resolvedPitch * 50f;
+			var detuneCents = resolvedPitch * _detunePerPitchUnit;
 			var detuneFactor = Mathf.Pow(2f, detuneCents / 1200f);
 			var unityPitch = resolvedSpeakingRate * detuneFactor;
-			return Mathf.Clamp(unityPitch, 0.1f, 3f);
+
+			var minPitch = Mathf.Min(_minUnityPitch, _maxUnityPitch);
+			var maxPitch = Mathf.Max(_minUnityPitch, _maxUnityPitch);
+			return Mathf.Clamp(unityPitch, minPitch, maxPitch);
 		}
 
 		private void EnsureDependencies()
