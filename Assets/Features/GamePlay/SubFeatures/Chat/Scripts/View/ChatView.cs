@@ -60,11 +60,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			SendChatMessage(_inputField.text);
 		}
 
-		protected override void OnEnabled()
-		{
-			BindInputFieldEvents();
-		}
-
 		protected override void OnDisabled()
 		{
 			UnbindInputFieldEvents();
@@ -129,6 +124,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			EnsureDependencies();
 			RefreshHistory();
+			BindInputFieldEvents();
 		}
 
 		/// <summary>
