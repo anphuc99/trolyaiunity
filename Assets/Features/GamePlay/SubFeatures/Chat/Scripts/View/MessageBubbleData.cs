@@ -34,6 +34,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[SerializeField]
 		private Sprite _avatar;
 
+		[SerializeField]
+		private string _tone;
+
 		/// <summary>
 		/// Unique message identifier.
 		/// </summary>
@@ -77,6 +80,15 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			get => _avatar;
 			set => _avatar = value;
+		}
+
+		/// <summary>
+		/// Optional tone hint for text-to-speech playback.
+		/// </summary>
+		public string Tone
+		{
+			get => _tone;
+			set => _tone = value;
 		}
 	}
 }

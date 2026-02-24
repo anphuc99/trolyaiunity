@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -27,7 +28,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[SerializeField]
 		private ChatMessageAutoResize _messageAutoResize;
 
+		[SerializeField]
+		private Button _speakerButton;
+
 		private string _messageId;
+		private MessageBubbleData _boundData;
+		private Action<MessageBubbleData> _onSpeakerClicked;
 
 		/// <summary>
 		/// Type that this prefab instance represents.
@@ -52,6 +58,31 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 		}
 
+		private void Awake()
+		{
+			if (_speakerButton != null)
+			{
+				_speakerButton.onClick.AddListener(HandleSpeakerClicked);
+			}
+		}
+
+		private void OnDestroy()
+		{
+			if (_speakerButton != null)
+			{
+				_speakerButton.onClick.RemoveListener(HandleSpeakerClicked);
+			}
+		}
+
+		/// <summary>
+		/// Configures callback for speaker-button click.
+		/// </summary>
+		/// <param name="onSpeakerClicked">Callback invoked with currently bound message data.</param>
+		public void SetSpeakerClickHandler(Action<MessageBubbleData> onSpeakerClicked)
+		{
+			_onSpeakerClicked = onSpeakerClicked;
+		}
+
 		/// <summary>
 		/// Binds message data and applies width-dependent layout.
 		/// </summary>
@@ -64,6 +95,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
+			_boundData = data;
 			_messageId = data.MessageId ?? string.Empty;
 
 			if (_nameText != null)
@@ -86,6 +118,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_messageAutoResize != null)
 			{
 				_messageAutoResize.RefreshLayout();
+			}
+
+			if (_speakerButton != null)
+			{
+				_speakerButton.interactable = !string.IsNullOrWhiteSpace(data.Message);
 			}
 
 			ForceRebuild();
@@ -191,6 +228,16 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			Canvas.ForceUpdateCanvases();
 			LayoutRebuilder.ForceRebuildLayoutImmediate(_rootRect);
+		}
+
+		private void HandleSpeakerClicked()
+		{
+			if (_boundData == null)
+			{
+				return;
+			}
+
+			_onSpeakerClicked?.Invoke(_boundData);
 		}
 
         

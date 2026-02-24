@@ -45,6 +45,63 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 	}
 
 	/// <summary>
+	/// Payload from view to request replaying message audio.
+	/// </summary>
+	public sealed class ChatPlayMessageAudioRequestPayload
+	{
+		/// <summary>
+		/// Message id to replay.
+		/// </summary>
+		public string MessageId { get; set; }
+
+		/// <summary>
+		/// Character display name.
+		/// </summary>
+		public string CharacterName { get; set; }
+
+		/// <summary>
+		/// Message text to synthesize.
+		/// </summary>
+		public string Text { get; set; }
+
+		/// <summary>
+		/// Optional tone hint.
+		/// </summary>
+		public string Tone { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload from controller to view for playing message audio.
+	/// </summary>
+	public sealed class ChatPlayMessageAudioPayload
+	{
+		/// <summary>
+		/// Message id to replay.
+		/// </summary>
+		public string MessageId { get; set; }
+
+		/// <summary>
+		/// Character display name.
+		/// </summary>
+		public string CharacterName { get; set; }
+
+		/// <summary>
+		/// Message text to synthesize.
+		/// </summary>
+		public string Text { get; set; }
+
+		/// <summary>
+		/// Tone hint used for TTS.
+		/// </summary>
+		public string Tone { get; set; }
+
+		/// <summary>
+		/// Voice name resolved by controller from cache/signals.
+		/// </summary>
+		public string VoiceName { get; set; }
+	}
+
+	/// <summary>
 	/// One role/content message entry returned by chat APIs.
 	/// </summary>
 	public sealed class ChatHistoryMessagePayload

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -11,6 +12,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 	/// </summary>
 	public sealed class VirtualizedChatMessageContainer : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IScrollHandler
 	{
+		public Action<MessageBubbleData> OnMessageSpeakerClicked { get; set; }
+
 		[SerializeField]
 		private RectTransform _viewport;
 
@@ -363,6 +366,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			var bubble = Instantiate(prefab, _itemsRoot);
 			bubble.name = prefab.name + "_Virtualized_" + suffix;
+			bubble.SetSpeakerClickHandler(HandleBubbleSpeakerClicked);
 
 			bubble.gameObject.SetActive(false);
 			return bubble;
@@ -396,6 +400,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			bubble.name = bubble.name + "_Measure_" + suffix;
+			bubble.SetSpeakerClickHandler(null);
 			bubble.gameObject.SetActive(true);
 			var rect = bubble.RootRect;
 			if (rect != null)
@@ -412,6 +417,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			canvasGroup.alpha = 0f;
 			canvasGroup.interactable = false;
 			canvasGroup.blocksRaycasts = false;
+		}
+
+		private void HandleBubbleSpeakerClicked(MessageBubbleData messageData)
+		{
+			OnMessageSpeakerClicked?.Invoke(messageData);
 		}
 
 		private void RebuildMetrics()

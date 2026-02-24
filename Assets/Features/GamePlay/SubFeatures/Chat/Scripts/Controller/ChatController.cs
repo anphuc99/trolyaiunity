@@ -130,6 +130,40 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
+		/// Handles replay request from chat view and publishes playback event.
+		/// </summary>
+		/// <param name="payload">Replay request payload.</param>
+		[Request(ChatRequests.PlayMessageAudio)]
+		public static void HandlePlayMessageAudio(ChatPlayMessageAudioRequestPayload payload)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.Text))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Missing message content for audio playback."
+				});
+				return;
+			}
+
+			var characterName = string.IsNullOrWhiteSpace(payload.CharacterName)
+				? string.Empty
+				: payload.CharacterName.Trim();
+
+			var voiceName = string.IsNullOrWhiteSpace(characterName)
+				? null
+				: ChatState.ParentSignals?.GetCharacterVoiceNameByName?.Invoke(characterName);
+
+			EventBus.Publish(ChatEvents.MessageAudioPlayRequested, new ChatPlayMessageAudioPayload
+			{
+				MessageId = payload.MessageId,
+				CharacterName = characterName,
+				Text = payload.Text,
+				Tone = payload.Tone,
+				VoiceName = voiceName,
+			});
+		}
+
+		/// <summary>
 		/// Sample request handler that echoes payload to a view event and parent signal.
 		/// </summary>
 		/// <param name="payload">Optional payload.</param>

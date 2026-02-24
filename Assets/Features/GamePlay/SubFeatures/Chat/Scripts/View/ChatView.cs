@@ -154,6 +154,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			StopAllCoroutines();
 			_pendingCharacterTurns.Clear();
 			_isProcessingCharacterTurns = false;
+			if (_messageContainer != null)
+			{
+				_messageContainer.OnMessageSpeakerClicked = null;
+			}
 			if (_characterVoiceAudioSource != null)
 			{
 				_characterVoiceAudioSource.Stop();
@@ -212,6 +216,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 						Type = MessageBubbleType.Character,
 						SenderName = DefaultCharacterDisplayName,
 						Message = item.Content ?? string.Empty,
+						Tone = DefaultTtsTone,
 						Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, DefaultCharacterDisplayName),
 					});
 					continue;
@@ -233,6 +238,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 						Type = MessageBubbleType.Character,
 						SenderName = characterName,
 						Message = text,
+						Tone = string.IsNullOrWhiteSpace(turn.Tone) ? DefaultTtsTone : turn.Tone.Trim(),
 						Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, characterName),
 					});
 				}
@@ -268,6 +274,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					Type = MessageBubbleType.Character,
 					SenderName = DefaultCharacterDisplayName,
 					Message = response.Reply,
+					Tone = DefaultTtsTone,
 					Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, DefaultCharacterDisplayName),
 				});
 				return;
@@ -329,6 +336,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					Type = MessageBubbleType.Character,
 					SenderName = characterName,
 					Message = messageText,
+					Tone = tone,
 					Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, characterName),
 				});
 
@@ -436,6 +444,65 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					_characterVoiceAudioSource = gameObject.AddComponent<AudioSource>();
 				}
 			}
+
+			if (_messageContainer != null)
+			{
+				_messageContainer.OnMessageSpeakerClicked = HandleMessageSpeakerClicked;
+			}
+		}
+
+		private void HandleMessageSpeakerClicked(MessageBubbleData messageData)
+		{
+			if (messageData == null || messageData.Type != MessageBubbleType.Character)
+			{
+				return;
+			}
+
+			if (string.IsNullOrWhiteSpace(messageData.Message))
+			{
+				return;
+			}
+
+			SendRequest(ChatRequests.PlayMessageAudio, new ChatPlayMessageAudioRequestPayload
+			{
+				MessageId = messageData.MessageId,
+				CharacterName = messageData.SenderName,
+				Text = messageData.Message,
+				Tone = string.IsNullOrWhiteSpace(messageData.Tone) ? DefaultTtsTone : messageData.Tone,
+			});
+		}
+
+		/// <summary>
+		/// Handles controller-approved message-audio playback.
+		/// </summary>
+		/// <param name="payload">Playback payload.</param>
+		[OnEvent(ChatEvents.MessageAudioPlayRequested)]
+		private void OnMessageAudioPlayRequested(object payload)
+		{
+			var playback = payload as ChatPlayMessageAudioPayload;
+			if (playback == null || string.IsNullOrWhiteSpace(playback.Text))
+			{
+				return;
+			}
+
+			StartCoroutine(PlaySingleMessageAudio(playback));
+		}
+
+		private IEnumerator PlaySingleMessageAudio(ChatPlayMessageAudioPayload playback)
+		{
+			var tone = string.IsNullOrWhiteSpace(playback.Tone) ? DefaultTtsTone : playback.Tone.Trim();
+			AudioClip clip = null;
+			yield return StartCoroutine(RequestCharacterTtsClip(playback.Text, tone, playback.VoiceName, loadedClip =>
+			{
+				clip = loadedClip;
+			}));
+
+			if (clip == null)
+			{
+				yield break;
+			}
+
+			yield return StartCoroutine(PlayCharacterVoiceAsync(clip));
 		}
 
 		private string BuildTextToSpeechRequestUrl(string text, string tone, string voiceName)

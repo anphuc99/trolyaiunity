@@ -12,5 +12,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Requests
 		public const string SendMessage = "game.play.chat.send.message.request";
 		public const string GetCharacterAvatar = "game.play.chat.get.character.avatar.request";
 		public const string GetCharacterVoiceName = "game.play.chat.get.character.voice.name.request";
+		public const string PlayMessageAudio = "game.play.chat.play.message.audio.request";
 	}
 }
