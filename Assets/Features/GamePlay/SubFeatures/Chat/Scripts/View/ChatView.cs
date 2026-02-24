@@ -594,12 +594,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			if (string.IsNullOrWhiteSpace(messageData.MessageId) || string.IsNullOrWhiteSpace(messageData.Translation))
+			if (string.IsNullOrWhiteSpace(messageData.MessageId) && string.IsNullOrWhiteSpace(messageData.Translation))
 			{
 				return;
 			}
 
-			_messageContainer.ToggleMessageTranslation(messageData.MessageId, messageData.Translation);
+			_messageContainer.ToggleMessageTranslation(messageData);
 		}
 
 		/// <summary>

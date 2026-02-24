@@ -163,7 +163,31 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		/// <param name="translation">Translation text.</param>
 		public void ToggleMessageTranslation(string messageId, string translation)
 		{
-			if (string.IsNullOrWhiteSpace(messageId) || string.IsNullOrWhiteSpace(translation))
+			if (string.IsNullOrWhiteSpace(messageId))
+			{
+				return;
+			}
+
+			ToggleMessageTranslationInternal(null, messageId, translation);
+		}
+
+		/// <summary>
+		/// Toggles translation display for a specific message instance.
+		/// </summary>
+		/// <param name="messageData">Message instance from bubble callback.</param>
+		public void ToggleMessageTranslation(MessageBubbleData messageData)
+		{
+			if (messageData == null)
+			{
+				return;
+			}
+
+			ToggleMessageTranslationInternal(messageData, messageData.MessageId, messageData.Translation);
+		}
+
+		private void ToggleMessageTranslationInternal(MessageBubbleData targetMessage, string messageId, string translation)
+		{
+			if (targetMessage == null && string.IsNullOrWhiteSpace(messageId))
 			{
 				return;
 			}
@@ -177,9 +201,15 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					continue;
 				}
 
-				if (!string.Equals(message.MessageId, messageId, StringComparison.Ordinal))
+				if (!ReferenceEquals(message, targetMessage) && !string.Equals(message.MessageId, messageId, StringComparison.Ordinal))
 				{
 					continue;
+				}
+
+				var resolvedTranslation = string.IsNullOrWhiteSpace(translation) ? message.Translation : translation;
+				if (string.IsNullOrWhiteSpace(resolvedTranslation))
+				{
+					break;
 				}
 
 				var originalText = string.IsNullOrWhiteSpace(message.OriginalMessage)
@@ -194,8 +224,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				else
 				{
 					message.OriginalMessage = originalText;
-					message.Translation = translation;
-					message.Message = originalText + "\n" + TranslationSeparator + "\n" + translation;
+					message.Translation = resolvedTranslation;
+					message.Message = originalText + "\n" + TranslationSeparator + "\n" + resolvedTranslation;
 					message.IsTranslationExpanded = true;
 				}
 
