@@ -1,6 +1,7 @@
 using Core.Infrastructure.Views;
 using Features.GamePlay.Events;
 using Features.GamePlay.Infrastructure.Attributes;
+using Features.GamePlay.Model;
 using Features.GamePlay.Requests;
 using UnityEngine;
 
@@ -11,25 +12,14 @@ namespace Features.GamePlay.View
 	/// </summary>
 	public sealed class GamePlayView : BaseView
 	{
-		[SerializeField]
-		private string _message = "Hello";
-
-		/// <summary>
-		/// Example method to send a request.
-		/// </summary>
-		public void SendEcho()
+		public void OpenHome() 
 		{
-			SendRequest(GamePlayRequests.Echo, _message);
+			SendRequest(GamePlayRequests.OpenSubController, GamePlaySubControllerType.Home);	
 		}
-
-		/// <summary>
-		/// Example event handler (auto-bound).
-		/// </summary>
-		/// <param name="payload">Payload from controller.</param>
-		[OnEvent(GamePlayEvents.Echoed)]
-		private void OnEchoed(object payload)
+		
+		public void OpenChat()
 		{
-			Debug.Log("[GamePlayView] Echoed: " + payload, this);
+			SendRequest(GamePlayRequests.OpenSubController, GamePlaySubControllerType.Chat);
 		}
 	}
 }
