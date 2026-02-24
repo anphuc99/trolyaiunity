@@ -53,7 +53,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[TextArea(1, 4)]
 		private string _cheatMessageText = "Hello, this is a test message.";
 
-		[SerializeField]
 		private List<MessageBubbleData> _messages = new();
 
 		private readonly List<MessageBubble> _characterPool = new();
@@ -109,29 +108,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		private void OnEnable()
 		{
-			RefreshVisible();
-		}
-
-		private void OnValidate()
-		{
-			if (_dragSensitivity < 0.01f)
-			{
-				_dragSensitivity = 0.01f;
-			}
-
-			if (_mouseWheelStep < 1f)
-			{
-				_mouseWheelStep = 1f;
-			}
-
-			if (_maxSpawnedObjects < 1)
-			{
-				_maxSpawnedObjects = 1;
-			}
-
-			EnsureReferences();
-			EnsureMeasureBubbles();
-			RebuildMetrics();
 			RefreshVisible();
 		}
 

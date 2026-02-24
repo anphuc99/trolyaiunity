@@ -79,7 +79,6 @@ namespace Features.GamePlay.Controller
 
 			CloseCurrentSubControllerInternal();
 			InstallSubController(target);
-			GamePlayState.CurrentSubController = target;
 			EventBus.Publish(GamePlayEvents.SubControllerChanged, target.ToString());
 			return true;
 		}
@@ -133,6 +132,7 @@ namespace Features.GamePlay.Controller
 					TaskController.Install();
 					break;
 			}
+			GamePlayState.CurrentSubController = subControllerType;
 		}
 
 		/// <summary>

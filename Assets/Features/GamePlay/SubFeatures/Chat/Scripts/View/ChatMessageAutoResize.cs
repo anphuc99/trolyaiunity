@@ -83,7 +83,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			var verticalPadding = _paddingTop + _paddingBottom;
 			var availableTextWidth = Mathf.Max(1f, _maxWidth - horizontalPadding);
 
-			_messageText.enableWordWrapping = true;
+			_messageText.textWrappingMode = TextWrappingModes.Normal;
 			_messageText.overflowMode = TextOverflowModes.Overflow;
 
 			var unconstrainedPreferred = _messageText.GetPreferredValues(_messageText.text, Mathf.Infinity, Mathf.Infinity);
