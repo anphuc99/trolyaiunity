@@ -1,6 +1,7 @@
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace Features.GamePlay.SubFeatures.Chat.View
@@ -34,10 +35,17 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[SerializeField]
 		private Button _translateButton;
 
+		[SerializeField]
+		[Min(0.1f)]
+		private float _speakerLongPressSeconds = 0.45f;
+
 		private string _messageId;
 		private MessageBubbleData _boundData;
 		private Action<MessageBubbleData> _onSpeakerClicked;
+		private Action<MessageBubbleData> _onSpeakerLongPressed;
 		private Action<MessageBubbleData> _onTranslateClicked;
+		private Coroutine _speakerLongPressCoroutine;
+		private bool _suppressNextSpeakerClick;
 
 		/// <summary>
 		/// Type that this prefab instance represents.
@@ -67,6 +75,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_speakerButton != null)
 			{
 				_speakerButton.onClick.AddListener(HandleSpeakerClicked);
+				SetupSpeakerLongPressEvents();
 			}
 
 			if (_translateButton != null)
@@ -77,6 +86,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		private void OnDestroy()
 		{
+			CancelSpeakerLongPress();
+
 			if (_speakerButton != null)
 			{
 				_speakerButton.onClick.RemoveListener(HandleSpeakerClicked);
@@ -95,6 +106,15 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		public void SetSpeakerClickHandler(Action<MessageBubbleData> onSpeakerClicked)
 		{
 			_onSpeakerClicked = onSpeakerClicked;
+		}
+
+		/// <summary>
+		/// Configures callback for speaker-button long press.
+		/// </summary>
+		/// <param name="onSpeakerLongPressed">Callback invoked with currently bound message data.</param>
+		public void SetSpeakerLongPressHandler(Action<MessageBubbleData> onSpeakerLongPressed)
+		{
+			_onSpeakerLongPressed = onSpeakerLongPressed;
 		}
 
 		/// <summary>
@@ -145,6 +165,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			if (_speakerButton != null)
 			{
+				_speakerButton.gameObject.SetActive(!data.IsTtsReloading);
 				_speakerButton.interactable = !string.IsNullOrWhiteSpace(data.Message);
 			}
 
@@ -260,12 +281,106 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		private void HandleSpeakerClicked()
 		{
+			if (_suppressNextSpeakerClick)
+			{
+				_suppressNextSpeakerClick = false;
+				return;
+			}
+
 			if (_boundData == null)
 			{
 				return;
 			}
 
 			_onSpeakerClicked?.Invoke(_boundData);
+		}
+
+		private void SetupSpeakerLongPressEvents()
+		{
+			if (_speakerButton == null)
+			{
+				return;
+			}
+
+			var trigger = _speakerButton.GetComponent<EventTrigger>();
+			if (trigger == null)
+			{
+				trigger = _speakerButton.gameObject.AddComponent<EventTrigger>();
+			}
+
+			if (trigger.triggers == null)
+			{
+				trigger.triggers = new System.Collections.Generic.List<EventTrigger.Entry>();
+			}
+
+			AddEventTrigger(trigger, EventTriggerType.PointerDown, OnSpeakerPointerDown);
+			AddEventTrigger(trigger, EventTriggerType.PointerUp, OnSpeakerPointerUpOrExit);
+			AddEventTrigger(trigger, EventTriggerType.PointerExit, OnSpeakerPointerUpOrExit);
+		}
+
+		private void AddEventTrigger(EventTrigger trigger, EventTriggerType eventType, Action<BaseEventData> handler)
+		{
+			for (var i = 0; i < trigger.triggers.Count; i++)
+			{
+				if (trigger.triggers[i].eventID == eventType)
+				{
+					trigger.triggers[i].callback.AddListener(eventData => handler?.Invoke(eventData));
+					return;
+				}
+			}
+
+			var entry = new EventTrigger.Entry
+			{
+				eventID = eventType,
+				callback = new EventTrigger.TriggerEvent()
+			};
+			entry.callback.AddListener(eventData => handler?.Invoke(eventData));
+			trigger.triggers.Add(entry);
+		}
+
+		private void OnSpeakerPointerDown(BaseEventData eventData)
+		{
+			if (_speakerLongPressCoroutine != null)
+			{
+				StopCoroutine(_speakerLongPressCoroutine);
+			}
+
+			_speakerLongPressCoroutine = StartCoroutine(DetectSpeakerLongPress());
+		}
+
+		private void OnSpeakerPointerUpOrExit(BaseEventData eventData)
+		{
+			CancelSpeakerLongPress();
+		}
+
+		private System.Collections.IEnumerator DetectSpeakerLongPress()
+		{
+			yield return new WaitForSeconds(_speakerLongPressSeconds);
+
+			_speakerLongPressCoroutine = null;
+			if (_boundData == null)
+			{
+				yield break;
+			}
+
+			if (_boundData.IsTtsReloading)
+			{
+				yield break;
+			}
+
+			_suppressNextSpeakerClick = true;
+			_onSpeakerLongPressed?.Invoke(_boundData);
+		}
+
+		private void CancelSpeakerLongPress()
+		{
+			if (_speakerLongPressCoroutine == null)
+			{
+				return;
+			}
+
+			StopCoroutine(_speakerLongPressCoroutine);
+			_speakerLongPressCoroutine = null;
 		}
 
 		private void HandleTranslateClicked()

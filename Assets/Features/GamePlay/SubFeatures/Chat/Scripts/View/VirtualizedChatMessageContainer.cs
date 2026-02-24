@@ -13,6 +13,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 	public sealed class VirtualizedChatMessageContainer : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IScrollHandler
 	{
 		public Action<MessageBubbleData> OnMessageSpeakerClicked { get; set; }
+		public Action<MessageBubbleData> OnMessageSpeakerLongPressed { get; set; }
 		public Action<MessageBubbleData> OnMessageTranslateClicked { get; set; }
 
 		private const string TranslationSeparator = "---------------------";
@@ -205,6 +206,48 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (updated)
 			{
 				RebuildMetrics();
+				RefreshVisible();
+			}
+		}
+
+		/// <summary>
+		/// Sets TTS reloading state for a message and refreshes visible bubbles.
+		/// </summary>
+		/// <param name="messageId">Target message id.</param>
+		/// <param name="isReloading">Reloading state.</param>
+		public void SetMessageTtsReloading(string messageId, bool isReloading)
+		{
+			if (string.IsNullOrWhiteSpace(messageId))
+			{
+				return;
+			}
+
+			var updated = false;
+			for (var i = 0; i < _messages.Count; i++)
+			{
+				var message = _messages[i];
+				if (message == null)
+				{
+					continue;
+				}
+
+				if (!string.Equals(message.MessageId, messageId, StringComparison.Ordinal))
+				{
+					continue;
+				}
+
+				if (message.IsTtsReloading == isReloading)
+				{
+					break;
+				}
+
+				message.IsTtsReloading = isReloading;
+				updated = true;
+				break;
+			}
+
+			if (updated)
+			{
 				RefreshVisible();
 			}
 		}
@@ -424,6 +467,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			var bubble = Instantiate(prefab, _itemsRoot);
 			bubble.name = prefab.name + "_Virtualized_" + suffix;
 			bubble.SetSpeakerClickHandler(HandleBubbleSpeakerClicked);
+			bubble.SetSpeakerLongPressHandler(HandleBubbleSpeakerLongPressed);
 			bubble.SetTranslateClickHandler(HandleBubbleTranslateClicked);
 
 			bubble.gameObject.SetActive(false);
@@ -459,6 +503,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			bubble.name = bubble.name + "_Measure_" + suffix;
 			bubble.SetSpeakerClickHandler(null);
+			bubble.SetSpeakerLongPressHandler(null);
 			bubble.SetTranslateClickHandler(null);
 			bubble.gameObject.SetActive(true);
 			var rect = bubble.RootRect;
@@ -481,6 +526,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private void HandleBubbleSpeakerClicked(MessageBubbleData messageData)
 		{
 			OnMessageSpeakerClicked?.Invoke(messageData);
+		}
+
+		private void HandleBubbleSpeakerLongPressed(MessageBubbleData messageData)
+		{
+			OnMessageSpeakerLongPressed?.Invoke(messageData);
 		}
 
 		private void HandleBubbleTranslateClicked(MessageBubbleData messageData)

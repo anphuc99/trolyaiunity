@@ -292,6 +292,7 @@ MonoBehaviour:
   _avatarImage: {fileID: 5041546366747983831}
   _messageAutoResize: {fileID: 8688632695700173482}
   _speakerButton: {fileID: 4717182999456521263}
+  _translateButton: {fileID: 3478195725622554138}
 --- !u!1 &3325969614326157883
 GameObject:
   m_ObjectHideFlags: 0

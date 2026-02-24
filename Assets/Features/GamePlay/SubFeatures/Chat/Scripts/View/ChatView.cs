@@ -43,6 +43,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private AudioSource _characterVoiceAudioSource;
 
 		private readonly Queue<ChatAssistantTurnPayload> _pendingCharacterTurns = new Queue<ChatAssistantTurnPayload>();
+		private readonly HashSet<string> _reloadingTtsMessageIds = new HashSet<string>(StringComparer.Ordinal);
 		private bool _isProcessingCharacterTurns;
 		private NetworkSettings _networkSettings;
 
@@ -158,8 +159,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_messageContainer != null)
 			{
 				_messageContainer.OnMessageSpeakerClicked = null;
+				_messageContainer.OnMessageSpeakerLongPressed = null;
 				_messageContainer.OnMessageTranslateClicked = null;
 			}
+			_reloadingTtsMessageIds.Clear();
 			if (_characterVoiceAudioSource != null)
 			{
 				_characterVoiceAudioSource.Stop();
@@ -359,13 +362,18 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		private IEnumerator RequestCharacterTtsClip(string text, string tone, string characterName, Action<AudioClip> onCompleted)
 		{
+			yield return RequestCharacterTtsClip(text, tone, characterName, false, onCompleted);
+		}
+
+		private IEnumerator RequestCharacterTtsClip(string text, string tone, string characterName, bool forceReload, Action<AudioClip> onCompleted)
+		{
 			if (string.IsNullOrWhiteSpace(text))
 			{
 				onCompleted?.Invoke(null);
 				yield break;
 			}
 
-			var requestUrl = BuildTextToSpeechRequestUrl(text, tone, characterName);
+			var requestUrl = BuildTextToSpeechRequestUrl(text, tone, characterName, forceReload);
 			if (string.IsNullOrWhiteSpace(requestUrl))
 			{
 				onCompleted?.Invoke(null);
@@ -462,6 +470,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_messageContainer != null)
 			{
 				_messageContainer.OnMessageSpeakerClicked = HandleMessageSpeakerClicked;
+				_messageContainer.OnMessageSpeakerLongPressed = HandleMessageSpeakerLongPressed;
 				_messageContainer.OnMessageTranslateClicked = HandleMessageTranslateClicked;
 			}
 		}
@@ -469,6 +478,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private void HandleMessageSpeakerClicked(MessageBubbleData messageData)
 		{
 			if (messageData == null || messageData.Type != MessageBubbleType.Character)
+			{
+				return;
+			}
+
+			if (_reloadingTtsMessageIds.Contains(messageData.MessageId) || messageData.IsTtsReloading)
 			{
 				return;
 			}
@@ -485,6 +499,58 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				Text = string.IsNullOrWhiteSpace(messageData.OriginalMessage) ? messageData.Message : messageData.OriginalMessage,
 				Tone = string.IsNullOrWhiteSpace(messageData.Tone) ? DefaultTtsTone : messageData.Tone,
 			});
+		}
+
+		private void HandleMessageSpeakerLongPressed(MessageBubbleData messageData)
+		{
+			if (_messageContainer == null || messageData == null || messageData.Type != MessageBubbleType.Character)
+			{
+				return;
+			}
+
+			if (string.IsNullOrWhiteSpace(messageData.MessageId) || _reloadingTtsMessageIds.Contains(messageData.MessageId))
+			{
+				return;
+			}
+
+			StartCoroutine(ForceReloadMessageTts(messageData));
+		}
+
+		private IEnumerator ForceReloadMessageTts(MessageBubbleData messageData)
+		{
+			if (_messageContainer == null || messageData == null || string.IsNullOrWhiteSpace(messageData.MessageId))
+			{
+				yield break;
+			}
+
+			var messageId = messageData.MessageId;
+			_reloadingTtsMessageIds.Add(messageId);
+			_messageContainer.SetMessageTtsReloading(messageId, true);
+
+			var baseText = string.IsNullOrWhiteSpace(messageData.OriginalMessage) ? messageData.Message : messageData.OriginalMessage;
+			if (string.IsNullOrWhiteSpace(baseText))
+			{
+				_messageContainer.SetMessageTtsReloading(messageId, false);
+				_reloadingTtsMessageIds.Remove(messageId);
+				yield break;
+			}
+
+			var tone = string.IsNullOrWhiteSpace(messageData.Tone) ? DefaultTtsTone : messageData.Tone.Trim();
+			var characterName = string.IsNullOrWhiteSpace(messageData.SenderName) ? DefaultCharacterDisplayName : messageData.SenderName.Trim();
+
+			AudioClip clip = null;
+			yield return StartCoroutine(RequestCharacterTtsClip(baseText, tone, characterName, true, loadedClip =>
+			{
+				clip = loadedClip;
+			}));
+
+			if (clip != null)
+			{
+				yield return StartCoroutine(PlayCharacterVoiceAsync(clip));
+			}
+
+			_messageContainer.SetMessageTtsReloading(messageId, false);
+			_reloadingTtsMessageIds.Remove(messageId);
 		}
 
 		private void HandleMessageTranslateClicked(MessageBubbleData messageData)
@@ -535,7 +601,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			yield return StartCoroutine(PlayCharacterVoiceAsync(clip));
 		}
 
-		private string BuildTextToSpeechRequestUrl(string text, string tone, string characterName)
+		private string BuildTextToSpeechRequestUrl(string text, string tone, string characterName, bool forceReload = false)
 		{
 			var baseUrl = NormalizeServerBaseUrl(GetServerBaseUrl());
 			if (string.IsNullOrWhiteSpace(baseUrl))
@@ -550,6 +616,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				"tone=" + UnityWebRequest.EscapeURL(string.IsNullOrWhiteSpace(tone) ? DefaultTtsTone : tone),
 				"characterName=" + UnityWebRequest.EscapeURL(string.IsNullOrWhiteSpace(characterName) ? DefaultCharacterDisplayName : characterName),
 			};
+
+			if (forceReload)
+			{
+				queryParts.Add("force=true");
+			}
 
 			return endpoint + "?" + string.Join("&", queryParts);
 		}

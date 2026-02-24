@@ -47,6 +47,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[SerializeField]
 		private bool _isTranslationExpanded;
 
+		[SerializeField]
+		private bool _isTtsReloading;
+
 		/// <summary>
 		/// Unique message identifier.
 		/// </summary>
@@ -126,6 +129,15 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			get => _isTranslationExpanded;
 			set => _isTranslationExpanded = value;
+		}
+
+		/// <summary>
+		/// Indicates whether this message is currently force-reloading TTS.
+		/// </summary>
+		public bool IsTtsReloading
+		{
+			get => _isTtsReloading;
+			set => _isTtsReloading = value;
 		}
 	}
 }
