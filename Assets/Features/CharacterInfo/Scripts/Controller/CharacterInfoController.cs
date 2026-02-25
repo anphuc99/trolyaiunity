@@ -85,13 +85,23 @@ namespace Features.CharacterInfo.Controller
 				return;
 			}
 
+			SetDeletedCharacterNotice(selectedCharacter);
+
+			LoadScene.UnloadByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CharacterInfoGameplay);
+		}
+
+		private static void SetDeletedCharacterNotice(SelectedCharacterInfo selectedCharacter)
+		{
+			if (selectedCharacter == null)
+			{
+				return;
+			}
+
 			GlobalVariables.Set(DeletedCharacterGlobalKey, new DeletedCharacterNotice
 			{
 				CharacterId = selectedCharacter.Id,
 				CharacterName = selectedCharacter.Name,
 			});
-
-			LoadScene.UnloadByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CharacterInfoGameplay);
 		}
 
 		private static void PublishSelectedCharacter()
