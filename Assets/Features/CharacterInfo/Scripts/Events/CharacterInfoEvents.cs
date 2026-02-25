@@ -8,5 +8,6 @@ namespace Features.CharacterInfo.Events
 	public static class CharacterInfoEvents
 	{
 		public const string Echoed = "character.info.echo.event";
+		public const string SelectedCharacterLoaded = "character.info.selected.character.loaded.event";
 	}
 }

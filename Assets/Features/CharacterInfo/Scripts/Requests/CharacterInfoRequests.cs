@@ -8,5 +8,6 @@ namespace Features.CharacterInfo.Requests
 	public static class CharacterInfoRequests
 	{
 		public const string Echo = "character.info.echo.request";
+		public const string LoadSelectedCharacter = "character.info.load.selected.character.request";
 	}
 }

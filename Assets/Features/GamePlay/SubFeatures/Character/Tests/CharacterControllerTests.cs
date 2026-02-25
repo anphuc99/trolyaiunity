@@ -1,8 +1,11 @@
 using System.Collections.Generic;
+using Core.Infrastructure.Attributes;
+using Core.Infrastructure.State;
 using Features.GamePlay.SubFeatures.Character.Controller;
 using Features.GamePlay.SubFeatures.Character.Events;
 using Features.GamePlay.SubFeatures.Character.Model;
 using NUnit.Framework;
+using Share.Components;
 
 namespace Features.GamePlay.SubFeatures.Character.Tests
 {
@@ -11,11 +14,23 @@ namespace Features.GamePlay.SubFeatures.Character.Tests
 	/// </summary>
 	public sealed class CharacterControllerTests
 	{
+		private const string SelectedCharacterGlobalKey = "global.character.selected.info";
+
+		[ControllerScope(ControllerScopeKey.Global)]
+		private static class GlobalVariablesMutationProxyController
+		{
+			public static void ClearSelectedCharacter()
+			{
+				GlobalVariables.Remove(SelectedCharacterGlobalKey);
+			}
+		}
+
 		[TearDown]
 		public void TearDown()
 		{
 			CharacterController.SetParentSignals(null);
 			CharacterState.CachedCharacters = new List<CharacterListItemPayload>();
+			GlobalVariablesMutationProxyController.ClearSelectedCharacter();
 		}
 
 		[Test]
@@ -60,6 +75,20 @@ namespace Features.GamePlay.SubFeatures.Character.Tests
 
 			Assert.IsNotNull(CharacterState.CachedCharacters);
 			Assert.AreEqual(0, CharacterState.CachedCharacters.Count);
+		}
+
+		[Test]
+		public void HandleOpenCharacterInfo_ReturnsFalse_WhenCharacterDoesNotExist()
+		{
+			CharacterController.SetParentSignals(new CharacterParentSignals
+			{
+				GetCharacterInfo = _ => null
+			});
+
+			var opened = CharacterController.HandleOpenCharacterInfo("unknown");
+
+			Assert.IsFalse(opened);
+			Assert.IsFalse(GlobalVariables.TryGet<SelectedCharacterInfo>(SelectedCharacterGlobalKey, out _));
 		}
 	}
 }

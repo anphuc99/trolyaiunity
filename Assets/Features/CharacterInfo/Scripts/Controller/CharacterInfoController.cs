@@ -2,6 +2,8 @@ using Features.CharacterInfo.Events;
 using Features.CharacterInfo.Infrastructure;
 using Features.CharacterInfo.Infrastructure.Attributes;
 using Features.CharacterInfo.Requests;
+using Core.Infrastructure.State;
+using Share.Components;
 
 namespace Features.CharacterInfo.Controller
 {
@@ -11,12 +13,15 @@ namespace Features.CharacterInfo.Controller
 	[Core.Infrastructure.Attributes.ControllerScope(Core.Infrastructure.Attributes.ControllerScopeKey.CharacterInfoGameplay)]
 	public static class CharacterInfoController
 	{
+		private const string SelectedCharacterGlobalKey = "global.character.selected.info";
+
 		/// <summary>
 		/// Called when the controller scope is entered.
 		/// </summary>
 		[Core.Infrastructure.Attributes.ControllerInit]
 		public static void OnEnterScope()
 		{
+			PublishSelectedCharacter();
 		}
 
 		/// <summary>
@@ -35,6 +40,21 @@ namespace Features.CharacterInfo.Controller
 		public static void HandleEcho(object payload)
 		{
 			EventBus.Publish(CharacterInfoEvents.Echoed, payload);
+		}
+
+		/// <summary>
+		/// Loads selected character info from global variables and publishes to view.
+		/// </summary>
+		[Request(CharacterInfoRequests.LoadSelectedCharacter)]
+		public static void HandleLoadSelectedCharacter()
+		{
+			PublishSelectedCharacter();
+		}
+
+		private static void PublishSelectedCharacter()
+		{
+			GlobalVariables.TryGet<SelectedCharacterInfo>(SelectedCharacterGlobalKey, out var selectedCharacter);
+			EventBus.Publish(CharacterInfoEvents.SelectedCharacterLoaded, selectedCharacter);
 		}
 	}
 }

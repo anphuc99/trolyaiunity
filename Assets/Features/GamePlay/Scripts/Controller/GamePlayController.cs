@@ -21,6 +21,7 @@ using Features.GamePlay.SubFeatures.Task.Controller;
 using Features.GamePlay.SubFeatures.Task.Model;
 using Core.Infrastructure.Network;
 using Newtonsoft.Json;
+using Share.Components;
 using UnityEngine.Networking;
 using Core.Infrastructure.Scenes;
 using UnityEngine.SceneManagement;
@@ -159,6 +160,7 @@ namespace Features.GamePlay.Controller
 				OnEchoed = OnSubControllerEchoed,
 				GetCharacterNames = GetChatCharacterNames,
 				GetCharacterAvatar = GetChatCharacterAvatar,
+				GetCharacterInfo = GetChatCharacterInfo,
 			});
 			ChatController.SetParentSignals(new ChatParentSignals
 			{
@@ -216,6 +218,31 @@ namespace Features.GamePlay.Controller
 			return GamePlayState.ChatCharacterByName.TryGetValue(characterName.Trim(), out var cachedCharacter)
 				? cachedCharacter.VoiceName
 				: null;
+		}
+
+		private static SelectedCharacterInfo GetChatCharacterInfo(string characterName)
+		{
+			if (string.IsNullOrWhiteSpace(characterName))
+			{
+				return null;
+			}
+
+			if (!GamePlayState.ChatCharacterByName.TryGetValue(characterName.Trim(), out var cachedCharacter)
+				|| cachedCharacter == null)
+			{
+				return null;
+			}
+
+			return new SelectedCharacterInfo
+			{
+				Name = cachedCharacter.Name,
+				Avatar = cachedCharacter.AvatarSprite,
+				Age = cachedCharacter.Age,
+				Description = cachedCharacter.Personality,
+				Gender = cachedCharacter.Gender,
+				VoiceName = cachedCharacter.VoiceName,
+				Pitch = cachedCharacter.Pitch,
+			};
 		}
 
 		private static float? GetChatCharacterPitch(string characterName)

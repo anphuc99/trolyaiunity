@@ -78,9 +78,19 @@ namespace Features.GamePlay.SubFeatures.Character.View
 				item.gameObject.SetActive(true);
 				var characterName = itemData.Name.Trim();
 				var avatar = SendRequest<Sprite>(CharacterRequests.GetCharacterAvatar, characterName);
-				item.Initialize(characterName, avatar, null);
+				item.Initialize(characterName, avatar, () => OnCharacterItemClicked(characterName));
 				_spawnedItems.Add(item);
 			}
+		}
+
+		private void OnCharacterItemClicked(string characterName)
+		{
+			if (string.IsNullOrWhiteSpace(characterName))
+			{
+				return;
+			}
+
+			SendRequest<bool>(CharacterRequests.OpenCharacterInfo, characterName.Trim());
 		}
 
 		private void ClearItems()

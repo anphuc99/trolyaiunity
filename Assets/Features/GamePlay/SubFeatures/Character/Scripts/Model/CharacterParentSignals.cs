@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Share.Components;
 using UnityEngine;
 
 namespace Features.GamePlay.SubFeatures.Character.Model
@@ -28,5 +29,10 @@ namespace Features.GamePlay.SubFeatures.Character.Model
 		/// Provides avatar sprite by character name.
 		/// </summary>
 		public Func<string, Sprite> GetCharacterAvatar { get; set; }
+
+		/// <summary>
+		/// Provides full character info by character name.
+		/// </summary>
+		public Func<string, SelectedCharacterInfo> GetCharacterInfo { get; set; }
 	}
 }

@@ -3,9 +3,12 @@ using Features.GamePlay.SubFeatures.Character.Infrastructure;
 using Features.GamePlay.SubFeatures.Character.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.Character.Model;
 using Features.GamePlay.SubFeatures.Character.Requests;
+using Core.Infrastructure.Scenes;
+using Core.Infrastructure.State;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Features.GamePlay.SubFeatures.Character.Controller
 {
@@ -15,6 +18,8 @@ namespace Features.GamePlay.SubFeatures.Character.Controller
 	[Core.Infrastructure.Attributes.ControllerScope(Core.Infrastructure.Attributes.ControllerScopeKey.GamePlayGameplay)]
 	public static class CharacterController
 	{
+		private const string SelectedCharacterGlobalKey = "global.character.selected.info";
+
 		/// <summary>
 		/// Called when the controller scope is entered.
 		/// </summary>
@@ -113,6 +118,31 @@ namespace Features.GamePlay.SubFeatures.Character.Controller
 			}
 
 			return CharacterState.ParentSignals?.GetCharacterAvatar?.Invoke(characterName.Trim());
+		}
+
+		/// <summary>
+		/// Opens CharacterInfo scope for the selected character.
+		/// </summary>
+		/// <param name="payload">Selected character name.</param>
+		/// <returns>True when open flow executed; otherwise false.</returns>
+		[Request(CharacterRequests.OpenCharacterInfo)]
+		public static bool HandleOpenCharacterInfo(object payload)
+		{
+			if (payload is not string characterName || string.IsNullOrWhiteSpace(characterName))
+			{
+				return false;
+			}
+
+			var normalizedName = characterName.Trim();
+			var selectedCharacter = CharacterState.ParentSignals?.GetCharacterInfo?.Invoke(normalizedName);
+			if (selectedCharacter == null)
+			{
+				return false;
+			}
+
+			GlobalVariables.Set(SelectedCharacterGlobalKey, selectedCharacter);
+			LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CharacterInfoGameplay, LoadSceneMode.Additive);
+			return true;
 		}
 	}
 }

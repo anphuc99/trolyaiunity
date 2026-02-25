@@ -3,6 +3,7 @@
     "rootNamespace": "",
     "references": [
         "Core",
+        "Share",
         "GamePlay.Home",
         "GamePlay.Journal",
         "GamePlay.Character",
