@@ -438,7 +438,7 @@ namespace Core.Infrastructure.Network
 					return (responseText, responseCode);
 				}
 
-				return (responseText, responseCode);
+				return (responseText ?? string.Empty, responseCode);
 			}
 		}
 
