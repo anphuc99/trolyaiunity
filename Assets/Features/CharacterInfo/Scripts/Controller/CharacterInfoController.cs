@@ -4,7 +4,6 @@ using Features.CharacterInfo.Infrastructure.Attributes;
 using Features.CharacterInfo.Requests;
 using Core.Infrastructure.Network;
 using Core.Infrastructure.Scenes;
-using Core.Infrastructure.Attributes;
 using Core.Infrastructure.State;
 using Share.Model;
 using UnityEngine;
@@ -62,7 +61,7 @@ namespace Features.CharacterInfo.Controller
 		[Request(CharacterInfoRequests.CloseScope)]
 		public static void HandleCloseScope()
 		{
-			LoadScene.UnloadByScope(ControllerScopeKey.CharacterInfoGameplay);
+			LoadScene.UnloadByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CharacterInfoGameplay);
 		}
 
 		/// <summary>
@@ -92,7 +91,7 @@ namespace Features.CharacterInfo.Controller
 				CharacterName = selectedCharacter.Name,
 			});
 
-			LoadScene.UnloadByScope(ControllerScopeKey.CharacterInfoGameplay);
+			LoadScene.UnloadByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CharacterInfoGameplay);
 		}
 
 		private static void PublishSelectedCharacter()
