@@ -10,6 +10,11 @@ namespace Share.Model
 	public sealed class SelectedCharacterInfo
 	{
 		/// <summary>
+		/// Character identifier.
+		/// </summary>
+		public int Id { get; set; }
+
+		/// <summary>
 		/// Character display name.
 		/// </summary>
 		public string Name { get; set; }
@@ -43,5 +48,21 @@ namespace Share.Model
 		/// Character voice pitch.
 		/// </summary>
 		public float? Pitch { get; set; }
+	}
+
+	/// <summary>
+	/// Global notice payload for a recently deleted character.
+	/// </summary>
+	public sealed class DeletedCharacterNotice
+	{
+		/// <summary>
+		/// Deleted character identifier.
+		/// </summary>
+		public int CharacterId { get; set; }
+
+		/// <summary>
+		/// Deleted character display name.
+		/// </summary>
+		public string CharacterName { get; set; }
 	}
 }

@@ -21,6 +21,7 @@ namespace Core.Infrastructure.Network
 			{ BuildKey("POST", NetworkEndpoints.TokenRefresh), BuildTokenRefreshResponse },
 			{ BuildKey("GET", NetworkEndpoints.Characters), _ => "[]" },
 			{ BuildKey("POST", NetworkEndpoints.Characters), _ => "{\"status\":\"success\"}" },
+			{ BuildKey("DELETE", NetworkEndpoints.Characters), _ => "{}" },
 			{ BuildKey("POST", NetworkEndpoints.CharactersUploadAvatar), _ => "{\"url\":\"/public/avatars/fake-avatar.jpg\"}" },
 			{ BuildKey("GET", NetworkEndpoints.Personalities), _ => BuildPersonalitiesResponse() }
 		};

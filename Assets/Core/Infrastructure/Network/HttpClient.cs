@@ -11,7 +11,7 @@ using UnityEngine.Networking;
 namespace Core.Infrastructure.Network
 {
 	/// <summary>
-	/// Simple HTTP client for GET and JSON POST requests.
+	/// Simple HTTP client for GET, JSON POST, and DELETE requests.
 	/// </summary>
 	public static class HttpClient
 	{
@@ -142,6 +142,58 @@ namespace Core.Infrastructure.Network
 			CancellationToken cancellationToken = default)
 		{
 			return PostJsonAsync(url, payload, headers, timeoutSeconds, cancellationToken).AsTask();
+		}
+
+		/// <summary>
+		/// Sends a DELETE request and returns the response text.
+		/// </summary>
+		/// <param name="url">Request URL or relative path.</param>
+		/// <param name="headers">Optional headers.</param>
+		/// <param name="timeoutSeconds">Optional timeout in seconds (0 means default).</param>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <returns>Response text or null on failure.</returns>
+		public static async UniTask<string> DeleteAsync(
+			string url,
+			Dictionary<string, string> headers = null,
+			int timeoutSeconds = 0,
+			CancellationToken cancellationToken = default)
+		{
+			if (string.IsNullOrWhiteSpace(url))
+			{
+				Debug.LogError($"{LogPrefix} DELETE failed: url is null/empty.");
+				return null;
+			}
+
+			if (UseFakeResponses())
+			{
+				return await FakeDeleteAsync(url, cancellationToken);
+			}
+
+			var resolvedUrl = ResolveUrl(url);
+			var response = await SendRequestWithRetryAsync(
+				() => UnityWebRequest.Delete(resolvedUrl),
+				headers,
+				timeoutSeconds,
+				cancellationToken);
+
+			return response;
+		}
+
+		/// <summary>
+		/// Sends a DELETE request and returns the response text as a Task.
+		/// </summary>
+		/// <param name="url">Request URL or relative path.</param>
+		/// <param name="headers">Optional headers.</param>
+		/// <param name="timeoutSeconds">Optional timeout in seconds (0 means default).</param>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <returns>Response text or null on failure.</returns>
+		public static Task<string> DeleteTaskAsync(
+			string url,
+			Dictionary<string, string> headers = null,
+			int timeoutSeconds = 0,
+			CancellationToken cancellationToken = default)
+		{
+			return DeleteAsync(url, headers, timeoutSeconds, cancellationToken).AsTask();
 		}
 
 		private static void ApplyHeaders(UnityWebRequest request, Dictionary<string, string> headers)
@@ -280,6 +332,23 @@ namespace Core.Infrastructure.Network
 
 			var key = FakeServer.BuildKey("POST", url);
 			Debug.LogWarning($"{LogPrefix} Fake POST missing for '{key}'. Returning fallback.");
+			return UniTask.FromResult(response);
+		}
+
+		private static UniTask<string> FakeDeleteAsync(string url, CancellationToken cancellationToken)
+		{
+			if (cancellationToken.IsCancellationRequested)
+			{
+				return UniTask.FromCanceled<string>(cancellationToken);
+			}
+
+			if (FakeServer.TryGetResponse("DELETE", url, null, out var response))
+			{
+				return UniTask.FromResult(response);
+			}
+
+			var key = FakeServer.BuildKey("DELETE", url);
+			Debug.LogWarning($"{LogPrefix} Fake DELETE missing for '{key}'. Returning fallback.");
 			return UniTask.FromResult(response);
 		}
 

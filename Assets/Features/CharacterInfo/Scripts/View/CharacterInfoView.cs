@@ -62,7 +62,44 @@ namespace Features.CharacterInfo.View
 		protected override void OnEnable()
 		{
 			base.OnEnable();
+			if (_backButton != null)
+			{
+				_backButton.onClick.RemoveListener(OnBackButtonClicked);
+				_backButton.onClick.AddListener(OnBackButtonClicked);
+			}
+
+			if (_removeButton != null)
+			{
+				_removeButton.onClick.RemoveListener(OnRemoveButtonClicked);
+				_removeButton.onClick.AddListener(OnRemoveButtonClicked);
+			}
+
 			SendRequest(CharacterInfoRequests.LoadSelectedCharacter);
+		}
+
+		protected override void OnDisable()
+		{
+			if (_backButton != null)
+			{
+				_backButton.onClick.RemoveListener(OnBackButtonClicked);
+			}
+
+			if (_removeButton != null)
+			{
+				_removeButton.onClick.RemoveListener(OnRemoveButtonClicked);
+			}
+
+			base.OnDisable();
+		}
+
+		private void OnBackButtonClicked()
+		{
+			SendRequest(CharacterInfoRequests.CloseScope);
+		}
+
+		private void OnRemoveButtonClicked()
+		{
+			SendRequest(CharacterInfoRequests.RemoveSelectedCharacter);
 		}
 
 		private void Render(SelectedCharacterInfo info)

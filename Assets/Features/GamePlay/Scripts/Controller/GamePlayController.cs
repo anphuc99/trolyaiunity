@@ -20,6 +20,8 @@ using Features.GamePlay.SubFeatures.Story.Model;
 using Features.GamePlay.SubFeatures.Task.Controller;
 using Features.GamePlay.SubFeatures.Task.Model;
 using Core.Infrastructure.Network;
+using Core.Infrastructure.State;
+using CoreEvents = Core.Infrastructure.Events;
 using Newtonsoft.Json;
 using Share.Model;
 using UnityEngine.Networking;
@@ -34,6 +36,8 @@ namespace Features.GamePlay.Controller
 	[Core.Infrastructure.Attributes.ControllerScope(Core.Infrastructure.Attributes.ControllerScopeKey.GamePlayGameplay)]
 	public static class GamePlayController
 	{
+		private const string DeletedCharacterGlobalKey = "global.character.deleted.notice";
+
 		/// <summary>
 		/// Called when the controller scope is entered.
 		/// </summary>
@@ -55,6 +59,27 @@ namespace Features.GamePlay.Controller
 			CloseCurrentSubControllerInternal();
 			ClearAllSubControllerSignals();
 			ClearChatCharacterCache();
+		}
+
+		[Core.Infrastructure.Attributes.OnGlobalScopeChanged]
+		private static void HandleScopeChanged(CoreEvents.ScopeChangedPayload payload)
+		{
+			if (payload == null
+				|| payload.IsOpened
+				|| payload.ScopeKey != Core.Infrastructure.Attributes.ControllerScopeKey.CharacterInfoGameplay)
+			{
+				return;
+			}
+
+			if (!GlobalVariables.TryGet<DeletedCharacterNotice>(DeletedCharacterGlobalKey, out var deletedCharacter)
+				|| deletedCharacter == null)
+			{
+				return;
+			}
+
+			GlobalVariables.Remove(DeletedCharacterGlobalKey);
+			RemoveDeletedCharacterFromCache(deletedCharacter);
+			CharacterController.HandleLoadCharacters();
 		}
 
 		/// <summary>
@@ -235,6 +260,7 @@ namespace Features.GamePlay.Controller
 
 			return new SelectedCharacterInfo
 			{
+				Id = cachedCharacter.Id,
 				Name = cachedCharacter.Name,
 				Avatar = cachedCharacter.AvatarSprite,
 				Age = cachedCharacter.Age,
@@ -243,6 +269,47 @@ namespace Features.GamePlay.Controller
 				VoiceName = cachedCharacter.VoiceName,
 				Pitch = cachedCharacter.Pitch,
 			};
+		}
+
+		private static void RemoveDeletedCharacterFromCache(DeletedCharacterNotice deletedCharacter)
+		{
+			if (deletedCharacter == null)
+			{
+				return;
+			}
+
+			if (!string.IsNullOrWhiteSpace(deletedCharacter.CharacterName))
+			{
+				GamePlayState.ChatCharacterByName.Remove(deletedCharacter.CharacterName.Trim());
+				return;
+			}
+
+			if (deletedCharacter.CharacterId <= 0)
+			{
+				return;
+			}
+
+			var keys = new List<string>(GamePlayState.ChatCharacterByName.Keys);
+			for (var i = 0; i < keys.Count; i++)
+			{
+				var key = keys[i];
+				if (string.IsNullOrWhiteSpace(key))
+				{
+					continue;
+				}
+
+				if (!GamePlayState.ChatCharacterByName.TryGetValue(key, out var cachedCharacter)
+					|| cachedCharacter == null)
+				{
+					continue;
+				}
+
+				if (cachedCharacter.Id == deletedCharacter.CharacterId)
+				{
+					GamePlayState.ChatCharacterByName.Remove(key);
+					return;
+				}
+			}
 		}
 
 		private static float? GetChatCharacterPitch(string characterName)

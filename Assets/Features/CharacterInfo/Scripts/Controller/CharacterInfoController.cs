@@ -2,8 +2,12 @@ using Features.CharacterInfo.Events;
 using Features.CharacterInfo.Infrastructure;
 using Features.CharacterInfo.Infrastructure.Attributes;
 using Features.CharacterInfo.Requests;
+using Core.Infrastructure.Network;
+using Core.Infrastructure.Scenes;
+using Core.Infrastructure.Attributes;
 using Core.Infrastructure.State;
 using Share.Model;
+using UnityEngine;
 
 namespace Features.CharacterInfo.Controller
 {
@@ -14,6 +18,7 @@ namespace Features.CharacterInfo.Controller
 	public static class CharacterInfoController
 	{
 		private const string SelectedCharacterGlobalKey = "global.character.selected.info";
+		private const string DeletedCharacterGlobalKey = "global.character.deleted.notice";
 
 		/// <summary>
 		/// Called when the controller scope is entered.
@@ -49,6 +54,45 @@ namespace Features.CharacterInfo.Controller
 		public static void HandleLoadSelectedCharacter()
 		{
 			PublishSelectedCharacter();
+		}
+
+		/// <summary>
+		/// Closes CharacterInfo scope.
+		/// </summary>
+		[Request(CharacterInfoRequests.CloseScope)]
+		public static void HandleCloseScope()
+		{
+			LoadScene.UnloadByScope(ControllerScopeKey.CharacterInfoGameplay);
+		}
+
+		/// <summary>
+		/// Removes selected character from server and closes CharacterInfo scope.
+		/// </summary>
+		[Request(CharacterInfoRequests.RemoveSelectedCharacter)]
+		public static async void HandleRemoveSelectedCharacter()
+		{
+			if (!GlobalVariables.TryGet<SelectedCharacterInfo>(SelectedCharacterGlobalKey, out var selectedCharacter)
+				|| selectedCharacter == null
+				|| selectedCharacter.Id <= 0)
+			{
+				return;
+			}
+
+			var endpoint = $"{NetworkEndpoints.Characters}/{selectedCharacter.Id}";
+			var responseJson = await HttpClient.DeleteTaskAsync(endpoint);
+			if (responseJson == null)
+			{
+				Debug.LogError("[CharacterInfoController] Failed to delete selected character.");
+				return;
+			}
+
+			GlobalVariables.Set(DeletedCharacterGlobalKey, new DeletedCharacterNotice
+			{
+				CharacterId = selectedCharacter.Id,
+				CharacterName = selectedCharacter.Name,
+			});
+
+			LoadScene.UnloadByScope(ControllerScopeKey.CharacterInfoGameplay);
 		}
 
 		private static void PublishSelectedCharacter()
