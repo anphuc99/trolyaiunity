@@ -25,6 +25,10 @@ namespace Share.Component
 
 		[SerializeField]
 		[Min(0f)]
+		private float _minHeight = 0f;
+
+		[SerializeField]
+		[Min(0f)]
 		private float _paddingTop = 16f;
 
 		[SerializeField]
@@ -41,6 +45,7 @@ namespace Share.Component
 
 		private string _lastText;
 		private bool _lastAlwaysUseMaxWidth;
+		private float _lastMinHeight;
 
 		private void Reset()
 		{
@@ -66,7 +71,7 @@ namespace Share.Component
 				return;
 			}
 
-			if (_lastText != _messageText.text || _lastAlwaysUseMaxWidth != _alwaysUseMaxWidth)
+			if (_lastText != _messageText.text || _lastAlwaysUseMaxWidth != _alwaysUseMaxWidth || !Mathf.Approximately(_lastMinHeight, _minHeight))
 			{
 				RefreshLayout();
 			}
@@ -103,11 +108,14 @@ namespace Share.Component
 				textRect.offsetMax = new Vector2(-_paddingRight, -_paddingTop);
 			}
 
+			var bubbleHeight = Mathf.Max(_minHeight, constrainedPreferred.y + verticalPadding);
+
 			_bubbleRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, textWidth + horizontalPadding);
-			_bubbleRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, constrainedPreferred.y + verticalPadding);
+			_bubbleRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, bubbleHeight);
 
 			_lastText = _messageText.text;
 			_lastAlwaysUseMaxWidth = _alwaysUseMaxWidth;
+			_lastMinHeight = _minHeight;
 		}
 	}
 }
