@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-namespace Share.Component
+namespace Share.Components
 {
 	/// <summary>
 	/// Virtualized message container that supports drag and mouse-wheel scrolling without using Unity ScrollView.
@@ -123,6 +123,30 @@ namespace Share.Component
 			SyncMessageIndices();
 			RebuildMetrics();
 			_scrollOffset = GetMaxScrollOffset();
+			RefreshVisible();
+		}
+
+		/// <summary>
+		/// Clears all messages and destroys pooled objects to release memory.
+		/// </summary>
+		public void ClearAllDataAndPools()
+		{
+			_messages.Clear();
+			_messageHeights.Clear();
+			_prefixHeights.Clear();
+			_scrollOffset = 0f;
+			_totalHeight = 0f;
+
+			DestroyBubbles(_characterPool);
+			DestroyBubbles(_userPool);
+			_characterPool.Clear();
+			_userPool.Clear();
+
+			DestroyBubble(_characterMeasureBubble);
+			DestroyBubble(_userMeasureBubble);
+			_characterMeasureBubble = null;
+			_userMeasureBubble = null;
+
 			RefreshVisible();
 		}
 
@@ -570,6 +594,29 @@ namespace Share.Component
 		private void HandleBubbleTranslateClicked(MessageBubbleData messageData)
 		{
 			OnMessageTranslateClicked?.Invoke(messageData);
+		}
+
+		private void DestroyBubbles(List<MessageBubble> pool)
+		{
+			if (pool == null)
+			{
+				return;
+			}
+
+			for (var i = 0; i < pool.Count; i++)
+			{
+				DestroyBubble(pool[i]);
+			}
+		}
+
+		private void DestroyBubble(MessageBubble bubble)
+		{
+			if (bubble == null)
+			{
+				return;
+			}
+
+			Destroy(bubble.gameObject);
 		}
 
 		private void RebuildMetrics()
