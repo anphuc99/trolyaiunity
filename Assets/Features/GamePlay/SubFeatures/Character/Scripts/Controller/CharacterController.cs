@@ -3,6 +3,9 @@ using Features.GamePlay.SubFeatures.Character.Infrastructure;
 using Features.GamePlay.SubFeatures.Character.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.Character.Model;
 using Features.GamePlay.SubFeatures.Character.Requests;
+using System;
+using System.Collections.Generic;
+using UnityEngine;
 
 namespace Features.GamePlay.SubFeatures.Character.Controller
 {
@@ -26,6 +29,7 @@ namespace Features.GamePlay.SubFeatures.Character.Controller
 		[Core.Infrastructure.Attributes.ControllerShutdown]
 		public static void OnExitScope()
 		{
+			CharacterState.CachedCharacters = new List<CharacterListItemPayload>();
 		}
 
 		/// <summary>
@@ -34,6 +38,7 @@ namespace Features.GamePlay.SubFeatures.Character.Controller
 		public static void Install()
 		{
 			EventBus.Publish(CharacterEvents.Installed, null);
+			HandleLoadCharacters();
 		}
 
 		/// <summary>
@@ -41,6 +46,7 @@ namespace Features.GamePlay.SubFeatures.Character.Controller
 		/// </summary>
 		public static void Uninstall()
 		{
+			CharacterState.CachedCharacters = new List<CharacterListItemPayload>();
 			EventBus.Publish(CharacterEvents.Uninstalled, null);
 		}
 
@@ -62,6 +68,51 @@ namespace Features.GamePlay.SubFeatures.Character.Controller
 		{
 			EventBus.Publish(CharacterEvents.Echoed, payload);
 			CharacterState.ParentSignals?.OnEchoed?.Invoke(payload);
+		}
+
+		/// <summary>
+		/// Loads character list from parent scope cache and publishes to view.
+		/// </summary>
+		[Request(CharacterRequests.LoadCharacters)]
+		public static void HandleLoadCharacters()
+		{
+			var names = CharacterState.ParentSignals?.GetCharacterNames?.Invoke();
+			var payload = new List<CharacterListItemPayload>();
+			if (names != null)
+			{
+				for (var i = 0; i < names.Count; i++)
+				{
+					var name = names[i];
+					if (string.IsNullOrWhiteSpace(name))
+					{
+						continue;
+					}
+
+					payload.Add(new CharacterListItemPayload
+					{
+						Name = name.Trim()
+					});
+				}
+			}
+
+			CharacterState.CachedCharacters = payload;
+			EventBus.Publish(CharacterEvents.CharactersLoaded, payload);
+		}
+
+		/// <summary>
+		/// Gets character avatar sprite from parent scope cache.
+		/// </summary>
+		/// <param name="payload">Character name payload.</param>
+		/// <returns>Avatar sprite when available; otherwise null.</returns>
+		[Request(CharacterRequests.GetCharacterAvatar)]
+		public static Sprite HandleGetCharacterAvatar(object payload)
+		{
+			if (payload is not string characterName || string.IsNullOrWhiteSpace(characterName))
+			{
+				return null;
+			}
+
+			return CharacterState.ParentSignals?.GetCharacterAvatar?.Invoke(characterName.Trim());
 		}
 	}
 }

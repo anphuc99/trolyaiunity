@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using UnityEngine;
 
 namespace Features.GamePlay.SubFeatures.Character.Model
 {
@@ -16,5 +18,15 @@ namespace Features.GamePlay.SubFeatures.Character.Model
 		/// Optional callback for retrieving data from the parent.
 		/// </summary>
 		public Func<string> GetParentStatus { get; set; }
+
+		/// <summary>
+		/// Provides character names from parent cache.
+		/// </summary>
+		public Func<List<string>> GetCharacterNames { get; set; }
+
+		/// <summary>
+		/// Provides avatar sprite by character name.
+		/// </summary>
+		public Func<string, Sprite> GetCharacterAvatar { get; set; }
 	}
 }

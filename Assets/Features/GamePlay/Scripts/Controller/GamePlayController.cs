@@ -153,7 +153,12 @@ namespace Features.GamePlay.Controller
 				OpenJournal = () => HandleOpenSubController(GamePlaySubControllerType.Journal), 
 				OpenCreateCharacter = HandleOpenCreateCharacter,
 			});
-			CharacterController.SetParentSignals(new CharacterParentSignals { OnEchoed = OnSubControllerEchoed });
+			CharacterController.SetParentSignals(new CharacterParentSignals
+			{
+				OnEchoed = OnSubControllerEchoed,
+				GetCharacterNames = GetChatCharacterNames,
+				GetCharacterAvatar = GetChatCharacterAvatar,
+			});
 			ChatController.SetParentSignals(new ChatParentSignals
 			{
 				OnEchoed = OnSubControllerEchoed,
@@ -181,6 +186,23 @@ namespace Features.GamePlay.Controller
 			return GamePlayState.ChatCharacterByName.TryGetValue(characterName.Trim(), out var cachedCharacter)
 				? cachedCharacter.AvatarSprite
 				: null;
+		}
+
+		private static List<string> GetChatCharacterNames()
+		{
+			var names = new List<string>();
+			foreach (var pair in GamePlayState.ChatCharacterByName)
+			{
+				if (string.IsNullOrWhiteSpace(pair.Key))
+				{
+					continue;
+				}
+
+				names.Add(pair.Key);
+			}
+
+			names.Sort(System.StringComparer.OrdinalIgnoreCase);
+			return names;
 		}
 
 		private static string GetChatCharacterVoiceName(string characterName)

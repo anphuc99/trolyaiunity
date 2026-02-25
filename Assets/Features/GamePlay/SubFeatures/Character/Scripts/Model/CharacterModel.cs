@@ -1,13 +1,13 @@
 namespace Features.GamePlay.SubFeatures.Character.Model
 {
 	/// <summary>
-	/// Data model for Character.
+	/// View payload for one character list item.
 	/// </summary>
-	public sealed class CharacterModel
+	public sealed class CharacterListItemPayload
 	{
 		/// <summary>
-		/// Example data property.
+		/// Character display name.
 		/// </summary>
-		public string Value { get; set; }
+		public string Name { get; set; }
 	}
 }

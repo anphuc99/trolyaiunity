@@ -6,5 +6,8 @@ namespace Features.GamePlay.SubFeatures.Character.Model
 	public static class CharacterState
 	{
 		public static CharacterParentSignals ParentSignals { get; set; }
+
+		public static System.Collections.Generic.List<CharacterListItemPayload> CachedCharacters { get; set; } =
+			new System.Collections.Generic.List<CharacterListItemPayload>();
 	}
 }
