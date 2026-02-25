@@ -21,6 +21,9 @@ namespace Share.Component
 		private float _maxWidth = 420f;
 
 		[SerializeField]
+		private bool _alwaysUseMaxWidth = false;
+
+		[SerializeField]
 		[Min(0f)]
 		private float _paddingTop = 16f;
 
@@ -37,6 +40,7 @@ namespace Share.Component
 		private float _paddingRight = 20f;
 
 		private string _lastText;
+		private bool _lastAlwaysUseMaxWidth;
 
 		private void Reset()
 		{
@@ -62,7 +66,7 @@ namespace Share.Component
 				return;
 			}
 
-			if (_lastText != _messageText.text)
+			if (_lastText != _messageText.text || _lastAlwaysUseMaxWidth != _alwaysUseMaxWidth)
 			{
 				RefreshLayout();
 			}
@@ -87,7 +91,7 @@ namespace Share.Component
 			_messageText.overflowMode = TextOverflowModes.Overflow;
 
 			var unconstrainedPreferred = _messageText.GetPreferredValues(_messageText.text, Mathf.Infinity, Mathf.Infinity);
-			var textWidth = Mathf.Min(availableTextWidth, unconstrainedPreferred.x);
+			var textWidth = _alwaysUseMaxWidth ? availableTextWidth : Mathf.Min(availableTextWidth, unconstrainedPreferred.x);
 			var constrainedPreferred = _messageText.GetPreferredValues(_messageText.text, textWidth, Mathf.Infinity);
 
 			textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, textWidth);
@@ -103,6 +107,7 @@ namespace Share.Component
 			_bubbleRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, constrainedPreferred.y + verticalPadding);
 
 			_lastText = _messageText.text;
+			_lastAlwaysUseMaxWidth = _alwaysUseMaxWidth;
 		}
 	}
 }
