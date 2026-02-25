@@ -5,7 +5,8 @@
         "GamePlay.Character",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
-        "Core"
+        "Core",
+        "Share"
     ],
     "includePlatforms": [
         "Editor"

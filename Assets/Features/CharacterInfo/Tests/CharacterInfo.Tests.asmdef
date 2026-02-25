@@ -1,15 +1,26 @@
 {
     "name": "CharacterInfo.Tests",
     "rootNamespace": "",
-    "references": ["CharacterInfo"],
-    "includePlatforms": ["Editor"],
+    "references": [
+        "CharacterInfo",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "Core",
+        "Share"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
-    "overrideReferences": false,
-    "precompiledReferences": [],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
     "autoReferenced": false,
-    "defineConstraints": [],
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
     "versionDefines": [],
-    "noEngineReferences": false,
-    "optionalUnityReferences": ["TestAssemblies"]
+    "noEngineReferences": false
 }
