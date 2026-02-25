@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-namespace Features.GamePlay.SubFeatures.Chat.View
+namespace Share.Component
 {
 	/// <summary>
 	/// Virtualized message container that supports drag and mouse-wheel scrolling without using Unity ScrollView.

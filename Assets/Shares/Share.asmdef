@@ -1,10 +1,8 @@
 {
-    "name": "GamePlay.Chat",
-    "rootNamespace": "",
+    "name": "Share",
+    "rootNamespace": "Share",
     "references": [
-        "Core",
-        "Unity.TextMeshPro",
-        "Share"
+        "GUID:6055be8ebefd69e48b49212b09b47b2f"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

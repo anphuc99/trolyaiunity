@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace Features.GamePlay.SubFeatures.Chat.View
+namespace Share.Component
 {
 	/// <summary>
 	/// Sender type for chat message bubble.

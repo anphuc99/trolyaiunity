@@ -56,5 +56,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "UnityTemlet.sln"
+    "dotnet.defaultSolution": "trolyAi.sln"
 }

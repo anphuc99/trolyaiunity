@@ -1,7 +1,7 @@
 using TMPro;
 using UnityEngine;
 
-namespace Features.GamePlay.SubFeatures.Chat.View
+namespace Share.Component
 {
 	/// <summary>
 	/// Auto-resizes a message bubble to fit text content.

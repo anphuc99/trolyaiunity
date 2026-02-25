@@ -4,15 +4,15 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-namespace Features.GamePlay.SubFeatures.Journal.View
+namespace Share.Component
 {
 	/// <summary>
 	/// Message bubble presenter for either user or character prefab.
 	/// </summary>
-	public sealed class JournalMessageBubble : MonoBehaviour
+	public sealed class MessageBubble : MonoBehaviour
 	{
 		[SerializeField]
-		private JournalMessageBubbleType _bubbleType = JournalMessageBubbleType.Character;
+		private MessageBubbleType _bubbleType = MessageBubbleType.Character;
 
 		[SerializeField]
 		private RectTransform _rootRect;
@@ -27,7 +27,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		private Image _avatarImage;
 
 		[SerializeField]
-		private JournalChatMessageAutoResize _messageAutoResize;
+		private ChatMessageAutoResize _messageAutoResize;
 
 		[SerializeField]
 		private Button _speakerButton;
@@ -40,17 +40,17 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		private float _speakerLongPressSeconds = 0.45f;
 
 		private string _messageId;
-		private JournalMessageBubbleData _boundData;
-		private Action<JournalMessageBubbleData> _onSpeakerClicked;
-		private Action<JournalMessageBubbleData> _onSpeakerLongPressed;
-		private Action<JournalMessageBubbleData> _onTranslateClicked;
+		private MessageBubbleData _boundData;
+		private Action<MessageBubbleData> _onSpeakerClicked;
+		private Action<MessageBubbleData> _onSpeakerLongPressed;
+		private Action<MessageBubbleData> _onTranslateClicked;
 		private Coroutine _speakerLongPressCoroutine;
 		private bool _suppressNextSpeakerClick;
 
 		/// <summary>
 		/// Type that this prefab instance represents.
 		/// </summary>
-		public JournalMessageBubbleType BubbleType => _bubbleType;
+		public MessageBubbleType BubbleType => _bubbleType;
 
 		/// <summary>
 		/// Backing message id currently displayed.
@@ -103,7 +103,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		/// Configures callback for speaker-button click.
 		/// </summary>
 		/// <param name="onSpeakerClicked">Callback invoked with currently bound message data.</param>
-		public void SetSpeakerClickHandler(Action<JournalMessageBubbleData> onSpeakerClicked)
+		public void SetSpeakerClickHandler(Action<MessageBubbleData> onSpeakerClicked)
 		{
 			_onSpeakerClicked = onSpeakerClicked;
 		}
@@ -112,7 +112,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		/// Configures callback for speaker-button long press.
 		/// </summary>
 		/// <param name="onSpeakerLongPressed">Callback invoked with currently bound message data.</param>
-		public void SetSpeakerLongPressHandler(Action<JournalMessageBubbleData> onSpeakerLongPressed)
+		public void SetSpeakerLongPressHandler(Action<MessageBubbleData> onSpeakerLongPressed)
 		{
 			_onSpeakerLongPressed = onSpeakerLongPressed;
 		}
@@ -121,7 +121,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		/// Configures callback for translate-button click.
 		/// </summary>
 		/// <param name="onTranslateClicked">Callback invoked with currently bound message data.</param>
-		public void SetTranslateClickHandler(Action<JournalMessageBubbleData> onTranslateClicked)
+		public void SetTranslateClickHandler(Action<MessageBubbleData> onTranslateClicked)
 		{
 			_onTranslateClicked = onTranslateClicked;
 		}
@@ -131,7 +131,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		/// </summary>
 		/// <param name="data">Message data.</param>
 		/// <param name="viewportWidth">Available viewport width (for measurement context).</param>
-		public void ApplyData(JournalMessageBubbleData data, float viewportWidth)
+		public void ApplyData(MessageBubbleData data, float viewportWidth)
 		{
 			if (data == null)
 			{
@@ -183,7 +183,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		/// <param name="data">Message data.</param>
 		/// <param name="viewportWidth">Available viewport width.</param>
 		/// <returns>Preferred bubble height.</returns>
-		public float MeasureHeight(JournalMessageBubbleData data, float viewportWidth)
+		public float MeasureHeight(MessageBubbleData data, float viewportWidth)
 		{
 			ApplyData(data, viewportWidth);
 			if (_rootRect == null)
