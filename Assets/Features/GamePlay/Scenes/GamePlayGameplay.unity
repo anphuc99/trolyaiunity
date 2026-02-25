@@ -615,6 +615,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_HorizontalFit: 0
   m_VerticalFit: 2
+--- !u!82 &346532559 stripped
+AudioSource:
+  m_CorrespondingSourceObject: {fileID: 1822314465239737638, guid: 350cd9f72a67e5b4cafcf946840dce1e, type: 3}
+  m_PrefabInstance: {fileID: 4707081849294931328}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &464136616
 GameObject:
   m_ObjectHideFlags: 0
@@ -1989,19 +1994,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2445829492254341416, guid: 231e04d3259011544992a3dc281d588c, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 2745997950848672025, guid: 231e04d3259011544992a3dc281d588c, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3623831159354899936, guid: 231e04d3259011544992a3dc281d588c, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3873613157489891876, guid: 231e04d3259011544992a3dc281d588c, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 4467398981661087964, guid: 231e04d3259011544992a3dc281d588c, type: 3}
       propertyPath: m_Pivot.x
@@ -2085,11 +2090,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5596921700351542290, guid: 231e04d3259011544992a3dc281d588c, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8591129397464430837, guid: 231e04d3259011544992a3dc281d588c, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 9172241123421892854, guid: 231e04d3259011544992a3dc281d588c, type: 3}
       propertyPath: _visible
@@ -2315,6 +2320,7 @@ MonoBehaviour:
   _listRoot: {fileID: 4707081849294931330}
   _chatVariantRoot: {fileID: 4707081849294931331}
   _loadOnInstall: 1
+  _voiceAudioSource: {fileID: 346532559}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
