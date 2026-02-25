@@ -147,6 +147,8 @@ namespace Share.Components
 			_characterMeasureBubble = null;
 			_userMeasureBubble = null;
 
+			DestroyAllBubbleChildren();
+
 			RefreshVisible();
 		}
 
@@ -617,6 +619,20 @@ namespace Share.Components
 			}
 
 			Destroy(bubble.gameObject);
+		}
+
+		private void DestroyAllBubbleChildren()
+		{
+			if (_itemsRoot == null)
+			{
+				return;
+			}
+
+			var bubbles = _itemsRoot.GetComponentsInChildren<MessageBubble>(true);
+			for (var i = 0; i < bubbles.Length; i++)
+			{
+				DestroyBubble(bubbles[i]);
+			}
 		}
 
 		private void RebuildMetrics()
