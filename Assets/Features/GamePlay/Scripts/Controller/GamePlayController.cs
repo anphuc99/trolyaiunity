@@ -152,6 +152,7 @@ namespace Features.GamePlay.Controller
 				OnEchoed = OnSubControllerEchoed,
 				OpenJournal = () => HandleOpenSubController(GamePlaySubControllerType.Journal), 
 				OpenCreateCharacter = HandleOpenCreateCharacter,
+				OpenCharacter = () => HandleOpenSubController(GamePlaySubControllerType.Character),
 			});
 			CharacterController.SetParentSignals(new CharacterParentSignals
 			{

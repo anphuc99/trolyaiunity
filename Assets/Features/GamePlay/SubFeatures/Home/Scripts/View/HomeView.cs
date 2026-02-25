@@ -61,5 +61,10 @@ namespace Features.GamePlay.SubFeatures.Home.View
 		{
 			SendRequest(HomeRequests.OpenCreateCharacter);
 		}
+
+		public void OpenCharacter()
+		{
+			SendRequest(HomeRequests.OpenCharacter);
+		}
 	}
 }
