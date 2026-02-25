@@ -3,6 +3,13 @@ using Features.GamePlay.SubFeatures.Journal.Infrastructure;
 using Features.GamePlay.SubFeatures.Journal.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.Journal.Model;
 using Features.GamePlay.SubFeatures.Journal.Requests;
+using Core.Infrastructure.Network;
+using Newtonsoft.Json;
+using System;
+using System.Threading.Tasks;
+using UnityEngine;
+using System.Collections.Generic;
+using Share.Components;
 
 namespace Features.GamePlay.SubFeatures.Journal.Controller
 {
@@ -26,6 +33,9 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		[Core.Infrastructure.Attributes.ControllerShutdown]
 		public static void OnExitScope()
 		{
+			JournalState.CachedList = new JournalListResponsePayload();
+			JournalState.CachedDetail = null;
+			JournalState.SelectedJournalId = null;
 		}
 
 		/// <summary>
@@ -62,6 +72,221 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		{
 			EventBus.Publish(JournalEvents.Echoed, payload);
 			JournalState.ParentSignals?.OnEchoed?.Invoke(payload);
+		}
+
+		/// <summary>
+		/// Loads journal list from server.
+		/// </summary>
+		/// <param name="payload">Optional list request payload.</param>
+		[Request(JournalRequests.LoadJournals)]
+		public static void HandleLoadJournals(JournalListRequestPayload payload)
+		{
+			_ = LoadJournalsInternalAsync(payload ?? new JournalListRequestPayload());
+		}
+
+		/// <summary>
+		/// Loads one journal detail by id.
+		/// </summary>
+		/// <param name="payload">Detail request payload or raw id.</param>
+		[Request(JournalRequests.LoadJournalDetail)]
+		public static void HandleLoadJournalDetail(object payload)
+		{
+			if (!TryResolveJournalId(payload, out var journalId))
+			{
+				PublishError("Missing or invalid journal id.");
+				return;
+			}
+
+			_ = LoadJournalDetailInternalAsync(journalId);
+		}
+
+		/// <summary>
+		/// Switches journal view back to list mode.
+		/// </summary>
+		[Request(JournalRequests.ShowJournalList)]
+		public static void HandleShowJournalList()
+		{
+			EventBus.Publish(JournalEvents.ViewModeChanged, new JournalViewModePayload
+			{
+				ShowDetail = false,
+				JournalId = null
+			});
+		}
+
+		/// <summary>
+		/// Performs list API call and publishes response.
+		/// </summary>
+		/// <param name="payload">List request payload.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task LoadJournalsInternalAsync(JournalListRequestPayload payload)
+		{
+			try
+			{
+				var endpoint = BuildJournalsEndpoint(payload?.StoryId);
+				var responseJson = await HttpClient.GetTaskAsync(endpoint);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					PublishError("Empty journals response from server.");
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<JournalListResponsePayload>(responseJson) ?? new JournalListResponsePayload();
+				if (response.Journals == null)
+				{
+					response.Journals = new System.Collections.Generic.List<JournalListItemPayload>();
+				}
+
+				JournalState.CachedList = response;
+				EventBus.Publish(JournalEvents.JournalsLoaded, response);
+				EventBus.Publish(JournalEvents.ViewModeChanged, new JournalViewModePayload
+				{
+					ShowDetail = false,
+					JournalId = null
+				});
+			}
+			catch (Exception exception)
+			{
+				PublishError("Failed to load journals: " + exception.Message);
+			}
+		}
+
+		/// <summary>
+		/// Performs detail API call and publishes response.
+		/// </summary>
+		/// <param name="journalId">Journal id to load.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task LoadJournalDetailInternalAsync(int journalId)
+		{
+			try
+			{
+				var endpoint = BuildJournalDetailEndpoint(journalId);
+				var responseJson = await HttpClient.GetTaskAsync(endpoint);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					PublishError("Empty journal detail response from server.");
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<JournalDetailResponsePayload>(responseJson);
+				if (response == null || response.Journal == null)
+				{
+					PublishError("Server returned invalid journal detail payload.");
+					return;
+				}
+
+				if (response.Messages == null)
+				{
+					response.Messages = new System.Collections.Generic.List<JournalMessagePayload>();
+				}
+
+				JournalState.CachedDetail = response;
+				JournalState.SelectedJournalId = response.Journal.Id;
+
+				var messages = response.Messages;
+				List<MessageBubbleData> messageBubbleDataList = new List<MessageBubbleData>();
+				for (int i = 0; i < messages.Count; i++)
+				{
+					var message = messages[i];
+					messageBubbleDataList.Add(new MessageBubbleData
+					{
+						MessageId = message.Id,
+						Type = message.CharacterName == "User" ? MessageBubbleType.User : MessageBubbleType.Character,
+						SenderName = message.CharacterName,
+						Message = message.Content,
+						Avatar = GetAvatar(message.CharacterName), // Avatar can be set based on sender or other logic
+						Tone = message.Tone,
+						Translation = message.Translation,
+						IsTranslationExpanded = false,
+						IsTtsReloading = false,
+						MessageIndex = i,
+					});
+				}
+
+				// Activate detail view BEFORE sending data so the container
+				// is active when SetMessages measures bubble heights.
+				EventBus.Publish(JournalEvents.ViewModeChanged, new JournalViewModePayload
+				{
+					ShowDetail = true,
+					JournalId = response.Journal.Id
+				});
+				EventBus.Publish(JournalEvents.JournalDetailLoaded, messageBubbleDataList);
+			}
+			catch (Exception exception)
+			{
+				PublishError("Failed to load journal detail: " + exception.Message);
+			}
+		}
+
+		/// <summary>
+		/// Builds journal list endpoint with optional story id query.
+		/// </summary>
+		/// <param name="storyId">Optional story id filter.</param>
+		/// <returns>Resolved endpoint path.</returns>
+		private static string BuildJournalsEndpoint(int? storyId)
+		{
+			if (!storyId.HasValue || storyId.Value <= 0)
+			{
+				return NetworkEndpoints.Journals;
+			}
+
+			return NetworkEndpoints.Journals + "?storyId=" + Uri.EscapeDataString(storyId.Value.ToString());
+		}
+
+		/// <summary>
+		/// Builds journal detail endpoint.
+		/// </summary>
+		/// <param name="journalId">Journal id.</param>
+		/// <returns>Resolved endpoint path.</returns>
+		private static string BuildJournalDetailEndpoint(int journalId)
+		{
+			return NetworkEndpoints.Journals + "/" + journalId;
+		}
+
+		/// <summary>
+		/// Tries to resolve journal id from multiple payload shapes.
+		/// </summary>
+		/// <param name="payload">Request payload.</param>
+		/// <param name="journalId">Resolved journal id.</param>
+		/// <returns>True when resolution succeeds.</returns>
+		private static bool TryResolveJournalId(object payload, out int journalId)
+		{
+			if (payload is JournalDetailRequestPayload requestPayload)
+			{
+				journalId = requestPayload.JournalId;
+				return journalId > 0;
+			}
+
+			if (payload is int id)
+			{
+				journalId = id;
+				return journalId > 0;
+			}
+
+			if (payload is string raw && int.TryParse(raw, out var parsed))
+			{
+				journalId = parsed;
+				return journalId > 0;
+			}
+
+			journalId = 0;
+			return false;
+		}
+
+		/// <summary>
+		/// Publishes standardized request error event.
+		/// </summary>
+		/// <param name="message">Human-readable error message.</param>
+		private static void PublishError(string message)
+		{
+			EventBus.Publish(JournalEvents.RequestFailed, new JournalErrorPayload
+			{
+				Message = message
+			});
+		}
+
+		private static Sprite GetAvatar(string characterName)
+		{
+			return JournalState.ParentSignals?.GetAvatar?.Invoke(characterName);
 		}
 	}
 }

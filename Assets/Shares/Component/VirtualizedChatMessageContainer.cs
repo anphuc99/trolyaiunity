@@ -67,6 +67,7 @@ namespace Share.Components
 		private float _scrollOffset;
 		private bool _isDragging;
 		private float _totalHeight;
+		private bool _metricsStale;
 
 		/// <summary>
 		/// Returns current total message count.
@@ -88,6 +89,12 @@ namespace Share.Components
 
 		private void OnEnable()
 		{
+			if (_metricsStale)
+			{
+				_metricsStale = false;
+				RebuildMetrics();
+			}
+
 			RefreshVisible();
 		}
 
@@ -146,8 +153,6 @@ namespace Share.Components
 			DestroyBubble(_userMeasureBubble);
 			_characterMeasureBubble = null;
 			_userMeasureBubble = null;
-
-			DestroyAllBubbleChildren();
 
 			RefreshVisible();
 		}
@@ -621,20 +626,6 @@ namespace Share.Components
 			Destroy(bubble.gameObject);
 		}
 
-		private void DestroyAllBubbleChildren()
-		{
-			if (_itemsRoot == null)
-			{
-				return;
-			}
-
-			var bubbles = _itemsRoot.GetComponentsInChildren<MessageBubble>(true);
-			for (var i = 0; i < bubbles.Length; i++)
-			{
-				DestroyBubble(bubbles[i]);
-			}
-		}
-
 		private void RebuildMetrics()
 		{
 			SyncMessageIndices();
@@ -646,6 +637,13 @@ namespace Share.Components
 			if (_viewport == null)
 			{
 				return;
+			}
+
+			// Mark metrics stale when measured while the hierarchy is inactive;
+			// OnEnable will rebuild with correct layout data.
+			if (!gameObject.activeInHierarchy)
+			{
+				_metricsStale = true;
 			}
 
 			EnsureMeasureBubbles();
