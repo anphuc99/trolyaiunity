@@ -14,6 +14,7 @@ namespace Core.Infrastructure.Network
 		public const string CharactersUploadAvatar = "/api/characters/upload-avatar";
 		public const string ChatHistory = "/api/chat/history";
 		public const string ChatSend = "/api/chat/send";
+		public const string Journals = "/api/journals";
 		public const string TextToSpeech = "/api/text-to-speech";
 		public const string Personalities = "/personalities";
 	}

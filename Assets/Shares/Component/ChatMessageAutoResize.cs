@@ -1,7 +1,7 @@
 using TMPro;
 using UnityEngine;
 
-namespace Share.Component
+namespace Share.Components
 {
 	/// <summary>
 	/// Auto-resizes a message bubble to fit text content.

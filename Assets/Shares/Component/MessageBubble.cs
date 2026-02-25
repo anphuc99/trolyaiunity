@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-namespace Share.Component
+namespace Share.Components
 {
 	/// <summary>
 	/// Message bubble presenter for either user or character prefab.

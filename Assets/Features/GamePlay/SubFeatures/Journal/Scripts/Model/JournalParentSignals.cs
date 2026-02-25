@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace Features.GamePlay.SubFeatures.Journal.Model
 {
@@ -16,5 +17,7 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 		/// Optional callback for retrieving data from the parent.
 		/// </summary>
 		public Func<string> GetParentStatus { get; set; }
+
+		public Func<string, Sprite> GetAvatar { get; set; }
 	}
 }

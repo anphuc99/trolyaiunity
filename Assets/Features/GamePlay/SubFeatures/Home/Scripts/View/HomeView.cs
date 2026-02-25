@@ -51,5 +51,10 @@ namespace Features.GamePlay.SubFeatures.Home.View
 		{
 			gameObject.SetActive(false);
 		}
+
+		public void OpenJournal()
+		{
+			SendRequest(HomeRequests.OpenJournal);
+		}
 	}
 }

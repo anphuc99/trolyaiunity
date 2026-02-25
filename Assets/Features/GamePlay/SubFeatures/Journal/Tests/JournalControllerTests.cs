@@ -1,16 +1,105 @@
+using System.Threading.Tasks;
+using Core.Infrastructure.Network;
+using Features.GamePlay.SubFeatures.Journal.Controller;
+using Features.GamePlay.SubFeatures.Journal.Events;
+using Features.GamePlay.SubFeatures.Journal.Model;
+using UnityEngine.TestTools;
 using NUnit.Framework;
 
 namespace Features.GamePlay.SubFeatures.Journal.Tests
 {
 	/// <summary>
-	/// Basic tests for Journal controller.
+	/// Tests for Journal controller request and event flow.
 	/// </summary>
 	public sealed class JournalControllerTests
 	{
-		[Test]
-		public void PlaceholderTest()
+		[TearDown]
+		public void TearDown()
 		{
-			Assert.Pass("Generated test placeholder.");
+			FakeServer.ResetToDefaults();
+		}
+
+		[Test]
+		public void HandleShowJournalList_PublishesViewModeChanged()
+		{
+			JournalViewModePayload publishedPayload = null;
+			void Handler(object payload)
+			{
+				publishedPayload = payload as JournalViewModePayload;
+			}
+
+			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.ViewModeChanged, Handler);
+			try
+			{
+				JournalController.HandleShowJournalList();
+			}
+			finally
+			{
+				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.ViewModeChanged, Handler);
+			}
+
+			Assert.IsNotNull(publishedPayload);
+			Assert.IsFalse(publishedPayload.ShowDetail);
+		}
+
+		[Test]
+		public void HandleLoadJournalDetail_InvalidPayload_PublishesRequestFailed()
+		{
+			JournalErrorPayload errorPayload = null;
+			void Handler(object payload)
+			{
+				errorPayload = payload as JournalErrorPayload;
+			}
+
+			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.RequestFailed, Handler);
+			try
+			{
+				JournalController.HandleLoadJournalDetail("invalid-id");
+			}
+			finally
+			{
+				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.RequestFailed, Handler);
+			}
+
+			Assert.IsNotNull(errorPayload);
+			Assert.IsFalse(string.IsNullOrWhiteSpace(errorPayload.Message));
+		}
+
+		[UnityTest]
+		public System.Collections.IEnumerator HandleLoadJournals_ValidResponse_PublishesJournalsLoaded()
+		{
+			JournalListResponsePayload listPayload = null;
+			void Handler(object payload)
+			{
+				listPayload = payload as JournalListResponsePayload;
+			}
+
+			FakeServer.Register("GET", NetworkEndpoints.Journals, _ =>
+				"{\"journals\":[{\"id\":1,\"summary\":\"Summary\",\"createdAt\":\"2026-02-25T10:00:00.000Z\"}]}"
+			);
+
+			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.JournalsLoaded, Handler);
+			try
+			{
+				JournalController.HandleLoadJournals(new JournalListRequestPayload());
+				yield return AwaitTask(Task.Delay(100));
+			}
+			finally
+			{
+				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.JournalsLoaded, Handler);
+			}
+
+			Assert.IsNotNull(listPayload);
+			Assert.AreEqual(1, listPayload.Journals.Count);
+			Assert.AreEqual(1, listPayload.Journals[0].Id);
+		}
+
+		private static System.Collections.IEnumerator AwaitTask(Task task)
+		{
+			while (!task.IsCompleted)
+			{
+				yield return null;
+			}
 		}
 	}
 }

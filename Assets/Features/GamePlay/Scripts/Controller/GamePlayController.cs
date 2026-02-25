@@ -146,7 +146,10 @@ namespace Features.GamePlay.Controller
 		/// </summary>
 		private static void SetAllSubControllerSignals()
 		{
-			HomeController.SetParentSignals(new HomeParentSignals { OnEchoed = OnSubControllerEchoed });
+			HomeController.SetParentSignals(new HomeParentSignals { 
+				OnEchoed = OnSubControllerEchoed,
+				OpenJournal = () => HandleOpenSubController(GamePlaySubControllerType.Journal), 
+			});
 			CharacterController.SetParentSignals(new CharacterParentSignals { OnEchoed = OnSubControllerEchoed });
 			ChatController.SetParentSignals(new ChatParentSignals
 			{
@@ -156,7 +159,10 @@ namespace Features.GamePlay.Controller
 				GetCharacterPitchByName = GetChatCharacterPitch,
 				GetCharacterSpeakingRateByName = GetChatCharacterSpeakingRate,
 			});
-			JournalController.SetParentSignals(new JournalParentSignals { OnEchoed = OnSubControllerEchoed });
+			JournalController.SetParentSignals(new JournalParentSignals { 
+				OnEchoed = OnSubControllerEchoed,
+				GetAvatar = GetChatCharacterAvatar, 
+			});
 			PracticeController.SetParentSignals(new PracticeParentSignals { OnEchoed = OnSubControllerEchoed });
 			StoryController.SetParentSignals(new StoryParentSignals { OnEchoed = OnSubControllerEchoed });
 			TaskController.SetParentSignals(new TaskParentSignals { OnEchoed = OnSubControllerEchoed });

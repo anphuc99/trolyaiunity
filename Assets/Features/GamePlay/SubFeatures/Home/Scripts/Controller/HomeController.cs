@@ -63,5 +63,11 @@ namespace Features.GamePlay.SubFeatures.Home.Controller
 			EventBus.Publish(HomeEvents.Echoed, payload);
 			HomeState.ParentSignals?.OnEchoed?.Invoke(payload);
 		}
+
+		[Request(HomeRequests.OpenJournal)]
+		public static void HandleOpenJournal(object payload)
+		{
+			HomeState.ParentSignals?.OpenJournal?.Invoke();
+		}
 	}
 }

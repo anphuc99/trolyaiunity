@@ -8,5 +8,7 @@ namespace Features.GamePlay.SubFeatures.Home.Requests
 	public static class HomeRequests
 	{
 		public const string Echo = "game.play.home.echo.request";
+
+		public const string OpenJournal = "game.play.home.open.journal.request";
 	}
 }

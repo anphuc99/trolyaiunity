@@ -16,5 +16,7 @@ namespace Features.GamePlay.SubFeatures.Home.Model
 		/// Optional callback for retrieving data from the parent.
 		/// </summary>
 		public Func<string> GetParentStatus { get; set; }
+
+		public Action OpenJournal { get; set; }
 	}
 }
