@@ -128,6 +128,15 @@ namespace Features.CreateCharater.Controller
 			_ = UploadAvatarAsync(payload);
 		}
 
+		/// <summary>
+		/// Closes CreateCharater scope.
+		/// </summary>
+		[Request(CreateCharaterRequests.CloseScope)]
+		public static void HandleCloseScope()
+		{
+			LoadScene.UnloadByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay);
+		}
+
 		private static CreateCharacterPayload NormalizePayload(CreateCharacterPayload payload)
 		{
 			var name = (payload.name ?? string.Empty).Trim();

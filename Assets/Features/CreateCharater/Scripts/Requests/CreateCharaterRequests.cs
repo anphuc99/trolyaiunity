@@ -11,5 +11,6 @@ namespace Features.CreateCharater.Requests
 		public const string FetchPersonalities = "create.charater.fetch_personalities.request";
 		public const string SubmitCharacter = "create.charater.submit.request";
 		public const string UploadAvatar = "create.charater.upload_avatar.request";
+		public const string CloseScope = "create.charater.close.scope.request";
 	}
 }

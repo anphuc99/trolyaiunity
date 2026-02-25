@@ -10,6 +10,7 @@ using Features.CreateCharater.Model;
 using Features.CreateCharater.Requests;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace Features.CreateCharater.View
@@ -32,6 +33,7 @@ namespace Features.CreateCharater.View
 		[SerializeField] private Slider _speakingRateSlider;
 		[SerializeField] private Button _avatarUploadButton;
 		[SerializeField] private Image _avatarPreviewImage;
+		[SerializeField] private Button _closeButton;
 
 		[Header("Actions")]
 		[SerializeField] private Button _submitButton;
@@ -47,9 +49,11 @@ namespace Features.CreateCharater.View
 		protected override void OnEnabled()
 		{
 			TryAutoBindOptionalControls();
+			UpdateBackButtonVisibility();
 
 			if (_submitButton != null)
 			{
+				_submitButton.onClick.RemoveListener(OnSubmitClicked);
 				_submitButton.onClick.AddListener(OnSubmitClicked);
 			}
 
@@ -57,6 +61,12 @@ namespace Features.CreateCharater.View
 			{
 				_avatarUploadButton.onClick.RemoveListener(OnAvatarUploadClicked);
 				_avatarUploadButton.onClick.AddListener(OnAvatarUploadClicked);
+			}
+
+			if (_closeButton != null)
+			{
+				_closeButton.onClick.RemoveListener(OnBackButtonClicked);
+				_closeButton.onClick.AddListener(OnBackButtonClicked);
 			}
 		}
 
@@ -71,6 +81,28 @@ namespace Features.CreateCharater.View
 			{
 				_avatarUploadButton.onClick.RemoveListener(OnAvatarUploadClicked);
 			}
+
+			if (_closeButton != null)
+			{
+				_closeButton.onClick.RemoveListener(OnBackButtonClicked);
+			}
+		}
+
+		private void UpdateBackButtonVisibility()
+		{
+			if (_closeButton == null)
+			{
+				return;
+			}
+
+			var gameplaySceneName = Core.Infrastructure.Attributes.ControllerScopeKey.GamePlayGameplay.ToString();
+			var gameplayScene = SceneManager.GetSceneByName(gameplaySceneName);
+			_closeButton.gameObject.SetActive(gameplayScene.IsValid() && gameplayScene.isLoaded);
+		}
+
+		private void OnBackButtonClicked()
+		{
+			SendRequest(CreateCharaterRequests.CloseScope);
 		}
 
 		private string GetSelectedGender()
