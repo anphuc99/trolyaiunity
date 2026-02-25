@@ -2,7 +2,9 @@ using Core.Infrastructure.Views;
 using Features.CharacterInfo.Events;
 using Features.CharacterInfo.Infrastructure.Attributes;
 using Features.CharacterInfo.Requests;
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Features.CharacterInfo.View
 {
@@ -11,25 +13,40 @@ namespace Features.CharacterInfo.View
 	/// </summary>
 	public sealed class CharacterInfoView : BaseView
 	{
+		[Header("Thông tin cơ bản")]
+		[SerializeField] 
+		private TextMeshProUGUI _name;
 		[SerializeField]
-		private string _message = "Hello";
+		private Image _avatar;
+		[SerializeField]
+		private TextMeshProUGUI _age;
+		[SerializeField]
+		private TextMeshProUGUI _description;
 
-		/// <summary>
-		/// Example method to send a request.
-		/// </summary>
-		public void SendEcho()
-		{
-			SendRequest(CharacterInfoRequests.Echo, _message);
-		}
+		[Header("Giới tính")]
+		[SerializeField]
+		private TextMeshProUGUI _gender;
+		[SerializeField]
+		private Image _genderIcon;
+		[SerializeField]
+		private Sprite _maleIcon;
+		[SerializeField]
+		private Sprite _femaleIcon;
+		
+		[Header("Giọng nói")]
+		[SerializeField]
+		private TextMeshProUGUI _voiceName;
+		[SerializeField]
+		private TextMeshProUGUI _pitch;
+		[SerializeField]
+		private Slider _pitchSlider;
 
-		/// <summary>
-		/// Example event handler (auto-bound).
-		/// </summary>
-		/// <param name="payload">Payload from controller.</param>
-		[OnEvent(CharacterInfoEvents.Echoed)]
-		private void OnEchoed(object payload)
-		{
-			Debug.Log("[CharacterInfoView] Echoed: " + payload, this);
-		}
+		[Header("Chỉnh sửa")]
+		[SerializeField]
+		private Button _editButton;
+		[SerializeField]
+		private Button _removeButton;
+		[SerializeField]
+		private Button _backButton;
 	}
 }
