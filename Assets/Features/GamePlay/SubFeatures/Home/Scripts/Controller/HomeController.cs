@@ -69,5 +69,11 @@ namespace Features.GamePlay.SubFeatures.Home.Controller
 		{
 			HomeState.ParentSignals?.OpenJournal?.Invoke();
 		}
+
+		[Request(HomeRequests.OpenCreateCharacter)]
+		public static void HandleOpenCreateCharacter()
+		{
+			HomeState.ParentSignals?.OpenCreateCharacter?.Invoke();
+		}
 	}
 }

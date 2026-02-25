@@ -18,5 +18,7 @@ namespace Features.GamePlay.SubFeatures.Home.Model
 		public Func<string> GetParentStatus { get; set; }
 
 		public Action OpenJournal { get; set; }
+
+		public Action OpenCreateCharacter { get; set; }
 	}
 }

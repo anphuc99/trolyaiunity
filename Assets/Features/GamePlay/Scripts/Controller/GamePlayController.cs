@@ -22,6 +22,8 @@ using Features.GamePlay.SubFeatures.Task.Model;
 using Core.Infrastructure.Network;
 using Newtonsoft.Json;
 using UnityEngine.Networking;
+using Core.Infrastructure.Scenes;
+using UnityEngine.SceneManagement;
 
 namespace Features.GamePlay.Controller
 {
@@ -149,6 +151,7 @@ namespace Features.GamePlay.Controller
 			HomeController.SetParentSignals(new HomeParentSignals { 
 				OnEchoed = OnSubControllerEchoed,
 				OpenJournal = () => HandleOpenSubController(GamePlaySubControllerType.Journal), 
+				OpenCreateCharacter = HandleOpenCreateCharacter,
 			});
 			CharacterController.SetParentSignals(new CharacterParentSignals { OnEchoed = OnSubControllerEchoed });
 			ChatController.SetParentSignals(new ChatParentSignals
@@ -462,6 +465,11 @@ namespace Features.GamePlay.Controller
 		private static void OnSubControllerEchoed(object payload)
 		{
 			EventBus.Publish(GamePlayEvents.Echoed, payload);
+		}
+
+		private static void HandleOpenCreateCharacter()
+		{
+			LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay, LoadSceneMode.Additive);
 		}
 	}
 }
