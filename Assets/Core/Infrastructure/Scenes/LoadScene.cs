@@ -30,5 +30,25 @@ namespace Core.Infrastructure.Scenes
 			// Scene names must match ControllerScopeKey values for auto-scope activation.
 			SceneManager.LoadScene(sceneName, mode);
 		}
+
+		/// <summary>
+		/// Unloads the scene whose name matches the provided <see cref="ControllerScopeKey"/>.
+		/// </summary>
+		/// <param name="scopeKey">The controller scope key that maps to a scene name.</param>
+		/// <remarks>
+		/// Side effects: triggers Unity scene unloading, which will deactivate controller scopes
+		/// through <see cref="Requests.ControllerScopeSceneBridge"/>.
+		/// </remarks>
+		public static void UnloadByScope(ControllerScopeKey scopeKey)
+		{
+			var sceneName = scopeKey.ToString();
+			if (string.IsNullOrWhiteSpace(sceneName))
+			{
+				Debug.LogWarning("[LoadScene] Scope key produced an empty scene name.");
+				return;
+			}
+
+			SceneManager.UnloadSceneAsync(sceneName);
+		}
 	}
 }
