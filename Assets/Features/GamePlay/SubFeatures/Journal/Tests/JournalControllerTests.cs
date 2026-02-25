@@ -94,6 +94,43 @@ namespace Features.GamePlay.SubFeatures.Journal.Tests
 			Assert.AreEqual(1, listPayload.Journals[0].Id);
 		}
 
+		[UnityTest]
+		public System.Collections.IEnumerator HandlePlayMessageAudio_ValidResponse_PublishesAudioEvent()
+		{
+			JournalPlayMessageAudioPayload audioPayload = null;
+			void Handler(object payload)
+			{
+				audioPayload = payload as JournalPlayMessageAudioPayload;
+			}
+
+			FakeServer.Register("GET", NetworkEndpoints.TextToSpeech, _ =>
+				"{\"output\":\"audio-id\",\"url\":\"/public/audio.mp3\"}"
+			);
+
+			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.MessageAudioPlayRequested, Handler);
+			try
+			{
+				JournalController.HandlePlayMessageAudio(new JournalPlayMessageAudioRequestPayload
+				{
+					MessageId = "m1",
+					MessageIndex = 1,
+					CharacterName = "Mimi",
+					Text = "Hello",
+					Tone = "neutral",
+					ForceReload = false
+				});
+				yield return AwaitTask(Task.Delay(100));
+			}
+			finally
+			{
+				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.MessageAudioPlayRequested, Handler);
+			}
+
+			Assert.IsNotNull(audioPayload);
+			Assert.AreEqual("m1", audioPayload.MessageId);
+			Assert.AreEqual("/public/audio.mp3", audioPayload.AudioUrl);
+		}
+
 		private static System.Collections.IEnumerator AwaitTask(Task task)
 		{
 			while (!task.IsCompleted)

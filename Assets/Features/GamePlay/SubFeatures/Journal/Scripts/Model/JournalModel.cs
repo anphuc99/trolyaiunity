@@ -129,4 +129,94 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 		/// </summary>
 		public string Message { get; set; }
 	}
+
+	/// <summary>
+	/// Request payload for playing journal message audio.
+	/// </summary>
+	public sealed class JournalPlayMessageAudioRequestPayload
+	{
+		/// <summary>
+		/// Message id to replay.
+		/// </summary>
+		public string MessageId { get; set; }
+
+		/// <summary>
+		/// Message index in the current list.
+		/// </summary>
+		public int MessageIndex { get; set; }
+
+		/// <summary>
+		/// Character display name.
+		/// </summary>
+		public string CharacterName { get; set; }
+
+		/// <summary>
+		/// Message text to synthesize.
+		/// </summary>
+		public string Text { get; set; }
+
+		/// <summary>
+		/// Optional tone hint.
+		/// </summary>
+		public string Tone { get; set; }
+
+		/// <summary>
+		/// True to force TTS regeneration on server.
+		/// </summary>
+		public bool ForceReload { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload returned by text-to-speech endpoint.
+	/// </summary>
+	public sealed class JournalTextToSpeechResponsePayload
+	{
+		/// <summary>
+		/// Generated audio id on server.
+		/// </summary>
+		[JsonProperty("output")]
+		public string Output { get; set; }
+
+		/// <summary>
+		/// URL to the generated audio file.
+		/// </summary>
+		[JsonProperty("url")]
+		public string Url { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload for playing journal message audio.
+	/// </summary>
+	public sealed class JournalPlayMessageAudioPayload
+	{
+		/// <summary>
+		/// Message id to replay.
+		/// </summary>
+		public string MessageId { get; set; }
+
+		/// <summary>
+		/// Message index in the current list.
+		/// </summary>
+		public int MessageIndex { get; set; }
+
+		/// <summary>
+		/// Character display name.
+		/// </summary>
+		public string CharacterName { get; set; }
+
+		/// <summary>
+		/// Message text used for TTS.
+		/// </summary>
+		public string Text { get; set; }
+
+		/// <summary>
+		/// Tone hint used for TTS.
+		/// </summary>
+		public string Tone { get; set; }
+
+		/// <summary>
+		/// Resolved audio URL returned by server.
+		/// </summary>
+		public string AudioUrl { get; set; }
+	}
 }

@@ -114,6 +114,22 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		}
 
 		/// <summary>
+		/// Requests server-generated audio for a journal message.
+		/// </summary>
+		/// <param name="payload">Audio request payload.</param>
+		[Request(JournalRequests.PlayMessageAudio)]
+		public static void HandlePlayMessageAudio(JournalPlayMessageAudioRequestPayload payload)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.Text))
+			{
+				PublishError("Missing message content for audio playback.");
+				return;
+			}
+
+			_ = RequestMessageAudioInternalAsync(payload);
+		}
+
+		/// <summary>
 		/// Performs list API call and publishes response.
 		/// </summary>
 		/// <param name="payload">List request payload.</param>
@@ -218,6 +234,46 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		}
 
 		/// <summary>
+		/// Performs text-to-speech API call and publishes audio playback payload.
+		/// </summary>
+		/// <param name="payload">Audio request payload.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task RequestMessageAudioInternalAsync(JournalPlayMessageAudioRequestPayload payload)
+		{
+			try
+			{
+				var endpoint = BuildTextToSpeechEndpoint(payload.Text, payload.Tone, payload.CharacterName, payload.ForceReload);
+				var responseJson = await HttpClient.GetTaskAsync(endpoint);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					PublishError("Empty text-to-speech response from server.");
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<JournalTextToSpeechResponsePayload>(responseJson);
+				if (response == null || string.IsNullOrWhiteSpace(response.Url))
+				{
+					PublishError("Server returned invalid text-to-speech payload.");
+					return;
+				}
+
+				EventBus.Publish(JournalEvents.MessageAudioPlayRequested, new JournalPlayMessageAudioPayload
+				{
+					MessageId = payload.MessageId,
+					MessageIndex = payload.MessageIndex,
+					CharacterName = payload.CharacterName,
+					Text = payload.Text,
+					Tone = payload.Tone,
+					AudioUrl = response.Url
+				});
+			}
+			catch (Exception exception)
+			{
+				PublishError("Failed to load journal audio: " + exception.Message);
+			}
+		}
+
+		/// <summary>
 		/// Builds journal list endpoint with optional story id query.
 		/// </summary>
 		/// <param name="storyId">Optional story id filter.</param>
@@ -240,6 +296,32 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		private static string BuildJournalDetailEndpoint(int journalId)
 		{
 			return NetworkEndpoints.Journals + "/" + journalId;
+		}
+
+		/// <summary>
+		/// Builds text-to-speech endpoint with query parameters.
+		/// </summary>
+		/// <param name="text">Message text.</param>
+		/// <param name="tone">Optional tone hint.</param>
+		/// <param name="characterName">Character display name.</param>
+		/// <param name="forceReload">True to force regeneration on server.</param>
+		/// <returns>Resolved endpoint path.</returns>
+		private static string BuildTextToSpeechEndpoint(string text, string tone, string characterName, bool forceReload)
+		{
+			var safeText = string.IsNullOrWhiteSpace(text) ? string.Empty : text;
+			var safeTone = string.IsNullOrWhiteSpace(tone) ? "neutral" : tone.Trim();
+			var safeName = string.IsNullOrWhiteSpace(characterName) ? string.Empty : characterName.Trim();
+			var endpoint = NetworkEndpoints.TextToSpeech;
+			var query = "text=" + Uri.EscapeDataString(safeText)
+				+ "&tone=" + Uri.EscapeDataString(safeTone)
+				+ "&characterName=" + Uri.EscapeDataString(safeName);
+
+			if (forceReload)
+			{
+				query += "&force=true";
+			}
+
+			return endpoint + "?" + query;
 		}
 
 		/// <summary>

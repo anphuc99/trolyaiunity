@@ -12,6 +12,7 @@ namespace Features.GamePlay.SubFeatures.Journal.Events
 		public const string Uninstalled = "game.play.journal.uninstalled.event";
 		public const string JournalsLoaded = "game.play.journal.list.loaded.event";
 		public const string JournalDetailLoaded = "game.play.journal.detail.loaded.event";
+		public const string MessageAudioPlayRequested = "game.play.journal.message.audio.play.requested.event";
 		public const string RequestFailed = "game.play.journal.request.failed.event";
 		public const string ViewModeChanged = "game.play.journal.view.mode.changed.event";
 	}

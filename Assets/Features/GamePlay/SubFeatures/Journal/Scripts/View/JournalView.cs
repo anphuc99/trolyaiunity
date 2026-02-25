@@ -1,15 +1,18 @@
 using Core.Infrastructure.Views;
+using Core.Infrastructure.Network;
 using Features.GamePlay.SubFeatures.Journal.Events;
 using Features.GamePlay.SubFeatures.Journal.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.Journal.Model;
 using Features.GamePlay.SubFeatures.Journal.Requests;
 using Share.Components;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Networking;
 
 namespace Features.GamePlay.SubFeatures.Journal.View
 {
@@ -33,7 +36,12 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		[SerializeField]
 		private bool _loadOnInstall = true;
 
+		[SerializeField]
+		private AudioSource _voiceAudioSource;
+
 		private readonly List<GameObject> _spawnedListItems = new List<GameObject>();
+		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
+		private NetworkSettings _networkSettings;
 
 		/// <summary>
 		/// Requests journal list from API.
@@ -126,6 +134,29 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		}
 
 		/// <summary>
+		/// Plays journal message audio when controller provides audio URL.
+		/// </summary>
+		/// <param name="payload">Audio playback payload.</param>
+		[OnEvent(JournalEvents.MessageAudioPlayRequested)]
+		private void OnMessageAudioPlayRequested(object payload)
+		{
+			if (payload is not JournalPlayMessageAudioPayload audioPayload)
+			{
+				return;
+			}
+
+			if (string.IsNullOrWhiteSpace(audioPayload.AudioUrl))
+			{
+				ClearReloadingState(audioPayload.MessageIndex);
+				Debug.LogWarning("[JournalView] Missing audio URL for playback.", this);
+				return;
+			}
+
+			EnsureAudioSource();
+			StartCoroutine(PlayJournalAudioAsync(audioPayload));
+		}
+
+		/// <summary>
 		/// Shows this subfeature view when its controller is installed.
 		/// </summary>
 		/// <param name="payload">Unused payload.</param>
@@ -149,6 +180,12 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		[OnEvent(JournalEvents.Uninstalled)]
 		private void OnUninstalled(object payload)
 		{
+			StopAllCoroutines();
+			_reloadingTtsMessageIndices.Clear();
+			if (_voiceAudioSource != null)
+			{
+				_voiceAudioSource.Stop();
+			}
 			gameObject.SetActive(false);
 		}
 
@@ -180,7 +217,12 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				_listItemTemplate = _listContent.GetChild(0).gameObject;
 			}
 
-			_chatVariantRoot.callback = Callback;
+			if (_chatVariantRoot != null)
+			{
+				_chatVariantRoot.callback = Callback;
+				_chatVariantRoot.OnSpeakerClicked = HandleMessageSpeakerClicked;
+				_chatVariantRoot.OnSpeakerLongPressed = HandleMessageSpeakerLongPressed;
+			}
 		}
 
 		/// <summary>
@@ -261,6 +303,205 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		private void RenderJournalDetail(List<MessageBubbleData> messageBubbleData)
 		{
 			_chatVariantRoot.SetChatHistory(messageBubbleData);
+		}
+
+		private void HandleMessageSpeakerClicked(MessageBubbleData messageData)
+		{
+			if (messageData == null || messageData.Type != MessageBubbleType.Character)
+			{
+				return;
+			}
+
+			if (_reloadingTtsMessageIndices.Contains(messageData.MessageIndex) || messageData.IsTtsReloading)
+			{
+				return;
+			}
+
+			var text = string.IsNullOrWhiteSpace(messageData.OriginalMessage) ? messageData.Message : messageData.OriginalMessage;
+			if (string.IsNullOrWhiteSpace(text))
+			{
+				return;
+			}
+
+			SendRequest(JournalRequests.PlayMessageAudio, new JournalPlayMessageAudioRequestPayload
+			{
+				MessageId = messageData.MessageId,
+				MessageIndex = messageData.MessageIndex,
+				CharacterName = messageData.SenderName,
+				Text = text,
+				Tone = messageData.Tone,
+				ForceReload = false
+			});
+		}
+
+		private void HandleMessageSpeakerLongPressed(MessageBubbleData messageData)
+		{
+			if (_chatVariantRoot == null || messageData == null || messageData.Type != MessageBubbleType.Character)
+			{
+				return;
+			}
+
+			var messageIndex = messageData.MessageIndex;
+			if (messageIndex < 0 || _reloadingTtsMessageIndices.Contains(messageIndex))
+			{
+				return;
+			}
+
+			var text = string.IsNullOrWhiteSpace(messageData.OriginalMessage) ? messageData.Message : messageData.OriginalMessage;
+			if (string.IsNullOrWhiteSpace(text))
+			{
+				return;
+			}
+
+			_reloadingTtsMessageIndices.Add(messageIndex);
+			_chatVariantRoot.SetMessageTtsReloading(messageIndex, true);
+
+			SendRequest(JournalRequests.PlayMessageAudio, new JournalPlayMessageAudioRequestPayload
+			{
+				MessageId = messageData.MessageId,
+				MessageIndex = messageIndex,
+				CharacterName = messageData.SenderName,
+				Text = text,
+				Tone = messageData.Tone,
+				ForceReload = true
+			});
+		}
+
+		private IEnumerator PlayJournalAudioAsync(JournalPlayMessageAudioPayload payload)
+		{
+			var resolvedUrl = ResolveAudioUrl(payload.AudioUrl);
+			if (string.IsNullOrWhiteSpace(resolvedUrl))
+			{
+				ClearReloadingState(payload.MessageIndex);
+				yield break;
+			}
+
+			using var audioRequest = UnityWebRequestMultimedia.GetAudioClip(resolvedUrl, ResolveAudioType(resolvedUrl));
+			yield return audioRequest.SendWebRequest();
+
+			if (audioRequest.result != UnityWebRequest.Result.Success)
+			{
+				ClearReloadingState(payload.MessageIndex);
+				Debug.LogWarning("[JournalView] Failed to download audio: " + audioRequest.error, this);
+				yield break;
+			}
+
+			var clip = DownloadHandlerAudioClip.GetContent(audioRequest);
+			if (clip == null)
+			{
+				ClearReloadingState(payload.MessageIndex);
+				yield break;
+			}
+
+			EnsureAudioSource();
+			_voiceAudioSource.Stop();
+			_voiceAudioSource.clip = clip;
+			_voiceAudioSource.Play();
+			while (_voiceAudioSource.isPlaying)
+			{
+				yield return null;
+			}
+
+			ClearReloadingState(payload.MessageIndex);
+		}
+
+		private void ClearReloadingState(int messageIndex)
+		{
+			if (messageIndex < 0)
+			{
+				return;
+			}
+
+			if (_reloadingTtsMessageIndices.Remove(messageIndex) && _chatVariantRoot != null)
+			{
+				_chatVariantRoot.SetMessageTtsReloading(messageIndex, false);
+			}
+		}
+
+		private void EnsureAudioSource()
+		{
+			if (_voiceAudioSource != null)
+			{
+				return;
+			}
+
+			_voiceAudioSource = GetComponent<AudioSource>();
+			if (_voiceAudioSource == null)
+			{
+				_voiceAudioSource = gameObject.AddComponent<AudioSource>();
+			}
+		}
+
+		private string ResolveAudioUrl(string audioUrl)
+		{
+			if (string.IsNullOrWhiteSpace(audioUrl))
+			{
+				return null;
+			}
+
+			if (Uri.TryCreate(audioUrl, UriKind.Absolute, out var absoluteUri))
+			{
+				return absoluteUri.ToString();
+			}
+
+			var baseUrl = NormalizeServerBaseUrl(GetServerBaseUrl());
+			if (string.IsNullOrWhiteSpace(baseUrl))
+			{
+				return null;
+			}
+
+			if (!audioUrl.StartsWith("/", StringComparison.Ordinal))
+			{
+				audioUrl = "/" + audioUrl;
+			}
+
+			return baseUrl + audioUrl;
+		}
+
+		private static AudioType ResolveAudioType(string audioUrl)
+		{
+			if (string.IsNullOrWhiteSpace(audioUrl))
+			{
+				return AudioType.MPEG;
+			}
+
+			if (audioUrl.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+			{
+				return AudioType.WAV;
+			}
+
+			if (audioUrl.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase))
+			{
+				return AudioType.OGGVORBIS;
+			}
+
+			return AudioType.MPEG;
+		}
+
+		private string GetServerBaseUrl()
+		{
+			if (_networkSettings == null)
+			{
+				_networkSettings = Resources.Load<NetworkSettings>("NetworkSettings");
+			}
+
+			return _networkSettings != null ? _networkSettings.BaseUrl : null;
+		}
+
+		private static string NormalizeServerBaseUrl(string baseUrl)
+		{
+			if (string.IsNullOrWhiteSpace(baseUrl))
+			{
+				return null;
+			}
+
+			var normalized = baseUrl.Trim().TrimEnd('/');
+			if (normalized.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
+			{
+				normalized = normalized.Substring(0, normalized.Length - 4);
+			}
+
+			return normalized;
 		}
 
 		/// <summary>
