@@ -2,7 +2,7 @@ using Core.Infrastructure.Views;
 using Features.CharacterInfo.Events;
 using Features.CharacterInfo.Infrastructure.Attributes;
 using Features.CharacterInfo.Requests;
-using Share.Components;
+using Share.Model;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;

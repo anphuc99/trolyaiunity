@@ -3,7 +3,7 @@ using Features.CharacterInfo.Infrastructure;
 using Features.CharacterInfo.Infrastructure.Attributes;
 using Features.CharacterInfo.Requests;
 using Core.Infrastructure.State;
-using Share.Components;
+using Share.Model;
 
 namespace Features.CharacterInfo.Controller
 {

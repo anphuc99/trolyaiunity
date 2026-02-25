@@ -1,10 +1,10 @@
 using System;
 using UnityEngine;
 
-namespace Share.Components
+namespace Share.Model
 {
 	/// <summary>
-	/// Shared selected-character payload used to pass character data across controller scopes.
+	/// Shared selected-character payload model used to pass character data across controller scopes.
 	/// </summary>
 	[Serializable]
 	public sealed class SelectedCharacterInfo

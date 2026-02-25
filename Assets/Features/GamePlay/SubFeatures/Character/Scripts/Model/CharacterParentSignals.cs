@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Share.Components;
+using Share.Model;
 using UnityEngine;
 
 namespace Features.GamePlay.SubFeatures.Character.Model

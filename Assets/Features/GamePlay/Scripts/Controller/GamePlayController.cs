@@ -21,7 +21,7 @@ using Features.GamePlay.SubFeatures.Task.Controller;
 using Features.GamePlay.SubFeatures.Task.Model;
 using Core.Infrastructure.Network;
 using Newtonsoft.Json;
-using Share.Components;
+using Share.Model;
 using UnityEngine.Networking;
 using Core.Infrastructure.Scenes;
 using UnityEngine.SceneManagement;

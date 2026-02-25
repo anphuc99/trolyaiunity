@@ -5,7 +5,7 @@ using Features.GamePlay.SubFeatures.Character.Controller;
 using Features.GamePlay.SubFeatures.Character.Events;
 using Features.GamePlay.SubFeatures.Character.Model;
 using NUnit.Framework;
-using Share.Components;
+using Share.Model;
 
 namespace Features.GamePlay.SubFeatures.Character.Tests
 {

@@ -4,7 +4,7 @@ using Core.Infrastructure.State;
 using Features.CharacterInfo.Controller;
 using Features.CharacterInfo.Events;
 using NUnit.Framework;
-using Share.Components;
+using Share.Model;
 
 namespace Features.CharacterInfo.Tests
 {
