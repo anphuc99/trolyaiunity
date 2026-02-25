@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Core.Infrastructure.Attributes;
+using Core.Infrastructure.Events;
 using UnityEngine;
 
 namespace Core.Infrastructure.Requests
@@ -22,6 +23,7 @@ namespace Core.Infrastructure.Requests
 		private static readonly Dictionary<string, Func<object, object>> InvokersByKey = new Dictionary<string, Func<object, object>>(StringComparer.Ordinal);
 		private static readonly Dictionary<ControllerScopeKey, ScopeBindings> BindingsByScope = new Dictionary<ControllerScopeKey, ScopeBindings>();
 		private static readonly HashSet<ControllerScopeKey> ActiveScopes = new HashSet<ControllerScopeKey>();
+		private static readonly List<Action<ScopeChangedPayload>> GlobalScopeChangedActions = new List<Action<ScopeChangedPayload>>();
 		private static readonly object ScopeSync = new object();
 
 		/// <summary>
@@ -151,6 +153,7 @@ namespace Core.Infrastructure.Requests
 			}
 
 			InvokeInitActions(scopeKey);
+			NotifyGlobalScopeChanged(scopeKey, isOpened: true);
 		}
 
 		/// <summary>
@@ -178,6 +181,7 @@ namespace Core.Infrastructure.Requests
 
 			InvokeShutdownActions(scopeKey);
 			UnregisterBindings(scopeKey);
+			NotifyGlobalScopeChanged(scopeKey, isOpened: false);
 		}
 
 		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -218,6 +222,7 @@ namespace Core.Infrastructure.Requests
 			InvokersByKey.Clear();
 			BindingsByScope.Clear();
 			ActiveScopes.Clear();
+			GlobalScopeChangedActions.Clear();
 
 			var assemblies = AppDomain.CurrentDomain.GetAssemblies();
 			for (var assemblyIndex = 0; assemblyIndex < assemblies.Length; assemblyIndex++)
@@ -258,6 +263,7 @@ namespace Core.Infrastructure.Requests
 					var scopeKey = GetScopeKey(type);
 					var scopeBindings = GetOrCreateScopeBindings(scopeKey);
 					RegisterLifecycleMethods(type, scopeBindings);
+					RegisterGlobalScopeChangedMethods(type);
 
 					var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
 					for (var methodIndex = 0; methodIndex < methods.Length; methodIndex++)
@@ -322,6 +328,26 @@ namespace Core.Infrastructure.Requests
 			}
 		}
 
+		private static void RegisterGlobalScopeChangedMethods(Type type)
+		{
+			var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+			for (var i = 0; i < methods.Length; i++)
+			{
+				var method = methods[i];
+				if (method == null)
+				{
+					continue;
+				}
+
+				if (method.GetCustomAttribute<OnGlobalScopeChangedAttribute>(inherit: false) == null)
+				{
+					continue;
+				}
+
+				TryRegisterGlobalScopeChangedAction(method);
+			}
+		}
+
 		private static void TryRegisterLifecycleAction(List<Action> target, MethodInfo method, string label)
 		{
 			if (method.ReturnType != typeof(void) || !method.IsStatic)
@@ -344,6 +370,37 @@ namespace Core.Infrastructure.Requests
 			catch (Exception ex)
 			{
 				Debug.LogError($"{LogPrefix} Ignoring {label} hook: cannot bind {Describe(method)}: {ex}");
+			}
+		}
+
+		private static void TryRegisterGlobalScopeChangedAction(MethodInfo method)
+		{
+			if (method == null)
+			{
+				return;
+			}
+
+			if (method.ReturnType != typeof(void) || !method.IsStatic)
+			{
+				Debug.LogError($"{LogPrefix} Ignoring global scope changed hook: method must be static void ({Describe(method)}).");
+				return;
+			}
+
+			var parameters = method.GetParameters();
+			if (parameters.Length != 1 || parameters[0].ParameterType != typeof(ScopeChangedPayload))
+			{
+				Debug.LogError($"{LogPrefix} Ignoring global scope changed hook: method must have exactly one parameter of type {typeof(ScopeChangedPayload).FullName} ({Describe(method)}).");
+				return;
+			}
+
+			try
+			{
+				var action = (Action<ScopeChangedPayload>)Delegate.CreateDelegate(typeof(Action<ScopeChangedPayload>), method);
+				GlobalScopeChangedActions.Add(action);
+			}
+			catch (Exception ex)
+			{
+				Debug.LogError($"{LogPrefix} Ignoring global scope changed hook: cannot bind {Describe(method)}: {ex}");
 			}
 		}
 
@@ -461,6 +518,29 @@ namespace Core.Infrastructure.Requests
 				catch (Exception ex)
 				{
 					Debug.LogError($"{LogPrefix} Shutdown hook threw for scope '{scopeKey}': {ex}");
+				}
+			}
+		}
+
+		private static void NotifyGlobalScopeChanged(ControllerScopeKey scopeKey, bool isOpened)
+		{
+			var payload = new ScopeChangedPayload
+			{
+				ScopeKey = scopeKey,
+				IsOpened = isOpened
+			};
+
+			EventBus.Publish(CoreGlobalEvents.ScopeChanged, payload);
+
+			for (var i = 0; i < GlobalScopeChangedActions.Count; i++)
+			{
+				try
+				{
+					GlobalScopeChangedActions[i]?.Invoke(payload);
+				}
+				catch (Exception ex)
+				{
+					Debug.LogError($"{LogPrefix} Global scope changed hook threw for scope '{scopeKey}' (isOpened={isOpened}): {ex}");
 				}
 			}
 		}
