@@ -8,6 +8,8 @@ namespace Features.GamePlay.View
     {
         public GamePlayMenuItem MenuItemPrefab;
 
+        public GameObject MenuContainer;
+
         private readonly Dictionary<string, GamePlayMenuItem> _menuItemsById = new Dictionary<string, GamePlayMenuItem>(StringComparer.Ordinal);
 
         public string AddMenuItem(string id, string text, Action onClick)
@@ -25,7 +27,10 @@ namespace Features.GamePlay.View
                 item.Text.text = text ?? string.Empty;
             }
 
-            item.OnClick = onClick;
+            item.OnClick = () => {
+                onClick?.Invoke();
+                ShowHideMenu();
+            };
             item.id = id;
             _menuItemsById[id] = item;
             return item.id;
@@ -47,6 +52,14 @@ namespace Features.GamePlay.View
             if (item != null)
             {
                 Destroy(item.gameObject);
+            }
+        }
+
+        public void ShowHideMenu()
+        {
+            if (MenuContainer != null)
+            {
+                MenuContainer.SetActive(!MenuContainer.activeSelf);
             }
         }
     }

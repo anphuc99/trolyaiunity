@@ -10,7 +10,8 @@
         "GamePlay.Story",
         "GamePlay.Practice",
         "GamePlay.Task",
-        "GamePlay.Chat"
+        "GamePlay.Chat",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
