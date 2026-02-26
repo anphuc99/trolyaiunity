@@ -177,6 +177,50 @@ Shader "Custom/UI/ImageOutline"
                 return alpha;
             }
 
+            // Sample min alpha quanh pixel để erode mép hình
+            fixed SampleMinRing(float2 uv, float2 offset)
+            {
+                fixed alpha = SampleTextureSafe(uv);
+
+                alpha = min(alpha, SampleTextureSafe(uv + float2(offset.x, 0)));
+                alpha = min(alpha, SampleTextureSafe(uv + float2(-offset.x, 0)));
+                alpha = min(alpha, SampleTextureSafe(uv + float2(0, offset.y)));
+                alpha = min(alpha, SampleTextureSafe(uv + float2(0, -offset.y)));
+
+                alpha = min(alpha, SampleTextureSafe(uv + float2(offset.x, offset.y)));
+                alpha = min(alpha, SampleTextureSafe(uv + float2(-offset.x, offset.y)));
+                alpha = min(alpha, SampleTextureSafe(uv + float2(offset.x, -offset.y)));
+                alpha = min(alpha, SampleTextureSafe(uv + float2(-offset.x, -offset.y)));
+
+                float d1 = 0.3827;
+                float d2 = 0.9239;
+                alpha = min(alpha, SampleTextureSafe(uv + float2(offset.x * d2, offset.y * d1)));
+                alpha = min(alpha, SampleTextureSafe(uv + float2(offset.x * d1, offset.y * d2)));
+                alpha = min(alpha, SampleTextureSafe(uv + float2(-offset.x * d2, offset.y * d1)));
+                alpha = min(alpha, SampleTextureSafe(uv + float2(-offset.x * d1, offset.y * d2)));
+                alpha = min(alpha, SampleTextureSafe(uv + float2(offset.x * d2, -offset.y * d1)));
+                alpha = min(alpha, SampleTextureSafe(uv + float2(offset.x * d1, -offset.y * d2)));
+                alpha = min(alpha, SampleTextureSafe(uv + float2(-offset.x * d2, -offset.y * d1)));
+                alpha = min(alpha, SampleTextureSafe(uv + float2(-offset.x * d1, -offset.y * d2)));
+
+                return alpha;
+            }
+
+            // Erode nhiều lớp để cho outline đè vào trong một vài pixel
+            fixed SampleErodeMultiLayer(float2 uv, float2 baseOffset, int layers)
+            {
+                fixed alpha = 1;
+
+                for (int i = 1; i <= layers; i++)
+                {
+                    float scale = (float)i / (float)layers;
+                    float2 offset = baseOffset * scale;
+                    alpha = min(alpha, SampleMinRing(uv, offset));
+                }
+
+                return alpha;
+            }
+
             fixed4 frag(v2f IN) : SV_Target
             {
                 // Sample texture chính
@@ -195,8 +239,8 @@ Shader "Custom/UI/ImageOutline"
                 if (_OutlineOverlap > 0.001)
                 {
                     float2 overlapOffset = _MainTex_TexelSize.xy * _OutlineOverlap;
-                    int overlapLayers = clamp((int)ceil(_OutlineOverlap), 1, 4);
-                    fixed innerAlpha = SampleOutlineMultiLayer(IN.texcoord, overlapOffset, overlapLayers);
+                    int overlapLayers = clamp((int)ceil(_OutlineOverlap), 1, 6);
+                    fixed innerAlpha = SampleErodeMultiLayer(IN.texcoord, overlapOffset, overlapLayers);
                     color.a *= innerAlpha;
                     color.rgb *= innerAlpha;
                 }
