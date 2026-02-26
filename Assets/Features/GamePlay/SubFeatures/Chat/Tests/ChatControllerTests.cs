@@ -20,6 +20,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 			ChatState.ParentSignals = null;
 			ChatState.AddCharacterMenuId = null;
 			ChatState.ContextMenuId = null;
+			ChatState.EndConversationMenuId = null;
 		}
 
 		[TearDown]
@@ -29,6 +30,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 			ChatState.ParentSignals = null;
 			ChatState.AddCharacterMenuId = null;
 			ChatState.ContextMenuId = null;
+			ChatState.EndConversationMenuId = null;
 		}
 
 		[Test]
@@ -53,6 +55,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 						return "menu-chat-context";
 					}
 
+					if (string.Equals(text, "Kết thúc hội thoại", StringComparison.Ordinal))
+					{
+						return "menu-chat-end";
+					}
+
 					return null;
 				}
 			});
@@ -61,9 +68,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 
 			CollectionAssert.Contains(requestedMenuTexts, "Thêm nhân vật");
 			CollectionAssert.Contains(requestedMenuTexts, "Nhập bối cảnh");
+			CollectionAssert.Contains(requestedMenuTexts, "Kết thúc hội thoại");
 			Assert.IsNotNull(requestedCharacterMenuAction);
 			Assert.AreEqual("menu-chat-add-character", ChatState.AddCharacterMenuId);
 			Assert.AreEqual("menu-chat-context", ChatState.ContextMenuId);
+			Assert.AreEqual("menu-chat-end", ChatState.EndConversationMenuId);
 		}
 
 		[Test]
@@ -73,9 +82,20 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 
 			ChatController.SetParentSignals(new ChatParentSignals
 			{
-				AddMenu = (text, _) => string.Equals(text, "Nhập bối cảnh", StringComparison.Ordinal)
-					? "menu-chat-context"
-					: "menu-chat-add-character",
+				AddMenu = (text, _) =>
+				{
+					if (string.Equals(text, "Nhập bối cảnh", StringComparison.Ordinal))
+					{
+						return "menu-chat-context";
+					}
+
+					if (string.Equals(text, "Kết thúc hội thoại", StringComparison.Ordinal))
+					{
+						return "menu-chat-end";
+					}
+
+					return "menu-chat-add-character";
+				},
 				RemoveMenu = menuId => removedMenuIds.Add(menuId),
 			});
 
@@ -84,8 +104,10 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 
 			CollectionAssert.Contains(removedMenuIds, "menu-chat-add-character");
 			CollectionAssert.Contains(removedMenuIds, "menu-chat-context");
+			CollectionAssert.Contains(removedMenuIds, "menu-chat-end");
 			Assert.IsNull(ChatState.AddCharacterMenuId);
 			Assert.IsNull(ChatState.ContextMenuId);
+			Assert.IsNull(ChatState.EndConversationMenuId);
 		}
 
 		[Test]

@@ -26,7 +26,7 @@ namespace Features.GamePlay.View
 
             RemoveMenuItem(id);
 
-            var item = Instantiate(MenuItemPrefab, transform);
+            var item = Instantiate(MenuItemPrefab, MenuContainer.transform);
             if (item.Text != null)
             {
                 item.Text.text = text ?? string.Empty;
