@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Features.GamePlay.SubFeatures.Chat.Model
@@ -19,9 +20,24 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		public Func<string> GetParentStatus { get; set; }
 
 		/// <summary>
+		/// Optional callback for getting all cached character names from parent scope.
+		/// </summary>
+		public Func<List<string>> GetCharacterNames { get; set; }
+
+		/// <summary>
 		/// Optional callback for getting cached character avatar by name.
 		/// </summary>
 		public Func<string, Sprite> GetCharacterAvatarByName { get; set; }
+
+		/// <summary>
+		/// Optional callback for adding a menu item at parent scope.
+		/// </summary>
+		public Func<string, Action, string> AddMenu { get; set; }
+
+		/// <summary>
+		/// Optional callback for removing a parent-scope menu item by id.
+		/// </summary>
+		public Action<string> RemoveMenu { get; set; }
 
 		/// <summary>
 		/// Optional callback for getting cached character voice name by character name.

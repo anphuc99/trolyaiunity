@@ -43,6 +43,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[SerializeField]
 		private AudioSource _characterVoiceAudioSource;
 
+		[SerializeField]
+		private ChatSelectCharacterPopupView _selectCharacterPopupView;
+
 		private readonly Queue<ChatAssistantTurnPayload> _pendingCharacterTurns = new Queue<ChatAssistantTurnPayload>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
 		private bool _isProcessingCharacterTurns;
@@ -161,7 +164,33 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				_characterVoiceAudioSource.Stop();
 			}
+			if (_selectCharacterPopupView != null)
+			{
+				_selectCharacterPopupView.HideImmediate();
+			}
 			gameObject.SetActive(false);
+		}
+
+		/// <summary>
+		/// Displays add-character popup with character list from controller.
+		/// </summary>
+		/// <param name="payload">Character list payload.</param>
+		[OnEvent(ChatEvents.CharactersLoaded)]
+		private void OnCharactersLoaded(object payload)
+		{
+			EnsureDependencies();
+			if (_selectCharacterPopupView == null)
+			{
+				return;
+			}
+
+			if (payload is List<ChatSelectableCharacterPayload> characters)
+			{
+				_selectCharacterPopupView.Show(characters);
+				return;
+			}
+
+			_selectCharacterPopupView.Show(new List<ChatSelectableCharacterPayload>());
 		}
 
 		/// <summary>
@@ -458,6 +487,19 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				if (_characterVoiceAudioSource == null)
 				{
 					_characterVoiceAudioSource = gameObject.AddComponent<AudioSource>();
+				}
+			}
+
+			if (_selectCharacterPopupView == null)
+			{
+				var popupTransform = FindChildByName(transform, "PopupSelectCharacter");
+				if (popupTransform != null)
+				{
+					_selectCharacterPopupView = popupTransform.GetComponent<ChatSelectCharacterPopupView>();
+					if (_selectCharacterPopupView == null)
+					{
+						_selectCharacterPopupView = popupTransform.gameObject.AddComponent<ChatSelectCharacterPopupView>();
+					}
 				}
 			}
 
@@ -758,6 +800,36 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			return new List<ChatAssistantTurnPayload>();
+		}
+
+		private static Transform FindChildByName(Transform root, string targetName)
+		{
+			if (root == null || string.IsNullOrWhiteSpace(targetName))
+			{
+				return null;
+			}
+
+			for (var i = 0; i < root.childCount; i++)
+			{
+				var child = root.GetChild(i);
+				if (child == null)
+				{
+					continue;
+				}
+
+				if (string.Equals(child.name, targetName, StringComparison.Ordinal))
+				{
+					return child;
+				}
+
+				var nested = FindChildByName(child, targetName);
+				if (nested != null)
+				{
+					return nested;
+				}
+			}
+
+			return null;
 		}
 
 		/// <summary>

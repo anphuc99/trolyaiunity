@@ -39,6 +39,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		/// </summary>
 		public static void Install()
 		{
+			RegisterAddCharacterMenu();
 			EventBus.Publish(ChatEvents.Installed, null);
 		}
 
@@ -47,6 +48,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		/// </summary>
 		public static void Uninstall()
 		{
+			UnregisterAddCharacterMenu();
 			EventBus.Publish(ChatEvents.Uninstalled, null);
 		}
 
@@ -56,6 +58,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		/// <param name="signals">Signals implemented by the parent feature.</param>
 		public static void SetParentSignals(ChatParentSignals signals)
 		{
+			if (signals == null)
+			{
+				UnregisterAddCharacterMenu();
+			}
+
 			ChatState.ParentSignals = signals;
 		}
 
@@ -214,6 +221,65 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			EventBus.Publish(ChatEvents.Echoed, payload);
 			ChatState.ParentSignals?.OnEchoed?.Invoke(payload);
+		}
+
+		private static void RegisterAddCharacterMenu()
+		{
+			UnregisterAddCharacterMenu();
+
+			var menuId = ChatState.ParentSignals?.AddMenu?.Invoke("Thêm nhân vật", HandleOpenAddCharacterMenu);
+			if (string.IsNullOrWhiteSpace(menuId))
+			{
+				return;
+			}
+
+			ChatState.AddCharacterMenuId = menuId;
+		}
+
+		private static void UnregisterAddCharacterMenu()
+		{
+			if (string.IsNullOrWhiteSpace(ChatState.AddCharacterMenuId))
+			{
+				ChatState.AddCharacterMenuId = null;
+				return;
+			}
+
+			ChatState.ParentSignals?.RemoveMenu?.Invoke(ChatState.AddCharacterMenuId);
+			ChatState.AddCharacterMenuId = null;
+		}
+
+		private static void HandleOpenAddCharacterMenu()
+		{
+			var payload = BuildSelectableCharacters();
+			EventBus.Publish(ChatEvents.CharactersLoaded, payload);
+		}
+
+		private static List<ChatSelectableCharacterPayload> BuildSelectableCharacters()
+		{
+			var result = new List<ChatSelectableCharacterPayload>();
+			var names = ChatState.ParentSignals?.GetCharacterNames?.Invoke();
+			if (names == null || names.Count == 0)
+			{
+				return result;
+			}
+
+			for (var i = 0; i < names.Count; i++)
+			{
+				var name = names[i];
+				if (string.IsNullOrWhiteSpace(name))
+				{
+					continue;
+				}
+
+				var normalizedName = name.Trim();
+				result.Add(new ChatSelectableCharacterPayload
+				{
+					Name = normalizedName,
+					Avatar = ChatState.ParentSignals?.GetCharacterAvatarByName?.Invoke(normalizedName),
+				});
+			}
+
+			return result;
 		}
 
 		/// <summary>

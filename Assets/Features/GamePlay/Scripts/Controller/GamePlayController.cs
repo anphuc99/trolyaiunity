@@ -218,7 +218,10 @@ namespace Features.GamePlay.Controller
 			ChatController.SetParentSignals(new ChatParentSignals
 			{
 				OnEchoed = OnSubControllerEchoed,
+				GetCharacterNames = GetChatCharacterNames,
 				GetCharacterAvatarByName = GetChatCharacterAvatar,
+				AddMenu = AddMenu,
+				RemoveMenu = RemoveMenu,
 				GetCharacterVoiceNameByName = GetChatCharacterVoiceName,
 				GetCharacterPitchByName = GetChatCharacterPitch,
 				GetCharacterSpeakingRateByName = GetChatCharacterSpeakingRate,

@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using UnityEngine;
 
 namespace Features.GamePlay.SubFeatures.Chat.Model
 {
@@ -272,5 +273,21 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// Human-readable error message.
 		/// </summary>
 		public string Message { get; set; }
+	}
+
+	/// <summary>
+	/// Character item payload for add-character popup in chat.
+	/// </summary>
+	public sealed class ChatSelectableCharacterPayload
+	{
+		/// <summary>
+		/// Character display name.
+		/// </summary>
+		public string Name { get; set; }
+
+		/// <summary>
+		/// Character avatar sprite.
+		/// </summary>
+		public Sprite Avatar { get; set; }
 	}
 }

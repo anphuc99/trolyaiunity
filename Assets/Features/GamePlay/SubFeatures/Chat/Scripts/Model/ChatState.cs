@@ -6,5 +6,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 	public static class ChatState
 	{
 		public static ChatParentSignals ParentSignals { get; set; }
+
+		public static string AddCharacterMenuId { get; set; }
 	}
 }
