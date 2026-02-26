@@ -1,7 +1,7 @@
 {
     "name": "GamePlay.Practice",
     "rootNamespace": "",
-    "references": ["Core"],
+    "references": ["Core", "Unity.TextMeshPro"],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
