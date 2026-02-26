@@ -1,7 +1,7 @@
 {
     "name": "GamePlay.Practice.Tests",
     "rootNamespace": "",
-    "references": ["GamePlay.Practice"],
+    "references": ["GamePlay.Practice", "Core"],
     "includePlatforms": ["Editor"],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
