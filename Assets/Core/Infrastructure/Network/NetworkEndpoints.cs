@@ -18,6 +18,11 @@ namespace Core.Infrastructure.Network
 		public const string ChatDeveloper = "/api/chat/developer";
 		public const string Journals = "/api/journals";
 		public const string JournalsEnd = "/api/journals/end";
+		public const string Translation = "/api/translation";
+		public const string TranslationDue = "/api/translation/due";
+		public const string TranslationLearn = "/api/translation/learn";
+		public const string TranslationContext = "/api/translation/context";
+		public const string TranslationReview = "/api/translation/review";
 		public const string TextToSpeech = "/api/text-to-speech";
 		public const string Personalities = "/personalities";
 	}
