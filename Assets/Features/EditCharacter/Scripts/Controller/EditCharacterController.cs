@@ -10,6 +10,7 @@ using Features.EditCharacter.Requests;
 using Newtonsoft.Json;
 using Share.Model;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace Features.EditCharacter.Controller
 {
@@ -140,6 +141,9 @@ namespace Features.EditCharacter.Controller
 					return;
 				}
 
+				var loadedSprite = await LoadSpriteFromUrlAsync(response.url);
+				UpdateSelectedCharacterAvatar(response.url, loadedSprite);
+
 				EventBus.Publish(EditCharacterEvents.AvatarUploadSucceeded, response.url);
 			}
 			catch
@@ -233,6 +237,62 @@ namespace Features.EditCharacter.Controller
 				AvatarUrl = avatarUrl,
 				SpeakingRate = speakingRate,
 			});
+		}
+
+		private static void UpdateSelectedCharacterAvatar(string avatarUrl, Sprite avatarSprite)
+		{
+			if (!GlobalVariables.TryGet<SelectedCharacterInfo>(SelectedCharacterGlobalKey, out var current)
+				|| current == null)
+			{
+				return;
+			}
+
+			current.AvatarUrl = string.IsNullOrWhiteSpace(avatarUrl) ? current.AvatarUrl : avatarUrl;
+			if (avatarSprite != null)
+			{
+				current.Avatar = avatarSprite;
+			}
+
+			GlobalVariables.Set(SelectedCharacterGlobalKey, current);
+		}
+
+		private static async Task<Sprite> LoadSpriteFromUrlAsync(string avatarUrl)
+		{
+			if (string.IsNullOrWhiteSpace(avatarUrl))
+			{
+				return null;
+			}
+
+			using var request = UnityWebRequestTexture.GetTexture(avatarUrl);
+			UnityWebRequestAsyncOperation operation;
+			try
+			{
+				operation = request.SendWebRequest();
+			}
+			catch (System.Exception exception)
+			{
+				Debug.LogError("[EditCharacterController] Failed to start avatar request for URL '" + avatarUrl + "': " + exception);
+				return null;
+			}
+
+			while (!operation.isDone)
+			{
+				await Task.Yield();
+			}
+
+			if (request.result != UnityWebRequest.Result.Success)
+			{
+				Debug.LogError("[EditCharacterController] Failed to load avatar sprite from URL '" + avatarUrl + "': " + request.error);
+				return null;
+			}
+
+			var texture = DownloadHandlerTexture.GetContent(request);
+			if (texture == null)
+			{
+				return null;
+			}
+
+			return Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f));
 		}
 	}
 }
