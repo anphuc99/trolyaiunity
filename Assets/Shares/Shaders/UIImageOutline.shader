@@ -9,7 +9,7 @@ Shader "Custom/UI/ImageOutline"
         
         // Outline properties
         _OutlineColor ("Outline Color", Color) = (0,0,0,1)
-        _OutlineWidth ("Outline Width", Range(0, 10)) = 1
+        _OutlineWidth ("Outline Width", Range(0, 100)) = 1
         
         // Stencil properties for UI masking
         _StencilComp ("Stencil Comparison", Float) = 8
@@ -115,20 +115,52 @@ Shader "Custom/UI/ImageOutline"
                 return OUT;
             }
 
-            // Lấy alpha từ 8 hướng xung quanh pixel để tạo outline
-            fixed SampleOutlineAlpha(float2 uv, float2 offset)
+            // Sample 16 hướng tại một khoảng cách cho outline mượt hơn
+            fixed SampleOutlineRing(float2 uv, float2 offset)
             {
                 fixed alpha = 0;
                 
-                // 8 hướng: trên, dưới, trái, phải và 4 góc
+                // 4 hướng chính: trên, dưới, trái, phải
                 alpha = max(alpha, tex2D(_MainTex, uv + float2(offset.x, 0)).a);
                 alpha = max(alpha, tex2D(_MainTex, uv + float2(-offset.x, 0)).a);
                 alpha = max(alpha, tex2D(_MainTex, uv + float2(0, offset.y)).a);
                 alpha = max(alpha, tex2D(_MainTex, uv + float2(0, -offset.y)).a);
+                
+                // 4 góc chéo
                 alpha = max(alpha, tex2D(_MainTex, uv + float2(offset.x, offset.y)).a);
                 alpha = max(alpha, tex2D(_MainTex, uv + float2(-offset.x, offset.y)).a);
                 alpha = max(alpha, tex2D(_MainTex, uv + float2(offset.x, -offset.y)).a);
                 alpha = max(alpha, tex2D(_MainTex, uv + float2(-offset.x, -offset.y)).a);
+                
+                // 8 hướng phụ (góc 22.5°, 67.5°, etc.) để lấp khoảng trống
+                float d = 0.7071; // cos(45°) = sin(45°)
+                float d1 = 0.3827; // sin(22.5°)
+                float d2 = 0.9239; // cos(22.5°)
+                
+                alpha = max(alpha, tex2D(_MainTex, uv + float2(offset.x * d2, offset.y * d1)).a);
+                alpha = max(alpha, tex2D(_MainTex, uv + float2(offset.x * d1, offset.y * d2)).a);
+                alpha = max(alpha, tex2D(_MainTex, uv + float2(-offset.x * d2, offset.y * d1)).a);
+                alpha = max(alpha, tex2D(_MainTex, uv + float2(-offset.x * d1, offset.y * d2)).a);
+                alpha = max(alpha, tex2D(_MainTex, uv + float2(offset.x * d2, -offset.y * d1)).a);
+                alpha = max(alpha, tex2D(_MainTex, uv + float2(offset.x * d1, -offset.y * d2)).a);
+                alpha = max(alpha, tex2D(_MainTex, uv + float2(-offset.x * d2, -offset.y * d1)).a);
+                alpha = max(alpha, tex2D(_MainTex, uv + float2(-offset.x * d1, -offset.y * d2)).a);
+                
+                return alpha;
+            }
+            
+            // Sample nhiều lớp từ trong ra ngoài để tạo outline dày đặc
+            fixed SampleOutlineMultiLayer(float2 uv, float2 baseOffset, int layers)
+            {
+                fixed alpha = 0;
+                
+                // Sample nhiều lớp với khoảng cách tăng dần
+                for (int i = 1; i <= layers; i++)
+                {
+                    float scale = (float)i / (float)layers;
+                    float2 offset = baseOffset * scale;
+                    alpha = max(alpha, SampleOutlineRing(uv, offset));
+                }
                 
                 return alpha;
             }
@@ -141,8 +173,11 @@ Shader "Custom/UI/ImageOutline"
                 // Tính offset dựa trên kích thước texture và độ rộng outline
                 float2 offset = _MainTex_TexelSize.xy * _OutlineWidth;
                 
-                // Lấy alpha của outline từ các pixel xung quanh
-                fixed outlineAlpha = SampleOutlineAlpha(IN.texcoord, offset);
+                // Xác định số lớp dựa trên độ rộng outline (tối thiểu 2, tối đa 8)
+                int layers = clamp((int)ceil(_OutlineWidth / 2.0), 2, 8);
+                
+                // Lấy alpha của outline từ nhiều lớp sample
+                fixed outlineAlpha = SampleOutlineMultiLayer(IN.texcoord, offset, layers);
                 
                 // Tính toán outline color với alpha
                 fixed4 outlineCol = _OutlineColor;
