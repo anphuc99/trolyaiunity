@@ -213,6 +213,25 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
+		/// Handles toggle changes for popup character selection and syncs to developer-state history.
+		/// </summary>
+		/// <param name="payload">Toggle request payload.</param>
+		[Request(ChatRequests.SetCharacterActive)]
+		public static void HandleSetCharacterActive(ChatSetCharacterActiveRequestPayload payload)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.CharacterName))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Character name is required when changing active state."
+				});
+				return;
+			}
+
+			_ = SetCharacterActiveInternalAsync(payload);
+		}
+
+		/// <summary>
 		/// Sample request handler that echoes payload to a view event and parent signal.
 		/// </summary>
 		/// <param name="payload">Optional payload.</param>
@@ -320,6 +339,39 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 
 			return activeNames;
+		}
+
+		private static async Task SetCharacterActiveInternalAsync(ChatSetCharacterActiveRequestPayload payload)
+		{
+			try
+			{
+				var characterName = payload.CharacterName.Trim();
+				var request = new ChatDeveloperMessageRequestPayload
+				{
+					SessionId = string.IsNullOrWhiteSpace(payload.SessionId) ? null : payload.SessionId.Trim(),
+					Kind = payload.IsActive ? "character_added" : "character_removed",
+					Character = new ChatDeveloperMessageCharacterPayload
+					{
+						Name = characterName,
+					}
+				};
+
+				var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatDeveloper, request);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = "Failed to sync character active state."
+					});
+				}
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to sync character active state: " + exception.Message
+				});
+			}
 		}
 
 		/// <summary>

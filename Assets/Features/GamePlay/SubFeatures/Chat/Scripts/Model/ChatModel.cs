@@ -307,4 +307,61 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		[JsonProperty("activeCharacterNames")]
 		public System.Collections.Generic.List<string> ActiveCharacterNames { get; set; }
 	}
+
+	/// <summary>
+	/// Request payload from view when character toggle changes in popup.
+	/// </summary>
+	public sealed class ChatSetCharacterActiveRequestPayload
+	{
+		/// <summary>
+		/// Optional chat session id.
+		/// </summary>
+		public string SessionId { get; set; }
+
+		/// <summary>
+		/// Character name from popup item.
+		/// </summary>
+		public string CharacterName { get; set; }
+
+		/// <summary>
+		/// True if character is selected (toggle on), false if removed (toggle off).
+		/// </summary>
+		public bool IsActive { get; set; }
+	}
+
+	/// <summary>
+	/// API payload for /api/chat/developer endpoint.
+	/// </summary>
+	public sealed class ChatDeveloperMessageRequestPayload
+	{
+		[JsonProperty("sessionId")]
+		public string SessionId { get; set; }
+
+		[JsonProperty("kind")]
+		public string Kind { get; set; }
+
+		[JsonProperty("character")]
+		public ChatDeveloperMessageCharacterPayload Character { get; set; }
+
+		[JsonProperty("context")]
+		public string Context { get; set; }
+	}
+
+	/// <summary>
+	/// Character object used in /api/chat/developer payload.
+	/// </summary>
+	public sealed class ChatDeveloperMessageCharacterPayload
+	{
+		[JsonProperty("name")]
+		public string Name { get; set; }
+
+		[JsonProperty("personality")]
+		public string Personality { get; set; }
+
+		[JsonProperty("gender")]
+		public string Gender { get; set; }
+
+		[JsonProperty("appearance")]
+		public string Appearance { get; set; }
+	}
 }

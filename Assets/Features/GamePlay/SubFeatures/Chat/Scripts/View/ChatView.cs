@@ -510,6 +510,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_isPopupInitialized = true;
 			}
 
+			if (_selectCharacterPopupView != null)
+			{
+				_selectCharacterPopupView.OnCharacterToggleChanged = HandleCharacterToggleChanged;
+			}
+
 			if (_messageContainer != null)
 			{
 				_messageContainer.OnMessageSpeakerClicked = HandleMessageSpeakerClicked;
@@ -650,6 +655,21 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			_messageContainer.ToggleMessageTranslation(messageData);
+		}
+
+		private void HandleCharacterToggleChanged(ChatSelectableCharacterPayload payload, bool isOn)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.Name))
+			{
+				return;
+			}
+
+			SendRequest(ChatRequests.SetCharacterActive, new ChatSetCharacterActiveRequestPayload
+			{
+				SessionId = string.IsNullOrWhiteSpace(_sessionId) ? null : _sessionId,
+				CharacterName = payload.Name,
+				IsActive = isOn,
+			});
 		}
 
 		/// <summary>

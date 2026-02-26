@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System;
 using DG.Tweening;
 using Features.GamePlay.SubFeatures.Chat.Model;
 using UnityEngine;
@@ -11,6 +12,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 	/// </summary>
 	public sealed class ChatSelectCharacterPopupView : MonoBehaviour
 	{
+		public Action<ChatSelectableCharacterPayload, bool> OnCharacterToggleChanged;
+
 		[SerializeField]
 		private RectTransform _popupRoot;
 
@@ -134,7 +137,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 				var item = Instantiate(_itemTemplate, _itemsContainer);
 				item.gameObject.SetActive(true);
-				item.Bind(character);
+				item.Bind(character, OnCharacterToggleChanged);
 				_spawnedItems.Add(item);
 			}
 		}

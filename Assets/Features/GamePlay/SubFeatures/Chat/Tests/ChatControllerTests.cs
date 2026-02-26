@@ -99,5 +99,25 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 			Assert.AreEqual("Mimi", publishedPayload[0].Name);
 			Assert.AreEqual("Luna", publishedPayload[1].Name);
 		}
+
+		[Test]
+		public void SetCharacterActive_ShouldPublishError_WhenCharacterNameMissing()
+		{
+			ChatErrorPayload errorPayload = null;
+			EventBus.Subscribe(ChatEvents.RequestFailed, payload =>
+			{
+				errorPayload = payload as ChatErrorPayload;
+			});
+
+			ChatController.HandleSetCharacterActive(new ChatSetCharacterActiveRequestPayload
+			{
+				SessionId = "default",
+				CharacterName = " ",
+				IsActive = true,
+			});
+
+			Assert.IsNotNull(errorPayload);
+			Assert.AreEqual("Character name is required when changing active state.", errorPayload.Message);
+		}
 	}
 }
