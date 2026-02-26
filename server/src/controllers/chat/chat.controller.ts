@@ -101,13 +101,21 @@ export const createChatController = (
 
   /**
    * Loads the story used for prompt enrichment.
+   * Falls back to user's currentStoryId when not provided in payload.
    *
    * @param userId - Authenticated user id.
    * @param payload - Request payload for the chat call.
    * @returns The matching story or null when not found.
    */
   const loadStoryForPrompt = async (userId: number, payload: Record<string, unknown>) => {
-    const storyId = parseStoryId(payload.storyId);
+    let storyId = parseStoryId(payload.storyId);
+    
+    // Fallback to user's currentStoryId if not provided
+    if (!storyId) {
+      const user = await userRepository.findOne({ where: { id: userId } });
+      storyId = user?.currentStoryId ?? null;
+    }
+    
     if (!storyId) {
       return null;
     }

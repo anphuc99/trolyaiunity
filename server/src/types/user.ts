@@ -7,4 +7,5 @@ export interface UserProfile extends AuthUser {
   levelId?: number | null;
   level?: string | null;
   levelDescription?: string | null;
+  currentStoryId?: number | null;
 }

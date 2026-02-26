@@ -187,7 +187,7 @@ Login with username + password.
 
 ```json
 {
-  "user": { "id": 1, "username": "example", "levelId": 1, "level": "A1", "levelDescription": "..." },
+  "user": { "id": 1, "username": "example", "levelId": 1, "level": "A1", "levelDescription": "...", "currentStoryId": null },
   "accessToken": "<access_token>",
   "refreshToken": "<refresh_token>"
 }
@@ -231,7 +231,7 @@ Get current user profile.
 - Response `200`:
 
 ```json
-{ "user": { "id": 1, "username": "example", "levelId": 1, "level": "A1", "levelDescription": "..." } }
+{ "user": { "id": 1, "username": "example", "levelId": 1, "level": "A1", "levelDescription": "...", "currentStoryId": 1 } }
 ```
 
 - Errors:
@@ -252,7 +252,7 @@ Update user level.
 
 ```json
 {
-  "user": { "id": 1, "username": "example", "levelId": 1, "level": "A1", "levelDescription": "..." },
+  "user": { "id": 1, "username": "example", "levelId": 1, "level": "A1", "levelDescription": "...", "currentStoryId": null },
   "accessToken": "<access_token>",
   "refreshToken": "<refresh_token>"
 }
@@ -261,6 +261,34 @@ Update user level.
 - Errors:
   - `400 {"message":"Level is required"}`
   - `404 {"message":"Level not found"}`
+  - `404 {"message":"User not found"}`
+
+### PUT /api/users/current-story
+
+Set the user's current story. Used as fallback when APIs don't receive a storyId parameter.
+
+- Auth: yes
+- Body:
+
+```json
+{ "storyId": 1 }
+```
+
+Pass `null` to clear the current story:
+
+```json
+{ "storyId": null }
+```
+
+- Response `200`:
+
+```json
+{ "user": { "id": 1, "username": "example", "levelId": 1, "level": "A1", "levelDescription": "...", "currentStoryId": 1 } }
+```
+
+- Errors:
+  - `400 {"message":"Story id is required"}`
+  - `404 {"message":"Story not found"}` – story must belong to the authenticated user
   - `404 {"message":"User not found"}`
 
 ---
@@ -551,7 +579,7 @@ List journals (optionally filtered by story).
 
 - Auth: yes
 - Query params:
-  - `storyId` (number, optional)
+  - `storyId` (number, optional) – falls back to user's `currentStoryId` if not provided
 - Response `200`:
 
 ```json
@@ -631,6 +659,9 @@ Finalize the current conversation:
 ```json
 { "sessionId": "string (optional)", "storyId": 123 }
 ```
+
+Notes:
+- If `storyId` is not provided, the user's `currentStoryId` is used as fallback.
 
 - Response `200`:
 

@@ -5,6 +5,7 @@ import JournalEntity from "../../models/journal.entity.js";
 import MessageEntity from "../../models/message.entity.js";
 import CharacterEntity from "../../models/character.entity.js";
 import StoryEntity from "../../models/story.entity.js";
+import UserEntity from "../../models/user.entity.js";
 import { createOpenAIChatService, type OpenAIChatService } from "../../services/openai.service.js";
 import { createChatHistoryStore, type ChatHistoryMessage, type ChatHistoryStore } from "../../services/chat-history.service.js";
 import { buildAudioId } from "../../services/tts.service.js";
@@ -44,6 +45,7 @@ export const createJournalController = (
   const messageRepository = dataSource.getRepository(MessageEntity);
   const characterRepository = dataSource.getRepository(CharacterEntity);
   const storyRepository = dataSource.getRepository(StoryEntity);
+  const userRepository = dataSource.getRepository(UserEntity);
   const apiKey = process.env.OPENAI_API_KEY ?? "";
   const model = process.env.OPENAI_MODEL ?? "gpt-4.1-mini";
   const systemPromptPath = process.env.OPENAI_SYSTEM_PROMPT_PATH;
@@ -286,7 +288,7 @@ export const createJournalController = (
     }
 
     const rawStoryId = request.query?.storyId;
-    const storyId = rawStoryId === undefined ? null : parseStoryId(rawStoryId);
+    let storyId = rawStoryId === undefined ? null : parseStoryId(rawStoryId);
 
     if (rawStoryId !== undefined && !storyId) {
       response.status(400).json({ message: "Invalid story id" });
@@ -294,6 +296,12 @@ export const createJournalController = (
     }
 
     try {
+      // Fallback to user's currentStoryId if not provided
+      if (storyId === null) {
+        const user = await userRepository.findOne({ where: { id: request.user.id } });
+        storyId = user?.currentStoryId ?? null;
+      }
+
       const journals = await journalRepository.find({
         where: {
           userId: request.user.id,
@@ -471,7 +479,7 @@ export const createJournalController = (
     }
 
     const sessionId = getSessionId(request.body?.sessionId);
-    const storyId = parseStoryId(request.body?.storyId);
+    let storyId = parseStoryId(request.body?.storyId);
 
     if (!openAIService) {
       response.status(500).json({ message: "OpenAI API key is not configured" });
@@ -479,6 +487,12 @@ export const createJournalController = (
     }
 
     try {
+      // Fallback to user's currentStoryId if not provided
+      if (!storyId) {
+        const user = await userRepository.findOne({ where: { id: request.user.id } });
+        storyId = user?.currentStoryId ?? null;
+      }
+
       let story: StoryEntity | null = null;
 
       if (storyId) {

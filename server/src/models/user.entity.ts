@@ -8,6 +8,7 @@ import {
   UpdateDateColumn
 } from "typeorm";
 import LevelEntity from "./level.entity.js";
+import StoryEntity from "./story.entity.js";
 
 /**
  * Persists application users for authentication.
@@ -29,6 +30,17 @@ class UserEntity {
   @ManyToOne(() => LevelEntity, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn({ name: "level_id" })
   level?: LevelEntity | null;
+
+  /**
+   * The currently active story for this user.
+   * Used as fallback when API requests don't specify a storyId.
+   */
+  @Column({ name: "current_story_id", type: "int", nullable: true })
+  currentStoryId?: number | null;
+
+  @ManyToOne(() => StoryEntity, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "current_story_id" })
+  currentStory?: StoryEntity | null;
 
   @CreateDateColumn({ name: "created_at", type: "datetime" })
   createdAt!: Date;

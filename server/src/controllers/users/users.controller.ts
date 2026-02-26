@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import type { Request, Response } from "express";
 import type { DataSource } from "typeorm";
 import LevelEntity from "../../models/level.entity.js";
+import StoryEntity from "../../models/story.entity.js";
 import UserEntity from "../../models/user.entity.js";
 import { signAuthTokenPair } from "../../services/auth.service.js";
 import type { AuthUser, UserProfile } from "../../types/user.js";
@@ -30,6 +31,7 @@ interface UsersController {
   resetPassword: (request: Request, response: Response) => Promise<void>;
   getMe: (request: Request, response: Response) => Promise<void>;
   updateLevel: (request: Request, response: Response) => Promise<void>;
+  setCurrentStory: (request: Request, response: Response) => Promise<void>;
 }
 
 const normalizeUsername = (value: unknown) => {
@@ -55,7 +57,8 @@ const toUserProfile = (user: UserEntity): UserProfile => ({
   username: user.username,
   levelId: user.levelId ?? null,
   level: user.level?.level ?? null,
-  levelDescription: user.level?.descript ?? null
+  levelDescription: user.level?.descript ?? null,
+  currentStoryId: user.currentStoryId ?? null
 });
 
 /**
@@ -84,6 +87,7 @@ const toAuthResponse = (user: UserEntity): UserResponse => {
 export const createUsersController = (dataSource: DataSource): UsersController => {
   const repository = dataSource.getRepository(UserEntity);
   const levelRepository = dataSource.getRepository(LevelEntity);
+  const storyRepository = dataSource.getRepository(StoryEntity);
 
   const register: UsersController["register"] = async (request, response) => {
     const payload = request.body as UserPayload;
@@ -291,11 +295,68 @@ export const createUsersController = (dataSource: DataSource): UsersController =
     }
   };
 
+  /**
+   * Sets the authenticated user's current story.
+   * Pass null to clear the current story.
+   *
+   * @param request - Express request with story payload.
+   * @param response - Express response for update results.
+   */
+  const setCurrentStory: UsersController["setCurrentStory"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const payload = request.body as { storyId?: number | null };
+    const storyId = payload?.storyId === null ? null : Number(payload?.storyId);
+
+    // Allow null to clear the current story
+    if (payload?.storyId !== null && !Number.isInteger(storyId)) {
+      response.status(400).json({ message: "Story id is required" });
+      return;
+    }
+
+    try {
+      // If storyId is provided and not null, verify ownership
+      if (storyId !== null) {
+        const story = await storyRepository.findOne({
+          where: { id: storyId, userId: request.user.id }
+        });
+
+        if (!story) {
+          response.status(404).json({ message: "Story not found" });
+          return;
+        }
+      }
+
+      const user = await repository.findOne({ where: { id: request.user.id } });
+
+      if (!user) {
+        response.status(404).json({ message: "User not found" });
+        return;
+      }
+
+      user.currentStoryId = storyId;
+      const saved = await repository.save(user);
+      const hydrated = await repository.findOne({ where: { id: saved.id }, relations: { level: true } });
+
+      response.json({ user: toUserProfile(hydrated ?? saved) });
+    } catch (error) {
+      console.error("Failed to set current story.", error);
+      response.status(500).json({
+        message: "Failed to set current story",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
   return {
     register,
     login,
     resetPassword,
     getMe,
-    updateLevel
+    updateLevel,
+    setCurrentStory
   };
 };

@@ -18,6 +18,7 @@ export const createUsersRoutes = (dataSource: DataSource) => {
   router.post("/reset-password", controller.resetPassword);
   router.get("/me", requireAuth, controller.getMe);
   router.put("/level", requireAuth, controller.updateLevel);
+  router.put("/current-story", requireAuth, controller.setCurrentStory);
 
   return router;
 };
