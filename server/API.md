@@ -473,6 +473,7 @@ Append a developer message to history. Used for:
   "kind": "character_added|character_removed|context_update",
   "character": {
     "name": "string",
+    "age": "number (optional)",
     "personality": "string (optional)",
     "gender": "string (optional)",
     "appearance": "string (optional)"

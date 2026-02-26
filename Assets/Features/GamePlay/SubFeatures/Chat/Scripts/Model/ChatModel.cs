@@ -355,6 +355,9 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		[JsonProperty("name")]
 		public string Name { get; set; }
 
+		[JsonProperty("age")]
+		public int? Age { get; set; }
+
 		[JsonProperty("personality")]
 		public string Personality { get; set; }
 

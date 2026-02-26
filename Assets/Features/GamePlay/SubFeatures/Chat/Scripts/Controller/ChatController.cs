@@ -355,6 +355,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					Character = new ChatDeveloperMessageCharacterPayload
 					{
 						Name = characterName,
+						Age = characterInfo?.Age,
 						Personality = characterInfo?.Description,
 						Gender = characterInfo?.Gender,
 						Appearance = characterAppearance,
