@@ -150,6 +150,9 @@ namespace Features.EditCharacter.Controller
 
 		private static async Task SubmitCharacterAsync(EditCharacterPayload payload)
 		{
+			GlobalVariables.TryGet<SelectedCharacterInfo>(SelectedCharacterGlobalKey, out var currentSelectedCharacter);
+			var preservedAvatarSprite = currentSelectedCharacter?.Avatar;
+
 			var request = new EditCharacterPayload
 			{
 				name = payload.name,
@@ -208,7 +211,7 @@ namespace Features.EditCharacter.Controller
 					Pitch = response.pitch,
 					SpeakingRate = response.speakingRate,
 					AvatarUrl = response.avatar,
-					Avatar = null,
+					Avatar = preservedAvatarSprite,
 				};
 
 				SetEditedCharacterNotice(updated, response.avatar, response.speakingRate);

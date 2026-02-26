@@ -308,6 +308,9 @@ namespace Features.GamePlay.Controller
 				return;
 			}
 
+			UnityEngine.Sprite preservedAvatarSprite = edited.Avatar;
+			string preservedAvatarUrl = edited.AvatarUrl;
+
 			if (edited.Id > 0)
 			{
 				var existingKeys = new List<string>(GamePlayState.ChatCharacterByName.Keys);
@@ -327,6 +330,16 @@ namespace Features.GamePlay.Controller
 
 					if (existingCharacter.Id == edited.Id)
 					{
+						if (preservedAvatarSprite == null)
+						{
+							preservedAvatarSprite = existingCharacter.AvatarSprite;
+						}
+
+						if (string.IsNullOrWhiteSpace(preservedAvatarUrl))
+						{
+							preservedAvatarUrl = existingCharacter.AvatarUrl;
+						}
+
 						GamePlayState.ChatCharacterByName.Remove(existingKey);
 					}
 				}
@@ -348,11 +361,13 @@ namespace Features.GamePlay.Controller
 			existing.Personality = edited.Description;
 			existing.Gender = edited.Gender;
 			existing.Age = edited.Age;
-			existing.AvatarUrl = string.IsNullOrWhiteSpace(notice.AvatarUrl) ? existing.AvatarUrl : notice.AvatarUrl;
+			existing.AvatarUrl = string.IsNullOrWhiteSpace(notice.AvatarUrl)
+				? (string.IsNullOrWhiteSpace(preservedAvatarUrl) ? existing.AvatarUrl : preservedAvatarUrl)
+				: notice.AvatarUrl;
 			existing.VoiceName = edited.VoiceName;
 			existing.Pitch = edited.Pitch;
 			existing.SpeakingRate = notice.SpeakingRate;
-			existing.AvatarSprite = edited.Avatar ?? existing.AvatarSprite;
+			existing.AvatarSprite = edited.Avatar ?? preservedAvatarSprite ?? existing.AvatarSprite;
 
 			GamePlayState.ChatCharacterByName[key] = existing;
 		}
