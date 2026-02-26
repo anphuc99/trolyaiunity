@@ -346,6 +346,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			try
 			{
 				var characterName = payload.CharacterName.Trim();
+				var characterInfo = ChatState.ParentSignals?.GetCharacterInfoByName?.Invoke(characterName);
+				var characterAppearance = ChatState.ParentSignals?.GetCharacterAppearanceByName?.Invoke(characterName);
 				var request = new ChatDeveloperMessageRequestPayload
 				{
 					SessionId = string.IsNullOrWhiteSpace(payload.SessionId) ? null : payload.SessionId.Trim(),
@@ -353,6 +355,9 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					Character = new ChatDeveloperMessageCharacterPayload
 					{
 						Name = characterName,
+						Personality = characterInfo?.Description,
+						Gender = characterInfo?.Gender,
+						Appearance = characterAppearance,
 					}
 				};
 

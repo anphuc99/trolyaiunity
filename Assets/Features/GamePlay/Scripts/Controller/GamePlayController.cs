@@ -220,6 +220,8 @@ namespace Features.GamePlay.Controller
 				OnEchoed = OnSubControllerEchoed,
 				GetCharacterNames = GetChatCharacterNames,
 				GetCharacterAvatarByName = GetChatCharacterAvatar,
+				GetCharacterInfoByName = GetChatCharacterInfo,
+				GetCharacterAppearanceByName = GetChatCharacterAppearance,
 				AddMenu = AddMenu,
 				RemoveMenu = RemoveMenu,
 				GetCharacterVoiceNameByName = GetChatCharacterVoiceName,
@@ -273,6 +275,18 @@ namespace Features.GamePlay.Controller
 
 			return GamePlayState.ChatCharacterByName.TryGetValue(characterName.Trim(), out var cachedCharacter)
 				? cachedCharacter.VoiceName
+				: null;
+		}
+
+		private static string GetChatCharacterAppearance(string characterName)
+		{
+			if (string.IsNullOrWhiteSpace(characterName))
+			{
+				return null;
+			}
+
+			return GamePlayState.ChatCharacterByName.TryGetValue(characterName.Trim(), out var cachedCharacter)
+				? cachedCharacter.Appearance
 				: null;
 		}
 

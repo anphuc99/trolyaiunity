@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Share.Model;
 using UnityEngine;
 
 namespace Features.GamePlay.SubFeatures.Chat.Model
@@ -28,6 +29,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// Optional callback for getting cached character avatar by name.
 		/// </summary>
 		public Func<string, Sprite> GetCharacterAvatarByName { get; set; }
+
+		/// <summary>
+		/// Optional callback for getting cached character full info by name.
+		/// </summary>
+		public Func<string, SelectedCharacterInfo> GetCharacterInfoByName { get; set; }
+
+		/// <summary>
+		/// Optional callback for getting cached character appearance by name.
+		/// </summary>
+		public Func<string, string> GetCharacterAppearanceByName { get; set; }
 
 		/// <summary>
 		/// Optional callback for adding a menu item at parent scope.
