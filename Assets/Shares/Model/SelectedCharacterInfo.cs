@@ -25,6 +25,11 @@ namespace Share.Model
 		public Sprite Avatar { get; set; }
 
 		/// <summary>
+		/// Character avatar URL.
+		/// </summary>
+		public string AvatarUrl { get; set; }
+
+		/// <summary>
 		/// Character age when available.
 		/// </summary>
 		public int? Age { get; set; }
@@ -48,6 +53,11 @@ namespace Share.Model
 		/// Character voice pitch.
 		/// </summary>
 		public float? Pitch { get; set; }
+
+		/// <summary>
+		/// Character speaking rate.
+		/// </summary>
+		public float? SpeakingRate { get; set; }
 	}
 
 	/// <summary>
@@ -64,5 +74,26 @@ namespace Share.Model
 		/// Deleted character display name.
 		/// </summary>
 		public string CharacterName { get; set; }
+	}
+
+	/// <summary>
+	/// Global notice payload for a recently edited character.
+	/// </summary>
+	public sealed class EditedCharacterNotice
+	{
+		/// <summary>
+		/// Updated character payload.
+		/// </summary>
+		public SelectedCharacterInfo Character { get; set; }
+
+		/// <summary>
+		/// Updated avatar URL from server.
+		/// </summary>
+		public string AvatarUrl { get; set; }
+
+		/// <summary>
+		/// Updated speaking rate.
+		/// </summary>
+		public float? SpeakingRate { get; set; }
 	}
 }

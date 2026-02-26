@@ -74,6 +74,12 @@ namespace Features.CharacterInfo.View
 				_removeButton.onClick.AddListener(OnRemoveButtonClicked);
 			}
 
+			if (_editButton != null)
+			{
+				_editButton.onClick.RemoveListener(OnEditButtonClicked);
+				_editButton.onClick.AddListener(OnEditButtonClicked);
+			}
+
 			SendRequest(CharacterInfoRequests.LoadSelectedCharacter);
 		}
 
@@ -89,6 +95,11 @@ namespace Features.CharacterInfo.View
 				_removeButton.onClick.RemoveListener(OnRemoveButtonClicked);
 			}
 
+			if (_editButton != null)
+			{
+				_editButton.onClick.RemoveListener(OnEditButtonClicked);
+			}
+
 			base.OnDisable();
 		}
 
@@ -100,6 +111,11 @@ namespace Features.CharacterInfo.View
 		private void OnRemoveButtonClicked()
 		{
 			SendRequest(CharacterInfoRequests.RemoveSelectedCharacter);
+		}
+
+		private void OnEditButtonClicked()
+		{
+			SendRequest(CharacterInfoRequests.OpenEditCharacter);
 		}
 
 		private void Render(SelectedCharacterInfo info)

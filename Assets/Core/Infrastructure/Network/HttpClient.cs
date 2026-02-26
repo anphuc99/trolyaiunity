@@ -145,6 +145,75 @@ namespace Core.Infrastructure.Network
 		}
 
 		/// <summary>
+		/// Sends a JSON PUT request and returns the response text.
+		/// </summary>
+		/// <typeparam name="T">Payload type to serialize to JSON.</typeparam>
+		/// <param name="url">Request URL or relative path.</param>
+		/// <param name="payload">Payload object. If null, an empty JSON object is sent.</param>
+		/// <param name="headers">Optional headers.</param>
+		/// <param name="timeoutSeconds">Optional timeout in seconds (0 means default).</param>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <returns>Response text or null on failure.</returns>
+		public static async UniTask<string> PutJsonAsync<T>(
+			string url,
+			T payload,
+			Dictionary<string, string> headers = null,
+			int timeoutSeconds = 0,
+			CancellationToken cancellationToken = default)
+		{
+			if (string.IsNullOrWhiteSpace(url))
+			{
+				Debug.LogError($"{LogPrefix} PUT failed: url is null/empty.");
+				return null;
+			}
+
+			var json = payload != null ? JsonConvert.SerializeObject(payload) : "{}";
+
+			if (UseFakeResponses())
+			{
+				return await FakePutJsonAsync(url, json, cancellationToken);
+			}
+
+			var bodyBytes = Encoding.UTF8.GetBytes(json);
+			var resolvedUrl = ResolveUrl(url);
+
+			var response = await SendRequestWithRetryAsync(
+				() =>
+				{
+					var request = new UnityWebRequest(resolvedUrl, UnityWebRequest.kHttpVerbPUT);
+					request.uploadHandler = new UploadHandlerRaw(bodyBytes);
+					request.downloadHandler = new DownloadHandlerBuffer();
+					request.SetRequestHeader("Content-Type", JsonContentType);
+					return request;
+				},
+				headers,
+				timeoutSeconds,
+				cancellationToken);
+
+			return response;
+		}
+
+		/// <summary>
+		/// Sends a JSON PUT request and returns the response text as a Task.
+		/// </summary>
+		/// <typeparam name="T">Payload type to serialize to JSON.</typeparam>
+		/// <param name="url">Request URL or relative path.</param>
+		/// <param name="payload">Payload object. If null, an empty JSON object is sent.</param>
+		/// <param name="headers">Optional headers.</param>
+		/// <param name="timeoutSeconds">Optional timeout in seconds (0 means default).</param>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <returns>Response text or null on failure.</returns>
+		public static Task<string> PutJsonTaskAsync<T>(
+			string url,
+			T payload,
+			Dictionary<string, string> headers = null,
+			int timeoutSeconds = 0,
+			CancellationToken cancellationToken = default)
+		{
+			return PutJsonAsync(url, payload, headers, timeoutSeconds, cancellationToken).AsTask();
+		}
+
+		/// <summary>
 		/// Sends a DELETE request and returns the response text.
 		/// </summary>
 		/// <param name="url">Request URL or relative path.</param>
@@ -332,6 +401,23 @@ namespace Core.Infrastructure.Network
 
 			var key = FakeServer.BuildKey("POST", url);
 			Debug.LogWarning($"{LogPrefix} Fake POST missing for '{key}'. Returning fallback.");
+			return UniTask.FromResult(response);
+		}
+
+		private static UniTask<string> FakePutJsonAsync(string url, string jsonPayload, CancellationToken cancellationToken)
+		{
+			if (cancellationToken.IsCancellationRequested)
+			{
+				return UniTask.FromCanceled<string>(cancellationToken);
+			}
+
+			if (FakeServer.TryGetResponse("PUT", url, jsonPayload, out var response))
+			{
+				return UniTask.FromResult(response);
+			}
+
+			var key = FakeServer.BuildKey("PUT", url);
+			Debug.LogWarning($"{LogPrefix} Fake PUT missing for '{key}'. Returning fallback.");
 			return UniTask.FromResult(response);
 		}
 

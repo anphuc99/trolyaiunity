@@ -2,6 +2,7 @@ using Features.CharacterInfo.Events;
 using Features.CharacterInfo.Infrastructure;
 using Features.CharacterInfo.Infrastructure.Attributes;
 using Features.CharacterInfo.Requests;
+using CoreEvents = Core.Infrastructure.Events;
 using Core.Infrastructure.Network;
 using Core.Infrastructure.Scenes;
 using Core.Infrastructure.State;
@@ -18,6 +19,7 @@ namespace Features.CharacterInfo.Controller
 	{
 		private const string SelectedCharacterGlobalKey = "global.character.selected.info";
 		private const string DeletedCharacterGlobalKey = "global.character.deleted.notice";
+		private const string EditedCharacterGlobalKey = "global.character.edited.notice";
 
 		/// <summary>
 		/// Called when the controller scope is entered.
@@ -90,6 +92,34 @@ namespace Features.CharacterInfo.Controller
 			LoadScene.UnloadByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CharacterInfoGameplay);
 		}
 
+		[Request(CharacterInfoRequests.OpenEditCharacter)]
+		public static void HandleOpenEditCharacter()
+		{
+			LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.EditCharacterGameplay, UnityEngine.SceneManagement.LoadSceneMode.Additive);
+		}
+
+		[Core.Infrastructure.Attributes.OnGlobalScopeChanged]
+		private static void HandleScopeChanged(CoreEvents.ScopeChangedPayload payload)
+		{
+			if (payload == null
+				|| payload.IsOpened
+				|| payload.ScopeKey != Core.Infrastructure.Attributes.ControllerScopeKey.EditCharacterGameplay)
+			{
+				return;
+			}
+
+			if (!GlobalVariables.TryGet<EditedCharacterNotice>(EditedCharacterGlobalKey, out var notice)
+				|| notice == null
+				|| notice.Character == null)
+			{
+				return;
+			}
+
+			GlobalVariables.Remove(EditedCharacterGlobalKey);
+			SetSelectedCharacterInfo(notice.Character);
+			PublishSelectedCharacter();
+		}
+
 		private static void SetDeletedCharacterNotice(SelectedCharacterInfo selectedCharacter)
 		{
 			if (selectedCharacter == null)
@@ -102,6 +132,11 @@ namespace Features.CharacterInfo.Controller
 				CharacterId = selectedCharacter.Id,
 				CharacterName = selectedCharacter.Name,
 			});
+		}
+
+		private static void SetSelectedCharacterInfo(SelectedCharacterInfo selectedCharacter)
+		{
+			GlobalVariables.Set(SelectedCharacterGlobalKey, selectedCharacter);
 		}
 
 		private static void PublishSelectedCharacter()

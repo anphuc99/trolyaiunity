@@ -37,6 +37,7 @@ namespace Features.GamePlay.Controller
 	public static class GamePlayController
 	{
 		private const string DeletedCharacterGlobalKey = "global.character.deleted.notice";
+		private const string EditedCharacterGlobalKey = "global.character.edited.notice";
 
 		/// <summary>
 		/// Called when the controller scope is entered.
@@ -64,12 +65,25 @@ namespace Features.GamePlay.Controller
 		[Core.Infrastructure.Attributes.OnGlobalScopeChanged]
 		private static void HandleScopeChanged(CoreEvents.ScopeChangedPayload payload)
 		{
-			if (payload == null
-				|| payload.IsOpened
-				|| payload.ScopeKey != Core.Infrastructure.Attributes.ControllerScopeKey.CharacterInfoGameplay)
+			if (payload == null || payload.IsOpened)
 			{
 				return;
 			}
+
+			if (payload.ScopeKey == Core.Infrastructure.Attributes.ControllerScopeKey.CharacterInfoGameplay)
+			{
+				HandleCharacterInfoScopeClosed();
+				return;
+			}
+
+			if (payload.ScopeKey == Core.Infrastructure.Attributes.ControllerScopeKey.EditCharacterGameplay)
+			{
+				HandleEditCharacterScopeClosed();
+			}
+		}
+
+		private static void HandleCharacterInfoScopeClosed()
+		{
 
 			if (!GlobalVariables.TryGet<DeletedCharacterNotice>(DeletedCharacterGlobalKey, out var deletedCharacter)
 				|| deletedCharacter == null)
@@ -79,6 +93,20 @@ namespace Features.GamePlay.Controller
 
 			GlobalVariables.Remove(DeletedCharacterGlobalKey);
 			RemoveDeletedCharacterFromCache(deletedCharacter);
+			CharacterController.HandleLoadCharacters();
+		}
+
+		private static void HandleEditCharacterScopeClosed()
+		{
+			if (!GlobalVariables.TryGet<EditedCharacterNotice>(EditedCharacterGlobalKey, out var editedNotice)
+				|| editedNotice == null
+				|| editedNotice.Character == null)
+			{
+				return;
+			}
+
+			GlobalVariables.Remove(EditedCharacterGlobalKey);
+			ApplyEditedCharacterToCache(editedNotice);
 			CharacterController.HandleLoadCharacters();
 		}
 
@@ -263,12 +291,71 @@ namespace Features.GamePlay.Controller
 				Id = cachedCharacter.Id,
 				Name = cachedCharacter.Name,
 				Avatar = cachedCharacter.AvatarSprite,
+				AvatarUrl = cachedCharacter.AvatarUrl,
 				Age = cachedCharacter.Age,
 				Description = cachedCharacter.Personality,
 				Gender = cachedCharacter.Gender,
 				VoiceName = cachedCharacter.VoiceName,
 				Pitch = cachedCharacter.Pitch,
+				SpeakingRate = cachedCharacter.SpeakingRate,
 			};
+		}
+
+		private static void ApplyEditedCharacterToCache(EditedCharacterNotice notice)
+		{
+			var edited = notice?.Character;
+			if (edited == null)
+			{
+				return;
+			}
+
+			if (edited.Id > 0)
+			{
+				var existingKeys = new List<string>(GamePlayState.ChatCharacterByName.Keys);
+				for (var i = 0; i < existingKeys.Count; i++)
+				{
+					var existingKey = existingKeys[i];
+					if (string.IsNullOrWhiteSpace(existingKey))
+					{
+						continue;
+					}
+
+					if (!GamePlayState.ChatCharacterByName.TryGetValue(existingKey, out var existingCharacter)
+						|| existingCharacter == null)
+					{
+						continue;
+					}
+
+					if (existingCharacter.Id == edited.Id)
+					{
+						GamePlayState.ChatCharacterByName.Remove(existingKey);
+					}
+				}
+			}
+
+			var key = (edited.Name ?? string.Empty).Trim();
+			if (string.IsNullOrWhiteSpace(key))
+			{
+				return;
+			}
+
+			if (!GamePlayState.ChatCharacterByName.TryGetValue(key, out var existing) || existing == null)
+			{
+				existing = new GamePlayChatCharacterCache();
+			}
+
+			existing.Id = edited.Id;
+			existing.Name = key;
+			existing.Personality = edited.Description;
+			existing.Gender = edited.Gender;
+			existing.Age = edited.Age;
+			existing.AvatarUrl = string.IsNullOrWhiteSpace(notice.AvatarUrl) ? existing.AvatarUrl : notice.AvatarUrl;
+			existing.VoiceName = edited.VoiceName;
+			existing.Pitch = edited.Pitch;
+			existing.SpeakingRate = notice.SpeakingRate;
+			existing.AvatarSprite = edited.Avatar ?? existing.AvatarSprite;
+
+			GamePlayState.ChatCharacterByName[key] = existing;
 		}
 
 		private static void RemoveDeletedCharacterFromCache(DeletedCharacterNotice deletedCharacter)

@@ -11,5 +11,6 @@ namespace Features.CharacterInfo.Requests
 		public const string LoadSelectedCharacter = "character.info.load.selected.character.request";
 		public const string CloseScope = "character.info.close.scope.request";
 		public const string RemoveSelectedCharacter = "character.info.remove.selected.character.request";
+		public const string OpenEditCharacter = "character.info.open.edit.character.request";
 	}
 }

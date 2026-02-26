@@ -17,6 +17,8 @@ namespace Core.Infrastructure.Attributes
 
 		StartSceneGameplay = 5,
 
-		CharacterInfoGameplay = 6
+		CharacterInfoGameplay = 6,
+
+		EditCharacterGameplay = 7
 	}
 }
