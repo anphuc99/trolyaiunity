@@ -289,5 +289,22 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// Character avatar sprite.
 		/// </summary>
 		public Sprite Avatar { get; set; }
+
+		/// <summary>
+		/// Indicates whether this character is active in current chat context.
+		/// </summary>
+		public bool IsActive { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload from /api/chat/developer-state.
+	/// </summary>
+	public sealed class ChatDeveloperStatePayload
+	{
+		/// <summary>
+		/// Active character names parsed from developer messages.
+		/// </summary>
+		[JsonProperty("activeCharacterNames")]
+		public System.Collections.Generic.List<string> ActiveCharacterNames { get; set; }
 	}
 }

@@ -248,13 +248,13 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			ChatState.AddCharacterMenuId = null;
 		}
 
-		private static void HandleOpenAddCharacterMenu()
+		private static async void HandleOpenAddCharacterMenu()
 		{
-			var payload = BuildSelectableCharacters();
+			var payload = await BuildSelectableCharactersAsync();
 			EventBus.Publish(ChatEvents.CharactersLoaded, payload);
 		}
 
-		private static List<ChatSelectableCharacterPayload> BuildSelectableCharacters()
+		private static async Task<List<ChatSelectableCharacterPayload>> BuildSelectableCharactersAsync()
 		{
 			var result = new List<ChatSelectableCharacterPayload>();
 			var names = ChatState.ParentSignals?.GetCharacterNames?.Invoke();
@@ -262,6 +262,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			{
 				return result;
 			}
+
+			var activeNames = await GetActiveCharacterNamesAsync();
 
 			for (var i = 0; i < names.Count; i++)
 			{
@@ -276,10 +278,48 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				{
 					Name = normalizedName,
 					Avatar = ChatState.ParentSignals?.GetCharacterAvatarByName?.Invoke(normalizedName),
+					IsActive = activeNames.Contains(normalizedName),
 				});
 			}
 
 			return result;
+		}
+
+		private static async Task<HashSet<string>> GetActiveCharacterNamesAsync()
+		{
+			var activeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+			try
+			{
+				var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.ChatDeveloperState);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					return activeNames;
+				}
+
+				var response = JsonConvert.DeserializeObject<ChatDeveloperStatePayload>(responseJson);
+				if (response?.ActiveCharacterNames == null || response.ActiveCharacterNames.Count == 0)
+				{
+					return activeNames;
+				}
+
+				for (var i = 0; i < response.ActiveCharacterNames.Count; i++)
+				{
+					var name = response.ActiveCharacterNames[i];
+					if (string.IsNullOrWhiteSpace(name))
+					{
+						continue;
+					}
+
+					activeNames.Add(name.Trim());
+				}
+			}
+			catch (Exception exception)
+			{
+				Debug.LogWarning("[ChatController] Failed to load active character names: " + exception.Message);
+			}
+
+			return activeNames;
 		}
 
 		/// <summary>

@@ -62,7 +62,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			if (_toggle != null)
 			{
-				_toggle.isOn = false;
+				_toggle.SetIsOnWithoutNotify(payload != null && payload.IsActive);
 			}
 		}
 
@@ -94,6 +94,14 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_toggle == null)
 			{
 				_toggle = GetComponentInChildren<Toggle>(true);
+			}
+		}
+
+		public void OnSelect()
+		{
+			if (_toggle != null)
+			{
+				_toggle.isOn = !_toggle.isOn;
 			}
 		}
 	}
