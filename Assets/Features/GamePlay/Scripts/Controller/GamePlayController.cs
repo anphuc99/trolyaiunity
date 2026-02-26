@@ -27,6 +27,7 @@ using Share.Model;
 using UnityEngine.Networking;
 using Core.Infrastructure.Scenes;
 using UnityEngine.SceneManagement;
+using System;
 
 namespace Features.GamePlay.Controller
 {
@@ -688,6 +689,47 @@ namespace Features.GamePlay.Controller
 		private static void HandleOpenCreateCharacter()
 		{
 			LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay, LoadSceneMode.Additive);
+		}
+
+		/// <summary>
+		/// Requests GamePlay view to add a menu item and returns its generated identifier.
+		/// </summary>
+		/// <param name="text">Menu item display text.</param>
+		/// <param name="onClick">Callback invoked when the menu item is clicked.</param>
+		/// <returns>Created menu item id, or null when input is invalid.</returns>
+		public static string AddMenu(string text, Action onClick)
+		{
+			if (string.IsNullOrWhiteSpace(text) || onClick == null)
+			{
+				return null;
+			}
+
+			var payload = new GamePlayMenuAddPayload
+			{
+				Id = Guid.NewGuid().ToString("N"),
+				Text = text.Trim(),
+				OnClick = onClick,
+			};
+
+			EventBus.Publish(GamePlayEvents.MenuItemAddRequested, payload);
+			return payload.Id;
+		}
+
+		/// <summary>
+		/// Requests GamePlay view to remove a menu item by identifier.
+		/// </summary>
+		/// <param name="menuId">Menu item identifier.</param>
+		public static void RemoveMenu(string menuId)
+		{
+			if (string.IsNullOrWhiteSpace(menuId))
+			{
+				return;
+			}
+
+			EventBus.Publish(GamePlayEvents.MenuItemRemoveRequested, new GamePlayMenuRemovePayload
+			{
+				Id = menuId.Trim(),
+			});
 		}
 	}
 }

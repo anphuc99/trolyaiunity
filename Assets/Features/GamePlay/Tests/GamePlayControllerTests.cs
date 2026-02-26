@@ -1,6 +1,8 @@
 using NUnit.Framework;
 using Features.GamePlay.Controller;
 using Features.GamePlay.Model;
+using Features.GamePlay.Events;
+using Core.Infrastructure.Events;
 
 namespace Features.GamePlay.Tests
 {
@@ -12,6 +14,14 @@ namespace Features.GamePlay.Tests
 		[SetUp]
 		public void SetUp()
 		{
+			EventBus.ClearAll();
+			GamePlayController.HandleCloseCurrentSubController();
+		}
+
+		[TearDown]
+		public void TearDown()
+		{
+			EventBus.ClearAll();
 			GamePlayController.HandleCloseCurrentSubController();
 		}
 
@@ -50,6 +60,36 @@ namespace Features.GamePlay.Tests
 
 			Assert.IsFalse(opened);
 			Assert.IsNull(GamePlayController.HandleGetCurrentSubController());
+		}
+
+		[Test]
+		public void AddMenu_ShouldPublishMenuItemAddRequestedEvent()
+		{
+			GamePlayMenuAddPayload receivedPayload = null;
+			EventBus.Subscribe(GamePlayEvents.MenuItemAddRequested, payload => receivedPayload = payload as GamePlayMenuAddPayload);
+
+			var clicked = false;
+			var menuId = GamePlayController.AddMenu("Home", () => clicked = true);
+
+			Assert.IsNotNull(menuId);
+			Assert.IsNotNull(receivedPayload);
+			Assert.AreEqual(menuId, receivedPayload.Id);
+			Assert.AreEqual("Home", receivedPayload.Text);
+
+			receivedPayload.OnClick?.Invoke();
+			Assert.IsTrue(clicked);
+		}
+
+		[Test]
+		public void RemoveMenu_ShouldPublishMenuItemRemoveRequestedEvent()
+		{
+			GamePlayMenuRemovePayload receivedPayload = null;
+			EventBus.Subscribe(GamePlayEvents.MenuItemRemoveRequested, payload => receivedPayload = payload as GamePlayMenuRemovePayload);
+
+			GamePlayController.RemoveMenu("menu-123");
+
+			Assert.IsNotNull(receivedPayload);
+			Assert.AreEqual("menu-123", receivedPayload.Id);
 		}
 	}
 }

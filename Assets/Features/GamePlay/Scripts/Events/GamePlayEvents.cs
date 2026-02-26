@@ -9,5 +9,7 @@ namespace Features.GamePlay.Events
 	{
 		public const string Echoed = "game.play.echo.event";
 		public const string SubControllerChanged = "game.play.subcontroller.changed.event";
+		public const string MenuItemAddRequested = "game.play.menu.item.add.requested.event";
+		public const string MenuItemRemoveRequested = "game.play.menu.item.remove.requested.event";
 	}
 }
