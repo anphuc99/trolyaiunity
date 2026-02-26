@@ -227,6 +227,7 @@ namespace Features.GamePlay.Controller
 				GetCharacterVoiceNameByName = GetChatCharacterVoiceName,
 				GetCharacterPitchByName = GetChatCharacterPitch,
 				GetCharacterSpeakingRateByName = GetChatCharacterSpeakingRate,
+				OpenHome = () => HandleOpenSubController(GamePlaySubControllerType.Home),
 			});
 			JournalController.SetParentSignals(new JournalParentSignals { 
 				OnEchoed = OnSubControllerEchoed,

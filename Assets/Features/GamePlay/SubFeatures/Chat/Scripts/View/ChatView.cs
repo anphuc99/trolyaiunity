@@ -219,6 +219,16 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		}
 
 		/// <summary>
+		/// Clears chat UI and navigates back to the Home tab after ending the conversation.
+		/// </summary>
+		/// <param name="payload">Optional end-conversation response payload.</param>
+		[OnEvent(ChatEvents.ConversationEnded)]
+		private void OnConversationEnded(object payload)
+		{
+			ClearConversationState();
+		}
+
+		/// <summary>
 		/// Binds server history into virtualized chat message container.
 		/// </summary>
 		/// <param name="payload">History response payload.</param>
@@ -914,6 +924,30 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			return null;
+		}
+
+		private void ClearConversationState()
+		{
+			StopAllCoroutines();
+			_pendingCharacterTurns.Clear();
+			_isProcessingCharacterTurns = false;
+			_reloadingTtsMessageIndices.Clear();
+
+			if (_characterVoiceAudioSource != null)
+			{
+				_characterVoiceAudioSource.Stop();
+			}
+
+			if (_messageContainer != null)
+			{
+				_messageContainer.SetMessages(new List<MessageBubbleData>());
+			}
+
+			if (_inputField != null)
+			{
+				_inputField.text = string.Empty;
+				_inputField.DeactivateInputField();
+			}
 		}
 
 		/// <summary>

@@ -17,6 +17,7 @@ namespace Core.Infrastructure.Network
 		public const string ChatDeveloperState = "/api/chat/developer-state";
 		public const string ChatDeveloper = "/api/chat/developer";
 		public const string Journals = "/api/journals";
+		public const string JournalsEnd = "/api/journals/end";
 		public const string TextToSpeech = "/api/text-to-speech";
 		public const string Personalities = "/personalities";
 	}

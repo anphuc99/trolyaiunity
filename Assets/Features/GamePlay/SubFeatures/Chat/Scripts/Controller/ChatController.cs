@@ -41,6 +41,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			RegisterAddCharacterMenu();
 			RegisterContextMenu();
+			RegisterEndConversationMenu();
 			EventBus.Publish(ChatEvents.Installed, null);
 		}
 
@@ -51,6 +52,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			UnregisterAddCharacterMenu();
 			UnregisterContextMenu();
+			UnregisterEndConversationMenu();
 			EventBus.Publish(ChatEvents.Uninstalled, null);
 		}
 
@@ -64,6 +66,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			{
 				UnregisterAddCharacterMenu();
 				UnregisterContextMenu();
+				UnregisterEndConversationMenu();
 			}
 
 			ChatState.ParentSignals = signals;
@@ -254,6 +257,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
+		/// Handles end-conversation request and syncs journal creation on server.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[Request(ChatRequests.EndConversation)]
+		public static void HandleEndConversation(object payload)
+		{
+			_ = EndConversationInternalAsync();
+		}
+
+		/// <summary>
 		/// Sample request handler that echoes payload to a view event and parent signal.
 		/// </summary>
 		/// <param name="payload">Optional payload.</param>
@@ -302,6 +315,19 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			ChatState.ContextMenuId = menuId;
 		}
 
+		private static void RegisterEndConversationMenu()
+		{
+			UnregisterEndConversationMenu();
+
+			var menuId = ChatState.ParentSignals?.AddMenu?.Invoke("Kết thúc hội thoại", HandleOpenEndConversationMenu);
+			if (string.IsNullOrWhiteSpace(menuId))
+			{
+				return;
+			}
+
+			ChatState.EndConversationMenuId = menuId;
+		}
+
 		private static void UnregisterContextMenu()
 		{
 			if (string.IsNullOrWhiteSpace(ChatState.ContextMenuId))
@@ -314,6 +340,18 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			ChatState.ContextMenuId = null;
 		}
 
+		private static void UnregisterEndConversationMenu()
+		{
+			if (string.IsNullOrWhiteSpace(ChatState.EndConversationMenuId))
+			{
+				ChatState.EndConversationMenuId = null;
+				return;
+			}
+
+			ChatState.ParentSignals?.RemoveMenu?.Invoke(ChatState.EndConversationMenuId);
+			ChatState.EndConversationMenuId = null;
+		}
+
 		private static async void HandleOpenAddCharacterMenu()
 		{
 			var payload = await BuildSelectableCharactersAsync();
@@ -323,6 +361,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		private static void HandleOpenContextMenu()
 		{
 			EventBus.Publish(ChatEvents.ContextInputRequested, null);
+		}
+
+		private static void HandleOpenEndConversationMenu()
+		{
+			_ = EndConversationInternalAsync();
 		}
 
 		private static async Task<List<ChatSelectableCharacterPayload>> BuildSelectableCharactersAsync()
@@ -457,6 +500,42 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
 				{
 					Message = "Failed to save developer context: " + exception.Message
+				});
+			}
+		}
+
+		private static async Task EndConversationInternalAsync()
+		{
+			try
+			{
+				var responseJson = await HttpClient.PostJsonTaskAsync<object>(NetworkEndpoints.JournalsEnd, null);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = "Failed to finalize conversation."
+					});
+					return;
+				}
+
+				ChatEndConversationResponsePayload response = null;
+				try
+				{
+					response = JsonConvert.DeserializeObject<ChatEndConversationResponsePayload>(responseJson);
+				}
+				catch (Exception exception)
+				{
+					Debug.LogWarning("[ChatController] Failed to parse end-conversation response: " + exception.Message);
+				}
+
+				EventBus.Publish(ChatEvents.ConversationEnded, response);
+				ChatState.ParentSignals?.OpenHome?.Invoke();
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to finalize conversation: " + exception.Message
 				});
 			}
 		}

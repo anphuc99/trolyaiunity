@@ -167,6 +167,24 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 	}
 
 	/// <summary>
+	/// Response payload for ending a conversation and creating a journal.
+	/// </summary>
+	public sealed class ChatEndConversationResponsePayload
+	{
+		/// <summary>
+		/// Newly created journal id.
+		/// </summary>
+		[JsonProperty("journalId")]
+		public int JournalId { get; set; }
+
+		/// <summary>
+		/// Summary returned by server.
+		/// </summary>
+		[JsonProperty("summary")]
+		public string Summary { get; set; }
+	}
+
+	/// <summary>
 	/// Response payload for /api/text-to-speech.
 	/// </summary>
 	public sealed class ChatTextToSpeechResponsePayload

@@ -64,5 +64,10 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// Optional callback for getting cached character speaking rate by character name.
 		/// </summary>
 		public Func<string, float?> GetCharacterSpeakingRateByName { get; set; }
+
+		/// <summary>
+		/// Optional callback for returning to the Home subcontroller.
+		/// </summary>
+		public Action OpenHome { get; set; }
 	}
 }
