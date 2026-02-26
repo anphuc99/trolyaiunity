@@ -115,36 +115,46 @@ Shader "Custom/UI/ImageOutline"
                 return OUT;
             }
 
+            // Sample texture với kiểm tra bounds - trả về 0 nếu UV ngoài (0,1)
+            fixed SampleTextureSafe(float2 uv)
+            {
+                // Nếu UV nằm ngoài bounds, trả về 0 thay vì clamp
+                if (uv.x < 0 || uv.x > 1 || uv.y < 0 || uv.y > 1)
+                {
+                    return 0;
+                }
+                return tex2D(_MainTex, uv).a;
+            }
+            
             // Sample 16 hướng tại một khoảng cách cho outline mượt hơn
             fixed SampleOutlineRing(float2 uv, float2 offset)
             {
                 fixed alpha = 0;
                 
                 // 4 hướng chính: trên, dưới, trái, phải
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(offset.x, 0)).a);
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(-offset.x, 0)).a);
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(0, offset.y)).a);
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(0, -offset.y)).a);
+                alpha = max(alpha, SampleTextureSafe(uv + float2(offset.x, 0)));
+                alpha = max(alpha, SampleTextureSafe(uv + float2(-offset.x, 0)));
+                alpha = max(alpha, SampleTextureSafe(uv + float2(0, offset.y)));
+                alpha = max(alpha, SampleTextureSafe(uv + float2(0, -offset.y)));
                 
                 // 4 góc chéo
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(offset.x, offset.y)).a);
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(-offset.x, offset.y)).a);
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(offset.x, -offset.y)).a);
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(-offset.x, -offset.y)).a);
+                alpha = max(alpha, SampleTextureSafe(uv + float2(offset.x, offset.y)));
+                alpha = max(alpha, SampleTextureSafe(uv + float2(-offset.x, offset.y)));
+                alpha = max(alpha, SampleTextureSafe(uv + float2(offset.x, -offset.y)));
+                alpha = max(alpha, SampleTextureSafe(uv + float2(-offset.x, -offset.y)));
                 
                 // 8 hướng phụ (góc 22.5°, 67.5°, etc.) để lấp khoảng trống
-                float d = 0.7071; // cos(45°) = sin(45°)
                 float d1 = 0.3827; // sin(22.5°)
                 float d2 = 0.9239; // cos(22.5°)
                 
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(offset.x * d2, offset.y * d1)).a);
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(offset.x * d1, offset.y * d2)).a);
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(-offset.x * d2, offset.y * d1)).a);
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(-offset.x * d1, offset.y * d2)).a);
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(offset.x * d2, -offset.y * d1)).a);
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(offset.x * d1, -offset.y * d2)).a);
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(-offset.x * d2, -offset.y * d1)).a);
-                alpha = max(alpha, tex2D(_MainTex, uv + float2(-offset.x * d1, -offset.y * d2)).a);
+                alpha = max(alpha, SampleTextureSafe(uv + float2(offset.x * d2, offset.y * d1)));
+                alpha = max(alpha, SampleTextureSafe(uv + float2(offset.x * d1, offset.y * d2)));
+                alpha = max(alpha, SampleTextureSafe(uv + float2(-offset.x * d2, offset.y * d1)));
+                alpha = max(alpha, SampleTextureSafe(uv + float2(-offset.x * d1, offset.y * d2)));
+                alpha = max(alpha, SampleTextureSafe(uv + float2(offset.x * d2, -offset.y * d1)));
+                alpha = max(alpha, SampleTextureSafe(uv + float2(offset.x * d1, -offset.y * d2)));
+                alpha = max(alpha, SampleTextureSafe(uv + float2(-offset.x * d2, -offset.y * d1)));
+                alpha = max(alpha, SampleTextureSafe(uv + float2(-offset.x * d1, -offset.y * d2)));
                 
                 return alpha;
             }
