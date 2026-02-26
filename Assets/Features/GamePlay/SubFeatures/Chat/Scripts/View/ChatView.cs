@@ -49,6 +49,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private readonly Queue<ChatAssistantTurnPayload> _pendingCharacterTurns = new Queue<ChatAssistantTurnPayload>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
 		private bool _isProcessingCharacterTurns;
+		private bool _isPopupInitialized;
 		private NetworkSettings _networkSettings;
 
 		/// <summary>
@@ -501,6 +502,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 						_selectCharacterPopupView = popupTransform.gameObject.AddComponent<ChatSelectCharacterPopupView>();
 					}
 				}
+			}
+
+			if (_selectCharacterPopupView != null && !_isPopupInitialized)
+			{
+				_selectCharacterPopupView.HideImmediate();
+				_isPopupInitialized = true;
 			}
 
 			if (_messageContainer != null)

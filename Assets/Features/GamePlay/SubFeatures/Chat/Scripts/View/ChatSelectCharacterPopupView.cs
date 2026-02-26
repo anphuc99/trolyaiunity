@@ -26,16 +26,16 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[SerializeField]
 		private float _animationDuration = 0.25f;
 
-		private readonly List<ChatSelectCharacterPopupItemView> _spawnedItems = new List<ChatSelectCharacterPopupItemView>();
+		[SerializeField]
 		private ChatSelectCharacterPopupItemView _itemTemplate;
+
+		private readonly List<ChatSelectCharacterPopupItemView> _spawnedItems = new List<ChatSelectCharacterPopupItemView>();
 		private Tween _heightTween;
 
 		private void Awake()
 		{
 			EnsureReferences();
 			BindCloseButton();
-			PrepareItemTemplate();
-			HideImmediate();
 		}
 
 		private void OnDestroy()
@@ -59,7 +59,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		public void Show(List<ChatSelectableCharacterPayload> characters)
 		{
 			EnsureReferences();
-			PrepareItemTemplate();
 
 			RenderItems(characters);
 
@@ -174,40 +173,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				.To(() => _popupRoot.sizeDelta, value => _popupRoot.sizeDelta = value, endSize, _animationDuration)
 				.SetEase(Ease.OutCubic)
 				.OnComplete(onComplete);
-		}
-
-		private void PrepareItemTemplate()
-		{
-			if (_itemsContainer == null)
-			{
-				_itemTemplate = null;
-				return;
-			}
-
-			if (_itemTemplate != null)
-			{
-				_itemTemplate.gameObject.SetActive(false);
-				return;
-			}
-
-			for (var i = 0; i < _itemsContainer.childCount; i++)
-			{
-				var child = _itemsContainer.GetChild(i);
-				if (child == null)
-				{
-					continue;
-				}
-
-				var itemView = child.GetComponent<ChatSelectCharacterPopupItemView>();
-				if (itemView == null)
-				{
-					itemView = child.gameObject.AddComponent<ChatSelectCharacterPopupItemView>();
-				}
-
-				_itemTemplate = itemView;
-				_itemTemplate.gameObject.SetActive(false);
-				break;
-			}
 		}
 
 		private void EnsureReferences()
