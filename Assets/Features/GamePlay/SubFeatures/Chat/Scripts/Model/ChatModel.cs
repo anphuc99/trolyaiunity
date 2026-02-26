@@ -330,6 +330,22 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 	}
 
 	/// <summary>
+	/// Request payload from view to save chat context via developer API.
+	/// </summary>
+	public sealed class ChatSaveContextRequestPayload
+	{
+		/// <summary>
+		/// Optional chat session id.
+		/// </summary>
+		public string SessionId { get; set; }
+
+		/// <summary>
+		/// Context text to append into developer history.
+		/// </summary>
+		public string Context { get; set; }
+	}
+
+	/// <summary>
 	/// API payload for /api/chat/developer endpoint.
 	/// </summary>
 	public sealed class ChatDeveloperMessageRequestPayload

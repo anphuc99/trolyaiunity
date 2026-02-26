@@ -40,6 +40,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		public static void Install()
 		{
 			RegisterAddCharacterMenu();
+			RegisterContextMenu();
 			EventBus.Publish(ChatEvents.Installed, null);
 		}
 
@@ -49,6 +50,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		public static void Uninstall()
 		{
 			UnregisterAddCharacterMenu();
+			UnregisterContextMenu();
 			EventBus.Publish(ChatEvents.Uninstalled, null);
 		}
 
@@ -61,6 +63,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			if (signals == null)
 			{
 				UnregisterAddCharacterMenu();
+				UnregisterContextMenu();
 			}
 
 			ChatState.ParentSignals = signals;
@@ -232,6 +235,25 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
+		/// Handles save-context requests from popup and syncs context via developer message API.
+		/// </summary>
+		/// <param name="payload">Context payload.</param>
+		[Request(ChatRequests.SaveContext)]
+		public static void HandleSaveContext(ChatSaveContextRequestPayload payload)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.Context))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Context is required when saving developer context."
+				});
+				return;
+			}
+
+			_ = SaveContextInternalAsync(payload);
+		}
+
+		/// <summary>
 		/// Sample request handler that echoes payload to a view event and parent signal.
 		/// </summary>
 		/// <param name="payload">Optional payload.</param>
@@ -267,10 +289,40 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			ChatState.AddCharacterMenuId = null;
 		}
 
+		private static void RegisterContextMenu()
+		{
+			UnregisterContextMenu();
+
+			var menuId = ChatState.ParentSignals?.AddMenu?.Invoke("Nhập bối cảnh", HandleOpenContextMenu);
+			if (string.IsNullOrWhiteSpace(menuId))
+			{
+				return;
+			}
+
+			ChatState.ContextMenuId = menuId;
+		}
+
+		private static void UnregisterContextMenu()
+		{
+			if (string.IsNullOrWhiteSpace(ChatState.ContextMenuId))
+			{
+				ChatState.ContextMenuId = null;
+				return;
+			}
+
+			ChatState.ParentSignals?.RemoveMenu?.Invoke(ChatState.ContextMenuId);
+			ChatState.ContextMenuId = null;
+		}
+
 		private static async void HandleOpenAddCharacterMenu()
 		{
 			var payload = await BuildSelectableCharactersAsync();
 			EventBus.Publish(ChatEvents.CharactersLoaded, payload);
+		}
+
+		private static void HandleOpenContextMenu()
+		{
+			EventBus.Publish(ChatEvents.ContextInputRequested, null);
 		}
 
 		private static async Task<List<ChatSelectableCharacterPayload>> BuildSelectableCharactersAsync()
@@ -376,6 +428,35 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
 				{
 					Message = "Failed to sync character active state: " + exception.Message
+				});
+			}
+		}
+
+		private static async Task SaveContextInternalAsync(ChatSaveContextRequestPayload payload)
+		{
+			try
+			{
+				var request = new ChatDeveloperMessageRequestPayload
+				{
+					SessionId = string.IsNullOrWhiteSpace(payload.SessionId) ? null : payload.SessionId.Trim(),
+					Kind = "context_update",
+					Context = payload.Context.Trim(),
+				};
+
+				var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatDeveloper, request);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = "Failed to save developer context."
+					});
+				}
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to save developer context: " + exception.Message
 				});
 			}
 		}

@@ -19,6 +19,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 			EventBus.ClearAll();
 			ChatState.ParentSignals = null;
 			ChatState.AddCharacterMenuId = null;
+			ChatState.ContextMenuId = null;
 		}
 
 		[TearDown]
@@ -27,47 +28,95 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 			EventBus.ClearAll();
 			ChatState.ParentSignals = null;
 			ChatState.AddCharacterMenuId = null;
+			ChatState.ContextMenuId = null;
 		}
 
 		[Test]
 		public void Install_ShouldAddCharacterMenuFromParentSignals()
 		{
-			string requestedMenuText = null;
-			Action requestedMenuAction = null;
+			var requestedMenuTexts = new List<string>();
+			Action requestedCharacterMenuAction = null;
 
 			ChatController.SetParentSignals(new ChatParentSignals
 			{
 				AddMenu = (text, onClick) =>
 				{
-					requestedMenuText = text;
-					requestedMenuAction = onClick;
-					return "menu-chat-add-character";
+					requestedMenuTexts.Add(text);
+					if (string.Equals(text, "Thêm nhân vật", StringComparison.Ordinal))
+					{
+						requestedCharacterMenuAction = onClick;
+						return "menu-chat-add-character";
+					}
+
+					if (string.Equals(text, "Nhập bối cảnh", StringComparison.Ordinal))
+					{
+						return "menu-chat-context";
+					}
+
+					return null;
 				}
 			});
 
 			ChatController.Install();
 
-			Assert.AreEqual("Thêm nhân vật", requestedMenuText);
-			Assert.IsNotNull(requestedMenuAction);
+			CollectionAssert.Contains(requestedMenuTexts, "Thêm nhân vật");
+			CollectionAssert.Contains(requestedMenuTexts, "Nhập bối cảnh");
+			Assert.IsNotNull(requestedCharacterMenuAction);
 			Assert.AreEqual("menu-chat-add-character", ChatState.AddCharacterMenuId);
+			Assert.AreEqual("menu-chat-context", ChatState.ContextMenuId);
 		}
 
 		[Test]
 		public void Uninstall_ShouldRemoveCharacterMenuFromParentSignals()
 		{
-			string removedMenuId = null;
+			var removedMenuIds = new List<string>();
 
 			ChatController.SetParentSignals(new ChatParentSignals
 			{
-				AddMenu = (_, _) => "menu-chat-add-character",
-				RemoveMenu = menuId => removedMenuId = menuId,
+				AddMenu = (text, _) => string.Equals(text, "Nhập bối cảnh", StringComparison.Ordinal)
+					? "menu-chat-context"
+					: "menu-chat-add-character",
+				RemoveMenu = menuId => removedMenuIds.Add(menuId),
 			});
 
 			ChatController.Install();
 			ChatController.Uninstall();
 
-			Assert.AreEqual("menu-chat-add-character", removedMenuId);
+			CollectionAssert.Contains(removedMenuIds, "menu-chat-add-character");
+			CollectionAssert.Contains(removedMenuIds, "menu-chat-context");
 			Assert.IsNull(ChatState.AddCharacterMenuId);
+			Assert.IsNull(ChatState.ContextMenuId);
+		}
+
+		[Test]
+		public void ContextMenuClick_ShouldPublishContextInputRequestedEvent()
+		{
+			Action contextMenuAction = null;
+			var isEventPublished = false;
+
+			EventBus.Subscribe(ChatEvents.ContextInputRequested, _ =>
+			{
+				isEventPublished = true;
+			});
+
+			ChatController.SetParentSignals(new ChatParentSignals
+			{
+				AddMenu = (text, onClick) =>
+				{
+					if (!string.Equals(text, "Nhập bối cảnh", StringComparison.Ordinal))
+					{
+						return "menu-chat-add-character";
+					}
+
+					contextMenuAction = onClick;
+					return "menu-chat-context";
+				},
+			});
+
+			ChatController.Install();
+			contextMenuAction?.Invoke();
+
+			Assert.IsTrue(isEventPublished);
 		}
 
 		[Test]
@@ -118,6 +167,25 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 
 			Assert.IsNotNull(errorPayload);
 			Assert.AreEqual("Character name is required when changing active state.", errorPayload.Message);
+		}
+
+		[Test]
+		public void SaveContext_ShouldPublishError_WhenContextIsMissing()
+		{
+			ChatErrorPayload errorPayload = null;
+			EventBus.Subscribe(ChatEvents.RequestFailed, payload =>
+			{
+				errorPayload = payload as ChatErrorPayload;
+			});
+
+			ChatController.HandleSaveContext(new ChatSaveContextRequestPayload
+			{
+				SessionId = "default",
+				Context = " ",
+			});
+
+			Assert.IsNotNull(errorPayload);
+			Assert.AreEqual("Context is required when saving developer context.", errorPayload.Message);
 		}
 	}
 }

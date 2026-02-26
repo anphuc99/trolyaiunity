@@ -46,10 +46,14 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[SerializeField]
 		private ChatSelectCharacterPopupView _selectCharacterPopupView;
 
+		[SerializeField]
+		private ChatContextPopupView _contextPopupView;
+
 		private readonly Queue<ChatAssistantTurnPayload> _pendingCharacterTurns = new Queue<ChatAssistantTurnPayload>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
 		private bool _isProcessingCharacterTurns;
 		private bool _isPopupInitialized;
+		private bool _isContextPopupInitialized;
 		private NetworkSettings _networkSettings;
 
 		/// <summary>
@@ -169,6 +173,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				_selectCharacterPopupView.HideImmediate();
 			}
+			if (_contextPopupView != null)
+			{
+				_contextPopupView.HideImmediate();
+			}
 			gameObject.SetActive(false);
 		}
 
@@ -192,6 +200,22 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			_selectCharacterPopupView.Show(new List<ChatSelectableCharacterPayload>());
+		}
+
+		/// <summary>
+		/// Opens context popup when requested from controller.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[OnEvent(ChatEvents.ContextInputRequested)]
+		private void OnContextInputRequested(object payload)
+		{
+			EnsureDependencies();
+			if (_contextPopupView == null)
+			{
+				return;
+			}
+
+			_contextPopupView.Show();
 		}
 
 		/// <summary>
@@ -504,6 +528,19 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				}
 			}
 
+			if (_contextPopupView == null)
+			{
+				var contextPopupTransform = FindChildByName(transform, "PopupContext");
+				if (contextPopupTransform != null)
+				{
+					_contextPopupView = contextPopupTransform.GetComponent<ChatContextPopupView>();
+					if (_contextPopupView == null)
+					{
+						_contextPopupView = contextPopupTransform.gameObject.AddComponent<ChatContextPopupView>();
+					}
+				}
+			}
+
 			if (_selectCharacterPopupView != null && !_isPopupInitialized)
 			{
 				_selectCharacterPopupView.HideImmediate();
@@ -513,6 +550,17 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_selectCharacterPopupView != null)
 			{
 				_selectCharacterPopupView.OnCharacterToggleChanged = HandleCharacterToggleChanged;
+			}
+
+			if (_contextPopupView != null && !_isContextPopupInitialized)
+			{
+				_contextPopupView.HideImmediate();
+				_isContextPopupInitialized = true;
+			}
+
+			if (_contextPopupView != null)
+			{
+				_contextPopupView.OnSaveContextClicked = HandleSaveContextClicked;
 			}
 
 			if (_messageContainer != null)
@@ -669,6 +717,15 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				SessionId = string.IsNullOrWhiteSpace(_sessionId) ? null : _sessionId,
 				CharacterName = payload.Name,
 				IsActive = isOn,
+			});
+		}
+
+		private void HandleSaveContextClicked(string context)
+		{
+			SendRequest(ChatRequests.SaveContext, new ChatSaveContextRequestPayload
+			{
+				SessionId = string.IsNullOrWhiteSpace(_sessionId) ? null : _sessionId,
+				Context = context,
 			});
 		}
 

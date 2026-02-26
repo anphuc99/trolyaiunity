@@ -14,6 +14,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Events
 		public const string MessageReceived = "game.play.chat.message.received.event";
 		public const string MessageAudioPlayRequested = "game.play.chat.message.audio.play.requested.event";
 		public const string CharactersLoaded = "game.play.chat.characters.loaded.event";
+		public const string ContextInputRequested = "game.play.chat.context.input.requested.event";
 		public const string RequestFailed = "game.play.chat.request.failed.event";
 	}
 }

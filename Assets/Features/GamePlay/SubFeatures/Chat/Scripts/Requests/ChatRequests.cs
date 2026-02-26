@@ -16,5 +16,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Requests
 		public const string GetCharacterSpeakingRate = "game.play.chat.get.character.speaking.rate.request";
 		public const string PlayMessageAudio = "game.play.chat.play.message.audio.request";
 		public const string SetCharacterActive = "game.play.chat.set.character.active.request";
+		public const string SaveContext = "game.play.chat.save.context.request";
 	}
 }
