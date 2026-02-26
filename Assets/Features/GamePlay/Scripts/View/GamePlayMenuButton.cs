@@ -12,6 +12,11 @@ namespace Features.GamePlay.View
 
         private readonly Dictionary<string, GamePlayMenuItem> _menuItemsById = new Dictionary<string, GamePlayMenuItem>(StringComparer.Ordinal);
 
+        private void Awake()
+        {
+            UpdateButtonVisibility();
+        }
+
         public string AddMenuItem(string id, string text, Action onClick)
         {
             if (MenuItemPrefab == null || string.IsNullOrWhiteSpace(id))
@@ -33,6 +38,7 @@ namespace Features.GamePlay.View
             };
             item.id = id;
             _menuItemsById[id] = item;
+            UpdateButtonVisibility();
             return item.id;
         }
 
@@ -40,11 +46,13 @@ namespace Features.GamePlay.View
         {
             if (string.IsNullOrWhiteSpace(id))
             {
+                UpdateButtonVisibility();
                 return;
             }
 
             if (!_menuItemsById.TryGetValue(id, out var item))
             {
+                UpdateButtonVisibility();
                 return;
             }
 
@@ -53,6 +61,8 @@ namespace Features.GamePlay.View
             {
                 Destroy(item.gameObject);
             }
+
+            UpdateButtonVisibility();
         }
 
         public void ShowHideMenu()
@@ -60,6 +70,21 @@ namespace Features.GamePlay.View
             if (MenuContainer != null)
             {
                 MenuContainer.SetActive(!MenuContainer.activeSelf);
+            }
+        }
+
+        private void UpdateButtonVisibility()
+        {
+            var hasMenuItems = _menuItemsById.Count > 0;
+
+            if (!hasMenuItems && MenuContainer != null && MenuContainer.activeSelf)
+            {
+                MenuContainer.SetActive(false);
+            }
+
+            if (gameObject.activeSelf != hasMenuItems)
+            {
+                gameObject.SetActive(hasMenuItems);
             }
         }
     }
