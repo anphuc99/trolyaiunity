@@ -10,6 +10,7 @@ Shader "Custom/UI/ImageOutline"
         // Outline properties
         _OutlineColor ("Outline Color", Color) = (0,0,0,1)
         _OutlineWidth ("Outline Width", Range(0, 100)) = 1
+        _OutlineOverlap ("Outline Overlap (px)", Range(0, 6)) = 0
         
         // Stencil properties for UI masking
         _StencilComp ("Stencil Comparison", Float) = 8
@@ -88,6 +89,7 @@ Shader "Custom/UI/ImageOutline"
             fixed4 _Color;
             fixed4 _OutlineColor;
             float _OutlineWidth;
+            float _OutlineOverlap;
             fixed4 _TextureSampleAdd;
             float4 _ClipRect;
             float _UIMaskSoftnessX;
@@ -188,6 +190,16 @@ Shader "Custom/UI/ImageOutline"
                 
                 // Lấy alpha của outline từ nhiều lớp sample
                 fixed outlineAlpha = SampleOutlineMultiLayer(IN.texcoord, offset, layers);
+
+                // Erode alpha nhẹ để outline đè vào trong một vài pixel
+                if (_OutlineOverlap > 0.001)
+                {
+                    float2 overlapOffset = _MainTex_TexelSize.xy * _OutlineOverlap;
+                    int overlapLayers = clamp((int)ceil(_OutlineOverlap), 1, 4);
+                    fixed innerAlpha = SampleOutlineMultiLayer(IN.texcoord, overlapOffset, overlapLayers);
+                    color.a *= innerAlpha;
+                    color.rgb *= innerAlpha;
+                }
                 
                 // Tính toán outline color với alpha
                 fixed4 outlineCol = _OutlineColor;
