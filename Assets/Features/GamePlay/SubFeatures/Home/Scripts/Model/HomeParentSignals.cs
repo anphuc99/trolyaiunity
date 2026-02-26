@@ -21,5 +21,6 @@ namespace Features.GamePlay.SubFeatures.Home.Model
 
 		public Action OpenCreateCharacter { get; set; }
 		public Action OpenCharacter { get; set; }
+		public Action OpenPractice { get; set; }
 	}
 }

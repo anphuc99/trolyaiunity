@@ -66,5 +66,10 @@ namespace Features.GamePlay.SubFeatures.Home.View
 		{
 			SendRequest(HomeRequests.OpenCharacter);
 		}
+
+		public void OpenPractice()
+		{
+			SendRequest(HomeRequests.OpenPractice);
+		}
 	}
 }

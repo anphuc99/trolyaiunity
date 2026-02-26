@@ -81,5 +81,11 @@ namespace Features.GamePlay.SubFeatures.Home.Controller
 		{
 			HomeState.ParentSignals?.OpenCharacter?.Invoke();
 		}
+
+		[Request(HomeRequests.OpenPractice)]
+		public static void HandleOpenPractice()
+		{
+			HomeState.ParentSignals?.OpenPractice?.Invoke();
+		}
 	}
 }

@@ -207,6 +207,7 @@ namespace Features.GamePlay.Controller
 				OpenJournal = () => HandleOpenSubController(GamePlaySubControllerType.Journal), 
 				OpenCreateCharacter = HandleOpenCreateCharacter,
 				OpenCharacter = () => HandleOpenSubController(GamePlaySubControllerType.Character),
+				OpenPractice = () => HandleOpenSubController(GamePlaySubControllerType.Practice),
 			});
 			CharacterController.SetParentSignals(new CharacterParentSignals
 			{
