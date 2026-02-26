@@ -95,6 +95,7 @@ namespace Features.CharacterInfo.Controller
 		[Request(CharacterInfoRequests.OpenEditCharacter)]
 		public static void HandleOpenEditCharacter()
 		{
+			GlobalVariables.Remove(EditedCharacterGlobalKey);
 			LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.EditCharacterGameplay, UnityEngine.SceneManagement.LoadSceneMode.Additive);
 		}
 
@@ -115,7 +116,6 @@ namespace Features.CharacterInfo.Controller
 				return;
 			}
 
-			GlobalVariables.Remove(EditedCharacterGlobalKey);
 			SetSelectedCharacterInfo(notice.Character);
 			PublishSelectedCharacter();
 		}

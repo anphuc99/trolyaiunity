@@ -105,7 +105,6 @@ namespace Features.GamePlay.Controller
 				return;
 			}
 
-			GlobalVariables.Remove(EditedCharacterGlobalKey);
 			ApplyEditedCharacterToCache(editedNotice);
 			CharacterController.HandleLoadCharacters();
 		}
