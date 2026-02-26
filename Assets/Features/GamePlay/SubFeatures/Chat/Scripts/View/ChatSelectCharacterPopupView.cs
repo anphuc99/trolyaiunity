@@ -170,8 +170,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			var currentSize = _popupRoot.sizeDelta;
 			var endSize = new Vector2(currentSize.x, targetHeight);
-			_heightTween = _popupRoot
-				.DOSizeDelta(endSize, _animationDuration)
+			_heightTween = DOTween
+				.To(() => _popupRoot.sizeDelta, value => _popupRoot.sizeDelta = value, endSize, _animationDuration)
 				.SetEase(Ease.OutCubic)
 				.OnComplete(onComplete);
 		}
