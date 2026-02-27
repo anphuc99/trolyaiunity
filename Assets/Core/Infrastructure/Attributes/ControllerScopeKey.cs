@@ -19,6 +19,8 @@ namespace Core.Infrastructure.Attributes
 
 		CharacterInfoGameplay = 6,
 
-		EditCharacterGameplay = 7
+		EditCharacterGameplay = 7,
+
+		JournalOverlayGameplay = 8
 	}
 }
