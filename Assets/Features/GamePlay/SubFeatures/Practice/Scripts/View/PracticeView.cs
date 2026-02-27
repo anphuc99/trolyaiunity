@@ -79,6 +79,13 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 		private bool _isContextRevealed;
 		private bool _isAnswerRevealed;
 
+		// Local counting state
+		private List<PracticePromptItemPayload> _pendingItems = new List<PracticePromptItemPayload>();
+		private int _currentItemIndex;
+		private int _localLearnedCount;
+		private int _totalItemCount;
+		private string _currentTabLabel;
+
 		/// <summary>
 		/// Shows this subfeature view when its controller is installed.
 		/// </summary>
@@ -239,19 +246,15 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 				return;
 			}
 
-			if (response.Summary != null)
-			{
-				UpdateTabTitle(response.Summary);
-			}
-			else
-			{
-				UpdateTabTitle(new PracticeTabSummaryPayload
-				{
-					TabLabel = GetTabLabel(response.Tab),
-					CurrentCount = 0,
-					TotalCount = 0
-				});
-			}
+			// Initialize local counting state
+			_pendingItems = new List<PracticePromptItemPayload>(response.Items);
+			_currentItemIndex = 0;
+			_localLearnedCount = 0;
+			_totalItemCount = response.Items.Count;
+			_currentTabLabel = response.Summary?.TabLabel ?? GetTabLabel(response.Tab);
+
+			// Update header with 0/total
+			UpdateLocalCountHeader();
 
 			if (response.Items.Count == 0)
 			{
@@ -259,7 +262,7 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 				return;
 			}
 
-			_currentItem = response.Items[0];
+			_currentItem = _pendingItems[0];
 			ResetRevealState();
 		}
 
@@ -298,6 +301,22 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 		[OnEvent(PracticeEvents.ReviewSubmitted)]
 		private void OnReviewSubmitted(object payload)
 		{
+			// Increment local count
+			_localLearnedCount += 1;
+			_currentItemIndex += 1;
+
+			// Update header with new count
+			UpdateLocalCountHeader();
+
+			// Check if we have more pending items locally
+			if (_currentItemIndex < _pendingItems.Count)
+			{
+				_currentItem = _pendingItems[_currentItemIndex];
+				ResetRevealState();
+				return;
+			}
+
+			// All local items done - reload from server to check for more
 			LoadTab(_currentTab);
 		}
 
@@ -454,6 +473,12 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 		private void ClearViewState()
 		{
 			_currentItem = null;
+			_pendingItems.Clear();
+			_currentItemIndex = 0;
+			_localLearnedCount = 0;
+			_totalItemCount = 0;
+			_currentTabLabel = string.Empty;
+
 			if (_koreanText != null)
 			{
 				_koreanText.text = string.Empty;
@@ -481,18 +506,17 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 		}
 
 		/// <summary>
-		/// Updates the header title with the selected tab and progress counts.
+		/// Updates the header title with local learned count and total.
 		/// </summary>
-		/// <param name="summary">Summary payload for the active tab.</param>
-		private void UpdateTabTitle(PracticeTabSummaryPayload summary)
+		private void UpdateLocalCountHeader()
 		{
-			if (_tabTitleText == null || summary == null)
+			if (_tabTitleText == null)
 			{
 				return;
 			}
 
-			var label = string.IsNullOrWhiteSpace(summary.TabLabel) ? GetTabLabel(_currentTab) : summary.TabLabel;
-			_tabTitleText.text = label + " (" + summary.CurrentCount + "/" + summary.TotalCount + ")";
+			var label = string.IsNullOrWhiteSpace(_currentTabLabel) ? GetTabLabel(_currentTab) : _currentTabLabel;
+			_tabTitleText.text = label + " (" + _localLearnedCount + "/" + _totalItemCount + ")";
 		}
 
 		private void SetRatingContainerVisible(bool isVisible)
