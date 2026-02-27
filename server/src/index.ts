@@ -59,7 +59,14 @@ const sendEmbeddedAsset = (assetPath: string, res: express.Response) => {
 const createApp = () => {
   const app = express();
 
-  app.use(cors());
+  app.use(cors({
+    origin: [
+      'http://mimichat.io.vn',
+      'http://api.mimichat.io.vn', // Thêm subdomain của bạn vào đây
+      'http://localhost:4000'   // Nếu bạn test local
+    ],
+    credentials: true
+  }));
 
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ limit: "10mb", extended: true }));
