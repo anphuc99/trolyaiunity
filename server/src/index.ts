@@ -60,12 +60,9 @@ const createApp = () => {
   const app = express();
 
   app.use(cors({
-    origin: [
-      'http://mimichat.io.vn',
-      'http://api.mimichat.io.vn', // Thêm subdomain của bạn vào đây
-      'http://localhost:4000'   // Nếu bạn test local
-    ],
-    credentials: true
+    origin: '*', // Cho phép mọi nguồn (bao gồm cả Editor)
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'], // Rất quan trọng cho Unity
   }));
 
   app.use(express.json({ limit: "10mb" }));
