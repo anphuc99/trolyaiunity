@@ -84,7 +84,7 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
 
       try {
         await fs.access(audioPath);
-				response.json({ success: true, output: audioId, url: `/audio/${audioId}.wav` });
+				response.json({ success: true, output: audioId, url: `/audio/${audioId}.mp3` });
         return;
       } catch (error) {
         if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
@@ -101,7 +101,7 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
         resolvedSettings.pitch,
         resolvedSettings.speakingRate
       );
-      response.json({ success: true, output: audioId, url: `/audio/${audioId}.wav` });
+      response.json({ success: true, output: audioId, url: `/audio/${audioId}.mp3` });
     } catch (error) {
       console.error("Failed to generate TTS.", error);
       response.status(500).json({

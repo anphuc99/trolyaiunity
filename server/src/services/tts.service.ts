@@ -1,3 +1,4 @@
+import { execFile } from "child_process";
 import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
@@ -132,12 +133,50 @@ const clampText = (text: string) => {
 };
 
 /**
+ * Converts a WAV buffer to MP3 using ffmpeg.
+ *
+ * @param wavBuffer - Input WAV buffer.
+ * @returns MP3 buffer.
+ */
+const convertWavToMp3 = async (wavBuffer: Buffer): Promise<Buffer> => {
+  const tempId = crypto.randomUUID();
+  const tempWavPath = path.join(AUDIO_DIR, `_tmp_${tempId}.wav`);
+  const tempMp3Path = path.join(AUDIO_DIR, `_tmp_${tempId}.mp3`);
+
+  try {
+    await fs.writeFile(tempWavPath, wavBuffer);
+
+    await new Promise<void>((resolve, reject) => {
+      execFile(
+        "ffmpeg",
+        ["-y", "-i", tempWavPath, "-codec:a", "libmp3lame", "-q:a", "2", tempMp3Path],
+        (error) => {
+          if (error) {
+            reject(new Error(`ffmpeg conversion failed: ${error.message}`));
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+
+    return await fs.readFile(tempMp3Path);
+  } finally {
+    await fs.unlink(tempWavPath).catch(() => {});
+    await fs.unlink(tempMp3Path).catch(() => {});
+  }
+};
+
+/**
  * Creates a TTS audio file using OpenAI.
+ * After applying pitch/speed transforms the result is converted to MP3 before saving.
  *
  * @param text - Text to synthesize.
  * @param tone - Tone instruction string.
  * @param audioId - Target audio file id (hash).
  * @param voice - Optional voice name override.
+ * @param pitch - Optional pitch adjustment.
+ * @param speakingRate - Optional playback speed multiplier.
  * @returns The audio file id.
  */
 export const createTtsAudio = async (
@@ -169,9 +208,10 @@ export const createTtsAudio = async (
   });
 
   const rawBuffer = Buffer.from(await response.arrayBuffer());
-  const transformedBuffer = await applyWebAudioTransform(rawBuffer, pitch, speakingRate);
-  const filePath = path.join(AUDIO_DIR, `${audioId}.wav`);
-  await fs.writeFile(filePath, transformedBuffer);
+  const transformedWav = await applyWebAudioTransform(rawBuffer, pitch, speakingRate);
+  const mp3Buffer = await convertWavToMp3(transformedWav);
+  const filePath = path.join(AUDIO_DIR, `${audioId}.mp3`);
+  await fs.writeFile(filePath, mp3Buffer);
 
   return audioId;
 };
@@ -182,4 +222,4 @@ export const createTtsAudio = async (
  * @param audioId - Audio hash id.
  * @returns The audio file path.
  */
-export const getAudioPath = (audioId: string) => path.join(AUDIO_DIR, `${audioId}.wav`);
+export const getAudioPath = (audioId: string) => path.join(AUDIO_DIR, `${audioId}.mp3`);
