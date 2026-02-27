@@ -23,6 +23,7 @@ namespace Core.Infrastructure.Network
 		public const string TranslationLearn = "/api/translation/learn";
 		public const string TranslationContext = "/api/translation/context";
 		public const string TranslationReview = "/api/translation/review";
+		public const string TasksToday = "/api/tasks/today";
 		public const string TextToSpeech = "/api/text-to-speech";
 		public const string Personalities = "/personalities";
 	}

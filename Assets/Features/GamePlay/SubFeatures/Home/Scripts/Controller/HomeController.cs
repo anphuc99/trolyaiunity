@@ -87,5 +87,11 @@ namespace Features.GamePlay.SubFeatures.Home.Controller
 		{
 			HomeState.ParentSignals?.OpenPractice?.Invoke();
 		}
+
+		[Request(HomeRequests.OpenTask)]
+		public static void HandleOpenTask()
+		{
+			HomeState.ParentSignals?.OpenTask?.Invoke();
+		}
 	}
 }

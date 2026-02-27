@@ -3,6 +3,9 @@ using Features.GamePlay.SubFeatures.Task.Infrastructure;
 using Features.GamePlay.SubFeatures.Task.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.Task.Model;
 using Features.GamePlay.SubFeatures.Task.Requests;
+using Newtonsoft.Json;
+using System;
+using Core.Infrastructure.Network;
 
 namespace Features.GamePlay.SubFeatures.Task.Controller
 {
@@ -62,6 +65,49 @@ namespace Features.GamePlay.SubFeatures.Task.Controller
 		{
 			EventBus.Publish(TaskEvents.Echoed, payload);
 			TaskState.ParentSignals?.OnEchoed?.Invoke(payload);
+		}
+
+		/// <summary>
+		/// Loads today's task progress from the server.
+		/// </summary>
+		[Request(TaskRequests.LoadToday)]
+		public static void HandleLoadToday(object payload)
+		{
+			_ = LoadTodayInternalAsync();
+		}
+
+		private static async global::System.Threading.Tasks.Task LoadTodayInternalAsync()
+		{
+			try
+			{
+				var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.TasksToday);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					EventBus.Publish(TaskEvents.RequestFailed, new TaskErrorPayload
+					{
+						Message = "Failed to load today tasks."
+					});
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<TaskTodayResponsePayload>(responseJson)
+					?? new TaskTodayResponsePayload();
+
+				EventBus.Publish(TaskEvents.TodayLoaded, new TaskTodayViewPayload
+				{
+					Date = response.Date,
+					Tasks = response.Tasks,
+					CompletedCount = response.CompletedCount,
+					TotalCount = response.TotalCount
+				});
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(TaskEvents.RequestFailed, new TaskErrorPayload
+				{
+					Message = "Failed to load today tasks: " + exception.Message
+				});
+			}
 		}
 	}
 }

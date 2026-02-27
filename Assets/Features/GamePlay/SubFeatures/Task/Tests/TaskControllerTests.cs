@@ -1,3 +1,6 @@
+using Core.Infrastructure.Events;
+using Features.GamePlay.SubFeatures.Task.Controller;
+using Features.GamePlay.SubFeatures.Task.Events;
 using NUnit.Framework;
 
 namespace Features.GamePlay.SubFeatures.Task.Tests
@@ -7,10 +10,39 @@ namespace Features.GamePlay.SubFeatures.Task.Tests
 	/// </summary>
 	public sealed class TaskControllerTests
 	{
-		[Test]
-		public void PlaceholderTest()
+		[SetUp]
+		public void SetUp()
 		{
-			Assert.Pass("Generated test placeholder.");
+			EventBus.ClearAll();
+		}
+
+		[TearDown]
+		public void TearDown()
+		{
+			EventBus.ClearAll();
+		}
+
+		[Test]
+		public void HandleEcho_ShouldPublishEchoedEvent()
+		{
+			object echoedPayload = null;
+			var payload = new { Value = "task" };
+
+			EventBus.Subscribe(TaskEvents.Echoed, eventPayload =>
+			{
+				echoedPayload = eventPayload;
+			});
+
+			TaskController.HandleEcho(payload);
+
+			Assert.IsNotNull(echoedPayload);
+			Assert.AreEqual(payload, echoedPayload);
+		}
+
+		[Test]
+		public void HandleLoadToday_ShouldNotThrow_WhenCalled()
+		{
+			Assert.DoesNotThrow(() => TaskController.HandleLoadToday(null));
 		}
 	}
 }

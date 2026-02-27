@@ -12,5 +12,6 @@ namespace Features.GamePlay.SubFeatures.Home.Requests
 		public const string OpenCreateCharacter = "game.play.home.open.create.character.request";
 		public const string OpenCharacter = "game.play.home.open.character.request";
 		public const string OpenPractice = "game.play.home.open.practice.request";
+		public const string OpenTask = "game.play.home.open.task.request";
 	}
 }
