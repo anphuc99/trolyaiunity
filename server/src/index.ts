@@ -102,9 +102,10 @@ const startServer = async () => {
     await AppDataSource.initialize();
     const app = createApp();
     const port = Number(process.env.PORT ?? DEFAULT_PORT);
+    const host = process.env.HOST || "localhost";
 
-    app.listen(port, () => {
-      console.log(`Server listening on http://localhost:${port}`);
+    app.listen(port, host, () => {
+      console.log(`Server listening on http://${host}:${port}`);
     });
   } catch (error) {
     console.error("Failed to initialize the data source.", error);

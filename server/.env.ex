@@ -2,6 +2,7 @@
 # Copy this file to .env and adjust values as needed.
 
 NODE_ENV=development
+HOST=localhost
 
 # Database
 # Choose which DB driver TypeORM should use.
