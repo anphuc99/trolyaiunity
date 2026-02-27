@@ -62,7 +62,7 @@ namespace Features.GamePlay.SubFeatures.Practice.Model
 	{
 		public string TabLabel { get; set; }
 
-		public int LearnedCount { get; set; }
+		public int CurrentCount { get; set; }
 
 		public int TotalCount { get; set; }
 	}

@@ -248,7 +248,7 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 				UpdateTabTitle(new PracticeTabSummaryPayload
 				{
 					TabLabel = GetTabLabel(response.Tab),
-					LearnedCount = 0,
+					CurrentCount = 0,
 					TotalCount = 0
 				});
 			}
@@ -492,7 +492,7 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			}
 
 			var label = string.IsNullOrWhiteSpace(summary.TabLabel) ? GetTabLabel(_currentTab) : summary.TabLabel;
-			_tabTitleText.text = label + " (" + summary.LearnedCount + "/" + summary.TotalCount + ")";
+			_tabTitleText.text = label + " (" + summary.CurrentCount + "/" + summary.TotalCount + ")";
 		}
 
 		private void SetRatingContainerVisible(bool isVisible)

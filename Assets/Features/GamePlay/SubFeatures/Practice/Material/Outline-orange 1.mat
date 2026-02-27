@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Outline-orange
+  m_Name: Outline-orange 1
   m_Shader: {fileID: 4800000, guid: 86ce055b2111dde40bea3e819f8b3211, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -44,7 +44,7 @@ Material:
     - _ColorMask: 15
     - _EnableExternalAlpha: 0
     - _OutlineOverlap: 6
-    - _OutlineWidth: 13
+    - _OutlineWidth: 20.8
     - _Stencil: 0
     - _StencilComp: 8
     - _StencilOp: 0

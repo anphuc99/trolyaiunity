@@ -151,41 +151,41 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 			try
 			{
 				List<PracticePromptItemPayload> items = new List<PracticePromptItemPayload>();
-				var learnedCount = 0;
-				var candidateCount = 0;
+				var currentCount = 0;
+				var totalCount = 0;
 
 				switch (tab)
 				{
 					case PracticeTabType.Learn:
 						var learnResult = await LoadLearnCandidatesAsync();
 						items = learnResult.Items;
-						candidateCount = learnResult.CandidateCount;
-						learnedCount = await LoadLearnedCountAsync();
+						currentCount = items.Count;
+						totalCount = learnResult.CandidateCount;
 						break;
 					case PracticeTabType.Review:
 						items = await LoadDueItemsAsync();
-						learnedCount = await LoadLearnedCountAsync();
-						candidateCount = await LoadLearnCandidateCountAsync();
+						currentCount = items.Count;
+						totalCount = items.Count;
 						break;
 					case PracticeTabType.Starred:
 						var starredCards = await LoadAllCardsAsync();
-						learnedCount = starredCards.Count;
 						items = starredCards.Where(card => card?.Review != null && card.Review.IsStarred).ToList();
-						candidateCount = await LoadLearnCandidateCountAsync();
+						currentCount = items.Count;
+						totalCount = items.Count;
 						break;
 					case PracticeTabType.Difficult:
 						var difficultCards = await LoadAllCardsAsync();
-						learnedCount = difficultCards.Count;
 						items = difficultCards.Where(card => IsDifficultToday(card?.Review)).ToList();
-						candidateCount = await LoadLearnCandidateCountAsync();
+						currentCount = items.Count;
+						totalCount = items.Count;
 						break;
 					default:
-						learnedCount = await LoadLearnedCountAsync();
-						candidateCount = await LoadLearnCandidateCountAsync();
+						currentCount = items.Count;
+						totalCount = items.Count;
 						break;
 				}
 
-				var summary = BuildTabSummary(tab, learnedCount, candidateCount);
+				var summary = BuildTabSummary(tab, currentCount, totalCount);
 
 				EventBus.Publish(PracticeEvents.TabLoaded, new PracticeTabResponsePayload
 				{
@@ -278,53 +278,21 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 		}
 
 		/// <summary>
-		/// Loads total learned card count for summary display.
-		/// </summary>
-		/// <returns>Total number of learned cards.</returns>
-		private static async Task<int> LoadLearnedCountAsync()
-		{
-			var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.Translation);
-			if (string.IsNullOrWhiteSpace(responseJson))
-			{
-				return 0;
-			}
-
-			var response = JsonConvert.DeserializeObject<PracticeTranslationListResponsePayload>(responseJson);
-			return response?.Cards?.Count ?? 0;
-		}
-
-		/// <summary>
-		/// Loads total learn candidate count for summary display.
-		/// </summary>
-		/// <returns>Total number of learn candidates.</returns>
-		private static async Task<int> LoadLearnCandidateCountAsync()
-		{
-			var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.TranslationLearn);
-			if (string.IsNullOrWhiteSpace(responseJson))
-			{
-				return 0;
-			}
-
-			var response = JsonConvert.DeserializeObject<PracticeTranslationLearnResponsePayload>(responseJson);
-			return response?.Candidates?.Count ?? 0;
-		}
-
-		/// <summary>
 		/// Builds the tab header summary for the current tab.
 		/// </summary>
 		/// <param name="tab">Active tab.</param>
-		/// <param name="learnedCount">Number of learned cards.</param>
-		/// <param name="candidateCount">Number of learn candidates.</param>
+		/// <param name="currentCount">Number of items in the current tab.</param>
+		/// <param name="totalCount">Total number of items for the current tab.</param>
 		/// <returns>Summary payload for the UI header.</returns>
-		private static PracticeTabSummaryPayload BuildTabSummary(PracticeTabType tab, int learnedCount, int candidateCount)
+		private static PracticeTabSummaryPayload BuildTabSummary(PracticeTabType tab, int currentCount, int totalCount)
 		{
-			var safeLearned = Math.Max(0, learnedCount);
-			var safeCandidates = Math.Max(0, candidateCount);
+			var safeCurrent = Math.Max(0, currentCount);
+			var safeTotal = Math.Max(0, totalCount);
 			return new PracticeTabSummaryPayload
 			{
 				TabLabel = GetTabLabel(tab),
-				LearnedCount = safeLearned,
-				TotalCount = safeLearned + safeCandidates
+				CurrentCount = safeCurrent,
+				TotalCount = safeTotal
 			};
 		}
 
