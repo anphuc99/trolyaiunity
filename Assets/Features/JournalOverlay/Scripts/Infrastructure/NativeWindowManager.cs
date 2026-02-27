@@ -4,7 +4,7 @@ using UnityEngine;
 using System.Runtime.InteropServices;
 #endif
 
-namespace Features.GamePlay.SubFeatures.Journal.Infrastructure
+namespace Features.JournalOverlay.Infrastructure
 {
 	/// <summary>
 	/// Win32 window manager for controlling the Unity application window.
@@ -20,6 +20,7 @@ namespace Features.GamePlay.SubFeatures.Journal.Infrastructure
 		private const uint SWP_NOMOVE = 0x0002;
 		private const uint SWP_NOSIZE = 0x0001;
 		private const uint SWP_SHOWWINDOW = 0x0040;
+		private const uint SWP_FRAMECHANGED = 0x0020;
 		private const int GWL_STYLE = -16;
 		private const int WS_CAPTION = 0x00C00000;
 		private const int WS_THICKFRAME = 0x00040000;
@@ -57,7 +58,6 @@ namespace Features.GamePlay.SubFeatures.Journal.Infrastructure
 		private static RECT _savedRect;
 		private static bool _hasSavedState;
 		private static bool _isTopmost;
-		private static bool _isBorderless;
 
 		/// <summary>
 		/// Retrieves the Unity main window handle. Cached after first call.
@@ -109,10 +109,8 @@ namespace Features.GamePlay.SubFeatures.Journal.Infrastructure
 			}
 
 			SetWindowLong(hwnd, GWL_STYLE, style);
-			// Force window to redraw with updated style.
 			SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0,
-				SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW | 0x0020 /* SWP_FRAMECHANGED */);
-			_isBorderless = enable;
+				SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW | SWP_FRAMECHANGED);
 #endif
 		}
 
@@ -165,10 +163,9 @@ namespace Features.GamePlay.SubFeatures.Journal.Infrastructure
 				_savedRect.Left, _savedRect.Top,
 				_savedRect.Right - _savedRect.Left,
 				_savedRect.Bottom - _savedRect.Top,
-				SWP_SHOWWINDOW | 0x0020 /* SWP_FRAMECHANGED */);
+				SWP_SHOWWINDOW | SWP_FRAMECHANGED);
 
 			_isTopmost = false;
-			_isBorderless = false;
 			_hasSavedState = false;
 #endif
 		}
