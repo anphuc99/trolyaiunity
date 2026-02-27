@@ -1,6 +1,7 @@
+import { execFile } from "child_process";
 import crypto from "crypto";
 import fs from "fs/promises";
-import lamejs from "lamejs";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import path from "path";
 import { AudioContext, OfflineAudioContext } from "node-web-audio-api";
 import * as WavEncoder from "wav-encoder";
@@ -133,98 +134,39 @@ const clampText = (text: string) => {
 };
 
 /**
- * Converts a WAV buffer to MP3 using lamejs (pure JavaScript encoder).
+ * Converts a WAV buffer to MP3 using the bundled ffmpeg binary.
  *
  * @param wavBuffer - Input WAV buffer.
  * @returns MP3 buffer.
  */
 const convertWavToMp3 = async (wavBuffer: Buffer): Promise<Buffer> => {
-  // Parse WAV header to extract format info
-  const dataView = new DataView(wavBuffer.buffer, wavBuffer.byteOffset, wavBuffer.byteLength);
+  const tempId = crypto.randomUUID();
+  const tempWavPath = path.join(AUDIO_DIR, `_tmp_${tempId}.wav`);
+  const tempMp3Path = path.join(AUDIO_DIR, `_tmp_${tempId}.mp3`);
 
-  // Skip to format chunk
-  let offset = 12; // Skip RIFF header
-  let numChannels = 1;
-  let sampleRate = 44100;
-  let bitsPerSample = 16;
-  let dataOffset = 0;
-  let dataSize = 0;
+  try {
+    await fs.writeFile(tempWavPath, wavBuffer);
 
-  while (offset < wavBuffer.length - 8) {
-    const chunkId = String.fromCharCode(
-      wavBuffer[offset],
-      wavBuffer[offset + 1],
-      wavBuffer[offset + 2],
-      wavBuffer[offset + 3]
-    );
-    const chunkSize = dataView.getUint32(offset + 4, true);
+    await new Promise<void>((resolve, reject) => {
+      execFile(
+        ffmpegInstaller.path,
+        ["-y", "-i", tempWavPath, "-codec:a", "libmp3lame", "-q:a", "2", tempMp3Path],
+        (error) => {
+          if (error) {
+            reject(new Error(`ffmpeg conversion failed: ${error.message}`));
+            return;
+          }
 
-    if (chunkId === "fmt ") {
-      numChannels = dataView.getUint16(offset + 10, true);
-      sampleRate = dataView.getUint32(offset + 12, true);
-      bitsPerSample = dataView.getUint16(offset + 22, true);
-    } else if (chunkId === "data") {
-      dataOffset = offset + 8;
-      dataSize = chunkSize;
-      break;
-    }
+          resolve();
+        }
+      );
+    });
 
-    offset += 8 + chunkSize;
+    return await fs.readFile(tempMp3Path);
+  } finally {
+    await fs.unlink(tempWavPath).catch(() => {});
+    await fs.unlink(tempMp3Path).catch(() => {});
   }
-
-  if (dataOffset === 0 || dataSize === 0) {
-    throw new Error("Invalid WAV format: data chunk not found");
-  }
-
-  // Extract PCM samples as Int16Array
-  const bytesPerSample = bitsPerSample / 8;
-  const numSamples = dataSize / bytesPerSample / numChannels;
-
-  const leftChannel = new Int16Array(numSamples);
-  const rightChannel = numChannels === 2 ? new Int16Array(numSamples) : leftChannel;
-
-  for (let i = 0; i < numSamples; i++) {
-    const sampleOffset = dataOffset + i * numChannels * bytesPerSample;
-    leftChannel[i] = dataView.getInt16(sampleOffset, true);
-    if (numChannels === 2) {
-      rightChannel[i] = dataView.getInt16(sampleOffset + bytesPerSample, true);
-    }
-  }
-
-  // Encode to MP3 using lamejs
-  const mp3Encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, 128);
-  const mp3Chunks: Int8Array[] = [];
-  const blockSize = 1152;
-
-  for (let i = 0; i < numSamples; i += blockSize) {
-    const leftBlock = leftChannel.subarray(i, i + blockSize);
-    const rightBlock = numChannels === 2 ? rightChannel.subarray(i, i + blockSize) : undefined;
-
-    const mp3Block =
-      numChannels === 2
-        ? mp3Encoder.encodeBuffer(leftBlock, rightBlock)
-        : mp3Encoder.encodeBuffer(leftBlock);
-
-    if (mp3Block.length > 0) {
-      mp3Chunks.push(mp3Block);
-    }
-  }
-
-  const finalBlock = mp3Encoder.flush();
-  if (finalBlock.length > 0) {
-    mp3Chunks.push(finalBlock);
-  }
-
-  // Combine all chunks into a single buffer
-  const totalLength = mp3Chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-  const mp3Buffer = Buffer.alloc(totalLength);
-  let position = 0;
-  for (const chunk of mp3Chunks) {
-    mp3Buffer.set(chunk, position);
-    position += chunk.length;
-  }
-
-  return mp3Buffer;
 };
 
 /**
