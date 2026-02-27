@@ -150,18 +150,47 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 		{
 			try
 			{
-				List<PracticePromptItemPayload> items = tab switch
+				List<PracticePromptItemPayload> items = new List<PracticePromptItemPayload>();
+				var learnedCount = 0;
+				var candidateCount = 0;
+
+				switch (tab)
 				{
-					PracticeTabType.Learn => await LoadLearnItemsAsync(),
-					PracticeTabType.Review => await LoadDueItemsAsync(),
-					PracticeTabType.Starred => await LoadStarredItemsAsync(),
-					PracticeTabType.Difficult => await LoadDifficultItemsAsync(),
-					_ => new List<PracticePromptItemPayload>()
-				};
+					case PracticeTabType.Learn:
+						var learnResult = await LoadLearnCandidatesAsync();
+						items = learnResult.Items;
+						candidateCount = learnResult.CandidateCount;
+						learnedCount = await LoadLearnedCountAsync();
+						break;
+					case PracticeTabType.Review:
+						items = await LoadDueItemsAsync();
+						learnedCount = await LoadLearnedCountAsync();
+						candidateCount = await LoadLearnCandidateCountAsync();
+						break;
+					case PracticeTabType.Starred:
+						var starredCards = await LoadAllCardsAsync();
+						learnedCount = starredCards.Count;
+						items = starredCards.Where(card => card?.Review != null && card.Review.IsStarred).ToList();
+						candidateCount = await LoadLearnCandidateCountAsync();
+						break;
+					case PracticeTabType.Difficult:
+						var difficultCards = await LoadAllCardsAsync();
+						learnedCount = difficultCards.Count;
+						items = difficultCards.Where(card => IsDifficultToday(card?.Review)).ToList();
+						candidateCount = await LoadLearnCandidateCountAsync();
+						break;
+					default:
+						learnedCount = await LoadLearnedCountAsync();
+						candidateCount = await LoadLearnCandidateCountAsync();
+						break;
+				}
+
+				var summary = BuildTabSummary(tab, learnedCount, candidateCount);
 
 				EventBus.Publish(PracticeEvents.TabLoaded, new PracticeTabResponsePayload
 				{
 					Tab = tab,
+					Summary = summary,
 					Items = items
 				});
 			}
@@ -198,21 +227,25 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 			return cards.Where(card => IsDifficultToday(card?.Review)).ToList();
 		}
 
-		private static async Task<List<PracticePromptItemPayload>> LoadLearnItemsAsync()
+		/// <summary>
+		/// Loads learn candidates and maps them into prompt items.
+		/// </summary>
+		/// <returns>Learn candidate items with the total candidate count.</returns>
+		private static async Task<PracticeLearnCandidatesResult> LoadLearnCandidatesAsync()
 		{
 			var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.TranslationLearn);
 			if (string.IsNullOrWhiteSpace(responseJson))
 			{
-				return new List<PracticePromptItemPayload>();
+				return new PracticeLearnCandidatesResult();
 			}
 
 			var response = JsonConvert.DeserializeObject<PracticeTranslationLearnResponsePayload>(responseJson);
 			if (response?.Candidates == null || response.Candidates.Count == 0)
 			{
-				return new List<PracticePromptItemPayload>();
+				return new PracticeLearnCandidatesResult();
 			}
 
-			return response.Candidates
+			var items = response.Candidates
 				.Where(candidate => candidate != null)
 				.Select(candidate => new PracticePromptItemPayload
 				{
@@ -224,6 +257,12 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 					Review = null,
 					IsLearnCandidate = true
 				}).ToList();
+
+			return new PracticeLearnCandidatesResult
+			{
+				Items = items,
+				CandidateCount = response.Candidates.Count
+			};
 		}
 
 		private static async Task<List<PracticePromptItemPayload>> LoadAllCardsAsync()
@@ -236,6 +275,84 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 
 			var response = JsonConvert.DeserializeObject<PracticeTranslationListResponsePayload>(responseJson);
 			return MapCardsToItems(response?.Cards);
+		}
+
+		/// <summary>
+		/// Loads total learned card count for summary display.
+		/// </summary>
+		/// <returns>Total number of learned cards.</returns>
+		private static async Task<int> LoadLearnedCountAsync()
+		{
+			var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.Translation);
+			if (string.IsNullOrWhiteSpace(responseJson))
+			{
+				return 0;
+			}
+
+			var response = JsonConvert.DeserializeObject<PracticeTranslationListResponsePayload>(responseJson);
+			return response?.Cards?.Count ?? 0;
+		}
+
+		/// <summary>
+		/// Loads total learn candidate count for summary display.
+		/// </summary>
+		/// <returns>Total number of learn candidates.</returns>
+		private static async Task<int> LoadLearnCandidateCountAsync()
+		{
+			var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.TranslationLearn);
+			if (string.IsNullOrWhiteSpace(responseJson))
+			{
+				return 0;
+			}
+
+			var response = JsonConvert.DeserializeObject<PracticeTranslationLearnResponsePayload>(responseJson);
+			return response?.Candidates?.Count ?? 0;
+		}
+
+		/// <summary>
+		/// Builds the tab header summary for the current tab.
+		/// </summary>
+		/// <param name="tab">Active tab.</param>
+		/// <param name="learnedCount">Number of learned cards.</param>
+		/// <param name="candidateCount">Number of learn candidates.</param>
+		/// <returns>Summary payload for the UI header.</returns>
+		private static PracticeTabSummaryPayload BuildTabSummary(PracticeTabType tab, int learnedCount, int candidateCount)
+		{
+			var safeLearned = Math.Max(0, learnedCount);
+			var safeCandidates = Math.Max(0, candidateCount);
+			return new PracticeTabSummaryPayload
+			{
+				TabLabel = GetTabLabel(tab),
+				LearnedCount = safeLearned,
+				TotalCount = safeLearned + safeCandidates
+			};
+		}
+
+		/// <summary>
+		/// Gets the display label for a practice tab.
+		/// </summary>
+		/// <param name="tab">Target tab.</param>
+		/// <returns>Localized tab label.</returns>
+		private static string GetTabLabel(PracticeTabType tab)
+		{
+			return tab switch
+			{
+				PracticeTabType.Review => "Ôn tập",
+				PracticeTabType.Difficult => "Từ khó",
+				PracticeTabType.Starred => "Từ sao",
+				PracticeTabType.Learn => "Học",
+				_ => "Luyện tập"
+			};
+		}
+
+		/// <summary>
+		/// Result payload for learn candidate loading.
+		/// </summary>
+		private sealed class PracticeLearnCandidatesResult
+		{
+			public List<PracticePromptItemPayload> Items { get; set; } = new List<PracticePromptItemPayload>();
+
+			public int CandidateCount { get; set; }
 		}
 
 		private static List<PracticePromptItemPayload> MapCardsToItems(List<PracticeTranslationCardPayload> cards)

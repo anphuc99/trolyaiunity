@@ -50,7 +50,21 @@ namespace Features.GamePlay.SubFeatures.Practice.Model
 	{
 		public PracticeTabType Tab { get; set; }
 
+		public PracticeTabSummaryPayload Summary { get; set; }
+
 		public List<PracticePromptItemPayload> Items { get; set; } = new List<PracticePromptItemPayload>();
+	}
+
+	/// <summary>
+	/// Summary payload for the practice tab header.
+	/// </summary>
+	public sealed class PracticeTabSummaryPayload
+	{
+		public string TabLabel { get; set; }
+
+		public int LearnedCount { get; set; }
+
+		public int TotalCount { get; set; }
 	}
 
 	/// <summary>

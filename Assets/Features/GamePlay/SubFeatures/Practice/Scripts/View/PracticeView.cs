@@ -35,6 +35,9 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 		private TMP_Text _revealButtonText;
 
 		[SerializeField]
+		private TMP_Text _tabTitleText;
+
+		[SerializeField]
 		private Button _revealButton;
 
 		[SerializeField]
@@ -141,6 +144,12 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 				_revealButtonText = _revealButton.GetComponentInChildren<TMP_Text>();
 			}
 
+			if (_tabTitleText == null)
+			{
+				var titleRoot = FindChildByName(transform, "Icon");
+				_tabTitleText = titleRoot != null ? titleRoot.GetComponentInChildren<TMP_Text>() : null;
+			}
+
 			if (_ratingContainer == null)
 			{
 				_ratingContainer = FindChildByName(transform, "btn đánh giá")?.gameObject;
@@ -228,6 +237,20 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			if (payload is not PracticeTabResponsePayload response || response.Items == null)
 			{
 				return;
+			}
+
+			if (response.Summary != null)
+			{
+				UpdateTabTitle(response.Summary);
+			}
+			else
+			{
+				UpdateTabTitle(new PracticeTabSummaryPayload
+				{
+					TabLabel = GetTabLabel(response.Tab),
+					LearnedCount = 0,
+					TotalCount = 0
+				});
 			}
 
 			if (response.Items.Count == 0)
@@ -457,6 +480,21 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			}
 		}
 
+		/// <summary>
+		/// Updates the header title with the selected tab and progress counts.
+		/// </summary>
+		/// <param name="summary">Summary payload for the active tab.</param>
+		private void UpdateTabTitle(PracticeTabSummaryPayload summary)
+		{
+			if (_tabTitleText == null || summary == null)
+			{
+				return;
+			}
+
+			var label = string.IsNullOrWhiteSpace(summary.TabLabel) ? GetTabLabel(_currentTab) : summary.TabLabel;
+			_tabTitleText.text = label + " (" + summary.LearnedCount + "/" + summary.TotalCount + ")";
+		}
+
 		private void SetRatingContainerVisible(bool isVisible)
 		{
 			if (_ratingContainer != null)
@@ -501,6 +539,23 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			}
 
 			return string.Join("\n", lines);
+		}
+
+		/// <summary>
+		/// Gets a display label for the tab when summary data is missing.
+		/// </summary>
+		/// <param name="tab">Target tab.</param>
+		/// <returns>Localized tab label.</returns>
+		private static string GetTabLabel(PracticeTabType tab)
+		{
+			return tab switch
+			{
+				PracticeTabType.Review => "Ôn tập",
+				PracticeTabType.Difficult => "Từ khó",
+				PracticeTabType.Starred => "Từ sao",
+				PracticeTabType.Learn => "Học",
+				_ => "Luyện tập"
+			};
 		}
 
 		private static Transform FindChildByName(Transform root, string targetName)
