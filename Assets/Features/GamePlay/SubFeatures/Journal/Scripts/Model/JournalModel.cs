@@ -219,4 +219,97 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 		/// </summary>
 		public string AudioUrl { get; set; }
 	}
+
+	/// <summary>
+	/// One item in the sequential playback queue, carrying all TTS and display data.
+	/// </summary>
+	public sealed class JournalPlaybackQueueItem
+	{
+		/// <summary>Journal id this message belongs to.</summary>
+		public int JournalId { get; set; }
+
+		/// <summary>Server-side message id.</summary>
+		public string MessageId { get; set; }
+
+		/// <summary>Zero-based index within the flattened playback queue.</summary>
+		public int QueueIndex { get; set; }
+
+		/// <summary>Character display name (sender).</summary>
+		public string CharacterName { get; set; }
+
+		/// <summary>Message text to synthesize via TTS.</summary>
+		public string Text { get; set; }
+
+		/// <summary>Optional tone hint for TTS.</summary>
+		public string Tone { get; set; }
+
+		/// <summary>Sender display name shown in the overlay bubble.</summary>
+		public string SenderName { get; set; }
+
+		/// <summary>Translation text, if available.</summary>
+		public string Translation { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload published when the currently playing message changes during auto-play.
+	/// </summary>
+	public sealed class JournalPlaybackMessageChangedPayload
+	{
+		/// <summary>The queue item that is now playing.</summary>
+		public JournalPlaybackQueueItem CurrentItem { get; set; }
+
+		/// <summary>Zero-based index of the current item in the queue.</summary>
+		public int CurrentIndex { get; set; }
+
+		/// <summary>Total number of items in the queue.</summary>
+		public int TotalCount { get; set; }
+
+		/// <summary>Resolved TTS audio URL for this message, or null if not yet resolved.</summary>
+		public string AudioUrl { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload published when floating overlay mode changes.
+	/// </summary>
+	public sealed class JournalFloatingModePayload
+	{
+		/// <summary>True when floating overlay is active.</summary>
+		public bool IsFloating { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload published when journal selection state changes.
+	/// </summary>
+	public sealed class JournalSelectionChangedPayload
+	{
+		/// <summary>Set of currently selected journal ids.</summary>
+		public HashSet<int> SelectedIds { get; set; } = new HashSet<int>();
+	}
+
+	/// <summary>
+	/// Request payload for toggling journal selection.
+	/// </summary>
+	public sealed class JournalToggleSelectionPayload
+	{
+		/// <summary>Journal id to toggle.</summary>
+		public int JournalId { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload for playback state transitions (started/stopped/paused/resumed).
+	/// </summary>
+	public sealed class JournalPlaybackStatePayload
+	{
+		/// <summary>True when playback is active (playing or paused).</summary>
+		public bool IsPlaying { get; set; }
+
+		/// <summary>True when playback is paused.</summary>
+		public bool IsPaused { get; set; }
+
+		/// <summary>Zero-based index of the current item in the queue.</summary>
+		public int CurrentIndex { get; set; }
+
+		/// <summary>Total number of items in the queue.</summary>
+		public int TotalCount { get; set; }
+	}
 }

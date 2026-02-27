@@ -33,9 +33,16 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		[Core.Infrastructure.Attributes.ControllerShutdown]
 		public static void OnExitScope()
 		{
+			// Stop playback if active before clearing state.
+			if (JournalState.IsPlaying)
+			{
+				StopPlaybackInternal();
+			}
+
 			JournalState.CachedList = new JournalListResponsePayload();
 			JournalState.CachedDetail = null;
 			JournalState.SelectedJournalId = null;
+			JournalState.ResetAll();
 		}
 
 		/// <summary>
@@ -51,6 +58,10 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		/// </summary>
 		public static void Uninstall()
 		{
+			if (JournalState.IsPlaying)
+			{
+				StopPlaybackInternal();
+			}
 			EventBus.Publish(JournalEvents.Uninstalled, null);
 		}
 
@@ -127,6 +138,155 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 			}
 
 			_ = RequestMessageAudioInternalAsync(payload);
+		}
+
+		// ==================================================================
+		// Selection handlers
+		// ==================================================================
+
+		/// <summary>
+		/// Toggles a journal id in/out of the multi-select set.
+		/// </summary>
+		/// <param name="payload">Toggle selection payload.</param>
+		[Request(JournalRequests.ToggleJournalSelection)]
+		public static void HandleToggleJournalSelection(JournalToggleSelectionPayload payload)
+		{
+			if (payload == null || payload.JournalId <= 0)
+			{
+				PublishError("Invalid journal id for selection.");
+				return;
+			}
+
+			var ids = JournalState.SelectedJournalIds;
+			if (!ids.Remove(payload.JournalId))
+			{
+				ids.Add(payload.JournalId);
+			}
+
+			EventBus.Publish(JournalEvents.SelectionChanged, new JournalSelectionChangedPayload
+			{
+				SelectedIds = ids
+			});
+		}
+
+		// ==================================================================
+		// Playback handlers
+		// ==================================================================
+
+		/// <summary>
+		/// Starts sequential playback of all selected journals' messages.
+		/// Loads details for journals not yet cached, then flattens messages into a queue.
+		/// </summary>
+		[Request(JournalRequests.StartPlayback)]
+		public static void HandleStartPlayback(object payload)
+		{
+			if (JournalState.SelectedJournalIds.Count == 0)
+			{
+				PublishError("No journals selected for playback.");
+				return;
+			}
+
+			_ = StartPlaybackInternalAsync();
+		}
+
+		/// <summary>
+		/// Pauses current playback.
+		/// </summary>
+		[Request(JournalRequests.PausePlayback)]
+		public static void HandlePausePlayback(object payload)
+		{
+			if (!JournalState.IsPlaying || JournalState.IsPaused)
+			{
+				return;
+			}
+
+			JournalState.IsPaused = true;
+			EventBus.Publish(JournalEvents.PlaybackPaused, BuildPlaybackStatePayload());
+		}
+
+		/// <summary>
+		/// Resumes paused playback.
+		/// </summary>
+		[Request(JournalRequests.ResumePlayback)]
+		public static void HandleResumePlayback(object payload)
+		{
+			if (!JournalState.IsPlaying || !JournalState.IsPaused)
+			{
+				return;
+			}
+
+			JournalState.IsPaused = false;
+			EventBus.Publish(JournalEvents.PlaybackResumed, BuildPlaybackStatePayload());
+		}
+
+		/// <summary>
+		/// Skips to the next message in the playback queue.
+		/// </summary>
+		[Request(JournalRequests.NextMessage)]
+		public static void HandleNextMessage(object payload)
+		{
+			if (!JournalState.IsPlaying)
+			{
+				return;
+			}
+
+			AdvanceToIndex(JournalState.CurrentPlaybackIndex + 1);
+		}
+
+		/// <summary>
+		/// Goes back to the previous message in the playback queue.
+		/// </summary>
+		[Request(JournalRequests.PreviousMessage)]
+		public static void HandlePreviousMessage(object payload)
+		{
+			if (!JournalState.IsPlaying)
+			{
+				return;
+			}
+
+			var newIndex = JournalState.CurrentPlaybackIndex - 1;
+			if (newIndex < 0)
+			{
+				newIndex = 0;
+			}
+
+			AdvanceToIndex(newIndex);
+		}
+
+		/// <summary>
+		/// Stops playback completely and resets state.
+		/// </summary>
+		[Request(JournalRequests.StopPlayback)]
+		public static void HandleStopPlayback(object payload)
+		{
+			StopPlaybackInternal();
+		}
+
+		/// <summary>
+		/// Toggles the floating overlay mode.
+		/// </summary>
+		[Request(JournalRequests.ToggleFloatingMode)]
+		public static void HandleToggleFloatingMode(object payload)
+		{
+			JournalState.IsFloatingMode = !JournalState.IsFloatingMode;
+			EventBus.Publish(JournalEvents.FloatingModeChanged, new JournalFloatingModePayload
+			{
+				IsFloating = JournalState.IsFloatingMode
+			});
+		}
+
+		/// <summary>
+		/// Internal request: View calls this when audio finishes to advance to the next message.
+		/// </summary>
+		[Request(JournalRequests.AdvancePlayback)]
+		public static void HandleAdvancePlayback(object payload)
+		{
+			if (!JournalState.IsPlaying)
+			{
+				return;
+			}
+
+			AdvanceToIndex(JournalState.CurrentPlaybackIndex + 1);
 		}
 
 		/// <summary>
@@ -369,6 +529,234 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		private static Sprite GetAvatar(string characterName)
 		{
 			return JournalState.ParentSignals?.GetAvatar?.Invoke(characterName);
+		}
+
+		// ==================================================================
+		// Playback internal helpers
+		// ==================================================================
+
+		/// <summary>
+		/// Loads all selected journal details and builds the flattened playback queue.
+		/// Journals are ordered from highest id to lowest (bottom-to-top in list).
+		/// </summary>
+		private static async Task StartPlaybackInternalAsync()
+		{
+			try
+			{
+				var selectedIds = new List<int>(JournalState.SelectedJournalIds);
+				// Sort descending so bottom journal (highest index in list) plays first.
+				selectedIds.Sort((a, b) => b.CompareTo(a));
+
+				// Load details for any uncached journals.
+				foreach (var journalId in selectedIds)
+				{
+					if (!JournalState.CachedDetails.ContainsKey(journalId))
+					{
+						var detail = await LoadJournalDetailForPlaybackAsync(journalId);
+						if (detail != null)
+						{
+							JournalState.CachedDetails[journalId] = detail;
+						}
+					}
+				}
+
+				// Build flattened queue from all journal messages.
+				var queue = new List<JournalPlaybackQueueItem>();
+				var queueIndex = 0;
+				foreach (var journalId in selectedIds)
+				{
+					if (!JournalState.CachedDetails.TryGetValue(journalId, out var detail))
+					{
+						continue;
+					}
+
+					var messages = detail.Messages;
+					if (messages == null)
+					{
+						continue;
+					}
+
+					for (var i = 0; i < messages.Count; i++)
+					{
+						var msg = messages[i];
+						queue.Add(new JournalPlaybackQueueItem
+						{
+							JournalId = journalId,
+							MessageId = msg.Id,
+							QueueIndex = queueIndex,
+							CharacterName = msg.CharacterName,
+							Text = msg.Content,
+							Tone = msg.Tone,
+							SenderName = msg.CharacterName,
+							Translation = msg.Translation
+						});
+						queueIndex++;
+					}
+				}
+
+				if (queue.Count == 0)
+				{
+					PublishError("No messages found in selected journals.");
+					return;
+				}
+
+				JournalState.PlaybackQueue = queue;
+				JournalState.CurrentPlaybackIndex = 0;
+				JournalState.IsPlaying = true;
+				JournalState.IsPaused = false;
+
+				EventBus.Publish(JournalEvents.PlaybackStarted, BuildPlaybackStatePayload());
+
+				// Request TTS for first message then publish.
+				await RequestAndPublishPlaybackAudioAsync(0);
+			}
+			catch (Exception exception)
+			{
+				PublishError("Failed to start playback: " + exception.Message);
+			}
+		}
+
+		/// <summary>
+		/// Loads a single journal detail for playback (does not affect main view state).
+		/// </summary>
+		/// <param name="journalId">Journal id to load.</param>
+		/// <returns>Detail response, or null on failure.</returns>
+		private static async Task<JournalDetailResponsePayload> LoadJournalDetailForPlaybackAsync(int journalId)
+		{
+			try
+			{
+				var endpoint = BuildJournalDetailEndpoint(journalId);
+				var responseJson = await HttpClient.GetTaskAsync(endpoint);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					return null;
+				}
+
+				var response = JsonConvert.DeserializeObject<JournalDetailResponsePayload>(responseJson);
+				if (response?.Journal == null)
+				{
+					return null;
+				}
+
+				if (response.Messages == null)
+				{
+					response.Messages = new List<JournalMessagePayload>();
+				}
+
+				return response;
+			}
+			catch (Exception exception)
+			{
+				Debug.LogWarning("[JournalController] Failed to load journal " + journalId + " for playback: " + exception.Message);
+				return null;
+			}
+		}
+
+		/// <summary>
+		/// Requests TTS for the message at the given queue index and publishes
+		/// <see cref="JournalEvents.PlaybackMessageChanged"/> with the audio URL.
+		/// </summary>
+		/// <param name="queueIndex">Index in <see cref="JournalState.PlaybackQueue"/>.</param>
+		private static async Task RequestAndPublishPlaybackAudioAsync(int queueIndex)
+		{
+			var queue = JournalState.PlaybackQueue;
+			if (queueIndex < 0 || queueIndex >= queue.Count)
+			{
+				return;
+			}
+
+			var item = queue[queueIndex];
+			string audioUrl = null;
+
+			// Only request TTS for non-empty character messages.
+			if (!string.IsNullOrWhiteSpace(item.Text))
+			{
+				try
+				{
+					var endpoint = BuildTextToSpeechEndpoint(item.Text, item.Tone, item.CharacterName, false);
+					var responseJson = await HttpClient.GetTaskAsync(endpoint);
+					if (!string.IsNullOrWhiteSpace(responseJson))
+					{
+						var ttsResponse = JsonConvert.DeserializeObject<JournalTextToSpeechResponsePayload>(responseJson);
+						if (ttsResponse != null && !string.IsNullOrWhiteSpace(ttsResponse.Url))
+						{
+							audioUrl = ttsResponse.Url;
+						}
+					}
+				}
+				catch (Exception exception)
+				{
+					Debug.LogWarning("[JournalController] TTS request failed for queue item " + queueIndex + ": " + exception.Message);
+				}
+			}
+
+			// Publish even if audioUrl is null so the View can skip to next.
+			EventBus.Publish(JournalEvents.PlaybackMessageChanged, new JournalPlaybackMessageChangedPayload
+			{
+				CurrentItem = item,
+				CurrentIndex = queueIndex,
+				TotalCount = queue.Count,
+				AudioUrl = audioUrl
+			});
+		}
+
+		/// <summary>
+		/// Advances playback to a specific queue index, or stops if past the end.
+		/// </summary>
+		/// <param name="newIndex">Target queue index.</param>
+		private static void AdvanceToIndex(int newIndex)
+		{
+			if (newIndex >= JournalState.PlaybackQueue.Count)
+			{
+				StopPlaybackInternal();
+				return;
+			}
+
+			JournalState.CurrentPlaybackIndex = newIndex;
+			JournalState.IsPaused = false;
+			_ = RequestAndPublishPlaybackAudioAsync(newIndex);
+		}
+
+		/// <summary>
+		/// Stops playback, resets state, and publishes stopped event.
+		/// </summary>
+		private static void StopPlaybackInternal()
+		{
+			var wasFloating = JournalState.IsFloatingMode;
+			JournalState.ResetPlaybackState();
+
+			// Exit floating mode if active.
+			if (wasFloating)
+			{
+				JournalState.IsFloatingMode = false;
+				EventBus.Publish(JournalEvents.FloatingModeChanged, new JournalFloatingModePayload
+				{
+					IsFloating = false
+				});
+			}
+
+			EventBus.Publish(JournalEvents.PlaybackStopped, new JournalPlaybackStatePayload
+			{
+				IsPlaying = false,
+				IsPaused = false,
+				CurrentIndex = 0,
+				TotalCount = 0
+			});
+		}
+
+		/// <summary>
+		/// Builds a <see cref="JournalPlaybackStatePayload"/> from current state.
+		/// </summary>
+		/// <returns>Current playback state payload.</returns>
+		private static JournalPlaybackStatePayload BuildPlaybackStatePayload()
+		{
+			return new JournalPlaybackStatePayload
+			{
+				IsPlaying = JournalState.IsPlaying,
+				IsPaused = JournalState.IsPaused,
+				CurrentIndex = JournalState.CurrentPlaybackIndex,
+				TotalCount = JournalState.PlaybackQueue.Count
+			};
 		}
 	}
 }
