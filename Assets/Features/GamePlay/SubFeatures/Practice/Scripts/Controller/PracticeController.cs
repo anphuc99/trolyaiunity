@@ -288,6 +288,7 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 					Content = candidate.Content,
 					Translation = candidate.Translation,
 					CharacterName = candidate.CharacterName,
+					JournalSummary = candidate.JournalSummary,
 					Audio = candidate.Audio,
 					Review = null,
 					IsLearnCandidate = true
@@ -373,6 +374,7 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 					Content = card.Content,
 					Translation = card.Translation,
 					CharacterName = card.CharacterName,
+					JournalSummary = card.JournalSummary,
 					Audio = card.Audio,
 					Review = card.Review,
 					IsLearnCandidate = false

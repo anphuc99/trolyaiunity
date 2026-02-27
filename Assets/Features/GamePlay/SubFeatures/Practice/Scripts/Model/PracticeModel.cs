@@ -82,6 +82,8 @@ namespace Features.GamePlay.SubFeatures.Practice.Model
 
 		public string CharacterName { get; set; }
 
+		public string JournalSummary { get; set; }
+
 		/// <summary>
 		/// Audio id returned by the API. Used to build the playback URL.
 		/// </summary>
@@ -119,6 +121,9 @@ namespace Features.GamePlay.SubFeatures.Practice.Model
 
 		[JsonProperty("characterName")]
 		public string CharacterName { get; set; }
+
+		[JsonProperty("journalSummary")]
+		public string JournalSummary { get; set; }
 
 		[JsonProperty("review")]
 		public PracticeTranslationReviewPayload Review { get; set; }
@@ -194,6 +199,9 @@ namespace Features.GamePlay.SubFeatures.Practice.Model
 
 		[JsonProperty("characterName")]
 		public string CharacterName { get; set; }
+
+		[JsonProperty("journalSummary")]
+		public string JournalSummary { get; set; }
 
 		/// <summary>
 		/// Audio id for cached TTS playback.

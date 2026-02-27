@@ -40,6 +40,9 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 		private TMP_Text _tabTitleText;
 
 		[SerializeField]
+		private TMP_Text _journalSummaryText;
+
+		[SerializeField]
 		private Button _revealButton;
 
 		[SerializeField]
@@ -164,6 +167,12 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 				_tabTitleText = titleRoot != null ? titleRoot.GetComponentInChildren<TMP_Text>() : null;
 			}
 
+			if (_journalSummaryText == null)
+			{
+				var summaryRoot = FindChildByName(transform, "Sumary");
+				_journalSummaryText = summaryRoot != null ? summaryRoot.GetComponentInChildren<TMP_Text>() : null;
+			}
+
 			if (_ratingContainer == null)
 			{
 				_ratingContainer = FindChildByName(transform, "btn đánh giá")?.gameObject;
@@ -286,6 +295,7 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 
 			_currentItem = _pendingItems[0];
 			ResetRevealState();
+			UpdateJournalSummaryText();
 		}
 
 		[OnEvent(PracticeEvents.ContextLoaded)]
@@ -335,6 +345,7 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			{
 				_currentItem = _pendingItems[_currentItemIndex];
 				ResetRevealState();
+				UpdateJournalSummaryText();
 				return;
 			}
 
@@ -522,6 +533,8 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			{
 				_contextAfterContainer.SetActive(false);
 			}
+
+			UpdateJournalSummaryText();
 		}
 
 		private void ClearViewState()
@@ -548,6 +561,11 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 				_contextAfterText.text = string.Empty;
 			}
 
+			if (_journalSummaryText != null)
+			{
+				_journalSummaryText.text = string.Empty;
+			}
+
 			SetRatingContainerVisible(false);
 		}
 
@@ -557,6 +575,18 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			{
 				_revealButtonText.text = text;
 			}
+		}
+
+		private void UpdateJournalSummaryText()
+		{
+			if (_journalSummaryText == null)
+			{
+				return;
+			}
+
+			_journalSummaryText.text = string.IsNullOrWhiteSpace(_currentItem?.JournalSummary)
+				? string.Empty
+				: _currentItem.JournalSummary;
 		}
 
 		/// <summary>
