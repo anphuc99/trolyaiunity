@@ -4,9 +4,11 @@ using Features.GamePlay.SubFeatures.Practice.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.Practice.Model;
 using Features.GamePlay.SubFeatures.Practice.Requests;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.UI;
 
 namespace Features.GamePlay.SubFeatures.Practice.View
@@ -72,6 +74,11 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 
 		[SerializeField]
 		private Button _tabLearnButton;
+
+		[SerializeField]
+		private Button _speakerButton;
+
+		private AudioSource _audioSource;
 
 		private PracticeTabType _currentTab = PracticeTabType.Review;
 		private PracticePromptItemPayload _currentItem;
@@ -202,6 +209,20 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 				_tabLearnButton = FindChildByName(transform, "Học")?.GetComponent<Button>();
 			}
 
+			if (_speakerButton == null)
+			{
+				_speakerButton = FindChildByName(transform, "Loa")?.GetComponent<Button>();
+			}
+
+			if (_audioSource == null)
+			{
+				_audioSource = GetComponent<AudioSource>();
+				if (_audioSource == null)
+				{
+					_audioSource = gameObject.AddComponent<AudioSource>();
+				}
+			}
+
 			BindButtonEvents();
 		}
 
@@ -216,6 +237,7 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			BindButton(_tabDifficultButton, () => LoadTab(PracticeTabType.Difficult));
 			BindButton(_tabStarredButton, () => LoadTab(PracticeTabType.Starred));
 			BindButton(_tabLearnButton, () => LoadTab(PracticeTabType.Learn));
+			BindButton(_speakerButton, HandleSpeakerClicked);
 		}
 
 		private static void BindButton(Button button, Action handler)
@@ -327,6 +349,22 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			Debug.LogWarning("[PracticeView] Request failed: " + (error?.Message ?? "Unknown error"), this);
 		}
 
+		/// <summary>
+		/// Handles the resolved audio URL event and starts playback.
+		/// </summary>
+		/// <param name="payload">Audio URL payload.</param>
+		[OnEvent(PracticeEvents.AudioUrlResolved)]
+		private void OnAudioUrlResolved(object payload)
+		{
+			if (payload is not PracticeAudioUrlPayload audioPayload
+				|| string.IsNullOrWhiteSpace(audioPayload.Url))
+			{
+				return;
+			}
+
+			StartCoroutine(PlayAudioFromUrlAsync(audioPayload.Url));
+		}
+
 		private void HandleRevealClicked()
 		{
 			if (_currentItem == null)
@@ -374,6 +412,22 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			});
 		}
 
+		/// <summary>
+		/// Sends a play audio request to the controller for the current item.
+		/// </summary>
+		private void HandleSpeakerClicked()
+		{
+			if (_currentItem == null || string.IsNullOrWhiteSpace(_currentItem.Audio))
+			{
+				return;
+			}
+
+			SendRequest(PracticeRequests.PlayAudio, new PracticeAudioRequestPayload
+			{
+				AudioId = _currentItem.Audio
+			});
+		}
+
 		private void ShowKoreanText()
 		{
 			if (_koreanText == null)
@@ -396,7 +450,6 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 
 			_isAnswerRevealed = true;
 			UpdateRevealButtonText(AnswerText);
-			SetRatingContainerVisible(true);
 			if (_revealButton != null)
 			{
 				_revealButton.interactable = false;
@@ -440,7 +493,8 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 				_revealButton.interactable = true;
 			}
 
-			SetRatingContainerVisible(false);
+			// Always show rating buttons when there's a current item
+			SetRatingContainerVisible(true);
 			SetRatingInteractable(true);
 		}
 
@@ -610,6 +664,48 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			}
 
 			return null;
+		}
+
+		/// <summary>
+		/// Downloads and plays an audio clip from the given URL.
+		/// </summary>
+		/// <param name="url">Full audio URL.</param>
+		/// <returns>Coroutine enumerator.</returns>
+		private IEnumerator PlayAudioFromUrlAsync(string url)
+		{
+			if (string.IsNullOrWhiteSpace(url))
+			{
+				yield break;
+			}
+
+			if (_audioSource == null)
+			{
+				yield break;
+			}
+
+			// Stop any currently playing audio before starting new playback
+			if (_audioSource.isPlaying)
+			{
+				_audioSource.Stop();
+			}
+
+			using var audioRequest = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.MPEG);
+			yield return audioRequest.SendWebRequest();
+
+			if (audioRequest.result != UnityWebRequest.Result.Success)
+			{
+				Debug.LogWarning("[PracticeView] Failed to download audio: " + audioRequest.error, this);
+				yield break;
+			}
+
+			var clip = DownloadHandlerAudioClip.GetContent(audioRequest);
+			if (clip == null)
+			{
+				yield break;
+			}
+
+			_audioSource.clip = clip;
+			_audioSource.Play();
 		}
 	}
 }

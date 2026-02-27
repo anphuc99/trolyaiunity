@@ -146,6 +146,40 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 			_ = SubmitReviewInternalAsync(payload);
 		}
 
+		/// <summary>
+		/// Resolves the audio URL for the given audio id and publishes it for playback.
+		/// </summary>
+		/// <param name="payload">Audio request payload containing the audio id.</param>
+		[Request(PracticeRequests.PlayAudio)]
+		public static void HandlePlayAudio(PracticeAudioRequestPayload payload)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.AudioId))
+			{
+				EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
+				{
+					Message = "Audio id is required for playback."
+				});
+				return;
+			}
+
+			var relativePath = "/audio/" + payload.AudioId.Trim() + ".mp3";
+			var resolvedUrl = HttpClient.ResolveUrl(relativePath);
+
+			if (string.IsNullOrWhiteSpace(resolvedUrl))
+			{
+				EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
+				{
+					Message = "Failed to resolve audio URL."
+				});
+				return;
+			}
+
+			EventBus.Publish(PracticeEvents.AudioUrlResolved, new PracticeAudioUrlPayload
+			{
+				Url = resolvedUrl
+			});
+		}
+
 		private static async Task LoadTabInternalAsync(PracticeTabType tab)
 		{
 			try
@@ -254,6 +288,7 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 					Content = candidate.Content,
 					Translation = candidate.Translation,
 					CharacterName = candidate.CharacterName,
+					Audio = candidate.Audio,
 					Review = null,
 					IsLearnCandidate = true
 				}).ToList();
@@ -338,6 +373,7 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 					Content = card.Content,
 					Translation = card.Translation,
 					CharacterName = card.CharacterName,
+					Audio = card.Audio,
 					Review = card.Review,
 					IsLearnCandidate = false
 				}).ToList();

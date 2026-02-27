@@ -304,7 +304,13 @@ namespace Core.Infrastructure.Network
 			request.timeout = timeoutSeconds;
 		}
 
-		private static string ResolveUrl(string url)
+		/// <summary>
+		/// Resolves a relative URL path to a full URL using the configured server base URL.
+		/// Absolute URLs (http/https) are returned as-is.
+		/// </summary>
+		/// <param name="url">Relative or absolute URL.</param>
+		/// <returns>Fully resolved URL.</returns>
+		public static string ResolveUrl(string url)
 		{
 			if (string.IsNullOrWhiteSpace(url))
 			{

@@ -74,5 +74,74 @@ namespace Features.GamePlay.SubFeatures.Practice.Tests
 			Assert.IsNotNull(errorPayload);
 			Assert.AreEqual("Rating must be between 1 and 4.", errorPayload.Message);
 		}
+
+		[Test]
+		public void PlayAudio_ShouldPublishError_WhenPayloadIsNull()
+		{
+			PracticeErrorPayload errorPayload = null;
+			EventBus.Subscribe(PracticeEvents.RequestFailed, payload =>
+			{
+				errorPayload = payload as PracticeErrorPayload;
+			});
+
+			PracticeController.HandlePlayAudio(null);
+
+			Assert.IsNotNull(errorPayload);
+			Assert.AreEqual("Audio id is required for playback.", errorPayload.Message);
+		}
+
+		[Test]
+		public void PlayAudio_ShouldPublishError_WhenAudioIdIsEmpty()
+		{
+			PracticeErrorPayload errorPayload = null;
+			EventBus.Subscribe(PracticeEvents.RequestFailed, payload =>
+			{
+				errorPayload = payload as PracticeErrorPayload;
+			});
+
+			PracticeController.HandlePlayAudio(new PracticeAudioRequestPayload
+			{
+				AudioId = "  "
+			});
+
+			Assert.IsNotNull(errorPayload);
+			Assert.AreEqual("Audio id is required for playback.", errorPayload.Message);
+		}
+
+		[Test]
+		public void PlayAudio_ShouldPublishAudioUrlResolved_WhenAudioIdIsValid()
+		{
+			PracticeAudioUrlPayload audioPayload = null;
+			EventBus.Subscribe(PracticeEvents.AudioUrlResolved, payload =>
+			{
+				audioPayload = payload as PracticeAudioUrlPayload;
+			});
+
+			PracticeController.HandlePlayAudio(new PracticeAudioRequestPayload
+			{
+				AudioId = "abc123"
+			});
+
+			Assert.IsNotNull(audioPayload);
+			Assert.IsTrue(audioPayload.Url.EndsWith("/audio/abc123.mp3"));
+		}
+
+		[Test]
+		public void PlayAudio_ShouldTrimAudioId()
+		{
+			PracticeAudioUrlPayload audioPayload = null;
+			EventBus.Subscribe(PracticeEvents.AudioUrlResolved, payload =>
+			{
+				audioPayload = payload as PracticeAudioUrlPayload;
+			});
+
+			PracticeController.HandlePlayAudio(new PracticeAudioRequestPayload
+			{
+				AudioId = "  xyz789  "
+			});
+
+			Assert.IsNotNull(audioPayload);
+			Assert.IsTrue(audioPayload.Url.EndsWith("/audio/xyz789.mp3"));
+		}
 	}
 }

@@ -82,6 +82,11 @@ namespace Features.GamePlay.SubFeatures.Practice.Model
 
 		public string CharacterName { get; set; }
 
+		/// <summary>
+		/// Audio id returned by the API. Used to build the playback URL.
+		/// </summary>
+		public string Audio { get; set; }
+
 		public PracticeTranslationReviewPayload Review { get; set; }
 
 		public bool IsLearnCandidate { get; set; }
@@ -117,6 +122,12 @@ namespace Features.GamePlay.SubFeatures.Practice.Model
 
 		[JsonProperty("review")]
 		public PracticeTranslationReviewPayload Review { get; set; }
+
+		/// <summary>
+		/// Audio id for cached TTS playback.
+		/// </summary>
+		[JsonProperty("audio")]
+		public string Audio { get; set; }
 	}
 
 	/// <summary>
@@ -183,6 +194,12 @@ namespace Features.GamePlay.SubFeatures.Practice.Model
 
 		[JsonProperty("characterName")]
 		public string CharacterName { get; set; }
+
+		/// <summary>
+		/// Audio id for cached TTS playback.
+		/// </summary>
+		[JsonProperty("audio")]
+		public string Audio { get; set; }
 	}
 
 	/// <summary>
@@ -234,5 +251,27 @@ namespace Features.GamePlay.SubFeatures.Practice.Model
 
 		[JsonProperty("messageId")]
 		public string MessageId { get; set; }
+	}
+
+	/// <summary>
+	/// Request payload for playing audio by audio id.
+	/// </summary>
+	public sealed class PracticeAudioRequestPayload
+	{
+		/// <summary>
+		/// Audio id from the API response.
+		/// </summary>
+		public string AudioId { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload containing the resolved audio URL for playback.
+	/// </summary>
+	public sealed class PracticeAudioUrlPayload
+	{
+		/// <summary>
+		/// Full audio URL ready for playback.
+		/// </summary>
+		public string Url { get; set; }
 	}
 }

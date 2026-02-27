@@ -11,5 +11,6 @@ namespace Features.GamePlay.SubFeatures.Practice.Requests
 		public const string LoadTab = "game.play.practice.load.tab.request";
 		public const string LoadContext = "game.play.practice.load.context.request";
 		public const string SubmitReview = "game.play.practice.submit.review.request";
+		public const string PlayAudio = "game.play.practice.play.audio.request";
 	}
 }
