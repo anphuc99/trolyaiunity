@@ -25,6 +25,7 @@
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
+    "lamejs": "^1.2.1",
     "mysql2": "^3.11.5",
     "node-web-audio-api": "^1.0.8",
     "openai": "^4.104.0",
