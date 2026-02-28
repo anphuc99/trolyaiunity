@@ -12,6 +12,7 @@ namespace Core.Infrastructure.Network
 		public const string TokenRefresh = "/api/token/refresh";
 		public const string Characters = "/api/characters";
 		public const string CharactersUploadAvatar = "/api/characters/upload-avatar";
+		public const string Levels = "/api/levels";
 		public const string ChatHistory = "/api/chat/history";
 		public const string ChatSend = "/api/chat/send";
 		public const string ChatDeveloperState = "/api/chat/developer-state";
@@ -26,6 +27,8 @@ namespace Core.Infrastructure.Network
 		public const string TranslationReview = "/api/translation/review";
 		public const string TasksToday = "/api/tasks/today";
 		public const string TextToSpeech = "/api/text-to-speech";
+		public const string UserMe = "/api/users/me";
+		public const string UserProfile = "/api/users/profile";
 		public const string Personalities = "/personalities";
 	}
 }

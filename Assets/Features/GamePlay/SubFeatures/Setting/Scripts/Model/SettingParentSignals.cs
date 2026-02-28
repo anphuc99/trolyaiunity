@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Features.GamePlay.SubFeatures.Setting.Model
 {
@@ -8,13 +9,23 @@ namespace Features.GamePlay.SubFeatures.Setting.Model
 	public sealed class SettingParentSignals
 	{
 		/// <summary>
-		/// Optional callback invoked when the child echoes a payload.
+		/// Optional callback invoked when the child echoes a payload (reserved for future use).
 		/// </summary>
 		public Action<object> OnEchoed { get; set; }
 
 		/// <summary>
-		/// Optional callback for retrieving data from the parent.
+		/// Retrieves the list of cached character names used for voice configuration.
 		/// </summary>
-		public Func<string> GetParentStatus { get; set; }
+		public Func<IReadOnlyList<string>> GetCharacterNames { get; set; }
+
+		/// <summary>
+		/// Resolves a character voice name by character name.
+		/// </summary>
+		public Func<string, string> GetCharacterVoiceName { get; set; }
+
+		/// <summary>
+		/// Resolves a character pitch by character name.
+		/// </summary>
+		public Func<string, float?> GetCharacterPitch { get; set; }
 	}
 }

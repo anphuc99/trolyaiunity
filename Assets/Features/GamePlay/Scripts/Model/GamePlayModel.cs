@@ -11,7 +11,8 @@ namespace Features.GamePlay.Model
 		Journal,
 		Practice,
 		Story,
-		Task
+		Task,
+		Setting
 	}
 
 	/// <summary>

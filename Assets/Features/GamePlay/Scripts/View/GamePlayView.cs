@@ -45,5 +45,10 @@ namespace Features.GamePlay.View
 		{
 			SendRequest(GamePlayRequests.OpenSubController, GamePlaySubControllerType.Chat);
 		}
+
+		public void OpenSetting()
+		{
+			SendRequest(GamePlayRequests.OpenSubController, GamePlaySubControllerType.Setting);
+		}
 	}
 }
