@@ -38,7 +38,6 @@ namespace Share.Components
 
 		private float _baseHeight;
 		private Tween _heightTween;
-		private bool _placeholderWasVisible;
 
 		private void Awake()
 		{
@@ -140,15 +139,14 @@ namespace Share.Components
 
 		private void HandleDeselected(string value)
 		{
-			AnimateHeight(_baseHeight, _blurEase);
-			RestorePlaceholderVisibility();
+			AnimateHeight(_baseHeight, _blurEase).OnComplete(() => SetPlaceholderVisible(true));
 		}
 
-		private void AnimateHeight(float targetHeight, Ease ease)
+		private Tween AnimateHeight(float targetHeight, Ease ease)
 		{
 			if (_targetRect == null)
 			{
-				return;
+				return null;
 			}
 
 			KillTween();
@@ -158,6 +156,7 @@ namespace Share.Components
 			_heightTween = DOTween
 				.To(() => _targetRect.sizeDelta, value => _targetRect.sizeDelta = value, endSize, _duration)
 				.SetEase(ease);
+            return _heightTween;
 		}
 
 		private void KillTween()
@@ -176,18 +175,7 @@ namespace Share.Components
 				return;
 			}
 
-			_placeholderWasVisible = _placeholderGraphic.enabled;
-			_placeholderGraphic.enabled = isVisible;
-		}
-
-		private void RestorePlaceholderVisibility()
-		{
-			if (_placeholderGraphic == null)
-			{
-				return;
-			}
-
-			_placeholderGraphic.enabled = _placeholderWasVisible;
+			_placeholderGraphic.gameObject.SetActive(isVisible);
 		}
 	}
 }
