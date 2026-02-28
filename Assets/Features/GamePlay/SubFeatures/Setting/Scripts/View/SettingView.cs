@@ -21,43 +21,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		Saving
 	}
 
-	/// <summary>
-	/// Holds all editable form data for the Setting screen.
-	/// </summary>
-	internal struct SettingFormState
-	{
-		public int? Age;
-		public int? LevelId;
-		public int? StoryId;
-		public float? Pitch;
-		public string VoiceName;
-
-		public static SettingFormState CreateDefault(string defaultVoiceName)
-		{
-			return new SettingFormState
-			{
-				Age = null,
-				LevelId = null,
-				StoryId = null,
-				Pitch = null,
-				VoiceName = defaultVoiceName
-			};
-		}
-
-		public static SettingFormState FromProfile(SettingProfilePayload profile, string fallbackVoiceName)
-		{
-			return new SettingFormState
-			{
-				Age = profile.Age,
-				LevelId = profile.LevelId,
-				StoryId = profile.CurrentStoryId,
-				Pitch = profile.Pitch,
-				VoiceName = string.IsNullOrWhiteSpace(profile.VoiceName) ? fallbackVoiceName : profile.VoiceName.Trim()
-			};
-		}
-	}
-
-	/// <summary>
+/// <summary>
 	/// View for Setting.
 	/// </summary>
 	public sealed class SettingView : BaseView
@@ -94,7 +58,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		private bool _uiBound;
 		private bool _suppressUiEvents;
 		private SettingViewState _viewState;
-		private SettingFormState _formState;
+		private string _loadedVoiceName;
 
 		#region Event Handlers
 
@@ -161,8 +125,6 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			BindButton(_saveButton, HandleSaveClicked);
 
 			_ageInputField?.onEndEdit.AddListener(HandleAgeInputChanged);
-			_levelDropdown?.onValueChanged.AddListener(HandleLevelChanged);
-			_currentStoryDropdown?.onValueChanged.AddListener(HandleStoryChanged);
 			_pitchSlider?.onValueChanged.AddListener(HandlePitchChanged);
 		}
 
@@ -187,22 +149,21 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		{
 			_levelOptions.Clear();
 			_storyOptions.Clear();
-			_formState = SettingFormState.CreateDefault(GetDefaultVoiceName());
+			_loadedVoiceName = GetDefaultVoiceName();
 
 			SetTextFieldValue(_nameInputField, string.Empty);
 			SetTextFieldValue(_descriptionInputField, string.Empty);
-			UpdateAgeDisplay();
-			PopulateDropdown(_levelDropdown, _levelOptions, opt => opt.Name ?? $"Cấp {opt.Id}", _formState.LevelId);
-			PopulateDropdown(_currentStoryDropdown, _storyOptions, opt => opt.Name ?? $"Story {opt.Id}", _formState.StoryId);
-			ApplyPitchToSlider(_formState.Pitch);
+			SetAgeValue(null);
+			PopulateDropdown(_levelDropdown, _levelOptions, opt => opt.Name ?? $"Cấp {opt.Id}", null);
+			PopulateDropdown(_currentStoryDropdown, _storyOptions, opt => opt.Name ?? $"Story {opt.Id}", null);
+			ApplyPitchToSlider(null);
 		}
 
 		private void RenderProfile(SettingProfilePayload profile)
 		{
 			SetTextFieldValue(_nameInputField, profile.Name);
 			SetTextFieldValue(_descriptionInputField, profile.Description);
-
-			_formState = SettingFormState.FromProfile(profile, GetDefaultVoiceName());
+			_loadedVoiceName = string.IsNullOrWhiteSpace(profile.VoiceName) ? GetDefaultVoiceName() : profile.VoiceName.Trim();
 
 			_levelOptions.Clear();
 			if (profile.Levels != null) _levelOptions.AddRange(profile.Levels);
@@ -210,10 +171,10 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			_storyOptions.Clear();
 			if (profile.Stories != null) _storyOptions.AddRange(profile.Stories);
 
-			UpdateAgeDisplay();
-			PopulateDropdown(_levelDropdown, _levelOptions, opt => opt.Name ?? $"Cấp {opt.Id}", _formState.LevelId);
-			PopulateDropdown(_currentStoryDropdown, _storyOptions, opt => opt.Name ?? $"Story {opt.Id}", _formState.StoryId);
-			ApplyPitchToSlider(_formState.Pitch);
+			SetAgeValue(profile.Age);
+			PopulateDropdown(_levelDropdown, _levelOptions, opt => opt.Name ?? $"Cấp {opt.Id}", profile.LevelId);
+			PopulateDropdown(_currentStoryDropdown, _storyOptions, opt => opt.Name ?? $"Story {opt.Id}", profile.CurrentStoryId);
+			ApplyPitchToSlider(profile.Pitch);
 		}
 
 		#endregion
@@ -305,35 +266,15 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 
 		#region UI Change Handlers
 
-		private void HandleLevelChanged(int index)
-		{
-			if (_suppressUiEvents) return;
-			_formState.LevelId = GetSelectedId(_levelOptions, index);
-		}
-
-		private void HandleStoryChanged(int index)
-		{
-			if (_suppressUiEvents) return;
-			_formState.StoryId = GetSelectedId(_storyOptions, index);
-		}
-
 		private void HandlePitchChanged(float value)
 		{
 			if (_suppressUiEvents) return;
-			_formState.Pitch = value;
 			UpdatePitchLabel(value);
 		}
 
 		private void HandleAgeInputChanged(string rawValue)
 		{
-			_formState.Age = ParseAge(rawValue);
-			UpdateAgeDisplay();
-		}
-
-		private static int? GetSelectedId<T>(List<T> options, int index) where T : class
-		{
-			if (index <= 0 || index - 1 >= options.Count) return null;
-			return GetIdFromOption(options[index - 1]);
+			SetAgeValue(ParseAge(rawValue));
 		}
 
 		#endregion
@@ -347,8 +288,6 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			_suppressUiEvents = true;
 			if (pitch.HasValue) _pitchSlider.value = pitch.Value;
 			_suppressUiEvents = false;
-
-			_formState.Pitch = pitch;
 			UpdatePitchLabel(_pitchSlider.value);
 		}
 
@@ -366,22 +305,28 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 
 		private void AdjustAge(int delta)
 		{
-			var current = _formState.Age ?? 0;
-			_formState.Age = Mathf.Clamp(current + delta, MinAge, MaxAge);
-			UpdateAgeDisplay();
+			var current = GetAgeValue() ?? 0;
+			SetAgeValue(Mathf.Clamp(current + delta, MinAge, MaxAge));
 		}
 
-		private int? ParseAge(string rawValue)
+		private int? GetAgeValue()
+		{
+			if (_ageInputField == null) return null;
+			var text = _ageInputField.text?.Trim() ?? string.Empty;
+			if (string.IsNullOrEmpty(text) || text == "--") return null;
+			return int.TryParse(text, out var parsed) ? Mathf.Clamp(parsed, MinAge, MaxAge) : (int?)null;
+		}
+
+		private void SetAgeValue(int? age)
+		{
+			_ageInputField?.SetTextWithoutNotify(age?.ToString() ?? "--");
+		}
+
+		private static int? ParseAge(string rawValue)
 		{
 			var sanitized = rawValue?.Trim() ?? string.Empty;
 			if (string.IsNullOrEmpty(sanitized) || sanitized == "--") return null;
-			if (int.TryParse(sanitized, out var parsed)) return Mathf.Clamp(parsed, MinAge, MaxAge);
-			return _formState.Age;
-		}
-
-		private void UpdateAgeDisplay()
-		{
-			_ageInputField?.SetTextWithoutNotify(_formState.Age?.ToString() ?? "--");
+			return int.TryParse(sanitized, out var parsed) ? Mathf.Clamp(parsed, MinAge, MaxAge) : (int?)null;
 		}
 
 		#endregion
@@ -402,34 +347,28 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 
 		private void HandleSaveClicked()
 		{
-			// Sync age from input before saving
-			if (_ageInputField != null)
-			{
-				_formState.Age = ParseAge(_ageInputField.text);
-			}
-
-			// Resolve final pitch from slider if available
-			if (_pitchSlider != null)
-			{
-				_formState.Pitch = _pitchSlider.value;
-			}
-
-			// Resolve voice name with fallback
 			var voiceFromUi = GetVoiceSelection();
-			var finalVoiceName = string.IsNullOrWhiteSpace(voiceFromUi) ? _formState.VoiceName : voiceFromUi;
 
 			var request = new SettingProfileSaveRequestPayload
 			{
 				Name = GetTextFieldValue(_nameInputField),
-				Age = _formState.Age,
+				Age = GetAgeValue(),
 				Description = GetTextFieldValue(_descriptionInputField),
-				LevelId = _formState.LevelId,
-				CurrentStoryId = _formState.StoryId,
-				VoiceName = finalVoiceName,
-				Pitch = _formState.Pitch
+				LevelId = GetSelectedDropdownId(_levelDropdown, _levelOptions),
+				CurrentStoryId = GetSelectedDropdownId(_currentStoryDropdown, _storyOptions),
+				VoiceName = string.IsNullOrWhiteSpace(voiceFromUi) ? _loadedVoiceName : voiceFromUi,
+				Pitch = _pitchSlider?.value
 			};
 
 			SendRequest(SettingRequests.SaveProfile, request);
+		}
+
+		private static int? GetSelectedDropdownId<T>(TMP_Dropdown dropdown, List<T> options) where T : class
+		{
+			if (dropdown == null) return null;
+			var index = dropdown.value;
+			if (index <= 0 || index - 1 >= options.Count) return null;
+			return GetIdFromOption(options[index - 1]);
 		}
 
 		#endregion
