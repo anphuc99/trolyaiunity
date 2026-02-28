@@ -103,3 +103,4 @@ server/Library/
 server/Temp/
 server/dist/
 server/.env
+servertoken.txt
