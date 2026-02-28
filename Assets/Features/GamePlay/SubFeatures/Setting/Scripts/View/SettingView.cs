@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Core.Infrastructure.Views;
 using Features.GamePlay.SubFeatures.Setting.Events;
@@ -11,50 +12,91 @@ using UnityEngine.UI;
 namespace Features.GamePlay.SubFeatures.Setting.View
 {
 	/// <summary>
+	/// Represents the current operational state of the view.
+	/// </summary>
+	internal enum SettingViewState
+	{
+		Idle,
+		Loading,
+		Saving
+	}
+
+	/// <summary>
+	/// Holds all editable form data for the Setting screen.
+	/// </summary>
+	internal struct SettingFormState
+	{
+		public int? Age;
+		public int? LevelId;
+		public int? StoryId;
+		public float? Pitch;
+		public string VoiceName;
+
+		public static SettingFormState CreateDefault(string defaultVoiceName)
+		{
+			return new SettingFormState
+			{
+				Age = null,
+				LevelId = null,
+				StoryId = null,
+				Pitch = null,
+				VoiceName = defaultVoiceName
+			};
+		}
+
+		public static SettingFormState FromProfile(SettingProfilePayload profile, string fallbackVoiceName)
+		{
+			return new SettingFormState
+			{
+				Age = profile.Age,
+				LevelId = profile.LevelId,
+				StoryId = profile.CurrentStoryId,
+				Pitch = profile.Pitch,
+				VoiceName = string.IsNullOrWhiteSpace(profile.VoiceName) ? fallbackVoiceName : profile.VoiceName.Trim()
+			};
+		}
+	}
+
+	/// <summary>
 	/// View for Setting.
 	/// </summary>
 	public sealed class SettingView : BaseView
 	{
 		private const string NoneOptionLabel = "Không chọn";
-		[SerializeField]
-		private TMP_InputField _nameInputField;
-		[SerializeField]
-		private TMP_InputField _ageInputField;
-		[SerializeField]
-		private Button _increaseAgeButton;
-		[SerializeField]
-		private Button _decreaseAgeButton;
-		[SerializeField]
-		private TMP_InputField _descriptionInputField;
-		[SerializeField]
-		private TMP_Dropdown _levelDropdown;
-		[SerializeField]
-		private TMP_Dropdown _currentStoryDropdown;
-		[SerializeField]
-		private TMP_Dropdown _voiceNameDropdown;
+		private const int MinAge = 0;
+		private const int MaxAge = 120;
+
+		[Header("Input Fields")]
+		[SerializeField] private TMP_InputField _nameInputField;
+		[SerializeField] private TMP_InputField _ageInputField;
+		[SerializeField] private TMP_InputField _descriptionInputField;
+
+		[Header("Buttons")]
+		[SerializeField] private Button _increaseAgeButton;
+		[SerializeField] private Button _decreaseAgeButton;
+		[SerializeField] private Button _saveButton;
+
+		[Header("Dropdowns")]
+		[SerializeField] private TMP_Dropdown _levelDropdown;
+		[SerializeField] private TMP_Dropdown _currentStoryDropdown;
+		[SerializeField] private TMP_Dropdown _voiceNameDropdown;
+
+		[Header("Voice Settings")]
 		[SerializeField]
 		[Tooltip("VoiceName value configured in the Inspector that should remain selected even after profile data loads.")]
 		private string _defaultVoiceName;
-		[SerializeField]
-		private Slider _pitchSlider;
-		[SerializeField]
-		private TextMeshProUGUI _pitchValueLabel;
-		[SerializeField]
-		private Button _saveButton;
+		[SerializeField] private Slider _pitchSlider;
+		[SerializeField] private TextMeshProUGUI _pitchValueLabel;
 
 		private readonly List<SettingLevelOptionPayload> _levelOptions = new List<SettingLevelOptionPayload>();
 		private readonly List<SettingStoryOptionPayload> _storyOptions = new List<SettingStoryOptionPayload>();
+
 		private bool _uiBound;
-		private bool _isLoading;
-		private bool _isSaving;
-		private bool _suppressDropdownEvents;
-		private bool _suppressPitchEvent;
-		private int? _currentAge;
-		private int? _selectedLevelId;
-		private int? _selectedStoryId;
-		private float? _selectedPitch;
-		private bool _pitchEdited;
-		private string _loadedVoiceName;
+		private bool _suppressUiEvents;
+		private SettingViewState _viewState;
+		private SettingFormState _formState;
+
+		#region Event Handlers
 
 		[OnEvent(SettingEvents.Installed)]
 		private void OnInstalled(object payload)
@@ -69,322 +111,244 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		private void OnUninstalled(object payload)
 		{
 			gameObject.SetActive(false);
-			_isLoading = false;
-			_isSaving = false;
-			UpdateInteractableState();
+			SetViewState(SettingViewState.Idle);
 		}
 
 		[OnEvent(SettingEvents.ProfileLoadStarted)]
-		private void OnProfileLoadStarted(object payload)
-		{
-			_isLoading = true;
-			UpdateInteractableState();
-		}
+		private void OnProfileLoadStarted(object payload) => SetViewState(SettingViewState.Loading);
 
 		[OnEvent(SettingEvents.ProfileLoaded)]
 		private void OnProfileLoaded(object payload)
 		{
-			_isLoading = false;
-			UpdateInteractableState();
-
-			if (payload is not SettingProfilePayload profile)
+			SetViewState(SettingViewState.Idle);
+			if (payload is SettingProfilePayload profile)
 			{
-				return;
+				RenderProfile(profile);
 			}
-
-			RenderProfile(profile);
 		}
 
 		[OnEvent(SettingEvents.ProfileLoadFailed)]
 		private void OnProfileLoadFailed(object payload)
 		{
-			_isLoading = false;
-			UpdateInteractableState();
+			SetViewState(SettingViewState.Idle);
 			LogError(payload as SettingErrorPayload, "Không thể tải cài đặt người dùng.");
 		}
 
 		[OnEvent(SettingEvents.ProfileSaveStarted)]
-		private void OnProfileSaveStarted(object payload)
-		{
-			_isSaving = true;
-			UpdateInteractableState();
-		}
+		private void OnProfileSaveStarted(object payload) => SetViewState(SettingViewState.Saving);
 
 		[OnEvent(SettingEvents.ProfileSaveSucceeded)]
-		private void OnProfileSaveSucceeded(object payload)
-		{
-			_isSaving = false;
-			UpdateInteractableState();
-		}
+		private void OnProfileSaveSucceeded(object payload) => SetViewState(SettingViewState.Idle);
 
 		[OnEvent(SettingEvents.ProfileSaveFailed)]
 		private void OnProfileSaveFailed(object payload)
 		{
-			_isSaving = false;
-			UpdateInteractableState();
+			SetViewState(SettingViewState.Idle);
 			LogError(payload as SettingErrorPayload, "Không thể lưu cài đặt.");
 		}
 
+		#endregion
+
+		#region UI Binding
+
 		private void BindUi()
 		{
-			if (_uiBound)
-			{
-				return;
-			}
-
+			if (_uiBound) return;
 			_uiBound = true;
 
-			if (_increaseAgeButton != null)
-			{
-				_increaseAgeButton.onClick.RemoveAllListeners();
-				_increaseAgeButton.onClick.AddListener(() => AdjustAge(1));
-			}
+			BindButton(_increaseAgeButton, () => AdjustAge(1));
+			BindButton(_decreaseAgeButton, () => AdjustAge(-1));
+			BindButton(_saveButton, HandleSaveClicked);
 
-			if (_decreaseAgeButton != null)
-			{
-				_decreaseAgeButton.onClick.RemoveAllListeners();
-				_decreaseAgeButton.onClick.AddListener(() => AdjustAge(-1));
-			}
+			_ageInputField?.onEndEdit.AddListener(HandleAgeInputChanged);
+			_levelDropdown?.onValueChanged.AddListener(HandleLevelChanged);
+			_currentStoryDropdown?.onValueChanged.AddListener(HandleStoryChanged);
+			_pitchSlider?.onValueChanged.AddListener(HandlePitchChanged);
+		}
 
-			if (_ageInputField != null)
-			{
-				_ageInputField.onEndEdit.RemoveListener(HandleAgeInputChanged);
-				_ageInputField.onEndEdit.AddListener(HandleAgeInputChanged);
-			}
+		private static void BindButton(Button button, UnityEngine.Events.UnityAction action)
+		{
+			if (button == null) return;
+			button.onClick.RemoveAllListeners();
+			button.onClick.AddListener(action);
+		}
 
-			if (_levelDropdown != null)
-			{
-				_levelDropdown.onValueChanged.RemoveListener(HandleLevelChanged);
-				_levelDropdown.onValueChanged.AddListener(HandleLevelChanged);
-			}
+		#endregion
 
-			if (_currentStoryDropdown != null)
-			{
-				_currentStoryDropdown.onValueChanged.RemoveListener(HandleStoryChanged);
-				_currentStoryDropdown.onValueChanged.AddListener(HandleStoryChanged);
-			}
+		#region State Management
 
-			if (_pitchSlider != null)
-			{
-				_pitchSlider.onValueChanged.RemoveListener(HandlePitchChanged);
-				_pitchSlider.onValueChanged.AddListener(HandlePitchChanged);
-			}
-
-			if (_saveButton != null)
-			{
-				_saveButton.onClick.RemoveAllListeners();
-				_saveButton.onClick.AddListener(HandleSaveClicked);
-			}
+		private void SetViewState(SettingViewState state)
+		{
+			_viewState = state;
+			UpdateInteractableState();
 		}
 
 		private void ResetEditingState()
 		{
 			_levelOptions.Clear();
 			_storyOptions.Clear();
-			_currentAge = null;
-			_selectedLevelId = null;
-			_selectedStoryId = null;
-			_selectedPitch = null;
-			_pitchEdited = false;
-			_loadedVoiceName = ResolveDefaultVoiceName();
-			SetNameValue(string.Empty);
-			SetDescriptionValue(string.Empty);
-			UpdateAgeText();
-			PopulateLevelDropdown();
-			PopulateStoryDropdown();
-			ApplyPitchToSlider(null);
+			_formState = SettingFormState.CreateDefault(GetDefaultVoiceName());
+
+			SetTextFieldValue(_nameInputField, string.Empty);
+			SetTextFieldValue(_descriptionInputField, string.Empty);
+			UpdateAgeDisplay();
+			PopulateDropdown(_levelDropdown, _levelOptions, opt => opt.Name ?? $"Cấp {opt.Id}", _formState.LevelId);
+			PopulateDropdown(_currentStoryDropdown, _storyOptions, opt => opt.Name ?? $"Story {opt.Id}", _formState.StoryId);
+			ApplyPitchToSlider(_formState.Pitch);
 		}
 
 		private void RenderProfile(SettingProfilePayload profile)
 		{
-			SetNameValue(profile.Name ?? string.Empty);
-			SetDescriptionValue(profile.Description ?? string.Empty);
-			_currentAge = profile.Age;
-			_selectedLevelId = profile.LevelId;
-			_selectedStoryId = profile.CurrentStoryId;
-			_loadedVoiceName = string.IsNullOrWhiteSpace(profile.VoiceName)
-				? ResolveDefaultVoiceName()
-				: profile.VoiceName.Trim();
-			_selectedPitch = profile.Pitch;
-			_pitchEdited = false;
+			SetTextFieldValue(_nameInputField, profile.Name);
+			SetTextFieldValue(_descriptionInputField, profile.Description);
+
+			_formState = SettingFormState.FromProfile(profile, GetDefaultVoiceName());
 
 			_levelOptions.Clear();
-			if (profile.Levels != null)
-			{
-				_levelOptions.AddRange(profile.Levels);
-			}
+			if (profile.Levels != null) _levelOptions.AddRange(profile.Levels);
 
 			_storyOptions.Clear();
-			if (profile.Stories != null)
-			{
-				_storyOptions.AddRange(profile.Stories);
-			}
+			if (profile.Stories != null) _storyOptions.AddRange(profile.Stories);
 
-			UpdateAgeText();
-			PopulateLevelDropdown();
-			PopulateStoryDropdown();
-			ApplyPitchToSlider(_selectedPitch);
+			UpdateAgeDisplay();
+			PopulateDropdown(_levelDropdown, _levelOptions, opt => opt.Name ?? $"Cấp {opt.Id}", _formState.LevelId);
+			PopulateDropdown(_currentStoryDropdown, _storyOptions, opt => opt.Name ?? $"Story {opt.Id}", _formState.StoryId);
+			ApplyPitchToSlider(_formState.Pitch);
 		}
 
-		private void PopulateLevelDropdown()
+		#endregion
+
+		#region Dropdown Helpers
+
+		/// <summary>
+		/// Generic method to populate a dropdown with options and select the appropriate value.
+		/// </summary>
+		private void PopulateDropdown<T>(TMP_Dropdown dropdown, List<T> options, Func<T, string> labelSelector, int? selectedId)
+			where T : class
 		{
-			if (_levelDropdown == null)
+			if (dropdown == null) return;
+
+			_suppressUiEvents = true;
+			dropdown.options.Clear();
+			dropdown.options.Add(new TMP_Dropdown.OptionData(NoneOptionLabel));
+
+			foreach (var option in options)
 			{
-				return;
+				var label = labelSelector(option);
+				dropdown.options.Add(new TMP_Dropdown.OptionData(label));
 			}
 
-			_suppressDropdownEvents = true;
-			_levelDropdown.options.Clear();
-			_levelDropdown.options.Add(new TMP_Dropdown.OptionData(NoneOptionLabel));
-			for (var i = 0; i < _levelOptions.Count; i++)
-			{
-				var option = _levelOptions[i];
-				var label = string.IsNullOrWhiteSpace(option?.Name) ? "Cấp " + option?.Id : option.Name;
-				_levelDropdown.options.Add(new TMP_Dropdown.OptionData(label));
-			}
-
-			_levelDropdown.value = ResolveLevelIndex(_selectedLevelId, _levelOptions);
-			_levelDropdown.RefreshShownValue();
-			_suppressDropdownEvents = false;
+			dropdown.value = FindDropdownIndex(options, selectedId);
+			dropdown.RefreshShownValue();
+			_suppressUiEvents = false;
 		}
 
-		private void PopulateStoryDropdown()
+		/// <summary>
+		/// Finds the dropdown index for the given ID using duck-typing (assumes T has an Id property).
+		/// </summary>
+		private static int FindDropdownIndex<T>(List<T> options, int? selectedId) where T : class
 		{
-			if (_currentStoryDropdown == null)
-			{
-				return;
-			}
-
-			_suppressDropdownEvents = true;
-			_currentStoryDropdown.options.Clear();
-			_currentStoryDropdown.options.Add(new TMP_Dropdown.OptionData(NoneOptionLabel));
-			for (var i = 0; i < _storyOptions.Count; i++)
-			{
-				var option = _storyOptions[i];
-				var label = string.IsNullOrWhiteSpace(option?.Name) ? "Story " + option?.Id : option.Name;
-				_currentStoryDropdown.options.Add(new TMP_Dropdown.OptionData(label));
-			}
-
-			_currentStoryDropdown.value = ResolveStoryIndex(_selectedStoryId, _storyOptions);
-			_currentStoryDropdown.RefreshShownValue();
-			_suppressDropdownEvents = false;
-		}
-
-		private static int ResolveLevelIndex(int? selectedId, List<SettingLevelOptionPayload> options)
-		{
-			if (!selectedId.HasValue)
-			{
-				return 0;
-			}
+			if (!selectedId.HasValue) return 0;
 
 			for (var i = 0; i < options.Count; i++)
 			{
-				if (options[i]?.Id == selectedId.Value)
-				{
-					return i + 1;
-				}
+				var id = GetIdFromOption(options[i]);
+				if (id == selectedId.Value) return i + 1;
 			}
-
-			return 0;
-		}
-
-		private static int ResolveStoryIndex(int? selectedId, List<SettingStoryOptionPayload> options)
-		{
-			if (!selectedId.HasValue)
-			{
-				return 0;
-			}
-
-			for (var i = 0; i < options.Count; i++)
-			{
-				if (options[i]?.Id == selectedId.Value)
-				{
-					return i + 1;
-				}
-			}
-
 			return 0;
 		}
 
 		/// <summary>
-		/// Returns the trimmed default voice identifier configured via the Inspector, if any.
+		/// Extracts Id from option using reflection-like approach for supported types.
 		/// </summary>
-		private string ResolveDefaultVoiceName()
+		private static int? GetIdFromOption<T>(T option) where T : class
 		{
-			return string.IsNullOrWhiteSpace(_defaultVoiceName) ? null : _defaultVoiceName.Trim();
+			return option switch
+			{
+				SettingLevelOptionPayload level => level.Id,
+				SettingStoryOptionPayload story => story.Id,
+				_ => null
+			};
 		}
 
+		#endregion
+
+		#region Voice Helpers
+
 		/// <summary>
-		/// Reads the current dropdown label without overwriting inspector defaults or remote data.
+		/// Returns the trimmed default voice identifier configured via the Inspector.
 		/// </summary>
-		private string ResolveVoiceSelection()
+		private string GetDefaultVoiceName()
+			=> string.IsNullOrWhiteSpace(_defaultVoiceName) ? null : _defaultVoiceName.Trim();
+
+		/// <summary>
+		/// Reads the current voice dropdown selection.
+		/// </summary>
+		private string GetVoiceSelection()
 		{
-			if (_voiceNameDropdown == null || _voiceNameDropdown.options == null || _voiceNameDropdown.options.Count == 0)
+			if (_voiceNameDropdown?.options == null || _voiceNameDropdown.options.Count == 0)
 			{
-				return ResolveDefaultVoiceName();
+				return GetDefaultVoiceName();
 			}
 
 			var index = Mathf.Clamp(_voiceNameDropdown.value, 0, _voiceNameDropdown.options.Count - 1);
-			var optionText = _voiceNameDropdown.options[index]?.text ?? string.Empty;
-			var trimmed = optionText.Trim();
-			if (string.IsNullOrWhiteSpace(trimmed))
-			{
-				return ResolveDefaultVoiceName();
-			}
+			var text = _voiceNameDropdown.options[index]?.text?.Trim() ?? string.Empty;
 
-			return trimmed.StartsWith("option", System.StringComparison.OrdinalIgnoreCase)
-				? ResolveDefaultVoiceName()
-				: trimmed;
+			if (string.IsNullOrWhiteSpace(text) || text.StartsWith("option", StringComparison.OrdinalIgnoreCase))
+			{
+				return GetDefaultVoiceName();
+			}
+			return text;
 		}
+
+		#endregion
+
+		#region UI Change Handlers
 
 		private void HandleLevelChanged(int index)
 		{
-			if (_suppressDropdownEvents)
-			{
-				return;
-			}
-
-			_selectedLevelId = index <= 0 || index - 1 >= _levelOptions.Count
-				? null
-				: _levelOptions[index - 1]?.Id;
+			if (_suppressUiEvents) return;
+			_formState.LevelId = GetSelectedId(_levelOptions, index);
 		}
 
 		private void HandleStoryChanged(int index)
 		{
-			if (_suppressDropdownEvents)
-			{
-				return;
-			}
-
-			_selectedStoryId = index <= 0 || index - 1 >= _storyOptions.Count
-				? null
-				: _storyOptions[index - 1]?.Id;
+			if (_suppressUiEvents) return;
+			_formState.StoryId = GetSelectedId(_storyOptions, index);
 		}
 
 		private void HandlePitchChanged(float value)
 		{
-			if (_suppressPitchEvent)
-			{
-				return;
-			}
-
-			_pitchEdited = true;
-			_selectedPitch = value;
+			if (_suppressUiEvents) return;
+			_formState.Pitch = value;
 			UpdatePitchLabel(value);
 		}
 
+		private void HandleAgeInputChanged(string rawValue)
+		{
+			_formState.Age = ParseAge(rawValue);
+			UpdateAgeDisplay();
+		}
+
+		private static int? GetSelectedId<T>(List<T> options, int index) where T : class
+		{
+			if (index <= 0 || index - 1 >= options.Count) return null;
+			return GetIdFromOption(options[index - 1]);
+		}
+
+		#endregion
+
+		#region Pitch Helpers
+
 		private void ApplyPitchToSlider(float? pitch)
 		{
-			if (_pitchSlider == null)
-			{
-				return;
-			}
+			if (_pitchSlider == null) return;
 
-			_suppressPitchEvent = true;
-			_pitchSlider.value = pitch ?? _pitchSlider.value;
-			_suppressPitchEvent = false;
-			_selectedPitch = pitch;
-			_pitchEdited = false;
+			_suppressUiEvents = true;
+			if (pitch.HasValue) _pitchSlider.value = pitch.Value;
+			_suppressUiEvents = false;
+
+			_formState.Pitch = pitch;
 			UpdatePitchLabel(_pitchSlider.value);
 		}
 
@@ -392,183 +356,114 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		{
 			if (_pitchValueLabel != null)
 			{
-				_pitchValueLabel.text = "Pitch: " + value.ToString("0.00");
+				_pitchValueLabel.text = $"Pitch: {value:0.00}";
 			}
 		}
 
-		private float? ResolvePitchValue()
-		{
-			if (_pitchSlider == null)
-			{
-				return _selectedPitch;
-			}
+		#endregion
 
-			if (_pitchEdited)
-			{
-				_selectedPitch = _pitchSlider.value;
-			}
-
-			return _selectedPitch;
-		}
+		#region Age Helpers
 
 		private void AdjustAge(int delta)
 		{
-			var value = _currentAge ?? 0;
-			value = Mathf.Clamp(value + delta, 0, 120);
-			_currentAge = value;
-			UpdateAgeText();
+			var current = _formState.Age ?? 0;
+			_formState.Age = Mathf.Clamp(current + delta, MinAge, MaxAge);
+			UpdateAgeDisplay();
 		}
 
-		private void HandleAgeInputChanged(string rawValue)
+		private int? ParseAge(string rawValue)
 		{
-			SyncAgeFromInput(rawValue);
-			UpdateAgeText();
+			var sanitized = rawValue?.Trim() ?? string.Empty;
+			if (string.IsNullOrEmpty(sanitized) || sanitized == "--") return null;
+			if (int.TryParse(sanitized, out var parsed)) return Mathf.Clamp(parsed, MinAge, MaxAge);
+			return _formState.Age;
 		}
 
-		private void SyncAgeFromInput(string rawValue)
+		private void UpdateAgeDisplay()
 		{
-			var parsed = ParseAgeValue(rawValue);
-			_currentAge = parsed;
+			_ageInputField?.SetTextWithoutNotify(_formState.Age?.ToString() ?? "--");
 		}
 
-		private int? ParseAgeValue(string rawValue)
+		#endregion
+
+		#region Text Field Helpers
+
+		private static void SetTextFieldValue(TMP_InputField field, string value)
 		{
-			var sanitized = (rawValue ?? string.Empty).Trim();
-			if (string.IsNullOrEmpty(sanitized) || sanitized == "--")
-			{
-				return null;
-			}
-
-			if (int.TryParse(sanitized, out var parsedAge))
-			{
-				return Mathf.Clamp(parsedAge, 0, 120);
-			}
-
-			return _currentAge;
+			if (field != null) field.text = value ?? string.Empty;
 		}
 
-		private void UpdateAgeText()
-		{
-			if (_ageInputField == null)
-			{
-				return;
-			}
+		private static string GetTextFieldValue(TMP_InputField field)
+			=> field?.text ?? string.Empty;
 
-			var display = _currentAge.HasValue ? _currentAge.Value.ToString() : "--";
-			_ageInputField.SetTextWithoutNotify(display);
-		}
+		#endregion
 
-		private void SetNameValue(string value)
-		{
-			var finalValue = value ?? string.Empty;
-			if (_nameInputField != null)
-			{
-				_nameInputField.text = finalValue;
-			}
-		}
-
-		private string GetNameInputValue()
-		{
-			if (_nameInputField != null)
-			{
-				return _nameInputField.text;
-			}
-
-			return string.Empty;
-		}
-
-		private void SetDescriptionValue(string value)
-		{
-			var finalValue = value ?? string.Empty;
-			if (_descriptionInputField != null)
-			{
-				_descriptionInputField.text = finalValue;
-			}
-		}
-
-		private string GetDescriptionInputValue()
-		{
-			if (_descriptionInputField != null)
-			{
-				return _descriptionInputField.text;
-			}
-
-			return string.Empty;
-		}
+		#region Save Handler
 
 		private void HandleSaveClicked()
 		{
+			// Sync age from input before saving
 			if (_ageInputField != null)
 			{
-				SyncAgeFromInput(_ageInputField.text);
+				_formState.Age = ParseAge(_ageInputField.text);
 			}
 
-			var resolvedPitch = ResolvePitchValue();
-			var voiceFromUi = ResolveVoiceSelection();
-			var resolvedVoiceName = string.IsNullOrWhiteSpace(voiceFromUi) ? _loadedVoiceName : voiceFromUi;
+			// Resolve final pitch from slider if available
+			if (_pitchSlider != null)
+			{
+				_formState.Pitch = _pitchSlider.value;
+			}
+
+			// Resolve voice name with fallback
+			var voiceFromUi = GetVoiceSelection();
+			var finalVoiceName = string.IsNullOrWhiteSpace(voiceFromUi) ? _formState.VoiceName : voiceFromUi;
 
 			var request = new SettingProfileSaveRequestPayload
 			{
-				Name = GetNameInputValue(),
-				Age = _currentAge,
-				Description = GetDescriptionInputValue(),
-				LevelId = _selectedLevelId,
-				CurrentStoryId = _selectedStoryId,
-				VoiceName = resolvedVoiceName,
-				Pitch = resolvedPitch
+				Name = GetTextFieldValue(_nameInputField),
+				Age = _formState.Age,
+				Description = GetTextFieldValue(_descriptionInputField),
+				LevelId = _formState.LevelId,
+				CurrentStoryId = _formState.StoryId,
+				VoiceName = finalVoiceName,
+				Pitch = _formState.Pitch
 			};
 
 			SendRequest(SettingRequests.SaveProfile, request);
 		}
 
+		#endregion
+
+		#region Interactable State
+
 		private void UpdateInteractableState()
 		{
-			var enabled = !_isLoading && !_isSaving;
-			if (_levelDropdown != null)
-			{
-				_levelDropdown.interactable = enabled;
-			}
+			var isInteractable = _viewState == SettingViewState.Idle;
 
-			if (_currentStoryDropdown != null)
-			{
-				_currentStoryDropdown.interactable = enabled;
-			}
-
-			if (_voiceNameDropdown != null)
-			{
-				_voiceNameDropdown.interactable = enabled;
-			}
-
-			if (_pitchSlider != null)
-			{
-				_pitchSlider.interactable = enabled;
-			}
-
-			if (_increaseAgeButton != null)
-			{
-				_increaseAgeButton.interactable = enabled;
-			}
-
-			if (_decreaseAgeButton != null)
-			{
-				_decreaseAgeButton.interactable = enabled;
-			}
-
-			if (_saveButton != null)
-			{
-				_saveButton.interactable = !_isLoading && !_isSaving;
-			}
+			SetInteractable(_levelDropdown, isInteractable);
+			SetInteractable(_currentStoryDropdown, isInteractable);
+			SetInteractable(_voiceNameDropdown, isInteractable);
+			SetInteractable(_pitchSlider, isInteractable);
+			SetInteractable(_increaseAgeButton, isInteractable);
+			SetInteractable(_decreaseAgeButton, isInteractable);
+			SetInteractable(_saveButton, isInteractable);
 		}
+
+		private static void SetInteractable(Selectable selectable, bool interactable)
+		{
+			if (selectable != null) selectable.interactable = interactable;
+		}
+
+		#endregion
+
+		#region Error Logging
 
 		private void LogError(SettingErrorPayload payload, string fallback)
 		{
-			var message = payload?.Message;
-			if (string.IsNullOrWhiteSpace(message))
-			{
-				message = fallback;
-			}
-
-			Debug.LogError("[SettingView] " + message, this);
+			var message = string.IsNullOrWhiteSpace(payload?.Message) ? fallback : payload.Message;
+			Debug.LogError($"[SettingView] {message}", this);
 		}
+
+		#endregion
 	}
 }
