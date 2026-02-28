@@ -44,7 +44,6 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 
 		private readonly List<SettingLevelOptionPayload> _levelOptions = new List<SettingLevelOptionPayload>();
 		private readonly List<SettingStoryOptionPayload> _storyOptions = new List<SettingStoryOptionPayload>();
-		private readonly List<SettingVoiceOptionPayload> _voiceOptions = new List<SettingVoiceOptionPayload>();
 		private bool _uiBound;
 		private bool _isLoading;
 		private bool _isSaving;
@@ -53,8 +52,8 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		private int? _currentAge;
 		private int? _selectedLevelId;
 		private int? _selectedStoryId;
-		private string _selectedVoiceName;
 		private float? _selectedPitch;
+		private string _loadedVoiceName;
 
 		[OnEvent(SettingEvents.Installed)]
 		private void OnInstalled(object payload)
@@ -158,12 +157,6 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 				_currentStoryDropdown.onValueChanged.AddListener(HandleStoryChanged);
 			}
 
-			if (_voiceNameDropdown != null)
-			{
-				_voiceNameDropdown.onValueChanged.RemoveListener(HandleVoiceChanged);
-				_voiceNameDropdown.onValueChanged.AddListener(HandleVoiceChanged);
-			}
-
 			if (_pitchSlider != null)
 			{
 				_pitchSlider.onValueChanged.RemoveListener(HandlePitchChanged);
@@ -181,18 +174,16 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		{
 			_levelOptions.Clear();
 			_storyOptions.Clear();
-			_voiceOptions.Clear();
 			_currentAge = null;
 			_selectedLevelId = null;
 			_selectedStoryId = null;
-			_selectedVoiceName = ResolveDefaultVoiceName();
 			_selectedPitch = null;
+			_loadedVoiceName = ResolveDefaultVoiceName();
 			SetNameValue(string.Empty);
 			SetDescriptionValue(string.Empty);
 			UpdateAgeText();
 			PopulateLevelDropdown();
 			PopulateStoryDropdown();
-			PopulateVoiceDropdown();
 			ApplyPitchToSlider(null);
 		}
 
@@ -203,10 +194,9 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			_currentAge = profile.Age;
 			_selectedLevelId = profile.LevelId;
 			_selectedStoryId = profile.CurrentStoryId;
-			if (string.IsNullOrWhiteSpace(_selectedVoiceName))
-			{
-				_selectedVoiceName = profile.VoiceName;
-			}
+			_loadedVoiceName = string.IsNullOrWhiteSpace(profile.VoiceName)
+				? ResolveDefaultVoiceName()
+				: profile.VoiceName.Trim();
 			_selectedPitch = profile.Pitch;
 
 			_levelOptions.Clear();
@@ -221,16 +211,9 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 				_storyOptions.AddRange(profile.Stories);
 			}
 
-			_voiceOptions.Clear();
-			if (profile.Voices != null)
-			{
-				_voiceOptions.AddRange(profile.Voices);
-			}
-
 			UpdateAgeText();
 			PopulateLevelDropdown();
 			PopulateStoryDropdown();
-			PopulateVoiceDropdown();
 			ApplyPitchToSlider(_selectedPitch);
 		}
 
@@ -278,28 +261,6 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			_suppressDropdownEvents = false;
 		}
 
-		private void PopulateVoiceDropdown()
-		{
-			if (_voiceNameDropdown == null)
-			{
-				return;
-			}
-
-			_suppressDropdownEvents = true;
-			_voiceNameDropdown.options.Clear();
-			_voiceNameDropdown.options.Add(new TMP_Dropdown.OptionData(NoneOptionLabel));
-			for (var i = 0; i < _voiceOptions.Count; i++)
-			{
-				var option = _voiceOptions[i];
-				var label = string.IsNullOrWhiteSpace(option?.Label) ? option?.VoiceName ?? "Voice" : option.Label;
-				_voiceNameDropdown.options.Add(new TMP_Dropdown.OptionData(label));
-			}
-
-			_voiceNameDropdown.value = ResolveVoiceIndex(_selectedVoiceName);
-			_voiceNameDropdown.RefreshShownValue();
-			_suppressDropdownEvents = false;
-		}
-
 		private static int ResolveLevelIndex(int? selectedId, List<SettingLevelOptionPayload> options)
 		{
 			if (!selectedId.HasValue)
@@ -336,30 +297,35 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			return 0;
 		}
 
-		private int ResolveVoiceIndex(string voiceName)
-		{
-			if (string.IsNullOrWhiteSpace(voiceName))
-			{
-				return 0;
-			}
-
-			for (var i = 0; i < _voiceOptions.Count; i++)
-			{
-				if (string.Equals(_voiceOptions[i]?.VoiceName, voiceName, System.StringComparison.OrdinalIgnoreCase))
-				{
-					return i + 1;
-				}
-			}
-
-			return 0;
-		}
-
 		/// <summary>
 		/// Returns the trimmed default voice identifier configured via the Inspector, if any.
 		/// </summary>
 		private string ResolveDefaultVoiceName()
 		{
 			return string.IsNullOrWhiteSpace(_defaultVoiceName) ? null : _defaultVoiceName.Trim();
+		}
+
+		/// <summary>
+		/// Reads the current dropdown label without overwriting inspector defaults or remote data.
+		/// </summary>
+		private string ResolveVoiceSelection()
+		{
+			if (_voiceNameDropdown == null || _voiceNameDropdown.options == null || _voiceNameDropdown.options.Count == 0)
+			{
+				return ResolveDefaultVoiceName();
+			}
+
+			var index = Mathf.Clamp(_voiceNameDropdown.value, 0, _voiceNameDropdown.options.Count - 1);
+			var optionText = _voiceNameDropdown.options[index]?.text ?? string.Empty;
+			var trimmed = optionText.Trim();
+			if (string.IsNullOrWhiteSpace(trimmed))
+			{
+				return ResolveDefaultVoiceName();
+			}
+
+			return trimmed.StartsWith("option", System.StringComparison.OrdinalIgnoreCase)
+				? ResolveDefaultVoiceName()
+				: trimmed;
 		}
 
 		private void HandleLevelChanged(int index)
@@ -384,27 +350,6 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			_selectedStoryId = index <= 0 || index - 1 >= _storyOptions.Count
 				? null
 				: _storyOptions[index - 1]?.Id;
-		}
-
-		private void HandleVoiceChanged(int index)
-		{
-			if (_suppressDropdownEvents)
-			{
-				return;
-			}
-
-			if (index <= 0 || index - 1 >= _voiceOptions.Count)
-			{
-				_selectedVoiceName = null;
-				return;
-			}
-
-			var option = _voiceOptions[index - 1];
-			_selectedVoiceName = option?.VoiceName;
-			if (option?.Pitch.HasValue == true)
-			{
-				ApplyPitchToSlider(option.Pitch);
-			}
 		}
 
 		private void HandlePitchChanged(float value)
@@ -496,6 +441,9 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 
 		private void HandleSaveClicked()
 		{
+			var voiceFromUi = ResolveVoiceSelection();
+			var resolvedVoiceName = string.IsNullOrWhiteSpace(voiceFromUi) ? _loadedVoiceName : voiceFromUi;
+
 			var request = new SettingProfileSaveRequestPayload
 			{
 				Name = GetNameInputValue(),
@@ -503,7 +451,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 				Description = GetDescriptionInputValue(),
 				LevelId = _selectedLevelId,
 				CurrentStoryId = _selectedStoryId,
-				VoiceName = _selectedVoiceName,
+				VoiceName = resolvedVoiceName,
 				Pitch = _selectedPitch
 			};
 
