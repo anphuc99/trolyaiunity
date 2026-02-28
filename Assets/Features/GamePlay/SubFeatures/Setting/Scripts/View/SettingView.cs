@@ -55,7 +55,6 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		private bool _uiBound;
 		private bool _suppressUiEvents;
 		private SettingViewState _viewState;
-		private string _loadedVoiceName;
 
 		#region Event Handlers
 
@@ -146,7 +145,6 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		{
 			_levelOptions.Clear();
 			_storyOptions.Clear();
-			_loadedVoiceName = null;
 
 			SetTextFieldValue(_nameInputField, string.Empty);
 			SetTextFieldValue(_descriptionInputField, string.Empty);
@@ -160,7 +158,6 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		{
 			SetTextFieldValue(_nameInputField, profile.Name);
 			SetTextFieldValue(_descriptionInputField, profile.Description);
-			_loadedVoiceName = string.IsNullOrWhiteSpace(profile.VoiceName) ? null : profile.VoiceName.Trim();
 
 			_levelOptions.Clear();
 			if (profile.Levels != null) _levelOptions.AddRange(profile.Levels);
@@ -338,8 +335,6 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 
 		private void HandleSaveClicked()
 		{
-			var voiceFromUi = GetVoiceSelection();
-
 			var request = new SettingProfileSaveRequestPayload
 			{
 				Name = GetTextFieldValue(_nameInputField),
@@ -347,7 +342,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 				Description = GetTextFieldValue(_descriptionInputField),
 				LevelId = GetSelectedDropdownId(_levelDropdown, _levelOptions),
 				CurrentStoryId = GetSelectedDropdownId(_currentStoryDropdown, _storyOptions),
-				VoiceName = string.IsNullOrWhiteSpace(voiceFromUi) ? _loadedVoiceName : voiceFromUi,
+				VoiceName = GetVoiceSelection(),
 				Pitch = _pitchSlider?.value
 			};
 
