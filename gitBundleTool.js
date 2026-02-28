@@ -6,7 +6,7 @@ const { execFileSync } = require('child_process');
 const http = require('http');
 const https = require('https');
 
-const DEFAULT_SERVER_URL = process.env.GIT_BUNDLE_SERVER || 'http://localhost:5000/api/bundles';
+const DEFAULT_SERVER_URL = process.env.GIT_BUNDLE_SERVER || 'http://14.225.222.181:5000/api/bundles';
 const DEFAULT_REMOTE = process.env.GIT_REMOTE || 'origin';
 const DEFAULT_TOKEN = process.env.GIT_BUNDLE_TOKEN || process.env.BUNDLE_TOKEN;
 
