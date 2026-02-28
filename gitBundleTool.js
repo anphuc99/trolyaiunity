@@ -52,7 +52,7 @@ function createBundle(branch, outputDir, bundleNameOverride) {
   const sanitizedBranch = branch.replace(/[/\\]/g, '_');
   const bundleName = bundleNameOverride || `${sanitizedBranch}-${Date.now()}.bundle`;
   const bundlePath = path.join(outputDir, bundleName);
-  runGit(['bundle', 'create', bundlePath, branch]);
+  runGit(['bundle', 'create', bundlePath, `origin/${branch}..${branch}`]);
   return bundlePath;
 }
 
@@ -186,7 +186,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const serverUrl = args.server || DEFAULT_SERVER_URL;
   const remoteName = args.remote || DEFAULT_REMOTE;
-  const token = args.token || DEFAULT_TOKEN;
+  const token = args.token || fs.existsSync('servertoken.txt') ? fs.readFileSync('servertoken.txt', 'utf8').trim() : DEFAULT_TOKEN;
 
   ensureGitRepo();
 
