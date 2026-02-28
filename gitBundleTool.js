@@ -220,6 +220,7 @@ async function main() {
       repo,
       token,
     });
+    await gitpull();
     console.log('Server response:', result);
   } finally {
     await cleanupTempDir(tempDir).catch((error) => {
@@ -232,3 +233,7 @@ main().catch((error) => {
   console.error('Failed to push bundle:', error.message);
   process.exit(1);
 });
+
+function gitpull(){
+  return runGit(['pull']);
+}
