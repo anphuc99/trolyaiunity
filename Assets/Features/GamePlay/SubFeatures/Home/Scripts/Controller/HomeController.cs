@@ -70,6 +70,12 @@ namespace Features.GamePlay.SubFeatures.Home.Controller
 			HomeState.ParentSignals?.OpenJournal?.Invoke();
 		}
 
+		[Request(HomeRequests.OpenStory)]
+		public static void HandleOpenStory()
+		{
+			HomeState.ParentSignals?.OpenStory?.Invoke();
+		}
+
 		[Request(HomeRequests.OpenCreateCharacter)]
 		public static void HandleOpenCreateCharacter()
 		{

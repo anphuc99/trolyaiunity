@@ -205,6 +205,7 @@ namespace Features.GamePlay.Controller
 			HomeController.SetParentSignals(new HomeParentSignals { 
 				OnEchoed = OnSubControllerEchoed,
 				OpenJournal = () => HandleOpenSubController(GamePlaySubControllerType.Journal), 
+				OpenStory = () => HandleOpenSubController(GamePlaySubControllerType.Story),
 				OpenCreateCharacter = HandleOpenCreateCharacter,
 				OpenCharacter = () => HandleOpenSubController(GamePlaySubControllerType.Character),
 				OpenPractice = () => HandleOpenSubController(GamePlaySubControllerType.Practice),
