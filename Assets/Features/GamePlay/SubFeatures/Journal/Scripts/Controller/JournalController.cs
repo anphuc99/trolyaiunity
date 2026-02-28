@@ -44,7 +44,6 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 			JournalState.CachedList = new JournalListResponsePayload();
 			JournalState.CachedDetail = null;
 			JournalState.SelectedJournalId = null;
-			JournalState.ResetAll();
 		}
 
 		/// <summary>
@@ -139,35 +138,6 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		}
 
 		// ==================================================================
-		// Selection handlers
-		// ==================================================================
-
-		/// <summary>
-		/// Toggles a journal id in/out of the multi-select set.
-		/// </summary>
-		/// <param name="payload">Toggle selection payload.</param>
-		[Request(JournalRequests.ToggleJournalSelection)]
-		public static void HandleToggleJournalSelection(JournalToggleSelectionPayload payload)
-		{
-			if (payload == null || payload.JournalId <= 0)
-			{
-				PublishError("Invalid journal id for selection.");
-				return;
-			}
-
-			var ids = JournalState.SelectedJournalIds;
-			if (!ids.Remove(payload.JournalId))
-			{
-				ids.Add(payload.JournalId);
-			}
-
-			EventBus.Publish(JournalEvents.SelectionChanged, new JournalSelectionChangedPayload
-			{
-				SelectedIds = ids
-			});
-		}
-
-		// ==================================================================
 		// Playback handlers
 		// ==================================================================
 
@@ -176,9 +146,9 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		/// The actual playback is handled entirely by the JournalOverlay feature.
 		/// </summary>
 		[Request(JournalRequests.StartPlayback)]
-		public static void HandleStartPlayback(object payload)
+		public static void HandleStartPlayback(JournalStartPlaybackRequestPayload payload)
 		{
-			if (JournalState.SelectedJournalIds.Count == 0)
+			if (payload == null || payload.SelectedIds == null || payload.SelectedIds.Count == 0)
 			{
 				PublishError("No journals selected for playback.");
 				return;
@@ -187,7 +157,7 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 			// Copy selected IDs to GlobalVariables so JournalOverlay can read them.
 			GlobalVariables.Set(
 				SelectedJournalIdsGlobalKey,
-				new List<int>(JournalState.SelectedJournalIds));
+				new List<int>(payload.SelectedIds));
 
 			// Load the JournalOverlay scene additively.
 			LoadScene.ByScope(

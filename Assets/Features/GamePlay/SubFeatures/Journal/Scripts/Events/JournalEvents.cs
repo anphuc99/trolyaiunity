@@ -17,9 +17,5 @@ namespace Features.GamePlay.SubFeatures.Journal.Events
 		public const string RequestFailed = "game.play.journal.request.failed.event";
 		public const string ViewModeChanged = "game.play.journal.view.mode.changed.event";
 
-		// --- Selection events ---
-
-		/// <summary>Published when multi-select state changes.</summary>
-		public const string SelectionChanged = "game.play.journal.selection.changed.event";
 	}
 }

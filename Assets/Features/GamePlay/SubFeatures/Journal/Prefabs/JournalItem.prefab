@@ -149,6 +149,7 @@ GameObject:
   - component: {fileID: 5992681948368967369}
   - component: {fileID: 8949855013837639792}
   - component: {fileID: 8818724245725342881}
+  - component: {fileID: 6904874154552364856}
   m_Layer: 5
   m_Name: JournalItem
   m_TagString: Untagged
@@ -279,3 +280,16 @@ MonoBehaviour:
   _paddingBottom: 16
   _paddingLeft: 20
   _paddingRight: 20
+--- !u!114 &6904874154552364856
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6440049984603835505}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22bd5caed06c316458a6e221120bcba6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _toggleSelect: {fileID: 0}

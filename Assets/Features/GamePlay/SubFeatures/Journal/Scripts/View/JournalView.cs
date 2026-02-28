@@ -8,7 +8,6 @@ using Share.Components;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -28,7 +27,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		private RectTransform _listContent;
 
 		[SerializeField]
-		private GameObject _listItemTemplate;
+		private JournalItemView _listItemTemplate;
 
 		[SerializeField]
 		private GameObject _listRoot;
@@ -48,9 +47,8 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		[Header("Selection")]
 		[SerializeField] private GameObject _playAllButton;
 
-		private readonly List<GameObject> _spawnedListItems = new List<GameObject>();
+		private readonly List<JournalItemView> _spawnedListItems = new List<JournalItemView>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
-		private readonly Dictionary<int, Toggle> _selectionToggles = new Dictionary<int, Toggle>();
 		private NetworkSettings _networkSettings;
 
 		/// <summary>
@@ -226,7 +224,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 
 			if (_listItemTemplate == null && _listContent != null && _listContent.childCount > 0)
 			{
-				_listItemTemplate = _listContent.GetChild(0).gameObject;
+				_listItemTemplate = _listContent.GetChild(0).GetComponent<JournalItemView>();
 			}
 
 			if (_chatVariantRoot != null)
@@ -261,14 +259,13 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		private void RenderJournalList(List<JournalListItemPayload> journals)
 		{
 			ClearSpawnedListItems();
-			_selectionToggles.Clear();
 
 			if (_listContent == null || _listItemTemplate == null)
 			{
 				return;
 			}
 
-			_listItemTemplate.SetActive(false);
+			_listItemTemplate.gameObject.SetActive(false);
 			if (journals == null || journals.Count == 0)
 			{
 				UpdatePlayAllButton(0);
@@ -285,7 +282,8 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 
 				var instance = Instantiate(_listItemTemplate, _listContent);
 				instance.name = "JournalItem-" + journal.Id;
-				instance.SetActive(true);
+				instance.gameObject.SetActive(true);
+				instance.Bind(journal.Id, false);
 				_spawnedListItems.Add(instance);
 
 				var textComponent = instance.GetComponentInChildren<TMP_Text>(true);
@@ -312,22 +310,12 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				var toggle = instance.GetComponentInChildren<Toggle>(true);
 				if (toggle != null)
 				{
-					var journalId = journal.Id;
-					var isSelected = JournalState.SelectedJournalIds.Contains(journalId);
-					toggle.SetIsOnWithoutNotify(isSelected);
 					toggle.onValueChanged.RemoveAllListeners();
-					toggle.onValueChanged.AddListener((_) =>
-					{
-						SendRequest(JournalRequests.ToggleJournalSelection, new JournalToggleSelectionPayload
-						{
-							JournalId = journalId
-						});
-					});
-					_selectionToggles[journalId] = toggle;
+					toggle.onValueChanged.AddListener((_) => UpdatePlayAllButton(GetSelectedJournalCount()));
 				}
 			}
 
-			UpdatePlayAllButton(JournalState.SelectedJournalIds.Count);
+			UpdatePlayAllButton(GetSelectedJournalCount());
 		}
 
 		/// <summary>
@@ -577,32 +565,6 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		}
 
 		// ==================================================================
-		// Selection event handlers
-		// ==================================================================
-
-		/// <summary>
-		/// Updates toggle visuals when the controller publishes selection changes.
-		/// Also toggles the Play All button visibility.
-		/// </summary>
-		/// <param name="payload">Selection changed payload.</param>
-		[OnEvent(JournalEvents.SelectionChanged)]
-		private void OnSelectionChanged(object payload)
-		{
-			if (payload is not JournalSelectionChangedPayload selectionPayload)
-			{
-				return;
-			}
-
-			var ids = selectionPayload.SelectedIds ?? new HashSet<int>();
-			foreach (var kvp in _selectionToggles)
-			{
-				kvp.Value.SetIsOnWithoutNotify(ids.Contains(kvp.Key));
-			}
-
-			UpdatePlayAllButton(ids.Count);
-		}
-
-		// ==================================================================
 		// Play All button helper
 		// ==================================================================
 
@@ -617,9 +579,51 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				if (btn != null)
 				{
 					btn.onClick.RemoveAllListeners();
-					btn.onClick.AddListener(() => SendRequest(JournalRequests.StartPlayback));
+					btn.onClick.AddListener(() =>
+						SendRequest(JournalRequests.StartPlayback, new JournalStartPlaybackRequestPayload
+						{
+							SelectedIds = GetSelectedJournalIds()
+						}));
 				}
 			}
+		}
+		// ==================================================================
+		/// <summary>
+		/// Builds a list of selected journal ids from list items.
+		/// </summary>
+		/// <returns>Selected journal ids.</returns>
+		private List<int> GetSelectedJournalIds()
+		{
+			var selectedIds = new List<int>();
+			for (var i = 0; i < _spawnedListItems.Count; i++)
+			{
+				var item = _spawnedListItems[i];
+				if (item != null && item.IsSelected && item.JournalId > 0)
+				{
+					selectedIds.Add(item.JournalId);
+				}
+			}
+
+			return selectedIds;
+		}
+
+		/// <summary>
+		/// Counts the selected journals in the current list.
+		/// </summary>
+		/// <returns>Selection count.</returns>
+		private int GetSelectedJournalCount()
+		{
+			var count = 0;
+			for (var i = 0; i < _spawnedListItems.Count; i++)
+			{
+				var item = _spawnedListItems[i];
+				if (item != null && item.IsSelected)
+				{
+					count++;
+				}
+			}
+
+			return count;
 		}
 		// ==================================================================
 		/// <summary>

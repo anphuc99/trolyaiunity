@@ -50,6 +50,17 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 	}
 
 	/// <summary>
+	/// Request payload for starting overlay playback using selected journal ids.
+	/// </summary>
+	public sealed class JournalStartPlaybackRequestPayload
+	{
+		/// <summary>
+		/// List of selected journal ids.
+		/// </summary>
+		public List<int> SelectedIds { get; set; } = new List<int>();
+	}
+
+	/// <summary>
 	/// Journal summary object in detail endpoint response.
 	/// </summary>
 	public sealed class JournalSummaryPayload
@@ -220,21 +231,4 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 		public string AudioUrl { get; set; }
 	}
 
-	/// <summary>
-	/// Event payload published when journal selection state changes.
-	/// </summary>
-	public sealed class JournalSelectionChangedPayload
-	{
-		/// <summary>Set of currently selected journal ids.</summary>
-		public HashSet<int> SelectedIds { get; set; } = new HashSet<int>();
-	}
-
-	/// <summary>
-	/// Request payload for toggling journal selection.
-	/// </summary>
-	public sealed class JournalToggleSelectionPayload
-	{
-		/// <summary>Journal id to toggle.</summary>
-		public int JournalId { get; set; }
-	}
 }

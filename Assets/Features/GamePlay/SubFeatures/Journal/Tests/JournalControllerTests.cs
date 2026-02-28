@@ -20,7 +20,6 @@ namespace Features.GamePlay.SubFeatures.Journal.Tests
 		public void TearDown()
 		{
 			FakeServer.ResetToDefaults();
-			JournalState.SelectedJournalIds.Clear();
 			GlobalVariables.Remove("global.journal.overlay.selected.ids");
 		}
 
@@ -137,58 +136,6 @@ namespace Features.GamePlay.SubFeatures.Journal.Tests
 		}
 
 		// ==================================================================
-		// Selection tests
-		// ==================================================================
-
-		[Test]
-		public void HandleToggleJournalSelection_AddsToSet_PublishesEvent()
-		{
-			JournalSelectionChangedPayload selectionPayload = null;
-			void Handler(object payload)
-			{
-				selectionPayload = payload as JournalSelectionChangedPayload;
-			}
-
-			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.SelectionChanged, Handler);
-			try
-			{
-				JournalController.HandleToggleJournalSelection(new JournalToggleSelectionPayload { JournalId = 42 });
-			}
-			finally
-			{
-				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.SelectionChanged, Handler);
-			}
-
-			Assert.IsNotNull(selectionPayload);
-			Assert.IsTrue(selectionPayload.SelectedIds.Contains(42));
-		}
-
-		[Test]
-		public void HandleToggleJournalSelection_RemovesFromSet_PublishesEvent()
-		{
-			JournalState.SelectedJournalIds.Add(42);
-
-			JournalSelectionChangedPayload selectionPayload = null;
-			void Handler(object payload)
-			{
-				selectionPayload = payload as JournalSelectionChangedPayload;
-			}
-
-			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.SelectionChanged, Handler);
-			try
-			{
-				JournalController.HandleToggleJournalSelection(new JournalToggleSelectionPayload { JournalId = 42 });
-			}
-			finally
-			{
-				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.SelectionChanged, Handler);
-			}
-
-			Assert.IsNotNull(selectionPayload);
-			Assert.IsFalse(selectionPayload.SelectedIds.Contains(42));
-		}
-
-		// ==================================================================
 		// StartPlayback tests (now delegates to JournalOverlay via GlobalVariables)
 		// ==================================================================
 
@@ -204,7 +151,7 @@ namespace Features.GamePlay.SubFeatures.Journal.Tests
 			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.RequestFailed, Handler);
 			try
 			{
-				JournalController.HandleStartPlayback(null);
+				JournalController.HandleStartPlayback(new JournalStartPlaybackRequestPayload());
 			}
 			finally
 			{
@@ -218,14 +165,14 @@ namespace Features.GamePlay.SubFeatures.Journal.Tests
 		[Test]
 		public void HandleStartPlayback_WithSelection_SetsGlobalVariable()
 		{
-			JournalState.SelectedJournalIds.Add(1);
-			JournalState.SelectedJournalIds.Add(2);
-
 			// HandleStartPlayback sets GlobalVariables and calls LoadScene.ByScope.
 			// LoadScene.ByScope may throw in test context; catch that.
 			try
 			{
-				JournalController.HandleStartPlayback(null);
+				JournalController.HandleStartPlayback(new JournalStartPlaybackRequestPayload
+				{
+					SelectedIds = new List<int> { 1, 2 }
+				});
 			}
 			catch (System.Exception)
 			{

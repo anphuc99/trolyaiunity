@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Features.GamePlay.SubFeatures.Journal.Model
 {
 	/// <summary>
@@ -24,20 +22,5 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 		/// Last selected journal id.
 		/// </summary>
 		public static int? SelectedJournalId { get; set; }
-
-		// --- Multi-select state ---
-
-		/// <summary>
-		/// Set of journal ids selected for batch playback via JournalOverlay.
-		/// </summary>
-		public static HashSet<int> SelectedJournalIds { get; set; } = new HashSet<int>();
-
-		/// <summary>
-		/// Resets all selection state to defaults.
-		/// </summary>
-		public static void ResetAll()
-		{
-			SelectedJournalIds.Clear();
-		}
 	}
 }
