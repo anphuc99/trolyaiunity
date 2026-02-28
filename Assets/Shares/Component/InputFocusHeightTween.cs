@@ -1,6 +1,7 @@
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Share.Components
 {
@@ -14,6 +15,12 @@ namespace Share.Components
 
 		[SerializeField]
 		private RectTransform _targetRect;
+
+		[SerializeField]
+		private Graphic _placeholderGraphic;
+
+		[SerializeField]
+		private bool _hidePlaceholderOnFocus = true;
 
 		[SerializeField]
 		[Min(0f)]
@@ -31,6 +38,7 @@ namespace Share.Components
 
 		private float _baseHeight;
 		private Tween _heightTween;
+		private bool _placeholderWasVisible;
 
 		private void Awake()
 		{
@@ -83,6 +91,11 @@ namespace Share.Components
 			{
 				_targetRect = _inputField != null ? _inputField.transform as RectTransform : transform as RectTransform;
 			}
+
+			if (_placeholderGraphic == null && _inputField != null)
+			{
+				_placeholderGraphic = _inputField.placeholder;
+			}
 		}
 
 		private void CacheBaseHeight()
@@ -122,11 +135,13 @@ namespace Share.Components
 		private void HandleSelected(string value)
 		{
 			AnimateHeight(_baseHeight + _heightIncrease, _focusEase);
+			SetPlaceholderVisible(!_hidePlaceholderOnFocus);
 		}
 
 		private void HandleDeselected(string value)
 		{
 			AnimateHeight(_baseHeight, _blurEase);
+			RestorePlaceholderVisibility();
 		}
 
 		private void AnimateHeight(float targetHeight, Ease ease)
@@ -152,6 +167,27 @@ namespace Share.Components
 				_heightTween.Kill();
 				_heightTween = null;
 			}
+		}
+
+		private void SetPlaceholderVisible(bool isVisible)
+		{
+			if (_placeholderGraphic == null)
+			{
+				return;
+			}
+
+			_placeholderWasVisible = _placeholderGraphic.enabled;
+			_placeholderGraphic.enabled = isVisible;
+		}
+
+		private void RestorePlaceholderVisibility()
+		{
+			if (_placeholderGraphic == null)
+			{
+				return;
+			}
+
+			_placeholderGraphic.enabled = _placeholderWasVisible;
 		}
 	}
 }
