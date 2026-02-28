@@ -23,6 +23,18 @@ export interface ChatPromptParams {
     */
     levelMaxWords?: number | null;
   /**
+   * User's display name.
+   */
+  userName?: string | null;
+  /**
+   * User's age.
+   */
+  userAge?: number | null;
+  /**
+   * User's self-description or bio.
+   */
+  userDescription?: string | null;
+  /**
    * Optional scene/context description. If missing, we default to a generic chat setting.
    */
   context?: string | null;
@@ -122,6 +134,15 @@ export const buildChatSystemPrompt = (params: ChatPromptParams): string => {
   const levelDescriptionBlock = dbDescription ? `\nLevel description (DB):\n${dbDescription}\n` : "";
   const levelGuidelineBlock = dbGuideline ? `\nLevel guideline (DB):\n${dbGuideline}\n` : "";
 
+  // Build user info block
+  const userInfoParts: string[] = [];
+  if (params.userName?.trim()) userInfoParts.push(`Name: ${params.userName.trim()}`);
+  if (typeof params.userAge === "number" && params.userAge > 0) userInfoParts.push(`Age: ${params.userAge}`);
+  if (params.userDescription?.trim()) userInfoParts.push(`Description: ${params.userDescription.trim()}`);
+  const userInfoBlock = userInfoParts.length > 0
+    ? `\n====================================\nUSER PROFILE\n====================================\n${userInfoParts.join("\n")}\n`
+    : "";
+
   const relatedStoryMessages = (params.relatedStoryMessages ?? "").trim();
   const relatedStoryBlock = relatedStoryMessages
     ? `\n====================================\nRELATED STORY REFERENCE\n====================================\nThe following transcript is from related story episodes. Use it as context reference only.\n\n${relatedStoryMessages}\n`
@@ -149,7 +170,7 @@ LANGUAGE LEVEL: ${level}
 ====================================
 ${levelDescriptionBlock}
 ${levelGuidelineBlock}
-
+${userInfoBlock}
 ====================================
 SCENE / CONTEXT
 ====================================
