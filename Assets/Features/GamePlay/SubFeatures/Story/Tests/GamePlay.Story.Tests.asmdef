@@ -1,7 +1,10 @@
 {
     "name": "GamePlay.Story.Tests",
     "rootNamespace": "",
-    "references": ["GamePlay.Story"],
+    "references": [
+        "GamePlay.Story",
+        "Core"
+    ],
     "includePlatforms": ["Editor"],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
