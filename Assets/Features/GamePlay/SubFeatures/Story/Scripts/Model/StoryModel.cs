@@ -50,8 +50,13 @@ namespace Features.GamePlay.SubFeatures.Story.Model
 	/// </summary>
 	public sealed class StoryCreateRequestPayload
 	{
+		[JsonProperty("name")]
 		public string Name { get; set; }
+
+		[JsonProperty("description")]
 		public string Description { get; set; }
+
+		[JsonProperty("currentProgress")]
 		public string CurrentProgress { get; set; }
 	}
 
@@ -60,9 +65,16 @@ namespace Features.GamePlay.SubFeatures.Story.Model
 	/// </summary>
 	public sealed class StoryUpdateRequestPayload
 	{
+		[JsonIgnore]
 		public int StoryId { get; set; }
+
+		[JsonProperty("name")]
 		public string Name { get; set; }
+
+		[JsonProperty("description")]
 		public string Description { get; set; }
+
+		[JsonProperty("currentProgress")]
 		public string CurrentProgress { get; set; }
 	}
 
