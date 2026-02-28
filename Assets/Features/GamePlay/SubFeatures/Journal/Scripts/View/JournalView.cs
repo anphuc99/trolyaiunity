@@ -44,7 +44,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		private AudioSource _voiceAudioSource;
 
 		[Header("Selection")]
-		[SerializeField] private GameObject _playAllButton;
+		[SerializeField] private Button _playAllButton;
 
 		private readonly List<JournalItemView> _spawnedListItems = new List<JournalItemView>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
@@ -575,16 +575,12 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		{
 			if (_playAllButton != null)
 			{
-				var btn = _playAllButton.GetComponent<Button>();
-				if (btn != null)
-				{
-					btn.onClick.RemoveAllListeners();
-					btn.onClick.AddListener(() =>
-						SendRequest(JournalRequests.StartPlayback, new JournalStartPlaybackRequestPayload
-						{
-							SelectedIds = GetSelectedJournalIds()
-						}));
-				}
+				_playAllButton.onClick.RemoveAllListeners();
+				_playAllButton.onClick.AddListener(() =>
+					SendRequest(JournalRequests.StartPlayback, new JournalStartPlaybackRequestPayload
+					{
+						SelectedIds = GetSelectedJournalIds()
+					}));
 			}
 		}
 		// ==================================================================
@@ -634,7 +630,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		{
 			if (_playAllButton != null)
 			{
-				_playAllButton.SetActive(selectedCount > 0);
+				_playAllButton.interactable = selectedCount > 0;
 			}
 		}
 	}
