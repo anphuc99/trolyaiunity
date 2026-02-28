@@ -248,6 +248,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			if (_chatVariantRoot != null)
 			{
 				_chatVariantRoot.gameObject.SetActive(showDetail);
+				_playAllButton.gameObject.SetActive(!showDetail);
 			}
 		}
 
@@ -533,8 +534,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 
 		private void Callback()
 		{
-			_chatVariantRoot.gameObject.SetActive(false);
-			_listRoot.SetActive(true);
+			SetMode(false);
 		}
 
 		/// <summary>

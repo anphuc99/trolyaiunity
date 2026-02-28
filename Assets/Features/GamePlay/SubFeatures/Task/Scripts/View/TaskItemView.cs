@@ -43,7 +43,7 @@ namespace Features.GamePlay.SubFeatures.Task.View
 
             if (_statusText != null)
             {
-                _statusText.text = task.Completed ? "Đã hoàn thành" : "Chưa hoàn thành";
+                _statusText.text = task.Completed ? "Đã hoàn thành" : "Đang làm";
             }
 
             if (_progressSlider != null)
@@ -64,9 +64,7 @@ namespace Features.GamePlay.SubFeatures.Task.View
 
             if (_remainingText != null)
             {
-                _remainingText.text = task.Target > 0
-                    ? task.Progress + "/" + task.Target + " (còn " + Mathf.Max(0, task.Remaining) + ")"
-                    : "Còn " + Mathf.Max(0, task.Remaining);
+                _remainingText.text = "Còn: " + Mathf.Max(0, task.Remaining);
             }
         }
 
