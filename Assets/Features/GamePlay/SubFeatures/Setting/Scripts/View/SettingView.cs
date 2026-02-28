@@ -16,27 +16,22 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 	public sealed class SettingView : BaseView
 	{
 		private const string NoneOptionLabel = "Không chọn";
-
-		[SerializeField]
-		private TextMeshProUGUI _nameText;
 		[SerializeField]
 		private TMP_InputField _nameInputField;
 		[SerializeField]
-		private TextMeshProUGUI _ageText;
+		private TMP_InputField _ageInputField;
 		[SerializeField]
 		private Button _increaseAgeButton;
 		[SerializeField]
 		private Button _decreaseAgeButton;
 		[SerializeField]
-		private TextMeshProUGUI _descriptionText;
-		[SerializeField]
 		private TMP_InputField _descriptionInputField;
 		[SerializeField]
-		private Dropdown _levelDropdown;
+		private TMP_Dropdown _levelDropdown;
 		[SerializeField]
-		private Dropdown _currentStoryDropdown;
+		private TMP_Dropdown _currentStoryDropdown;
 		[SerializeField]
-		private Dropdown _voiceNameDropdown;
+		private TMP_Dropdown _voiceNameDropdown;
 		[SerializeField]
 		private Slider _pitchSlider;
 		[SerializeField]
@@ -62,7 +57,6 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		private void OnInstalled(object payload)
 		{
 			gameObject.SetActive(true);
-			ResolveInputFields();
 			BindUi();
 			ResetEditingState();
 			SendRequest(SettingRequests.LoadProfile);
@@ -180,19 +174,6 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			}
 		}
 
-		private void ResolveInputFields()
-		{
-			if (_nameInputField == null && _nameText != null)
-			{
-				_nameInputField = _nameText.GetComponentInParent<TMP_InputField>();
-			}
-
-			if (_descriptionInputField == null && _descriptionText != null)
-			{
-				_descriptionInputField = _descriptionText.GetComponentInParent<TMP_InputField>();
-			}
-		}
-
 		private void ResetEditingState()
 		{
 			_levelOptions.Clear();
@@ -256,12 +237,12 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 
 			_suppressDropdownEvents = true;
 			_levelDropdown.options.Clear();
-			_levelDropdown.options.Add(new Dropdown.OptionData(NoneOptionLabel));
+			_levelDropdown.options.Add(new TMP_Dropdown.OptionData(NoneOptionLabel));
 			for (var i = 0; i < _levelOptions.Count; i++)
 			{
 				var option = _levelOptions[i];
 				var label = string.IsNullOrWhiteSpace(option?.Name) ? "Cấp " + option?.Id : option.Name;
-				_levelDropdown.options.Add(new Dropdown.OptionData(label));
+				_levelDropdown.options.Add(new TMP_Dropdown.OptionData(label));
 			}
 
 			_levelDropdown.value = ResolveLevelIndex(_selectedLevelId, _levelOptions);
@@ -278,12 +259,12 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 
 			_suppressDropdownEvents = true;
 			_currentStoryDropdown.options.Clear();
-			_currentStoryDropdown.options.Add(new Dropdown.OptionData(NoneOptionLabel));
+			_currentStoryDropdown.options.Add(new TMP_Dropdown.OptionData(NoneOptionLabel));
 			for (var i = 0; i < _storyOptions.Count; i++)
 			{
 				var option = _storyOptions[i];
 				var label = string.IsNullOrWhiteSpace(option?.Name) ? "Story " + option?.Id : option.Name;
-				_currentStoryDropdown.options.Add(new Dropdown.OptionData(label));
+				_currentStoryDropdown.options.Add(new TMP_Dropdown.OptionData(label));
 			}
 
 			_currentStoryDropdown.value = ResolveStoryIndex(_selectedStoryId, _storyOptions);
@@ -300,12 +281,12 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 
 			_suppressDropdownEvents = true;
 			_voiceNameDropdown.options.Clear();
-			_voiceNameDropdown.options.Add(new Dropdown.OptionData(NoneOptionLabel));
+			_voiceNameDropdown.options.Add(new TMP_Dropdown.OptionData(NoneOptionLabel));
 			for (var i = 0; i < _voiceOptions.Count; i++)
 			{
 				var option = _voiceOptions[i];
 				var label = string.IsNullOrWhiteSpace(option?.Label) ? option?.VoiceName ?? "Voice" : option.Label;
-				_voiceNameDropdown.options.Add(new Dropdown.OptionData(label));
+				_voiceNameDropdown.options.Add(new TMP_Dropdown.OptionData(label));
 			}
 
 			_voiceNameDropdown.value = ResolveVoiceIndex(_selectedVoiceName);
@@ -441,7 +422,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		{
 			if (_pitchValueLabel != null)
 			{
-				_pitchValueLabel.text = value.ToString("0.00");
+				_pitchValueLabel.text = "Pitch: " + value.ToString("0.00");
 			}
 		}
 
@@ -455,9 +436,9 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 
 		private void UpdateAgeText()
 		{
-			if (_ageText != null)
+			if (_ageInputField != null)
 			{
-				_ageText.text = _currentAge.HasValue ? _currentAge.Value.ToString() : "--";
+				_ageInputField.text = _currentAge.HasValue ? _currentAge.Value.ToString() : "--";
 			}
 		}
 
@@ -468,11 +449,6 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			{
 				_nameInputField.text = finalValue;
 			}
-
-			if (_nameText != null)
-			{
-				_nameText.text = finalValue;
-			}
 		}
 
 		private string GetNameInputValue()
@@ -482,7 +458,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 				return _nameInputField.text;
 			}
 
-			return _nameText != null ? _nameText.text : string.Empty;
+			return string.Empty;
 		}
 
 		private void SetDescriptionValue(string value)
@@ -491,11 +467,6 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			if (_descriptionInputField != null)
 			{
 				_descriptionInputField.text = finalValue;
-			}
-
-			if (_descriptionText != null)
-			{
-				_descriptionText.text = finalValue;
 			}
 		}
 
@@ -506,7 +477,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 				return _descriptionInputField.text;
 			}
 
-			return _descriptionText != null ? _descriptionText.text : string.Empty;
+			return string.Empty;
 		}
 
 		private void HandleSaveClicked()
