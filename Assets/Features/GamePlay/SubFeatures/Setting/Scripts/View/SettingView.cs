@@ -33,6 +33,9 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		[SerializeField]
 		private TMP_Dropdown _voiceNameDropdown;
 		[SerializeField]
+		[Tooltip("VoiceName value configured in the Inspector that should remain selected even after profile data loads.")]
+		private string _defaultVoiceName;
+		[SerializeField]
 		private Slider _pitchSlider;
 		[SerializeField]
 		private TextMeshProUGUI _pitchValueLabel;
@@ -182,7 +185,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			_currentAge = null;
 			_selectedLevelId = null;
 			_selectedStoryId = null;
-			_selectedVoiceName = null;
+			_selectedVoiceName = ResolveDefaultVoiceName();
 			_selectedPitch = null;
 			SetNameValue(string.Empty);
 			SetDescriptionValue(string.Empty);
@@ -200,7 +203,10 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			_currentAge = profile.Age;
 			_selectedLevelId = profile.LevelId;
 			_selectedStoryId = profile.CurrentStoryId;
-			_selectedVoiceName = profile.VoiceName;
+			if (string.IsNullOrWhiteSpace(_selectedVoiceName))
+			{
+				_selectedVoiceName = profile.VoiceName;
+			}
 			_selectedPitch = profile.Pitch;
 
 			_levelOptions.Clear();
@@ -346,6 +352,14 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			}
 
 			return 0;
+		}
+
+		/// <summary>
+		/// Returns the trimmed default voice identifier configured via the Inspector, if any.
+		/// </summary>
+		private string ResolveDefaultVoiceName()
+		{
+			return string.IsNullOrWhiteSpace(_defaultVoiceName) ? null : _defaultVoiceName.Trim();
 		}
 
 		private void HandleLevelChanged(int index)
