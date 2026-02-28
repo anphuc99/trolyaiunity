@@ -8,9 +8,7 @@ using Share.Components;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.Networking;
 
 namespace Features.GamePlay.SubFeatures.Journal.View
@@ -283,36 +281,10 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				var instance = Instantiate(_listItemTemplate, _listContent);
 				instance.name = "JournalItem-" + journal.Id;
 				instance.gameObject.SetActive(true);
-				instance.Bind(journal.Id, false);
+				instance.Bind(journal.Id, BuildJournalListLabel(journal), false);
 				_spawnedListItems.Add(instance);
-
-				var textComponent = instance.GetComponentInChildren<TMP_Text>(true);
-				if (textComponent != null)
-				{
-					textComponent.text = BuildJournalListLabel(journal);
-				}
-
-				var button = instance.GetComponent<Button>();
-				if (button != null)
-				{
-					var journalId = journal.Id;
-					button.onClick.RemoveAllListeners();
-					button.onClick.AddListener(() =>
-					{
-						SendRequest(JournalRequests.LoadJournalDetail, new JournalDetailRequestPayload
-						{
-							JournalId = journalId
-						});
-					});
-				}
-
-				// Add or find a selection toggle for multi-select.
-				var toggle = instance.GetComponentInChildren<Toggle>(true);
-				if (toggle != null)
-				{
-					toggle.onValueChanged.RemoveAllListeners();
-					toggle.onValueChanged.AddListener((_) => UpdatePlayAllButton(GetSelectedJournalCount()));
-				}
+				instance.Clicked += HandleItemClicked;
+				instance.SelectionChanged += HandleItemSelectionChanged;
 			}
 
 			UpdatePlayAllButton(GetSelectedJournalCount());
@@ -562,6 +534,33 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		{
 			_chatVariantRoot.gameObject.SetActive(false);
 			_listRoot.SetActive(true);
+		}
+
+		/// <summary>
+		/// Handles journal item click from the item view.
+		/// </summary>
+		/// <param name="item">Item view that fired the click.</param>
+		private void HandleItemClicked(JournalItemView item)
+		{
+			if (item == null || item.JournalId <= 0)
+			{
+				return;
+			}
+
+			SendRequest(JournalRequests.LoadJournalDetail, new JournalDetailRequestPayload
+			{
+				JournalId = item.JournalId
+			});
+		}
+
+		/// <summary>
+		/// Handles selection change from the item view.
+		/// </summary>
+		/// <param name="item">Item view that fired the change.</param>
+		/// <param name="isSelected">Current selection state.</param>
+		private void HandleItemSelectionChanged(JournalItemView item, bool isSelected)
+		{
+			UpdatePlayAllButton(GetSelectedJournalCount());
 		}
 
 		// ==================================================================
