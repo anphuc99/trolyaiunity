@@ -53,6 +53,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		private int? _selectedLevelId;
 		private int? _selectedStoryId;
 		private float? _selectedPitch;
+		private bool _pitchEdited;
 		private string _loadedVoiceName;
 
 		[OnEvent(SettingEvents.Installed)]
@@ -184,6 +185,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			_selectedLevelId = null;
 			_selectedStoryId = null;
 			_selectedPitch = null;
+			_pitchEdited = false;
 			_loadedVoiceName = ResolveDefaultVoiceName();
 			SetNameValue(string.Empty);
 			SetDescriptionValue(string.Empty);
@@ -204,6 +206,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 				? ResolveDefaultVoiceName()
 				: profile.VoiceName.Trim();
 			_selectedPitch = profile.Pitch;
+			_pitchEdited = false;
 
 			_levelOptions.Clear();
 			if (profile.Levels != null)
@@ -365,6 +368,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 				return;
 			}
 
+			_pitchEdited = true;
 			_selectedPitch = value;
 			UpdatePitchLabel(value);
 		}
@@ -379,7 +383,8 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			_suppressPitchEvent = true;
 			_pitchSlider.value = pitch ?? _pitchSlider.value;
 			_suppressPitchEvent = false;
-			_selectedPitch = pitch ?? _pitchSlider.value;
+			_selectedPitch = pitch;
+			_pitchEdited = false;
 			UpdatePitchLabel(_pitchSlider.value);
 		}
 
@@ -398,7 +403,11 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 				return _selectedPitch;
 			}
 
-			_selectedPitch = _pitchSlider.value;
+			if (_pitchEdited)
+			{
+				_selectedPitch = _pitchSlider.value;
+			}
+
 			return _selectedPitch;
 		}
 
