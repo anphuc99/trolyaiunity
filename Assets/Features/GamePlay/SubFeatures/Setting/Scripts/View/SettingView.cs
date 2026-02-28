@@ -46,9 +46,6 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		[SerializeField] private TMP_Dropdown _voiceNameDropdown;
 
 		[Header("Voice Settings")]
-		[SerializeField]
-		[Tooltip("VoiceName value configured in the Inspector that should remain selected even after profile data loads.")]
-		private string _defaultVoiceName;
 		[SerializeField] private Slider _pitchSlider;
 		[SerializeField] private TextMeshProUGUI _pitchValueLabel;
 
@@ -149,7 +146,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		{
 			_levelOptions.Clear();
 			_storyOptions.Clear();
-			_loadedVoiceName = GetDefaultVoiceName();
+			_loadedVoiceName = null;
 
 			SetTextFieldValue(_nameInputField, string.Empty);
 			SetTextFieldValue(_descriptionInputField, string.Empty);
@@ -163,7 +160,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		{
 			SetTextFieldValue(_nameInputField, profile.Name);
 			SetTextFieldValue(_descriptionInputField, profile.Description);
-			_loadedVoiceName = string.IsNullOrWhiteSpace(profile.VoiceName) ? GetDefaultVoiceName() : profile.VoiceName.Trim();
+			_loadedVoiceName = string.IsNullOrWhiteSpace(profile.VoiceName) ? null : profile.VoiceName.Trim();
 
 			_levelOptions.Clear();
 			if (profile.Levels != null) _levelOptions.AddRange(profile.Levels);
@@ -237,19 +234,13 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		#region Voice Helpers
 
 		/// <summary>
-		/// Returns the trimmed default voice identifier configured via the Inspector.
-		/// </summary>
-		private string GetDefaultVoiceName()
-			=> string.IsNullOrWhiteSpace(_defaultVoiceName) ? null : _defaultVoiceName.Trim();
-
-		/// <summary>
 		/// Reads the current voice dropdown selection.
 		/// </summary>
 		private string GetVoiceSelection()
 		{
 			if (_voiceNameDropdown?.options == null || _voiceNameDropdown.options.Count == 0)
 			{
-				return GetDefaultVoiceName();
+				return null;
 			}
 
 			var index = Mathf.Clamp(_voiceNameDropdown.value, 0, _voiceNameDropdown.options.Count - 1);
@@ -257,7 +248,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 
 			if (string.IsNullOrWhiteSpace(text) || text.StartsWith("option", StringComparison.OrdinalIgnoreCase))
 			{
-				return GetDefaultVoiceName();
+				return null;
 			}
 			return text;
 		}
