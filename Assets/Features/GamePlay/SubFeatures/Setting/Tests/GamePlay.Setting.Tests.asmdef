@@ -1,7 +1,10 @@
 {
     "name": "GamePlay.Setting.Tests",
     "rootNamespace": "",
-    "references": ["GamePlay.Setting"],
+    "references": [
+        "GamePlay.Setting",
+        "Core"
+    ],
     "includePlatforms": ["Editor"],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
