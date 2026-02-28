@@ -597,6 +597,18 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 624256447}
     m_Modifications:
+    - target: {fileID: 224723264453646616, guid: 51a0ed342aed2d940b6376648608d5b4, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 224723264453646616, guid: 51a0ed342aed2d940b6376648608d5b4, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 224723264453646616, guid: 51a0ed342aed2d940b6376648608d5b4, type: 3}
+      propertyPath: m_AnchorMin.x
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 2087276944920618854, guid: 51a0ed342aed2d940b6376648608d5b4, type: 3}
       propertyPath: m_Name
       value: Panel
@@ -683,6 +695,14 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2874653538516201729, guid: 51a0ed342aed2d940b6376648608d5b4, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7370515988381943934, guid: 51a0ed342aed2d940b6376648608d5b4, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7370515988381943934, guid: 51a0ed342aed2d940b6376648608d5b4, type: 3}
+      propertyPath: m_AnchorMax.y
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []

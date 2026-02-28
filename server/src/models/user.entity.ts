@@ -24,6 +24,36 @@ class UserEntity {
   @Column({ name: "password_hash", type: "varchar", length: 255 })
   passwordHash!: string;
 
+  /**
+   * User's display name.
+   */
+  @Column({ type: "varchar", length: 120, nullable: true })
+  name?: string | null;
+
+  /**
+   * User's age.
+   */
+  @Column({ type: "int", nullable: true })
+  age?: number | null;
+
+  /**
+   * Self-description / bio.
+   */
+  @Column({ type: "text", nullable: true })
+  description?: string | null;
+
+  /**
+   * TTS voice name (similar to character voice).
+   */
+  @Column({ type: "varchar", length: 64, nullable: true })
+  voiceName?: string | null;
+
+  /**
+   * TTS voice pitch (similar to character pitch).
+   */
+  @Column({ type: "float", nullable: true })
+  pitch?: number | null;
+
   @Column({ name: "level_id", type: "int", nullable: true })
   levelId?: number | null;
 

@@ -25,6 +25,16 @@ interface UserResponse {
   refreshToken: string;
 }
 
+interface UpdateProfilePayload {
+  name?: string | null;
+  age?: number | null;
+  description?: string | null;
+  levelId?: number | null;
+  currentStoryId?: number | null;
+  voiceName?: string | null;
+  pitch?: number | null;
+}
+
 interface UsersController {
   register: (request: Request, response: Response) => Promise<void>;
   login: (request: Request, response: Response) => Promise<void>;
@@ -32,6 +42,7 @@ interface UsersController {
   getMe: (request: Request, response: Response) => Promise<void>;
   updateLevel: (request: Request, response: Response) => Promise<void>;
   setCurrentStory: (request: Request, response: Response) => Promise<void>;
+  updateProfile: (request: Request, response: Response) => Promise<void>;
 }
 
 const normalizeUsername = (value: unknown) => {
@@ -55,6 +66,11 @@ const isValidPassword = (password: string) => password.length >= 6;
 const toUserProfile = (user: UserEntity): UserProfile => ({
   id: user.id,
   username: user.username,
+  name: user.name ?? null,
+  age: user.age ?? null,
+  description: user.description ?? null,
+  voiceName: user.voiceName ?? null,
+  pitch: user.pitch ?? null,
   levelId: user.levelId ?? null,
   level: user.level?.level ?? null,
   levelDescription: user.level?.descript ?? null,
@@ -351,12 +367,110 @@ export const createUsersController = (dataSource: DataSource): UsersController =
     }
   };
 
+  /**
+   * Updates the authenticated user's profile.
+   * Allows updating: name, age, description, levelId, currentStoryId, voiceName, pitch.
+   *
+   * @param request - Express request with profile payload.
+   * @param response - Express response for update results.
+   */
+  const updateProfile: UsersController["updateProfile"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const payload = request.body as UpdateProfilePayload;
+
+    try {
+      const user = await repository.findOne({ where: { id: request.user.id } });
+
+      if (!user) {
+        response.status(404).json({ message: "User not found" });
+        return;
+      }
+
+      // Update name
+      if (payload.name !== undefined) {
+        user.name = payload.name === null ? null : String(payload.name).trim() || null;
+      }
+
+      // Update age
+      if (payload.age !== undefined) {
+        user.age = payload.age === null ? null : Number(payload.age) || null;
+      }
+
+      // Update description
+      if (payload.description !== undefined) {
+        user.description = payload.description === null ? null : String(payload.description).trim() || null;
+      }
+
+      // Update voice name
+      if (payload.voiceName !== undefined) {
+        user.voiceName = payload.voiceName === null ? null : String(payload.voiceName).trim() || null;
+      }
+
+      // Update pitch
+      if (payload.pitch !== undefined) {
+        user.pitch = payload.pitch === null ? null : Number(payload.pitch) || null;
+      }
+
+      // Update level
+      if (payload.levelId !== undefined) {
+        if (payload.levelId === null) {
+          user.levelId = null;
+        } else {
+          const levelId = Number(payload.levelId);
+          if (Number.isInteger(levelId)) {
+            const level = await levelRepository.findOne({ where: { id: levelId } });
+            if (!level) {
+              response.status(404).json({ message: "Level not found" });
+              return;
+            }
+            user.levelId = level.id;
+          }
+        }
+      }
+
+      // Update current story
+      if (payload.currentStoryId !== undefined) {
+        if (payload.currentStoryId === null) {
+          user.currentStoryId = null;
+        } else {
+          const storyId = Number(payload.currentStoryId);
+          if (Number.isInteger(storyId)) {
+            const story = await storyRepository.findOne({
+              where: { id: storyId, userId: request.user.id }
+            });
+            if (!story) {
+              response.status(404).json({ message: "Story not found" });
+              return;
+            }
+            user.currentStoryId = story.id;
+          }
+        }
+      }
+
+      const saved = await repository.save(user);
+      const hydrated = await repository.findOne({ where: { id: saved.id }, relations: { level: true } });
+
+      response.json({ user: toUserProfile(hydrated ?? saved) });
+    } catch (error) {
+      console.error("Failed to update user profile.", error);
+      response.status(500).json({
+        message: "Failed to update user profile",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
   return {
     register,
     login,
     resetPassword,
     getMe,
     updateLevel,
-    setCurrentStory
+    setCurrentStory,
+    updateProfile
   };
 };

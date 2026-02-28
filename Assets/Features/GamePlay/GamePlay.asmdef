@@ -11,7 +11,8 @@
         "GamePlay.Practice",
         "GamePlay.Task",
         "GamePlay.Chat",
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "GamePlay.Setting"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

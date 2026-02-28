@@ -19,6 +19,7 @@ export const createUsersRoutes = (dataSource: DataSource) => {
   router.get("/me", requireAuth, controller.getMe);
   router.put("/level", requireAuth, controller.updateLevel);
   router.put("/current-story", requireAuth, controller.setCurrentStory);
+  router.put("/profile", requireAuth, controller.updateProfile);
 
   return router;
 };
