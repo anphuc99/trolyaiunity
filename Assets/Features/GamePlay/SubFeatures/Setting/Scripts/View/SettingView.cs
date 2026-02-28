@@ -343,7 +343,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 				LevelId = GetSelectedDropdownId(_levelDropdown, _levelOptions),
 				CurrentStoryId = GetSelectedDropdownId(_currentStoryDropdown, _storyOptions),
 				VoiceName = GetVoiceSelection(),
-				Pitch = _pitchSlider?.value
+				Pitch = _pitchSlider.value
 			};
 
 			SendRequest(SettingRequests.SaveProfile, request);

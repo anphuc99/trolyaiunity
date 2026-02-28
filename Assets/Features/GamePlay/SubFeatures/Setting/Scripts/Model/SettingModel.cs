@@ -103,7 +103,7 @@ namespace Features.GamePlay.SubFeatures.Setting.Model
 		public int? LevelId { get; set; }
 		public int? CurrentStoryId { get; set; }
 		public string VoiceName { get; set; }
-		public float? Pitch { get; set; }
+		public float Pitch { get; set; }
 	}
 
 	/// <summary>
