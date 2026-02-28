@@ -145,6 +145,12 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 				_decreaseAgeButton.onClick.AddListener(() => AdjustAge(-1));
 			}
 
+			if (_ageInputField != null)
+			{
+				_ageInputField.onEndEdit.RemoveListener(HandleAgeInputChanged);
+				_ageInputField.onEndEdit.AddListener(HandleAgeInputChanged);
+			}
+
 			if (_levelDropdown != null)
 			{
 				_levelDropdown.onValueChanged.RemoveListener(HandleLevelChanged);
@@ -385,6 +391,17 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			}
 		}
 
+		private float? ResolvePitchValue()
+		{
+			if (_pitchSlider == null)
+			{
+				return _selectedPitch;
+			}
+
+			_selectedPitch = _pitchSlider.value;
+			return _selectedPitch;
+		}
+
 		private void AdjustAge(int delta)
 		{
 			var value = _currentAge ?? 0;
@@ -393,12 +410,43 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			UpdateAgeText();
 		}
 
+		private void HandleAgeInputChanged(string rawValue)
+		{
+			SyncAgeFromInput(rawValue);
+			UpdateAgeText();
+		}
+
+		private void SyncAgeFromInput(string rawValue)
+		{
+			var parsed = ParseAgeValue(rawValue);
+			_currentAge = parsed;
+		}
+
+		private int? ParseAgeValue(string rawValue)
+		{
+			var sanitized = (rawValue ?? string.Empty).Trim();
+			if (string.IsNullOrEmpty(sanitized) || sanitized == "--")
+			{
+				return null;
+			}
+
+			if (int.TryParse(sanitized, out var parsedAge))
+			{
+				return Mathf.Clamp(parsedAge, 0, 120);
+			}
+
+			return _currentAge;
+		}
+
 		private void UpdateAgeText()
 		{
-			if (_ageInputField != null)
+			if (_ageInputField == null)
 			{
-				_ageInputField.text = _currentAge.HasValue ? _currentAge.Value.ToString() : "--";
+				return;
 			}
+
+			var display = _currentAge.HasValue ? _currentAge.Value.ToString() : "--";
+			_ageInputField.SetTextWithoutNotify(display);
 		}
 
 		private void SetNameValue(string value)
@@ -441,6 +489,12 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 
 		private void HandleSaveClicked()
 		{
+			if (_ageInputField != null)
+			{
+				SyncAgeFromInput(_ageInputField.text);
+			}
+
+			var resolvedPitch = ResolvePitchValue();
 			var voiceFromUi = ResolveVoiceSelection();
 			var resolvedVoiceName = string.IsNullOrWhiteSpace(voiceFromUi) ? _loadedVoiceName : voiceFromUi;
 
@@ -452,7 +506,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 				LevelId = _selectedLevelId,
 				CurrentStoryId = _selectedStoryId,
 				VoiceName = resolvedVoiceName,
-				Pitch = _selectedPitch
+				Pitch = resolvedPitch
 			};
 
 			SendRequest(SettingRequests.SaveProfile, request);
