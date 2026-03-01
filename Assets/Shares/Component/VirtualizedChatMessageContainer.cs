@@ -384,6 +384,15 @@ namespace Share.Components
 			RefreshVisible();
 		}
 
+		/// <summary>
+		/// Scrolls directly to the newest message at the bottom.
+		/// </summary>
+		public void ScrollToBottom()
+		{
+			_scrollOffset = GetMaxScrollOffset();
+			RefreshVisible();
+		}
+
 		private void EnsureReferences()
 		{
 			if (_viewport == null)

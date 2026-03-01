@@ -117,6 +117,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				Message = trimmed,
 				Avatar = null,
 			});
+			ScrollMessagesToBottom();
 
 			SendRequest(ChatRequests.SendMessage, new ChatSendRequestPayload
 			{
@@ -263,6 +264,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (response == null || response.Messages == null)
 			{
 				_messageContainer.SetMessages(new List<MessageBubbleData>());
+				ScrollMessagesToBottom();
 				return;
 			}
 
@@ -331,6 +333,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			_messageContainer.SetMessages(mapped);
+			ScrollMessagesToBottom();
 		}
 
 		/// <summary>
@@ -364,6 +367,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					Tone = DefaultTtsTone,
 					Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, DefaultCharacterDisplayName),
 				});
+				ScrollMessagesToBottom();
 				return;
 			}
 
@@ -430,6 +434,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					Tone = tone,
 					Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, characterName),
 				});
+				ScrollMessagesToBottom();
 
 				if (clip != null)
 				{
@@ -612,6 +617,16 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			_isCharacterResponding = isResponding;
 			SetChatInputInteractable(!isResponding);
+		}
+
+		private void ScrollMessagesToBottom()
+		{
+			if (_messageContainer == null)
+			{
+				return;
+			}
+
+			_messageContainer.ScrollToBottom();
 		}
 
 		private void SetChatInputInteractable(bool isInteractable)
@@ -999,6 +1014,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_messageContainer != null)
 			{
 				_messageContainer.SetMessages(new List<MessageBubbleData>());
+				ScrollMessagesToBottom();
 			}
 
 			if (_inputField != null)
