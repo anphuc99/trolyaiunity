@@ -13,6 +13,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.Networking;
 using Share.Components;
+using UnityEngine.UI;
 
 namespace Features.GamePlay.SubFeatures.Chat.View
 {
@@ -49,9 +50,16 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[SerializeField]
 		private ChatContextPopupView _contextPopupView;
 
+		[SerializeField]
+		private TMP_InputField _intputChat;
+
+		[SerializeField]
+		private Button _sendButton;
+
 		private readonly Queue<ChatAssistantTurnPayload> _pendingCharacterTurns = new Queue<ChatAssistantTurnPayload>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
 		private bool _isProcessingCharacterTurns;
+		private bool _isCharacterResponding;
 		private bool _isPopupInitialized;
 		private bool _isContextPopupInitialized;
 		private NetworkSettings _networkSettings;
@@ -61,6 +69,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		/// </summary>
 		public void SendInputMessage()
 		{
+			if (_isCharacterResponding)
+			{
+				return;
+			}
+
 			if (_inputField == null)
 			{
 				return;
@@ -80,6 +93,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		/// <param name="message">User message content.</param>
 		public void SendChatMessage(string message)
 		{
+			if (_isCharacterResponding)
+			{
+				return;
+			}
+
 			if (_messageContainer == null)
 			{
 				return;
@@ -158,6 +176,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			StopAllCoroutines();
 			_pendingCharacterTurns.Clear();
 			_isProcessingCharacterTurns = false;
+			SetCharacterRespondingState(false);
 			if (_messageContainer != null)
 			{
 				_messageContainer.OnMessageSpeakerClicked = null;
@@ -359,6 +378,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_pendingCharacterTurns.Enqueue(turn);
 			}
 
+			SetCharacterRespondingState(true);
+
 			if (!_isProcessingCharacterTurns)
 			{
 				StartCoroutine(ProcessCharacterTurnsSequentially());
@@ -368,6 +389,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private IEnumerator ProcessCharacterTurnsSequentially()
 		{
 			_isProcessingCharacterTurns = true;
+			SetCharacterRespondingState(true);
 
 			while (_pendingCharacterTurns.Count > 0)
 			{
@@ -416,6 +438,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			_isProcessingCharacterTurns = false;
+			SetCharacterRespondingState(false);
 		}
 
 		private IEnumerator RequestCharacterTtsClip(string text, string tone, string characterName, Action<AudioClip> onCompleted)
@@ -580,7 +603,41 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_messageContainer.OnMessageTranslateClicked = HandleMessageTranslateClicked;
 			}
 
+			SetChatInputInteractable(!_isCharacterResponding);
+
 			BindInputFieldEvents();
+		}
+
+		private void SetCharacterRespondingState(bool isResponding)
+		{
+			_isCharacterResponding = isResponding;
+			SetChatInputInteractable(!isResponding);
+		}
+
+		private void SetChatInputInteractable(bool isInteractable)
+		{
+			if (_inputField != null)
+			{
+				_inputField.interactable = isInteractable;
+				if (!isInteractable)
+				{
+					_inputField.DeactivateInputField();
+				}
+			}
+
+			if (_intputChat != null)
+			{
+				_intputChat.interactable = isInteractable;
+				if (!isInteractable)
+				{
+					_intputChat.DeactivateInputField();
+				}
+			}
+
+			if (_sendButton != null)
+			{
+				_sendButton.interactable = isInteractable;
+			}
 		}
 
 		private void BindInputFieldEvents()
@@ -931,6 +988,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			StopAllCoroutines();
 			_pendingCharacterTurns.Clear();
 			_isProcessingCharacterTurns = false;
+			SetCharacterRespondingState(false);
 			_reloadingTtsMessageIndices.Clear();
 
 			if (_characterVoiceAudioSource != null)
