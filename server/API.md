@@ -795,7 +795,7 @@ List translation cards with review + journal summary.
       "translation": "...",
       "userTranslation": null,
       "characterName": "Mimi",
-      "audio": "<audioId>",
+      "tone": "neutral, medium pitch",
       "explanationMd": "...",
       "journalId": 1,
       "userId": 1,
@@ -858,7 +858,7 @@ Return candidates for “learn new sentences”.
       "content": "...",
       "translation": "...",
       "characterName": "...",
-      "audio": "<audioId>|null",
+      "tone": "neutral, medium pitch|null",
       "journalId": 1,
       "journalSummary": "...",
       "createdAt": "..."

@@ -147,37 +147,84 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 		}
 
 		/// <summary>
-		/// Resolves the audio URL for the given audio id and publishes it for playback.
+		/// Resolves a text-to-speech URL from text, tone, and character name.
 		/// </summary>
-		/// <param name="payload">Audio request payload containing the audio id.</param>
+		/// <param name="payload">Audio request payload.</param>
 		[Request(PracticeRequests.PlayAudio)]
 		public static void HandlePlayAudio(PracticeAudioRequestPayload payload)
 		{
-			if (payload == null || string.IsNullOrWhiteSpace(payload.AudioId))
+			if (payload == null || string.IsNullOrWhiteSpace(payload.Text))
 			{
 				EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
 				{
-					Message = "Audio id is required for playback."
+					Message = "Text is required for playback."
 				});
 				return;
 			}
 
-			var relativePath = "/audio/" + payload.AudioId.Trim() + ".mp3";
-			var resolvedUrl = HttpClient.ResolveUrl(relativePath);
+			_ = ResolveAudioUrlInternalAsync(payload);
+		}
 
-			if (string.IsNullOrWhiteSpace(resolvedUrl))
+		private static async Task ResolveAudioUrlInternalAsync(PracticeAudioRequestPayload payload)
+		{
+			var safeText = payload.Text?.Trim() ?? string.Empty;
+			if (string.IsNullOrWhiteSpace(safeText))
 			{
-				EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
-				{
-					Message = "Failed to resolve audio URL."
-				});
 				return;
 			}
 
-			EventBus.Publish(PracticeEvents.AudioUrlResolved, new PracticeAudioUrlPayload
+			var safeTone = string.IsNullOrWhiteSpace(payload.Tone) ? "neutral, medium pitch" : payload.Tone.Trim();
+			var safeCharacterName = string.IsNullOrWhiteSpace(payload.CharacterName) ? "Mimi" : payload.CharacterName.Trim();
+
+			var endpoint = NetworkEndpoints.TextToSpeech
+				+ "?text=" + Uri.EscapeDataString(safeText)
+				+ "&tone=" + Uri.EscapeDataString(safeTone)
+				+ "&characterName=" + Uri.EscapeDataString(safeCharacterName);
+
+			try
 			{
-				Url = resolvedUrl
-			});
+				var responseJson = await HttpClient.GetTaskAsync(endpoint);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
+					{
+						Message = "Failed to resolve audio URL."
+					});
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<PracticeTextToSpeechResponsePayload>(responseJson);
+				if (response == null || string.IsNullOrWhiteSpace(response.Url))
+				{
+					EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
+					{
+						Message = "Failed to resolve audio URL."
+					});
+					return;
+				}
+
+				var resolvedUrl = HttpClient.ResolveUrl(response.Url.Trim());
+				if (string.IsNullOrWhiteSpace(resolvedUrl))
+				{
+					EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
+					{
+						Message = "Failed to resolve audio URL."
+					});
+					return;
+				}
+
+				EventBus.Publish(PracticeEvents.AudioUrlResolved, new PracticeAudioUrlPayload
+				{
+					Url = resolvedUrl
+				});
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
+				{
+					Message = "Failed to resolve audio URL: " + exception.Message
+				});
+			}
 		}
 
 		private static async Task LoadTabInternalAsync(PracticeTabType tab)
@@ -289,7 +336,7 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 					Translation = candidate.Translation,
 					CharacterName = candidate.CharacterName,
 					JournalSummary = candidate.JournalSummary,
-					Audio = candidate.Audio,
+					Tone = candidate.Tone,
 					Review = null,
 					IsLearnCandidate = true
 				}).ToList();
@@ -375,7 +422,7 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 					Translation = card.Translation,
 					CharacterName = card.CharacterName,
 					JournalSummary = card.JournalSummary,
-					Audio = card.Audio,
+					Tone = card.Tone,
 					Review = card.Review,
 					IsLearnCandidate = false
 				}).ToList();

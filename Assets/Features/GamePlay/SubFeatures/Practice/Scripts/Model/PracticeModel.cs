@@ -85,9 +85,9 @@ namespace Features.GamePlay.SubFeatures.Practice.Model
 		public string JournalSummary { get; set; }
 
 		/// <summary>
-		/// Audio id returned by the API. Used to build the playback URL.
+		/// Tone hint used for dynamic TTS playback.
 		/// </summary>
-		public string Audio { get; set; }
+		public string Tone { get; set; }
 
 		public PracticeTranslationReviewPayload Review { get; set; }
 
@@ -128,11 +128,8 @@ namespace Features.GamePlay.SubFeatures.Practice.Model
 		[JsonProperty("review")]
 		public PracticeTranslationReviewPayload Review { get; set; }
 
-		/// <summary>
-		/// Audio id for cached TTS playback.
-		/// </summary>
-		[JsonProperty("audio")]
-		public string Audio { get; set; }
+		[JsonProperty("tone")]
+		public string Tone { get; set; }
 	}
 
 	/// <summary>
@@ -203,11 +200,8 @@ namespace Features.GamePlay.SubFeatures.Practice.Model
 		[JsonProperty("journalSummary")]
 		public string JournalSummary { get; set; }
 
-		/// <summary>
-		/// Audio id for cached TTS playback.
-		/// </summary>
-		[JsonProperty("audio")]
-		public string Audio { get; set; }
+		[JsonProperty("tone")]
+		public string Tone { get; set; }
 	}
 
 	/// <summary>
@@ -262,14 +256,24 @@ namespace Features.GamePlay.SubFeatures.Practice.Model
 	}
 
 	/// <summary>
-	/// Request payload for playing audio by audio id.
+	/// Request payload for dynamic text-to-speech playback.
 	/// </summary>
 	public sealed class PracticeAudioRequestPayload
 	{
-		/// <summary>
-		/// Audio id from the API response.
-		/// </summary>
-		public string AudioId { get; set; }
+		public string Text { get; set; }
+
+		public string Tone { get; set; }
+
+		public string CharacterName { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload for text-to-speech endpoint.
+	/// </summary>
+	public sealed class PracticeTextToSpeechResponsePayload
+	{
+		[JsonProperty("url")]
+		public string Url { get; set; }
 	}
 
 	/// <summary>

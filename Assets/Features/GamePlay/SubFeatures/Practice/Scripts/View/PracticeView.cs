@@ -428,14 +428,16 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 		/// </summary>
 		private void HandleSpeakerClicked()
 		{
-			if (_currentItem == null || string.IsNullOrWhiteSpace(_currentItem.Audio))
+			if (_currentItem == null || string.IsNullOrWhiteSpace(_currentItem.Content))
 			{
 				return;
 			}
 
 			SendRequest(PracticeRequests.PlayAudio, new PracticeAudioRequestPayload
 			{
-				AudioId = _currentItem.Audio
+				Text = _currentItem.Content,
+				Tone = _currentItem.Tone,
+				CharacterName = _currentItem.CharacterName,
 			});
 		}
 
@@ -727,7 +729,7 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 				Debug.LogWarning("[PracticeView] Failed to download audio: " + audioRequest.error, this);
 				yield break;
 			}
-
+			Debug.Log(url);
 			var clip = DownloadHandlerAudioClip.GetContent(audioRequest);
 			if (clip == null)
 			{

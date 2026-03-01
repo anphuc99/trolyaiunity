@@ -74,7 +74,6 @@ const serialiseCard = (entity: TranslationCardEntity) => {
     translation: entity.translation,
     userTranslation: entity.userTranslation,
     characterName: entity.characterName,
-    audio: entity.audio,
     explanationMd: entity.explanationMd,
     journalId: entity.journalId,
     userId: entity.userId,
@@ -217,6 +216,15 @@ export const createTranslationController = (
         reviews.map((review: TranslationReviewEntity) => [review.translationCardId, review])
       );
 
+      const messageIds = [...new Set(cards.map((card: TranslationCardEntity) => card.messageId).filter((id) => Boolean(id)))];
+      const messages = messageIds.length
+        ? await messageRepo.find({
+            where: messageIds.map((id) => ({ id })),
+            select: ["id", "tone"]
+          })
+        : [];
+      const toneMap = new Map<string, string | null>(messages.map((message: MessageEntity) => [message.id, message.tone ?? null]));
+
       // Fetch journal summaries for the cards
       const journalIds = [...new Set(cards.map((card: TranslationCardEntity) => card.journalId))];
       const journals = journalIds.length
@@ -228,6 +236,7 @@ export const createTranslationController = (
         const review = reviewMap.get(card.id);
         return {
           ...serialiseCard(card),
+          tone: toneMap.get(card.messageId) ?? null,
           journalSummary: journalMap.get(card.journalId) ?? null,
           review: review ? serialiseReview(review) : null
         };
@@ -276,6 +285,14 @@ export const createTranslationController = (
 
       const cardMap = new Map<number, TranslationCardEntity>(cards.map((card: TranslationCardEntity) => [card.id, card]));
       const reviewMap = new Map<number, TranslationReviewEntity>(dueReviews.map((review: TranslationReviewEntity) => [review.translationCardId, review]));
+      const messageIds = [...new Set(cards.map((card: TranslationCardEntity) => card.messageId).filter((id) => Boolean(id)))];
+      const messages = messageIds.length
+        ? await messageRepo.find({
+            where: messageIds.map((id) => ({ id })),
+            select: ["id", "tone"]
+          })
+        : [];
+      const toneMap = new Map<string, string | null>(messages.map((message: MessageEntity) => [message.id, message.tone ?? null]));
 
       // Use database sorted results directly (sorted by message.createdAt)
       const sortedCards = cards;
@@ -283,6 +300,7 @@ export const createTranslationController = (
         const review = reviewMap.get(card.id);
         return {
           ...serialiseCard(card),
+          tone: toneMap.get(card.messageId) ?? null,
           journalSummary: journalMap.get(card.journalId) ?? null,
           review: review ? serialiseReview(review) : null
         };
@@ -412,7 +430,7 @@ export const createTranslationController = (
         content: message.content,
         translation: message.translation,
         characterName: message.characterName,
-        audio: message.audio ?? null,
+        tone: message.tone ?? null,
         journalId: message.journalId,
         journalSummary: journalMap.get(message.journalId) ?? null,
         createdAt: message.createdAt
@@ -554,8 +572,10 @@ export const createTranslationController = (
         return;
       }
 
+      const cardMessage = await messageRepo.findOne({ where: { id: card.messageId, userId }, select: ["id", "tone"] });
+
       if (card.explanationMd && card.explanationMd.trim()) {
-        response.json({ explanation: card.explanationMd, card: serialiseCard(card) });
+        response.json({ explanation: card.explanationMd, card: { ...serialiseCard(card), tone: cardMessage?.tone ?? null } });
         return;
       }
 
@@ -573,7 +593,7 @@ export const createTranslationController = (
       card.explanationMd = explanation;
       card = await cardRepo.save(card);
 
-      response.json({ explanation: explanation, card: serialiseCard(card) });
+      response.json({ explanation: explanation, card: { ...serialiseCard(card), tone: cardMessage?.tone ?? null } });
     } catch (error) {
       console.error("Failed to explain translation card.", error);
       response.status(500).json({ message: "Failed to explain translation card" });
@@ -687,7 +707,10 @@ export const createTranslationController = (
       const saved = await reviewRepo.save(reviewEntity ? { ...reviewEntity, ...nextReview } : reviewRepo.create(nextReview));
 
       response.json({
-        card: serialiseCard(card),
+        card: {
+          ...serialiseCard(card),
+          tone: (await messageRepo.findOne({ where: { id: card.messageId, userId }, select: ["id", "tone"] }))?.tone ?? null
+        },
         review: serialiseReview(saved)
       });
     } catch (error) {
