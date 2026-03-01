@@ -209,6 +209,9 @@ Before ending any response that includes code, the AI MUST:
    - Why it was changed
    - Key files affected
 
+## PUSH GIT
+   - Use only `node gitBundleTool` do not use `git push` directly
+   - Always push after a commit, never leave commits unpushed
 
 #### Allowed `<type>` values
 - `feat` — new feature
@@ -232,6 +235,7 @@ Before ending any response that includes code, the AI MUST:
 - ❌ Do NOT generate code before reading `README.md`
 - ❌ Do NOT guess project structure or logic
 - ❌ Do NOT skip Git commit
+- ❌ Do NOT skip Git push
 - ❌ Do NOT end with syntax errors
 - ❌ Do NOT mix unrelated changes
 - ❌ Do NOT remove existing documentation unless explicitly requested
