@@ -430,7 +430,7 @@ export const createTranslationController = (
         content: message.content,
         translation: message.translation,
         characterName: message.characterName,
-        tone: message.tone ?? null,
+        tone: message.tone?.trim() || "neutral, medium pitch",
         journalId: message.journalId,
         journalSummary: journalMap.get(message.journalId) ?? null,
         createdAt: message.createdAt
