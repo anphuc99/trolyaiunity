@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Core.Infrastructure.Authentication;
 using Core.Infrastructure.Network;
+using Core.Infrastructure.Scenes;
 using Features.GamePlay.SubFeatures.Setting.Events;
 using Features.GamePlay.SubFeatures.Setting.Infrastructure;
 using Features.GamePlay.SubFeatures.Setting.Infrastructure.Attributes;
@@ -84,6 +86,18 @@ namespace Features.GamePlay.SubFeatures.Setting.Controller
 			}
 
 			_ = SaveProfileInternalAsync(payload);
+		}
+
+		/// <summary>
+		/// Clears local auth tokens and navigates back to the Login scope.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[Request(SettingRequests.Logout)]
+		public static void HandleLogout(object payload)
+		{
+			AuthTokenModel.AccessToken = null;
+			AuthTokenModel.RefreshToken = null;
+			LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.LoginGameplay);
 		}
 
 		private static async Task LoadProfileInternalAsync()

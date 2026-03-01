@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Core.Infrastructure.Authentication;
 using Core.Infrastructure.Events;
 using Core.Infrastructure.Network;
 using Features.GamePlay.SubFeatures.Setting.Controller;
@@ -21,6 +22,8 @@ namespace Features.GamePlay.SubFeatures.Setting.Tests
 			EventBus.ClearAll();
 			SettingState.Reset();
 			FakeServer.ResetToDefaults();
+			AuthTokenModel.AccessToken = null;
+			AuthTokenModel.RefreshToken = null;
 		}
 
 		[TearDown]
@@ -29,6 +32,27 @@ namespace Features.GamePlay.SubFeatures.Setting.Tests
 			EventBus.ClearAll();
 			SettingState.Reset();
 			FakeServer.ResetToDefaults();
+			AuthTokenModel.AccessToken = null;
+			AuthTokenModel.RefreshToken = null;
+		}
+
+		[Test]
+		public void HandleLogout_ClearsAuthTokens()
+		{
+			AuthTokenModel.AccessToken = "access-token";
+			AuthTokenModel.RefreshToken = "refresh-token";
+
+			try
+			{
+				SettingController.HandleLogout(null);
+			}
+			catch
+			{
+				// Scene loading may throw in test runner context; token assertions still apply.
+			}
+
+			Assert.IsNull(AuthTokenModel.AccessToken);
+			Assert.IsNull(AuthTokenModel.RefreshToken);
 		}
 
 		[UnityTest]

@@ -39,6 +39,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		[SerializeField] private Button _increaseAgeButton;
 		[SerializeField] private Button _decreaseAgeButton;
 		[SerializeField] private Button _saveButton;
+		[SerializeField] private Button _logoutButton;
 
 		[Header("Dropdowns")]
 		[SerializeField] private TMP_Dropdown _levelDropdown;
@@ -119,6 +120,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			BindButton(_increaseAgeButton, () => AdjustAge(1));
 			BindButton(_decreaseAgeButton, () => AdjustAge(-1));
 			BindButton(_saveButton, HandleSaveClicked);
+			BindButton(_logoutButton, HandleLogoutClicked);
 
 			_ageInputField?.onEndEdit.AddListener(HandleAgeInputChanged);
 			_pitchSlider?.onValueChanged.AddListener(HandlePitchChanged);
@@ -349,6 +351,11 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			SendRequest(SettingRequests.SaveProfile, request);
 		}
 
+		private void HandleLogoutClicked()
+		{
+			SendRequest(SettingRequests.Logout);
+		}
+
 		private static int? GetSelectedDropdownId<T>(TMP_Dropdown dropdown, List<T> options) where T : class
 		{
 			if (dropdown == null) return null;
@@ -372,6 +379,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			SetInteractable(_increaseAgeButton, isInteractable);
 			SetInteractable(_decreaseAgeButton, isInteractable);
 			SetInteractable(_saveButton, isInteractable);
+			SetInteractable(_logoutButton, isInteractable);
 		}
 
 		private static void SetInteractable(Selectable selectable, bool interactable)
