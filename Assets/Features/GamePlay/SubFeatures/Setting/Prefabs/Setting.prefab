@@ -2839,15 +2839,15 @@ MonoBehaviour:
   _visible: 1
   _nameInputField: {fileID: 6671086276280832338}
   _ageInputField: {fileID: 3357651772074135075}
+  _descriptionInputField: {fileID: 5442575253239433301}
   _increaseAgeButton: {fileID: 4231475198853551645}
   _decreaseAgeButton: {fileID: 7346146284980463073}
-  _descriptionInputField: {fileID: 5442575253239433301}
+  _saveButton: {fileID: 6544693150484340968}
   _levelDropdown: {fileID: 7504185850134978701}
   _currentStoryDropdown: {fileID: 6083807065355460025}
   _voiceNameDropdown: {fileID: 2606087966971483446}
   _pitchSlider: {fileID: 2626852657347541071}
   _pitchValueLabel: {fileID: 33689662642596270}
-  _saveButton: {fileID: 6544693150484340968}
 --- !u!1 &3378957687334916643
 GameObject:
   m_ObjectHideFlags: 0
@@ -5939,7 +5939,7 @@ MonoBehaviour:
   m_CaretWidth: 1
   m_ReadOnly: 0
   m_RichText: 1
-  m_GlobalFontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_GlobalFontAsset: {fileID: 11400000, guid: 23d4654a79732b643af252b61d09dcb3, type: 2}
   m_OnFocusSelectAll: 1
   m_ResetOnDeActivation: 1
   m_KeepTextSelectionVisible: 0

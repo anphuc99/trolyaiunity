@@ -479,6 +479,8 @@ MonoBehaviour:
   _characterVoiceAudioSource: {fileID: 5874510021806240559}
   _selectCharacterPopupView: {fileID: 1151619655737409475}
   _contextPopupView: {fileID: 0}
+  _intputChat: {fileID: 0}
+  _sendButton: {fileID: 0}
 --- !u!82 &5874510021806240559
 AudioSource:
   m_ObjectHideFlags: 0
@@ -748,8 +750,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 80.596}
-  m_SizeDelta: {x: 0, y: -161.192}
+  m_AnchoredPosition: {x: 0, y: 90.89}
+  m_SizeDelta: {x: 0, y: -181.78}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &6980995478208728559
 MonoBehaviour:
@@ -801,7 +803,7 @@ MonoBehaviour:
   _dragSensitivity: 1
   _mouseWheelStep: 48
   _contentPaddingTop: 5
-  _contentPaddingBottom: 5
+  _contentPaddingBottom: 15
   _maxSpawnedObjects: 12
   _messages: []
 --- !u!222 &7452891467743004282
@@ -1242,6 +1244,10 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6809129689226525395, guid: 0504b28af74e8124cbf5d460c9874e3b, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6935980142049498131, guid: 0504b28af74e8124cbf5d460c9874e3b, type: 3}
       propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
