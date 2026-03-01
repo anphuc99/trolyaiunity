@@ -35,6 +35,13 @@ interface AssistantTurn {
   Translation?: string;
 }
 
+type ChatReplyService = OpenAIChatService | GeminiChatService;
+
+interface JsonReplyResult {
+  reply: string;
+  model: string;
+}
+
 /**
  * Builds the Chat controller with injected data source dependencies.
  *
@@ -268,6 +275,97 @@ export const createChatController = (
     }
 
     return [];
+  };
+
+  /**
+   * Validates that assistant turns match the required JSON schema shape.
+   *
+   * @param turns - Parsed assistant turns.
+   * @returns True when all required fields exist and are non-empty strings.
+   */
+  const isValidAssistantTurnSchema = (turns: AssistantTurn[]) => {
+    if (!Array.isArray(turns) || turns.length === 0) {
+      return false;
+    }
+
+    for (const turn of turns) {
+      if (!turn || typeof turn !== "object") {
+        return false;
+      }
+
+      const messageId = typeof turn.MessageId === "string" ? turn.MessageId.trim() : "";
+      const characterName = typeof turn.CharacterName === "string" ? turn.CharacterName.trim() : "";
+      const text = typeof turn.Text === "string" ? turn.Text.trim() : "";
+      const tone = typeof turn.Tone === "string" ? turn.Tone.trim() : "";
+      const translation = typeof turn.Translation === "string" ? turn.Translation.trim() : "";
+
+      if (!messageId || !characterName || !text || !tone || !translation) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  /**
+   * Creates a corrective retry prompt when assistant output is not valid JSON schema.
+   *
+   * @param userMessage - Original user message.
+   * @returns Retry prompt text.
+   */
+  const buildJsonRetryPrompt = (userMessage: string) => {
+    return [
+      userMessage,
+      "",
+      "Your previous response did not match the required JSON format.",
+      "Retry now and return ONLY valid JSON array.",
+      "Requirements:",
+      "- Must be a JSON array (1-10 items).",
+      "- Every item must include non-empty string fields: MessageId, CharacterName, Text, Tone, Translation.",
+      "- No markdown, no explanations, no comments."
+    ].join("\n");
+  };
+
+  /**
+   * Requests a reply from AI and retries with a corrective prompt when JSON format is invalid.
+   *
+   * @param service - Target chat service.
+   * @param message - User message to send.
+   * @param history - Message history.
+   * @param modelOverride - Optional model override.
+   * @param retryLimit - Max retry attempts after the initial call.
+   * @returns JSON-valid assistant reply result.
+   */
+  const requestJsonReplyWithRetry = async (
+    service: ChatReplyService,
+    message: string,
+    history: Array<{ role: "system" | "developer" | "user" | "assistant"; content: string }>,
+    modelOverride?: string,
+    retryLimit = 2
+  ): Promise<JsonReplyResult> => {
+    let attempt = 0;
+    let prompt = message;
+    let lastResult: JsonReplyResult | null = null;
+
+    while (attempt <= retryLimit) {
+      const result = await service.createReply(prompt, history, modelOverride || undefined);
+      lastResult = result;
+
+      const turns = parseAssistantReply(result.reply);
+      if (isValidAssistantTurnSchema(turns)) {
+        return result;
+      }
+
+      attempt += 1;
+      if (attempt > retryLimit) {
+        break;
+      }
+
+      console.warn(`Assistant reply JSON invalid at attempt ${attempt}. Retrying with strict JSON format reminder.`);
+      prompt = buildJsonRetryPrompt(message);
+    }
+
+    throw new Error("AI returned invalid JSON format after retries");
   };
 
   const collectAssistantMessageIds = (messages: { role: string; content: string }[]) => {
@@ -513,7 +611,8 @@ export const createChatController = (
       const systemPrompt = await buildSystemPrompt(request.user.id, request.body);
       await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
       const history = await historyStore.load(request.user.id);
-      const result = await selectedService.createReply(
+      const result = await requestJsonReplyWithRetry(
+        selectedService,
         message,
         history,
         modelOverride || undefined
@@ -700,7 +799,8 @@ export const createChatController = (
       await historyStore.clear(request.user.id);
       await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
 
-      const result = await selectedService.createReply(
+      const result = await requestJsonReplyWithRetry(
+        selectedService,
         editedContent,
         historyForAI,
         modelOverride || undefined
