@@ -13,7 +13,6 @@ import TranslationReviewEntity from "./models/translation-review.entity.js";
 import UserEntity from "./models/user.entity.js";
 import VocabularyEntity from "./models/vocabulary.entity.js";
 import VocabularyMemoryEntity from "./models/vocabulary-memory.entity.js";
-import JournalReviewEntity from "./models/journal-review.entity.js";
 import VocabularyReviewEntity from "./models/vocabulary-review.entity.js";
 import { repoRoot } from "./env.js";
 
@@ -78,7 +77,6 @@ export const AppDataSource = new DataSource({
   entities: [
     CharacterEntity,
     JournalEntity,
-    JournalReviewEntity,
     LevelEntity,
     MessageEntity,
     StoryEntity,

@@ -6,7 +6,6 @@ import { createSharedRoutes } from "./shared.routes.js";
 // mvc-gen:imports
 import { createCharactersRoutes } from "./characters.routes.js";
 import { createJournalRoutes } from "./journal.routes.js";
-import { createJournalReviewRoutes } from "./journal-review.routes.js";
 import { createLevelsRoutes } from "./levels.routes.js";
 import { createStreakRoutes } from "./streak.routes.js";
 import { createStoryRoutes } from "./story.routes.js";
@@ -28,7 +27,6 @@ export const createApiRouter = (dataSource: DataSource) => {
   router.use("/characters", createCharactersRoutes(dataSource));
   router.use("/chat", createChatRoutes(dataSource));
   router.use("/home", createHomeRoutes(dataSource));
-  router.use("/journal-reviews", createJournalReviewRoutes(dataSource));
   router.use("/journals", createJournalRoutes(dataSource));
   router.use("/levels", createLevelsRoutes(dataSource));
   router.use("/streak", createStreakRoutes(dataSource));

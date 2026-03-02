@@ -332,7 +332,7 @@ MonoBehaviour:
   _chatVariantRoot: {fileID: 8577476515591254257}
   _loadOnInstall: 1
   _voiceAudioSource: {fileID: 1822314465239737638}
-  _playAllButton: {fileID: 4809747554542831204}
+  _playAllButton: {fileID: 3043930823464276540}
 --- !u!1 &5445943289182274162
 GameObject:
   m_ObjectHideFlags: 0
