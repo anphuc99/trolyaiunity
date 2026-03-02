@@ -11,12 +11,16 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 	public sealed class ChatContextPopupView : MonoBehaviour
 	{
 		public Action<string> OnSaveContextClicked;
+		public Action<string> OnSaveAndSendContextClicked;
 
 		[SerializeField]
 		private TMP_InputField _contextInputField;
 
 		[SerializeField]
 		private Button _saveButton;
+
+		[SerializeField]
+		private Button _saveAndSendButton;
 
 		[SerializeField]
 		private Button _closeButton;
@@ -32,6 +36,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_saveButton != null)
 			{
 				_saveButton.onClick.RemoveListener(HandleSaveButtonClicked);
+			}
+
+			if (_saveAndSendButton != null)
+			{
+				_saveAndSendButton.onClick.RemoveListener(HandleSaveAndSendButtonClicked);
 			}
 
 			if (_closeButton != null)
@@ -88,12 +97,28 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			Hide();
 		}
 
+		private void HandleSaveAndSendButtonClicked()
+		{
+			var context = _contextInputField != null
+				? (_contextInputField.text ?? string.Empty).Trim()
+				: string.Empty;
+
+			OnSaveAndSendContextClicked?.Invoke(context);
+			Hide();
+		}
+
 		private void BindButtons()
 		{
 			if (_saveButton != null)
 			{
 				_saveButton.onClick.RemoveListener(HandleSaveButtonClicked);
 				_saveButton.onClick.AddListener(HandleSaveButtonClicked);
+			}
+
+			if (_saveAndSendButton != null)
+			{
+				_saveAndSendButton.onClick.RemoveListener(HandleSaveAndSendButtonClicked);
+				_saveAndSendButton.onClick.AddListener(HandleSaveAndSendButtonClicked);
 			}
 
 			if (_closeButton != null)
@@ -120,6 +145,15 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				if (saveButton != null)
 				{
 					_saveButton = saveButton.GetComponent<Button>();
+				}
+			}
+
+			if (_saveAndSendButton == null)
+			{
+				var saveAndSendButton = transform.Find("Panel/btnSaveAndSendContext");
+				if (saveAndSendButton != null)
+				{
+					_saveAndSendButton = saveAndSendButton.GetComponent<Button>();
 				}
 			}
 

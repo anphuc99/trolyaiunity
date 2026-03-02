@@ -617,6 +617,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_contextPopupView != null)
 			{
 				_contextPopupView.OnSaveContextClicked = HandleSaveContextClicked;
+				_contextPopupView.OnSaveAndSendContextClicked = HandleSaveAndSendContextClicked;
 			}
 
 			if (_messageContainer != null)
@@ -1120,6 +1121,36 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				SessionId = string.IsNullOrWhiteSpace(_sessionId) ? null : _sessionId,
 				Context = context,
 			});
+		}
+
+		private void HandleSaveAndSendContextClicked(string context)
+		{
+			HandleSaveContextClicked(context);
+
+			var messageToSend = ResolveCurrentInputMessage();
+			if (string.IsNullOrWhiteSpace(messageToSend))
+			{
+				return;
+			}
+
+			SendChatMessage(messageToSend);
+		}
+
+		private string ResolveCurrentInputMessage()
+		{
+			var primaryText = _inputField != null ? _inputField.text : null;
+			if (!string.IsNullOrWhiteSpace(primaryText))
+			{
+				return primaryText;
+			}
+
+			var secondaryText = _intputChat != null ? _intputChat.text : null;
+			if (!string.IsNullOrWhiteSpace(secondaryText))
+			{
+				return secondaryText;
+			}
+
+			return string.Empty;
 		}
 
 		/// <summary>
