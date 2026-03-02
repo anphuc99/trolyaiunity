@@ -1130,6 +1130,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			var messageToSend = ResolveCurrentInputMessage();
 			if (string.IsNullOrWhiteSpace(messageToSend))
 			{
+				messageToSend = context;
+			}
+
+			if (string.IsNullOrWhiteSpace(messageToSend))
+			{
 				return;
 			}
 
