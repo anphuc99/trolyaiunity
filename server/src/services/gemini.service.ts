@@ -36,20 +36,33 @@ export interface GeminiChatService {
 }
 
 /**
- * Formats a developer role message for Gemini.
- * 
- * Since Gemini doesn't have a "developer" role, we convert developer messages
- * to user messages with a special prefix explaining the role.
+ * Formats a merged developer+user block for Gemini.
  *
- * @param content - Original developer message content.
- * @returns Formatted content with developer role explanation.
+ * When multiple developer messages appear before a user message, they are merged
+ * into one user role entry so Gemini receives a single coherent instruction block.
+ *
+ * @param developerMessages - Developer messages collected before the user message.
+ * @param userContent - The user message content to append.
+ * @returns Merged message in the form:
+ * developer:
+ * ...
+ * user:
+ * ...
  */
-const formatDeveloperMessageForGemini = (content: string): string => {
-  return `[DEVELOPER INSTRUCTION - This is a system-level instruction that should be followed but not directly responded to. It provides context updates, character changes, or other meta-information for the conversation.]
+const formatMergedDeveloperUserMessage = (developerMessages: string[], userContent: string): string => {
+  const developerSections = developerMessages
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+    .map((entry) => `developer:\n${entry}`);
 
-${content}
+  const sections = [...developerSections];
+  const trimmedUserContent = userContent.trim();
 
-[END DEVELOPER INSTRUCTION - Continue the conversation naturally based on this instruction.]`;
+  if (trimmedUserContent.length > 0) {
+    sections.push(`user:\n${trimmedUserContent}`);
+  }
+
+  return sections.join("\n\n").trim();
 };
 
 /**
@@ -57,7 +70,8 @@ ${content}
  * 
  * Gemini supports only "user" and "model" roles, so we need to:
  * - Convert "assistant" -> "model"
- * - Convert "developer" -> "user" with special formatting
+ * - Merge consecutive "developer" messages into one "user" message
+ * - If a user message follows those developer messages, append it in the same message block
  * - Skip "system" messages (handled separately as system instruction)
  *
  * @param history - Original chat history with various roles.
@@ -67,6 +81,23 @@ const convertHistoryToGeminiFormat = (
   history: Array<{ role: "system" | "developer" | "user" | "assistant"; content: string }>
 ): Content[] => {
   const geminiHistory: Content[] = [];
+  const pendingDeveloperMessages: string[] = [];
+
+  const flushDeveloperOnlyBlock = () => {
+    if (pendingDeveloperMessages.length === 0) {
+      return;
+    }
+
+    const mergedDeveloperOnly = formatMergedDeveloperUserMessage(pendingDeveloperMessages, "");
+    if (mergedDeveloperOnly) {
+      geminiHistory.push({
+        role: "user",
+        parts: [{ text: mergedDeveloperOnly }]
+      });
+    }
+
+    pendingDeveloperMessages.length = 0;
+  };
 
   for (const message of history) {
     // Skip system messages - they're handled as systemInstruction
@@ -75,30 +106,35 @@ const convertHistoryToGeminiFormat = (
     }
 
     if (message.role === "developer") {
-      // Convert developer messages to user messages with special formatting
-      geminiHistory.push({
-        role: "user",
-        parts: [{ text: formatDeveloperMessageForGemini(message.content) }]
-      });
-      
-      // Add a placeholder model response to maintain conversation flow
-      // This prevents consecutive user messages which Gemini doesn't handle well
-      geminiHistory.push({
-        role: "model",
-        parts: [{ text: "[ACKNOWLEDGED - Instruction received and understood.]" }]
-      });
+      pendingDeveloperMessages.push(message.content);
     } else if (message.role === "assistant") {
+      flushDeveloperOnlyBlock();
       geminiHistory.push({
         role: "model",
         parts: [{ text: message.content }]
       });
     } else if (message.role === "user") {
+      if (pendingDeveloperMessages.length > 0) {
+        const mergedContent = formatMergedDeveloperUserMessage(pendingDeveloperMessages, message.content);
+        if (mergedContent) {
+          geminiHistory.push({
+            role: "user",
+            parts: [{ text: mergedContent }]
+          });
+        }
+
+        pendingDeveloperMessages.length = 0;
+        continue;
+      }
+
       geminiHistory.push({
         role: "user",
         parts: [{ text: message.content }]
       });
     }
   }
+
+  flushDeveloperOnlyBlock();
 
   return geminiHistory;
 };
