@@ -401,4 +401,34 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		[JsonProperty("appearance")]
 		public string Appearance { get; set; }
 	}
+
+	/// <summary>
+	/// Request payload for /api/chat/transcribe.
+	/// </summary>
+	public sealed class ChatSpeechToTextRequestPayload
+	{
+		/// <summary>
+		/// Base64 audio data URL.
+		/// </summary>
+		[JsonProperty("audio")]
+		public string Audio { get; set; }
+
+		/// <summary>
+		/// Optional language hint (for example: vi, ko, en).
+		/// </summary>
+		[JsonProperty("language")]
+		public string Language { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload from /api/chat/transcribe.
+	/// </summary>
+	public sealed class ChatSpeechToTextResponsePayload
+	{
+		/// <summary>
+		/// Transcribed plain text.
+		/// </summary>
+		[JsonProperty("transcript")]
+		public string Transcript { get; set; }
+	}
 }

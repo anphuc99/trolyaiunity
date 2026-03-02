@@ -454,6 +454,37 @@ Notes:
   - `400 {"message":"Message is required"}`
   - `500 {"message":"OpenAI API key is not configured"}` or `Gemini API key is not configured`
 
+### POST /api/chat/transcribe
+
+Transcribe recorded voice to plain text for chat input using OpenAI `gpt-4o-mini-transcribe`.
+
+- Auth: yes
+- Body:
+
+```json
+{
+  "audio": "data:audio/wav;base64,<...>",
+  "language": "vi"
+}
+```
+
+Notes:
+- `audio` is required and must be a base64 audio data URL.
+- Maximum payload size is 12 MB.
+- `language` is optional (for example: `vi`, `ko`, `en`).
+
+- Response `200`:
+
+```json
+{ "transcript": "..." }
+```
+
+- Errors:
+  - `400 {"message":"audio is required"}`
+  - `400 {"message":"Invalid audio data URL"}`
+  - `413 {"message":"Audio payload is too large"}`
+  - `500 {"message":"Failed to transcribe audio"}`
+
 ### GET /api/chat/history
 
 Get the current chat history (excluding `system` and `developer` messages).

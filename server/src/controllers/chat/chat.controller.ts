@@ -1,7 +1,8 @@
 import type { Request, Response } from "express";
 import { randomUUID } from "crypto";
 import type { DataSource } from "typeorm";
-import { createOpenAIChatService, type OpenAIChatService } from "../../services/openai.service.js";
+import { toFile, type Uploadable } from "openai/uploads";
+import { createOpenAIChatService, createOpenAIClient, type OpenAIChatService } from "../../services/openai.service.js";
 import { createGeminiChatService, isGeminiModel, type GeminiChatService } from "../../services/gemini.service.js";
 import { buildChatSystemPrompt } from "../../services/chat-prompt.service.js";
 import StoryEntity from "../../models/story.entity.js";
@@ -14,12 +15,14 @@ interface ChatController {
   appendDeveloperMessage: (request: Request, response: Response) => Promise<void>;
   editMessage: (request: Request, response: Response) => Promise<void>;
   getDeveloperState: (request: Request, response: Response) => Promise<void>;
+  transcribeAudio: (request: Request, response: Response) => Promise<void>;
 }
 
 interface ChatControllerDeps {
   openAIService?: OpenAIChatService;
   geminiService?: GeminiChatService;
   historyStore?: ChatHistoryStore;
+  transcribeWithOpenAI?: (file: Uploadable, language?: string) => Promise<string>;
   /**
    * Optional override for building the system instruction text.
    * Primarily used by unit tests to avoid database lookups.
@@ -42,6 +45,35 @@ interface JsonReplyResult {
   model: string;
 }
 
+const MAX_AUDIO_BYTES = 12 * 1024 * 1024;
+
+/**
+ * Parses a base64 audio data URL and extracts mime type + binary buffer.
+ */
+const parseAudioDataUrl = (dataUrl: string) => {
+  const match = /^data:(audio\/[a-z0-9.+-]+)(?:;[^,]*)?;base64,(.+)$/i.exec(dataUrl.trim());
+
+  if (!match) {
+    return null;
+  }
+
+  const mime = match[1];
+  const buffer = Buffer.from(match[2], "base64");
+
+  return { mime, buffer };
+};
+
+/**
+ * Resolves file extension from audio mime type.
+ */
+const resolveAudioExtension = (mime: string) => {
+  if (mime.includes("webm")) return "webm";
+  if (mime.includes("wav")) return "wav";
+  if (mime.includes("mpeg") || mime.includes("mp3")) return "mp3";
+  if (mime.includes("ogg")) return "ogg";
+  return "webm";
+};
+
 /**
  * Builds the Chat controller with injected data source dependencies.
  *
@@ -61,6 +93,7 @@ export const createChatController = (
   const openAIApiKey = process.env.OPENAI_API_KEY ?? "";
   const openAIModel = process.env.OPENAI_MODEL ?? "gpt-4.1-mini";
   const systemPromptPath = process.env.OPENAI_SYSTEM_PROMPT_PATH;
+  const openAIClient = openAIApiKey ? createOpenAIClient(openAIApiKey) : null;
   const openAIService =
     deps.openAIService ?? (openAIApiKey ? createOpenAIChatService({ apiKey: openAIApiKey, model: openAIModel, systemPromptPath }) : null);
   
@@ -71,6 +104,28 @@ export const createChatController = (
     deps.geminiService ?? (geminiApiKey ? createGeminiChatService({ apiKey: geminiApiKey, model: geminiModel }) : null);
   
   const historyStore = deps.historyStore ?? createChatHistoryStore();
+
+  const transcribeWithOpenAI =
+    deps.transcribeWithOpenAI ??
+    (async (file, language) => {
+      if (!openAIClient) {
+        throw new Error("OpenAI API key is not configured");
+      }
+
+      const resolvedLanguage = typeof language === "string" ? language.trim() : "";
+      const transcription = await openAIClient.audio.transcriptions.create({
+        file,
+        model: "gpt-4o-mini-transcribe",
+        ...(resolvedLanguage ? { language: resolvedLanguage } : {})
+      });
+
+      const transcript = transcription.text?.trim() ?? "";
+      if (!transcript) {
+        throw new Error("OpenAI returned an empty transcript");
+      }
+
+      return transcript;
+    });
 
   let hasLoggedAssistantReplyParseFailure = false;
 
@@ -868,11 +923,52 @@ export const createChatController = (
     }
   };
 
+  /**
+   * Transcribes recorded user audio into text for chat input.
+   */
+  const transcribeAudio: ChatController["transcribeAudio"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const payload = (request.body ?? {}) as { audio?: unknown; language?: unknown };
+    const audio = typeof payload.audio === "string" ? payload.audio : "";
+    const language = typeof payload.language === "string" ? payload.language : "";
+
+    if (!audio.trim()) {
+      response.status(400).json({ message: "audio is required" });
+      return;
+    }
+
+    const parsed = parseAudioDataUrl(audio);
+    if (!parsed) {
+      response.status(400).json({ message: "Invalid audio data URL" });
+      return;
+    }
+
+    if (parsed.buffer.byteLength > MAX_AUDIO_BYTES) {
+      response.status(413).json({ message: "Audio payload is too large" });
+      return;
+    }
+
+    try {
+      const extension = resolveAudioExtension(parsed.mime);
+      const file = await toFile(parsed.buffer, `chat.${extension}`, { type: parsed.mime });
+      const transcript = await transcribeWithOpenAI(file, language);
+      response.json({ transcript });
+    } catch (error) {
+      console.error("Error in transcribeAudio:", error);
+      response.status(500).json({ message: "Failed to transcribe audio" });
+    }
+  };
+
   return {
     sendMessage,
     getHistory,
     appendDeveloperMessage,
     editMessage,
-    getDeveloperState
+    getDeveloperState,
+    transcribeAudio
   };
 };

@@ -9,6 +9,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -25,6 +26,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private const string DefaultUserDisplayName = "You";
 		private const string DefaultCharacterDisplayName = "Mimi";
 		private const string DefaultTtsTone = "neutral";
+		private const int RecordingFrequencyHz = 16000;
+		private const int MaxRecordingSeconds = 60;
+		private const string DefaultSpeechLanguage = "vi";
 
 		[SerializeField]
 		private TMP_InputField _inputField;
@@ -54,6 +58,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private TMP_InputField _intputChat;
 
 		[SerializeField]
+		private Button _recordButton;
+
+		[SerializeField]
 		private Button _sendButton;
 
 		private readonly Queue<ChatAssistantTurnPayload> _pendingCharacterTurns = new Queue<ChatAssistantTurnPayload>();
@@ -62,6 +69,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private bool _isCharacterResponding;
 		private bool _isPopupInitialized;
 		private bool _isContextPopupInitialized;
+		private bool _isRecordingVoice;
+		private bool _isTranscribingVoice;
+		private string _recordingDeviceName;
+		private AudioClip _recordingAudioClip;
+		private Image _recordButtonImage;
+		private Color _recordButtonIdleColor = Color.white;
 		private NetworkSettings _networkSettings;
 
 		/// <summary>
@@ -84,7 +97,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		protected override void OnDisabled()
 		{
+			StopRecordingIfNeeded();
 			UnbindInputFieldEvents();
+			UnbindRecordButtonEvents();
 		}
 
 		/// <summary>
@@ -175,8 +190,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private void OnUninstalled(object payload)
 		{
 			StopAllCoroutines();
+			StopRecordingIfNeeded();
 			_pendingCharacterTurns.Clear();
 			_isProcessingCharacterTurns = false;
+			_isTranscribingVoice = false;
+			UpdateRecordButtonVisualState();
 			SetCharacterRespondingState(false);
 			if (_messageContainer != null)
 			{
@@ -608,6 +626,14 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_messageContainer.OnMessageTranslateClicked = HandleMessageTranslateClicked;
 			}
 
+			if (_recordButton != null)
+			{
+				_recordButtonImage = _recordButton.targetGraphic as Image;
+			}
+
+			BindRecordButtonEvents();
+			UpdateRecordButtonVisualState();
+
 			SetChatInputInteractable(!_isCharacterResponding);
 
 			BindInputFieldEvents();
@@ -653,6 +679,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				_sendButton.interactable = isInteractable;
 			}
+
+			if (_recordButton != null)
+			{
+				_recordButton.interactable = isInteractable && !_isTranscribingVoice;
+			}
 		}
 
 		private void BindInputFieldEvents()
@@ -679,6 +710,27 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_inputField.onEndEdit.RemoveListener(HandleInputEndEdit);
 		}
 
+		private void BindRecordButtonEvents()
+		{
+			if (_recordButton == null)
+			{
+				return;
+			}
+
+			_recordButton.onClick.RemoveListener(HandleRecordButtonClicked);
+			_recordButton.onClick.AddListener(HandleRecordButtonClicked);
+		}
+
+		private void UnbindRecordButtonEvents()
+		{
+			if (_recordButton == null)
+			{
+				return;
+			}
+
+			_recordButton.onClick.RemoveListener(HandleRecordButtonClicked);
+		}
+
 		private void HandleInputSubmitted(string value)
 		{
 			SendInputMessage();
@@ -692,6 +744,265 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			SendInputMessage();
+		}
+
+		private void HandleRecordButtonClicked()
+		{
+			if (_isCharacterResponding || _isTranscribingVoice)
+			{
+				return;
+			}
+
+			if (_isRecordingVoice)
+			{
+				StopAndTranscribeRecording();
+				return;
+			}
+
+			StartVoiceRecording();
+		}
+
+		private void StartVoiceRecording()
+		{
+			if (Microphone.devices == null || Microphone.devices.Length == 0)
+			{
+				Debug.LogWarning("[ChatView] No microphone device found.", this);
+				return;
+			}
+
+			_recordingDeviceName = Microphone.devices[0];
+			_recordingAudioClip = Microphone.Start(_recordingDeviceName, false, MaxRecordingSeconds, RecordingFrequencyHz);
+			if (_recordingAudioClip == null)
+			{
+				Debug.LogWarning("[ChatView] Failed to start voice recording.", this);
+				return;
+			}
+
+			_isRecordingVoice = true;
+			UpdateRecordButtonVisualState();
+		}
+
+		private void StopAndTranscribeRecording()
+		{
+			if (!_isRecordingVoice)
+			{
+				return;
+			}
+
+			var deviceName = _recordingDeviceName;
+			var recordedClip = _recordingAudioClip;
+			var sampleCount = 0;
+			if (!string.IsNullOrWhiteSpace(deviceName))
+			{
+				sampleCount = Microphone.GetPosition(deviceName);
+				Microphone.End(deviceName);
+			}
+
+			_isRecordingVoice = false;
+			_recordingDeviceName = null;
+			_recordingAudioClip = null;
+			UpdateRecordButtonVisualState();
+
+			if (recordedClip == null || sampleCount <= 0)
+			{
+				return;
+			}
+
+			var trimmedClip = TrimAudioClip(recordedClip, sampleCount);
+			if (trimmedClip == null)
+			{
+				return;
+			}
+
+			StartCoroutine(TranscribeRecordedAudio(trimmedClip));
+		}
+
+		private void StopRecordingIfNeeded()
+		{
+			if (!_isRecordingVoice)
+			{
+				return;
+			}
+
+			if (!string.IsNullOrWhiteSpace(_recordingDeviceName))
+			{
+				Microphone.End(_recordingDeviceName);
+			}
+
+			_isRecordingVoice = false;
+			_recordingDeviceName = null;
+			_recordingAudioClip = null;
+			UpdateRecordButtonVisualState();
+		}
+
+		private IEnumerator TranscribeRecordedAudio(AudioClip clip)
+		{
+			if (clip == null)
+			{
+				yield break;
+			}
+
+			var endpoint = BuildSpeechToTextRequestUrl();
+			if (string.IsNullOrWhiteSpace(endpoint))
+			{
+				yield break;
+			}
+
+			var wavBytes = ConvertClipToWav(clip);
+			if (wavBytes == null || wavBytes.Length == 0)
+			{
+				yield break;
+			}
+
+			var requestPayload = new ChatSpeechToTextRequestPayload
+			{
+				Audio = "data:audio/wav;base64," + Convert.ToBase64String(wavBytes),
+				Language = DefaultSpeechLanguage,
+			};
+
+			var requestJson = JsonConvert.SerializeObject(requestPayload);
+			var requestBytes = Encoding.UTF8.GetBytes(requestJson);
+			using var request = new UnityWebRequest(endpoint, UnityWebRequest.kHttpVerbPOST)
+			{
+				uploadHandler = new UploadHandlerRaw(requestBytes),
+				downloadHandler = new DownloadHandlerBuffer(),
+			};
+			request.SetRequestHeader("Content-Type", "application/json");
+
+			var accessToken = AuthTokenModel.AccessToken;
+			if (!string.IsNullOrWhiteSpace(accessToken))
+			{
+				request.SetRequestHeader("Authorization", "Bearer " + accessToken);
+			}
+
+			_isTranscribingVoice = true;
+			SetChatInputInteractable(!_isCharacterResponding);
+			UpdateRecordButtonVisualState();
+
+			yield return request.SendWebRequest();
+
+			_isTranscribingVoice = false;
+			SetChatInputInteractable(!_isCharacterResponding);
+			UpdateRecordButtonVisualState();
+
+			if (request.result != UnityWebRequest.Result.Success)
+			{
+				Debug.LogWarning("[ChatView] Speech-to-text request failed: " + request.error, this);
+				yield break;
+			}
+
+			ChatSpeechToTextResponsePayload response;
+			try
+			{
+				response = JsonConvert.DeserializeObject<ChatSpeechToTextResponsePayload>(request.downloadHandler.text);
+			}
+			catch (Exception exception)
+			{
+				Debug.LogWarning("[ChatView] Failed to parse speech-to-text response: " + exception.Message, this);
+				yield break;
+			}
+
+			var transcript = response?.Transcript?.Trim();
+			if (string.IsNullOrWhiteSpace(transcript))
+			{
+				yield break;
+			}
+
+			if (_inputField != null)
+			{
+				_inputField.text = transcript;
+				_inputField.ActivateInputField();
+			}
+
+			if (_intputChat != null && _intputChat != _inputField)
+			{
+				_intputChat.text = transcript;
+				_intputChat.ActivateInputField();
+			}
+		}
+
+		private void UpdateRecordButtonVisualState()
+		{
+			if (_recordButtonImage == null)
+			{
+				return;
+			}
+
+			_recordButtonImage.color = _isRecordingVoice ? Color.red : _recordButtonIdleColor;
+		}
+
+		private string BuildSpeechToTextRequestUrl()
+		{
+			var baseUrl = NormalizeServerBaseUrl(GetServerBaseUrl());
+			if (string.IsNullOrWhiteSpace(baseUrl))
+			{
+				return null;
+			}
+
+			return baseUrl + NetworkEndpoints.ChatTranscribe;
+		}
+
+		private static AudioClip TrimAudioClip(AudioClip sourceClip, int sampleCount)
+		{
+			if (sourceClip == null || sampleCount <= 0)
+			{
+				return null;
+			}
+
+			sampleCount = Mathf.Clamp(sampleCount, 1, sourceClip.samples);
+			var channelCount = sourceClip.channels;
+			var sourceData = new float[sourceClip.samples * channelCount];
+			sourceClip.GetData(sourceData, 0);
+
+			var trimmedData = new float[sampleCount * channelCount];
+			Array.Copy(sourceData, trimmedData, trimmedData.Length);
+
+			var trimmedClip = AudioClip.Create("chat-recorded", sampleCount, channelCount, sourceClip.frequency, false);
+			trimmedClip.SetData(trimmedData, 0);
+			return trimmedClip;
+		}
+
+		private static byte[] ConvertClipToWav(AudioClip clip)
+		{
+			if (clip == null)
+			{
+				return null;
+			}
+
+			var sampleCount = clip.samples;
+			var channelCount = clip.channels;
+			var frequency = clip.frequency;
+			var samples = new float[sampleCount * channelCount];
+			clip.GetData(samples, 0);
+
+			var pcmBytes = new byte[samples.Length * 2];
+			for (var index = 0; index < samples.Length; index++)
+			{
+				var value = Mathf.Clamp(samples[index], -1f, 1f);
+				short pcmValue = (short)Mathf.RoundToInt(value * short.MaxValue);
+				pcmBytes[index * 2] = (byte)(pcmValue & 0xff);
+				pcmBytes[index * 2 + 1] = (byte)((pcmValue >> 8) & 0xff);
+			}
+
+			var headerSize = 44;
+			var wavBytes = new byte[headerSize + pcmBytes.Length];
+
+			Encoding.ASCII.GetBytes("RIFF").CopyTo(wavBytes, 0);
+			BitConverter.GetBytes(wavBytes.Length - 8).CopyTo(wavBytes, 4);
+			Encoding.ASCII.GetBytes("WAVE").CopyTo(wavBytes, 8);
+			Encoding.ASCII.GetBytes("fmt ").CopyTo(wavBytes, 12);
+			BitConverter.GetBytes(16).CopyTo(wavBytes, 16);
+			BitConverter.GetBytes((short)1).CopyTo(wavBytes, 20);
+			BitConverter.GetBytes((short)channelCount).CopyTo(wavBytes, 22);
+			BitConverter.GetBytes(frequency).CopyTo(wavBytes, 24);
+			BitConverter.GetBytes(frequency * channelCount * 2).CopyTo(wavBytes, 28);
+			BitConverter.GetBytes((short)(channelCount * 2)).CopyTo(wavBytes, 32);
+			BitConverter.GetBytes((short)16).CopyTo(wavBytes, 34);
+			Encoding.ASCII.GetBytes("data").CopyTo(wavBytes, 36);
+			BitConverter.GetBytes(pcmBytes.Length).CopyTo(wavBytes, 40);
+			pcmBytes.CopyTo(wavBytes, headerSize);
+
+			return wavBytes;
 		}
 
 		private void HandleMessageSpeakerClicked(MessageBubbleData messageData)
@@ -1001,6 +1312,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private void ClearConversationState()
 		{
 			StopAllCoroutines();
+			StopRecordingIfNeeded();
 			_pendingCharacterTurns.Clear();
 			_isProcessingCharacterTurns = false;
 			SetCharacterRespondingState(false);

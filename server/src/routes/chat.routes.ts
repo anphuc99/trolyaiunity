@@ -18,6 +18,7 @@ export const createChatRoutes = (dataSource: DataSource) => {
   router.post("/developer", requireAuth, controller.appendDeveloperMessage);
   router.post("/edit", requireAuth, controller.editMessage);
   router.post("/send", requireAuth, controller.sendMessage);
+  router.post("/transcribe", requireAuth, controller.transcribeAudio);
 
   return router;
 };
