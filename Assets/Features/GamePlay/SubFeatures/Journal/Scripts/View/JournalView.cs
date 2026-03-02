@@ -555,6 +555,27 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			}
 
 			_spawnedListItems.Clear();
+
+			if (_listContent == null)
+			{
+				return;
+			}
+
+			for (var i = _listContent.childCount - 1; i >= 0; i--)
+			{
+				var child = _listContent.GetChild(i);
+				if (child == null)
+				{
+					continue;
+				}
+
+				if (_listItemTemplate != null && child == _listItemTemplate.transform)
+				{
+					continue;
+				}
+
+				Destroy(child.gameObject);
+			}
 		}
 
 		/// <summary>
