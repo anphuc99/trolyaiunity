@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Networking;
+using TMPro;
 
 namespace Features.GamePlay.SubFeatures.Journal.View
 {
@@ -203,8 +204,10 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			EnsureBindings();
 			EnsurePlayAllBinding();
 			EnsureFsrsBindings();
+			_isFsrsMode = false;
 			SetMode(false);
 			SetFsrsContainerVisible(false);
+			UpdateFsrsButtonText();
 			gameObject.SetActive(true);
 
 			if (_loadOnInstall)
@@ -734,12 +737,29 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		}
 
 		/// <summary>
-		/// Handles the FSRS button click — loads due journals.
+		/// Handles the FSRS button click — toggles between normal and FSRS modes.
+		/// In normal mode: loads due journals for review.
+		/// In FSRS mode: exits review mode and reloads all journals.
 		/// </summary>
 		private void HandleFsrsButtonClicked()
 		{
-			_isFsrsMode = true;
-			SendRequest(JournalRequests.LoadDueJournals, null);
+			if (_isFsrsMode)
+			{
+				// Exit FSRS mode and reload all journals
+				_isFsrsMode = false;
+				_dueJournals.Clear();
+				_currentDueIndex = 0;
+				SetFsrsContainerVisible(false);
+				UpdateFsrsButtonText();
+				LoadJournals();
+			}
+			else
+			{
+				// Enter FSRS mode and load due journals
+				_isFsrsMode = true;
+				UpdateFsrsButtonText();
+				SendRequest(JournalRequests.LoadDueJournals, null);
+			}
 		}
 
 		/// <summary>
@@ -771,6 +791,24 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			if (_fsrsContainer != null)
 			{
 				_fsrsContainer.SetActive(visible);
+			}
+		}
+
+		/// <summary>
+		/// Updates the FSRS button label based on current mode.
+		/// Normal mode: "Review lại" / FSRS mode: "Quay lại".
+		/// </summary>
+		private void UpdateFsrsButtonText()
+		{
+			if (_fsrsButton == null)
+			{
+				return;
+			}
+
+			var label = _fsrsButton.GetComponentInChildren<TMP_Text>();
+			if (label != null)
+			{
+				label.text = _isFsrsMode ? "Quay lại" : "Review lại";
 			}
 		}
 
@@ -833,6 +871,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				// All reviewed — exit FSRS mode and go back to normal list
 				_isFsrsMode = false;
 				SetFsrsContainerVisible(false);
+				UpdateFsrsButtonText();
 				LoadJournals();
 			}
 		}
