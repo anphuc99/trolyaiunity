@@ -21,6 +21,8 @@ namespace Core.Infrastructure.Network
 		public const string ChatDeveloper = "/api/chat/developer";
 		public const string Journals = "/api/journals";
 		public const string JournalsEnd = "/api/journals/end";
+		public const string JournalReviewDue = "/api/journal-reviews/due";
+		public const string JournalReview = "/api/journal-reviews/review";
 		public const string Stories = "/api/stories";
 		public const string Translation = "/api/translation";
 		public const string TranslationDue = "/api/translation/due";

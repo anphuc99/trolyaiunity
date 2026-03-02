@@ -165,6 +165,53 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 			_ = ResolveAudioUrlInternalAsync(payload);
 		}
 
+		/// <summary>
+		/// Loads due journals for FSRS review.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[Request(PracticeRequests.LoadFsrsJournals)]
+		public static void HandleLoadFsrsJournals(object payload)
+		{
+			_ = LoadFsrsJournalsInternalAsync();
+		}
+
+		/// <summary>
+		/// Submits a journal review rating via FSRS.
+		/// </summary>
+		/// <param name="payload">Journal review request payload.</param>
+		[Request(PracticeRequests.SubmitJournalReview)]
+		public static void HandleSubmitJournalReview(PracticeJournalReviewRequestPayload payload)
+		{
+			if (payload == null)
+			{
+				EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
+				{
+					Message = "Missing journal review payload."
+				});
+				return;
+			}
+
+			if (payload.Rating < 1 || payload.Rating > 4)
+			{
+				EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
+				{
+					Message = "Rating must be between 1 and 4."
+				});
+				return;
+			}
+
+			if (payload.JournalId <= 0)
+			{
+				EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
+				{
+					Message = "Journal id is required for journal review."
+				});
+				return;
+			}
+
+			_ = SubmitJournalReviewInternalAsync(payload);
+		}
+
 		private static async Task ResolveAudioUrlInternalAsync(PracticeAudioRequestPayload payload)
 		{
 			var safeText = payload.Text?.Trim() ?? string.Empty;
@@ -514,6 +561,75 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 				EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
 				{
 					Message = "Failed to submit review: " + exception.Message
+				});
+			}
+		}
+
+		/// <summary>
+		/// Fetches due journals for FSRS review from the server.
+		/// </summary>
+		private static async Task LoadFsrsJournalsInternalAsync()
+		{
+			try
+			{
+				var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.JournalReviewDue);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
+					{
+						Message = "Failed to load due journals."
+					});
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<PracticeDueJournalsResponsePayload>(responseJson)
+					?? new PracticeDueJournalsResponsePayload();
+
+				EventBus.Publish(PracticeEvents.FsrsJournalsLoaded, new PracticeFsrsJournalsLoadedPayload
+				{
+					Journals = response.Journals ?? new List<PracticeDueJournalItemPayload>(),
+					Total = response.Total
+				});
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
+				{
+					Message = "Failed to load due journals: " + exception.Message
+				});
+			}
+		}
+
+		/// <summary>
+		/// Submits a journal review rating to the server.
+		/// </summary>
+		private static async Task SubmitJournalReviewInternalAsync(PracticeJournalReviewRequestPayload payload)
+		{
+			try
+			{
+				var request = new PracticeJournalReviewServerRequestPayload
+				{
+					Rating = payload.Rating,
+					JournalId = payload.JournalId
+				};
+
+				var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.JournalReview, request);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
+					{
+						Message = "Failed to submit journal review."
+					});
+					return;
+				}
+
+				EventBus.Publish(PracticeEvents.JournalReviewSubmitted, payload);
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(PracticeEvents.RequestFailed, new PracticeErrorPayload
+				{
+					Message = "Failed to submit journal review: " + exception.Message
 				});
 			}
 		}

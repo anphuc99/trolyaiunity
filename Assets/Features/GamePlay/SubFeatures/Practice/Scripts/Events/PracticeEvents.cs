@@ -15,5 +15,7 @@ namespace Features.GamePlay.SubFeatures.Practice.Events
 		public const string ReviewSubmitted = "game.play.practice.review.submitted.event";
 		public const string AudioUrlResolved = "game.play.practice.audio.url.resolved.event";
 		public const string RequestFailed = "game.play.practice.request.failed.event";
+		public const string FsrsJournalsLoaded = "game.play.practice.fsrs.journals.loaded.event";
+		public const string JournalReviewSubmitted = "game.play.practice.journal.review.submitted.event";
 	}
 }

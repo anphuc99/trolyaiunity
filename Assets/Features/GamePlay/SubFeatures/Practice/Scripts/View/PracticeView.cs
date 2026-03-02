@@ -81,6 +81,20 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 		[SerializeField]
 		private Button _speakerButton;
 
+		[SerializeField]
+		private Button _fsrsButton;
+
+		[SerializeField]
+		private GameObject _fsrsContainer;
+		[SerializeField]
+		private Button _againButton;
+		[SerializeField]
+		private Button _hardButton;
+		[SerializeField]
+		private Button _goodButton;
+		[SerializeField]
+		private Button _easyButton;
+
 		private AudioSource _audioSource;
 
 		private PracticeTabType _currentTab = PracticeTabType.Review;
@@ -88,6 +102,13 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 		private bool _isKoreanRevealed;
 		private bool _isContextRevealed;
 		private bool _isAnswerRevealed;
+
+		// FSRS journal review state
+		private bool _isFsrsMode;
+		private List<PracticeDueJournalItemPayload> _pendingJournals = new List<PracticeDueJournalItemPayload>();
+		private int _currentJournalIndex;
+		private int _localJournalReviewedCount;
+		private int _totalJournalCount;
 
 		// Local counting state
 		private List<PracticePromptItemPayload> _pendingItems = new List<PracticePromptItemPayload>();
@@ -105,6 +126,7 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 		{
 			gameObject.SetActive(true);
 			EnsureDependencies();
+			ExitFsrsMode();
 			LoadTab(PracticeTabType.Review);
 		}
 
@@ -247,6 +269,11 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			BindButton(_tabStarredButton, () => LoadTab(PracticeTabType.Starred));
 			BindButton(_tabLearnButton, () => LoadTab(PracticeTabType.Learn));
 			BindButton(_speakerButton, HandleSpeakerClicked);
+			BindButton(_fsrsButton, HandleFsrsClicked);
+			BindButton(_againButton, () => HandleFsrsRateClicked(1));
+			BindButton(_hardButton, () => HandleFsrsRateClicked(2));
+			BindButton(_goodButton, () => HandleFsrsRateClicked(3));
+			BindButton(_easyButton, () => HandleFsrsRateClicked(4));
 		}
 
 		private static void BindButton(Button button, Action handler)
@@ -262,6 +289,7 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 
 		private void LoadTab(PracticeTabType tab)
 		{
+			ExitFsrsMode();
 			_currentTab = tab;
 			SendRequest(PracticeRequests.LoadTab, new PracticeTabRequestPayload
 			{
@@ -376,6 +404,58 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			StartCoroutine(PlayAudioFromUrlAsync(audioPayload.Url));
 		}
 
+		/// <summary>
+		/// Handles the FSRS journal list loaded event.
+		/// </summary>
+		/// <param name="payload">FSRS journals loaded payload.</param>
+		[OnEvent(PracticeEvents.FsrsJournalsLoaded)]
+		private void OnFsrsJournalsLoaded(object payload)
+		{
+			if (payload is not PracticeFsrsJournalsLoadedPayload response)
+			{
+				return;
+			}
+
+			_pendingJournals = response.Journals != null
+				? new List<PracticeDueJournalItemPayload>(response.Journals)
+				: new List<PracticeDueJournalItemPayload>();
+			_currentJournalIndex = 0;
+			_localJournalReviewedCount = 0;
+			_totalJournalCount = response.Total;
+
+			UpdateFsrsCountHeader();
+
+			if (_pendingJournals.Count == 0)
+			{
+				ShowFsrsEmptyState();
+				return;
+			}
+
+			ShowCurrentJournal();
+		}
+
+		/// <summary>
+		/// Handles journal review submitted event and advances to the next journal.
+		/// </summary>
+		/// <param name="payload">Journal review payload.</param>
+		[OnEvent(PracticeEvents.JournalReviewSubmitted)]
+		private void OnJournalReviewSubmitted(object payload)
+		{
+			_localJournalReviewedCount += 1;
+			_currentJournalIndex += 1;
+
+			UpdateFsrsCountHeader();
+
+			if (_currentJournalIndex < _pendingJournals.Count)
+			{
+				ShowCurrentJournal();
+				return;
+			}
+
+			// All done — reload from server
+			SendRequest(PracticeRequests.LoadFsrsJournals, null);
+		}
+
 		private void HandleRevealClicked()
 		{
 			if (_currentItem == null)
@@ -438,6 +518,45 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 				Text = _currentItem.Content,
 				Tone = _currentItem.Tone,
 				CharacterName = _currentItem.CharacterName,
+			});
+		}
+
+		/// <summary>
+		/// Enters FSRS journal review mode: loads due journals from the server.
+		/// </summary>
+		private void HandleFsrsClicked()
+		{
+			_isFsrsMode = true;
+			SetFsrsContainerVisible(true);
+			SetRatingContainerVisible(false);
+			_currentItem = null;
+
+			if (_tabTitleText != null)
+			{
+				_tabTitleText.text = "Đọc lại Journal (0/0)";
+			}
+
+			SendRequest(PracticeRequests.LoadFsrsJournals, null);
+		}
+
+		/// <summary>
+		/// Submits a journal review rating for the current journal.
+		/// </summary>
+		/// <param name="rating">Rating 1–4.</param>
+		private void HandleFsrsRateClicked(int rating)
+		{
+			if (!_isFsrsMode || _currentJournalIndex >= _pendingJournals.Count)
+			{
+				return;
+			}
+
+			var currentJournal = _pendingJournals[_currentJournalIndex];
+			SetFsrsRatingInteractable(false);
+
+			SendRequest(PracticeRequests.SubmitJournalReview, new PracticeJournalReviewRequestPayload
+			{
+				Rating = rating,
+				JournalId = currentJournal.JournalId
 			});
 		}
 
@@ -547,6 +666,11 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			_localLearnedCount = 0;
 			_totalItemCount = 0;
 			_currentTabLabel = string.Empty;
+			_isFsrsMode = false;
+			_pendingJournals.Clear();
+			_currentJournalIndex = 0;
+			_localJournalReviewedCount = 0;
+			_totalJournalCount = 0;
 
 			if (_koreanText != null)
 			{
@@ -569,6 +693,7 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			}
 
 			SetRatingContainerVisible(false);
+			SetFsrsContainerVisible(false);
 		}
 
 		private void UpdateRevealButtonText(string text)
@@ -627,6 +752,121 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			{
 				button.interactable = isInteractable;
 			}
+		}
+
+		/// <summary>
+		/// Exits FSRS journal review mode and restores the normal translation practice UI.
+		/// </summary>
+		private void ExitFsrsMode()
+		{
+			_isFsrsMode = false;
+			_pendingJournals.Clear();
+			_currentJournalIndex = 0;
+			_localJournalReviewedCount = 0;
+			_totalJournalCount = 0;
+			SetFsrsContainerVisible(false);
+		}
+
+		/// <summary>
+		/// Shows or hides the FSRS rating container.
+		/// </summary>
+		/// <param name="isVisible">True to show, false to hide.</param>
+		private void SetFsrsContainerVisible(bool isVisible)
+		{
+			if (_fsrsContainer != null)
+			{
+				_fsrsContainer.SetActive(isVisible);
+			}
+		}
+
+		/// <summary>
+		/// Enables or disables the FSRS rating buttons.
+		/// </summary>
+		/// <param name="isInteractable">True to enable, false to disable.</param>
+		private void SetFsrsRatingInteractable(bool isInteractable)
+		{
+			SetButtonInteractable(_againButton, isInteractable);
+			SetButtonInteractable(_hardButton, isInteractable);
+			SetButtonInteractable(_goodButton, isInteractable);
+			SetButtonInteractable(_easyButton, isInteractable);
+		}
+
+		/// <summary>
+		/// Displays the current journal in the view for FSRS review.
+		/// </summary>
+		private void ShowCurrentJournal()
+		{
+			if (_currentJournalIndex >= _pendingJournals.Count)
+			{
+				ShowFsrsEmptyState();
+				return;
+			}
+
+			var journal = _pendingJournals[_currentJournalIndex];
+
+			if (_koreanText != null)
+			{
+				_koreanText.text = string.IsNullOrWhiteSpace(journal.Summary)
+					? "(Không có tóm tắt)"
+					: journal.Summary;
+			}
+
+			if (_journalSummaryText != null)
+			{
+				_journalSummaryText.text = string.IsNullOrWhiteSpace(journal.CreatedAt)
+					? string.Empty
+					: "Ngày: " + journal.CreatedAt;
+			}
+
+			// Hide context containers in FSRS mode
+			if (_contextBeforeContainer != null)
+			{
+				_contextBeforeContainer.SetActive(false);
+			}
+
+			if (_contextAfterContainer != null)
+			{
+				_contextAfterContainer.SetActive(false);
+			}
+
+			// Hide reveal button (not needed for journal reading)
+			if (_revealButton != null)
+			{
+				_revealButton.interactable = false;
+			}
+
+			SetFsrsRatingInteractable(true);
+		}
+
+		/// <summary>
+		/// Shows an empty state when no more journals are due.
+		/// </summary>
+		private void ShowFsrsEmptyState()
+		{
+			if (_koreanText != null)
+			{
+				_koreanText.text = "Không có journal cần đọc lại";
+			}
+
+			if (_journalSummaryText != null)
+			{
+				_journalSummaryText.text = string.Empty;
+			}
+
+			SetFsrsRatingInteractable(false);
+		}
+
+		/// <summary>
+		/// Updates the FSRS header counter.
+		/// </summary>
+		private void UpdateFsrsCountHeader()
+		{
+			if (_tabTitleText == null)
+			{
+				return;
+			}
+
+			_tabTitleText.text = "Đọc lại Journal (" + _localJournalReviewedCount + "/" + _totalJournalCount + ")";
 		}
 
 		private static string BuildContextText(string title, List<PracticeContextMessagePayload> messages)
