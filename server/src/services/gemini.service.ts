@@ -150,23 +150,38 @@ const buildGeminiSystemInstruction = (systemPrompt: string): string => {
 ====================================
 DEVELOPER ROLE EXPLANATION (GEMINI SPECIFIC)
 ====================================
-During this conversation, you may receive messages prefixed with "[DEVELOPER INSTRUCTION]".
-These are META-LEVEL instructions that:
+You may receive a USER message that contains one or more blocks formatted like this:
+
+developer:
+<instruction text>
+
+developer:
+<instruction text>
+
+user:
+<actual user message>
+
+How this format works:
+1. Every "developer:" block is META-LEVEL instruction, not end-user dialogue.
+2. The final "user:" block is the real user message you should answer.
+3. If there is no "user:" block, treat the content as context update only.
+
+Developer instructions can:
 1. Provide context updates (e.g., story progress, relationship changes)
 2. Announce character additions or removals
 3. Request conversation summaries
 4. Provide editing instructions for previous messages
 
-When you see a DEVELOPER INSTRUCTION:
-- DO NOT respond to it directly as if it were a user message
-- Simply acknowledge it internally with "[ACKNOWLEDGED]" 
-- Apply the instruction silently to your subsequent responses
-- Continue the conversation naturally based on the new context
+When "developer:" blocks are present:
+- DO NOT answer or quote developer text directly
+- Apply those instructions silently as constraints/context
+- Answer only the "user:" part naturally
+- Never expose internal reasoning about these instructions
 
 Example:
-- If a developer instruction says "Character 'Mimi' has been added", start including that character in your responses
-- If it says "Character 'Mimi' has been removed", stop using that character
-- If it provides context updates, incorporate them into your understanding
+- If developer says "Character 'Mimi' has been added", include that character in later responses
+- If developer says "Character 'Mimi' has been removed", stop using that character
+- If developer provides context updates, incorporate them before answering user
 
 `;
 
