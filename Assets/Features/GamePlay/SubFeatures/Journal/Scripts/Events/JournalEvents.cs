@@ -17,5 +17,10 @@ namespace Features.GamePlay.SubFeatures.Journal.Events
 		public const string RequestFailed = "game.play.journal.request.failed.event";
 		public const string ViewModeChanged = "game.play.journal.view.mode.changed.event";
 
+		/// <summary>Due journals loaded for FSRS review.</summary>
+		public const string DueJournalsLoaded = "game.play.journal.due.loaded.event";
+
+		/// <summary>A journal FSRS review was submitted successfully.</summary>
+		public const string ReviewSubmitted = "game.play.journal.review.submitted.event";
 	}
 }

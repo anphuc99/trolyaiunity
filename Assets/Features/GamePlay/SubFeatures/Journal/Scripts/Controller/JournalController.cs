@@ -44,6 +44,8 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 			JournalState.CachedList = new JournalListResponsePayload();
 			JournalState.CachedDetail = null;
 			JournalState.SelectedJournalId = null;
+			JournalState.IsFsrsMode = false;
+			JournalState.FsrsReviewingJournalId = null;
 		}
 
 		/// <summary>
@@ -400,6 +402,114 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 			{
 				Message = message
 			});
+		}
+
+		// ==================================================================
+		// FSRS Journal Review
+		// ==================================================================
+
+		/// <summary>
+		/// Loads journals due for FSRS spaced-repetition review from the server.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[Request(JournalRequests.LoadDueJournals)]
+		public static void HandleLoadDueJournals(object payload)
+		{
+			_ = LoadDueJournalsInternalAsync();
+		}
+
+		/// <summary>
+		/// Submits an FSRS review rating for a journal.
+		/// </summary>
+		/// <param name="payload">Review request payload with journalId and rating.</param>
+		[Request(JournalRequests.SubmitJournalReview)]
+		public static void HandleSubmitJournalReview(JournalSubmitReviewRequestPayload payload)
+		{
+			if (payload == null)
+			{
+				PublishError("Missing journal review payload.");
+				return;
+			}
+
+			if (payload.JournalId <= 0)
+			{
+				PublishError("Invalid journal id for review.");
+				return;
+			}
+
+			if (payload.Rating < 1 || payload.Rating > 4)
+			{
+				PublishError("Rating must be between 1 and 4.");
+				return;
+			}
+
+			_ = SubmitJournalReviewInternalAsync(payload);
+		}
+
+		/// <summary>
+		/// Loads due journals from the server and publishes DueJournalsLoaded event.
+		/// </summary>
+		private static async Task LoadDueJournalsInternalAsync()
+		{
+			try
+			{
+				var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.JournalReviewDue);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					PublishError("Empty due journals response from server.");
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<JournalDueListResponsePayload>(responseJson)
+					?? new JournalDueListResponsePayload();
+				if (response.Journals == null)
+				{
+					response.Journals = new System.Collections.Generic.List<JournalDueItemPayload>();
+				}
+
+				JournalState.IsFsrsMode = true;
+				EventBus.Publish(JournalEvents.DueJournalsLoaded, response);
+			}
+			catch (Exception exception)
+			{
+				PublishError("Failed to load due journals: " + exception.Message);
+			}
+		}
+
+		/// <summary>
+		/// Posts a journal review rating to the server and publishes ReviewSubmitted event.
+		/// </summary>
+		/// <param name="payload">Review request payload.</param>
+		private static async Task SubmitJournalReviewInternalAsync(JournalSubmitReviewRequestPayload payload)
+		{
+			try
+			{
+				var body = new JournalReviewApiRequestBody
+				{
+					JournalId = payload.JournalId,
+					Rating = payload.Rating
+				};
+
+				var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.JournalReview, body);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					PublishError("Empty journal review response from server.");
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<JournalReviewApiResponsePayload>(responseJson);
+				if (response == null)
+				{
+					PublishError("Server returned invalid journal review payload.");
+					return;
+				}
+
+				EventBus.Publish(JournalEvents.ReviewSubmitted, response);
+			}
+			catch (Exception exception)
+			{
+				PublishError("Failed to submit journal review: " + exception.Message);
+			}
 		}
 
 		private static Sprite GetAvatar(string characterName)

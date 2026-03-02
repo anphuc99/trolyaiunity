@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import type { DataSource } from "typeorm";
 import { Like } from "typeorm";
 import JournalEntity from "../../models/journal.entity.js";
+import JournalReviewEntity from "../../models/journal-review.entity.js";
 import MessageEntity from "../../models/message.entity.js";
 import CharacterEntity from "../../models/character.entity.js";
 import StoryEntity from "../../models/story.entity.js";
@@ -9,12 +10,21 @@ import UserEntity from "../../models/user.entity.js";
 import { createOpenAIChatService, type OpenAIChatService } from "../../services/openai.service.js";
 import { createChatHistoryStore, type ChatHistoryMessage, type ChatHistoryStore } from "../../services/chat-history.service.js";
 import { buildAudioId } from "../../services/tts.service.js";
+import {
+  createInitialReviewState,
+  updateReviewAfterRating,
+  type FSRSRating,
+  type ReviewHistoryEntry,
+  type ReviewState
+} from "../../services/fsrs.service.js";
 
 interface JournalController {
   listJournals: (request: Request, response: Response) => Promise<void>;
   getJournal: (request: Request, response: Response) => Promise<void>;
   searchMessages: (request: Request, response: Response) => Promise<void>;
   endConversation: (request: Request, response: Response) => Promise<void>;
+  getDueJournals: (request: Request, response: Response) => Promise<void>;
+  submitJournalReview: (request: Request, response: Response) => Promise<void>;
 }
 
 interface JournalControllerDeps {
@@ -42,6 +52,7 @@ export const createJournalController = (
   deps: JournalControllerDeps = {}
 ): JournalController => {
   const journalRepository = dataSource.getRepository(JournalEntity);
+  const journalReviewRepository = dataSource.getRepository(JournalReviewEntity);
   const messageRepository = dataSource.getRepository(MessageEntity);
   const characterRepository = dataSource.getRepository(CharacterEntity);
   const storyRepository = dataSource.getRepository(StoryEntity);
@@ -580,10 +591,222 @@ Please summarize the above conversation in Vietnamese, update the story descript
     }
   };
 
+  // ────────────────────────────────────────────────────────────────────────
+  // FSRS Journal Review handlers
+  // ────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns journals that are due for review (nextReviewDate <= now)
+   * plus all journals that have no review row yet (new / unreviewed).
+   */
+  const getDueJournals: JournalController["getDueJournals"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    try {
+      const userId = request.user.id;
+
+      // 1. All journals for this user
+      const allJournals = await journalRepository.find({
+        where: { userId },
+        order: { createdAt: "DESC" }
+      });
+
+      // 2. All existing review rows for this user
+      const existingReviews = await journalReviewRepository.find({
+        where: { userId }
+      });
+
+      const reviewByJournalId = new Map<number, JournalReviewEntity>();
+      for (const review of existingReviews) {
+        reviewByJournalId.set(review.journalId, review);
+      }
+
+      const now = new Date();
+      const dueJournals: Array<{
+        id: number;
+        summary: string;
+        createdAt: string;
+        review: ReturnType<typeof serialiseJournalReview> | null;
+      }> = [];
+
+      for (const journal of allJournals) {
+        const review = reviewByJournalId.get(journal.id);
+
+        if (!review) {
+          // New / unreviewed journal — always include
+          dueJournals.push({
+            id: journal.id,
+            summary: journal.summary,
+            createdAt: journal.createdAt.toISOString(),
+            review: null
+          });
+          continue;
+        }
+
+        // Already reviewed — include only if due
+        const nextReview = review.nextReviewDate instanceof Date
+          ? review.nextReviewDate
+          : new Date(String(review.nextReviewDate));
+
+        if (nextReview <= now) {
+          dueJournals.push({
+            id: journal.id,
+            summary: journal.summary,
+            createdAt: journal.createdAt.toISOString(),
+            review: serialiseJournalReview(review)
+          });
+        }
+      }
+
+      response.json({ journals: dueJournals });
+    } catch (error) {
+      console.error("Error in getDueJournals:", error);
+      response.status(500).json({
+        message: "Failed to load due journals",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
+  /**
+   * Submits an FSRS review rating for a journal.
+   * Creates the review row on first rating.
+   *
+   * Body: { journalId: number, rating: 1|2|3|4 }
+   */
+  const submitJournalReview: JournalController["submitJournalReview"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const { journalId, rating } = request.body as {
+      journalId?: number;
+      rating?: number;
+    };
+
+    if (!journalId || !Number.isInteger(journalId) || journalId <= 0) {
+      response.status(400).json({ message: "Valid journalId is required" });
+      return;
+    }
+
+    if (!rating || rating < 1 || rating > 4) {
+      response.status(400).json({ message: "Rating must be 1–4" });
+      return;
+    }
+
+    try {
+      const userId = request.user.id;
+
+      // Verify journal belongs to user
+      const journal = await journalRepository.findOne({
+        where: { id: journalId, userId }
+      });
+
+      if (!journal) {
+        response.status(404).json({ message: "Journal not found" });
+        return;
+      }
+
+      // Find or initialise review state
+      let reviewEntity = await journalReviewRepository.findOne({
+        where: { journalId, userId }
+      });
+
+      const currentState: ReviewState = reviewEntity
+        ? {
+            stability: reviewEntity.stability,
+            difficulty: reviewEntity.difficulty,
+            lapses: reviewEntity.lapses,
+            currentIntervalDays: reviewEntity.currentIntervalDays,
+            nextReviewDate: reviewEntity.nextReviewDate instanceof Date
+              ? reviewEntity.nextReviewDate.toISOString()
+              : String(reviewEntity.nextReviewDate),
+            lastReviewDate: reviewEntity.lastReviewDate
+              ? reviewEntity.lastReviewDate instanceof Date
+                ? reviewEntity.lastReviewDate.toISOString()
+                : String(reviewEntity.lastReviewDate)
+              : null,
+            reviewHistory: (() => {
+              try {
+                return JSON.parse(reviewEntity.reviewHistoryJson || "[]") as ReviewHistoryEntry[];
+              } catch {
+                return [];
+              }
+            })()
+          }
+        : createInitialReviewState();
+
+      const updated = updateReviewAfterRating(currentState, rating as FSRSRating);
+
+      const nextReview = {
+        journalId,
+        userId,
+        stability: updated.stability,
+        difficulty: updated.difficulty,
+        lapses: updated.lapses,
+        currentIntervalDays: updated.currentIntervalDays,
+        nextReviewDate: new Date(updated.nextReviewDate),
+        lastReviewDate: updated.lastReviewDate ? new Date(updated.lastReviewDate) : null,
+        reviewHistoryJson: JSON.stringify(updated.reviewHistory)
+      };
+
+      const saved = await journalReviewRepository.save(
+        reviewEntity
+          ? { ...reviewEntity, ...nextReview }
+          : journalReviewRepository.create(nextReview)
+      );
+
+      response.json({
+        journal: {
+          id: journal.id,
+          summary: journal.summary,
+          createdAt: journal.createdAt.toISOString()
+        },
+        review: serialiseJournalReview(saved)
+      });
+    } catch (error) {
+      console.error("Error in submitJournalReview:", error);
+      response.status(500).json({
+        message: "Failed to submit journal review",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
+  /**
+   * Serialises a journal review entity to a client-facing JSON shape.
+   */
+  const serialiseJournalReview = (entity: JournalReviewEntity) => {
+    let reviewHistory: ReviewHistoryEntry[] = [];
+    try {
+      reviewHistory = JSON.parse(entity.reviewHistoryJson || "[]") as ReviewHistoryEntry[];
+    } catch {
+      reviewHistory = [];
+    }
+
+    return {
+      id: entity.id,
+      journalId: entity.journalId,
+      stability: entity.stability,
+      difficulty: entity.difficulty,
+      lapses: entity.lapses,
+      currentIntervalDays: entity.currentIntervalDays,
+      nextReviewDate: entity.nextReviewDate,
+      lastReviewDate: entity.lastReviewDate,
+      reviewHistory
+    };
+  };
+
   return {
     listJournals,
     getJournal,
     searchMessages,
-    endConversation
+    endConversation,
+    getDueJournals,
+    submitJournalReview
   };
 };

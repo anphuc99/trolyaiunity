@@ -4,6 +4,7 @@ import path from "path";
 import { DataSource } from "typeorm";
 import CharacterEntity from "./models/character.entity.js";
 import JournalEntity from "./models/journal.entity.js";
+import JournalReviewEntity from "./models/journal-review.entity.js";
 import LevelEntity from "./models/level.entity.js";
 import MessageEntity from "./models/message.entity.js";
 import StoryEntity from "./models/story.entity.js";
@@ -77,6 +78,7 @@ export const AppDataSource = new DataSource({
   entities: [
     CharacterEntity,
     JournalEntity,
+    JournalReviewEntity,
     LevelEntity,
     MessageEntity,
     StoryEntity,

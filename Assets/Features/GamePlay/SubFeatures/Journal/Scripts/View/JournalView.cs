@@ -46,9 +46,39 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		[Header("Selection")]
 		[SerializeField] private Button _playAllButton;
 
+		[Header("FSRS")]
+		[SerializeField]
+		private Button _fsrsButton;
+
+		[SerializeField]
+		private GameObject _fsrsContainer;
+		[SerializeField]
+		private Button _againButton;
+		[SerializeField]
+		private Button _hardButton;
+		[SerializeField]
+		private Button _goodButton;
+		[SerializeField]
+		private Button _easyButton;
+
 		private readonly List<JournalItemView> _spawnedListItems = new List<JournalItemView>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
 		private NetworkSettings _networkSettings;
+
+		/// <summary>
+		/// Tracks whether the view is in FSRS review mode.
+		/// </summary>
+		private bool _isFsrsMode;
+
+		/// <summary>
+		/// Cached due-journal list for advancing after a review.
+		/// </summary>
+		private List<JournalDueItemPayload> _dueJournals = new List<JournalDueItemPayload>();
+
+		/// <summary>
+		/// Index of the current due-journal being reviewed.
+		/// </summary>
+		private int _currentDueIndex;
 
 		/// <summary>
 		/// Requests journal list from API.
@@ -172,7 +202,9 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		{
 			EnsureBindings();
 			EnsurePlayAllBinding();
+			EnsureFsrsBindings();
 			SetMode(false);
+			SetFsrsContainerVisible(false);
 			gameObject.SetActive(true);
 
 			if (_loadOnInstall)
@@ -190,6 +222,9 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		{
 			StopAllCoroutines();
 			_reloadingTtsMessageIndices.Clear();
+			_isFsrsMode = false;
+			_dueJournals.Clear();
+			_currentDueIndex = 0;
 			if (_voiceAudioSource != null)
 			{
 				_voiceAudioSource.Stop();
@@ -250,6 +285,9 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				_chatVariantRoot.gameObject.SetActive(showDetail);
 				_playAllButton.gameObject.SetActive(!showDetail);
 			}
+
+			// Show FSRS rating buttons only in FSRS detail mode
+			SetFsrsContainerVisible(_isFsrsMode && showDetail);
 		}
 
 		/// <summary>
@@ -534,6 +572,14 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 
 		private void Callback()
 		{
+			if (_isFsrsMode)
+			{
+				// Return to due-journals list instead of normal list
+				SetMode(false);
+				RenderDueJournalList(_dueJournals);
+				return;
+			}
+
 			SetMode(false);
 		}
 
@@ -546,6 +592,19 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			if (item == null || item.JournalId <= 0)
 			{
 				return;
+			}
+
+			// Track the current due index if in FSRS mode
+			if (_isFsrsMode)
+			{
+				for (var i = 0; i < _dueJournals.Count; i++)
+				{
+					if (_dueJournals[i].Id == item.JournalId)
+					{
+						_currentDueIndex = i;
+						break;
+					}
+				}
 			}
 
 			SendRequest(JournalRequests.LoadJournalDetail, new JournalDetailRequestPayload
@@ -632,6 +691,209 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			{
 				_playAllButton.interactable = selectedCount > 0;
 			}
+		}
+
+		// ==================================================================
+		// FSRS Review helpers
+		// ==================================================================
+
+		/// <summary>
+		/// Wires the FSRS button and rating buttons.
+		/// </summary>
+		private void EnsureFsrsBindings()
+		{
+			if (_fsrsButton != null)
+			{
+				_fsrsButton.onClick.RemoveAllListeners();
+				_fsrsButton.onClick.AddListener(HandleFsrsButtonClicked);
+			}
+
+			if (_againButton != null)
+			{
+				_againButton.onClick.RemoveAllListeners();
+				_againButton.onClick.AddListener(() => SubmitFsrsRating(1));
+			}
+
+			if (_hardButton != null)
+			{
+				_hardButton.onClick.RemoveAllListeners();
+				_hardButton.onClick.AddListener(() => SubmitFsrsRating(2));
+			}
+
+			if (_goodButton != null)
+			{
+				_goodButton.onClick.RemoveAllListeners();
+				_goodButton.onClick.AddListener(() => SubmitFsrsRating(3));
+			}
+
+			if (_easyButton != null)
+			{
+				_easyButton.onClick.RemoveAllListeners();
+				_easyButton.onClick.AddListener(() => SubmitFsrsRating(4));
+			}
+		}
+
+		/// <summary>
+		/// Handles the FSRS button click — loads due journals.
+		/// </summary>
+		private void HandleFsrsButtonClicked()
+		{
+			_isFsrsMode = true;
+			SendRequest(JournalRequests.LoadDueJournals, null);
+		}
+
+		/// <summary>
+		/// Submits the current FSRS rating for the currently viewed journal.
+		/// </summary>
+		/// <param name="rating">1=Again, 2=Hard, 3=Good, 4=Easy.</param>
+		private void SubmitFsrsRating(int rating)
+		{
+			var journalId = JournalState.SelectedJournalId;
+			if (!journalId.HasValue || journalId.Value <= 0)
+			{
+				Debug.LogWarning("[JournalView] No journal selected for FSRS rating.", this);
+				return;
+			}
+
+			SendRequest(JournalRequests.SubmitJournalReview, new JournalSubmitReviewRequestPayload
+			{
+				JournalId = journalId.Value,
+				Rating = rating
+			});
+		}
+
+		/// <summary>
+		/// Shows or hides the FSRS rating container.
+		/// </summary>
+		/// <param name="visible">True to show.</param>
+		private void SetFsrsContainerVisible(bool visible)
+		{
+			if (_fsrsContainer != null)
+			{
+				_fsrsContainer.SetActive(visible);
+			}
+		}
+
+		/// <summary>
+		/// Handles due-journals-loaded event from controller.
+		/// </summary>
+		/// <param name="payload">Due journals response.</param>
+		[OnEvent(JournalEvents.DueJournalsLoaded)]
+		private void OnDueJournalsLoaded(object payload)
+		{
+			if (payload is not JournalDueListResponsePayload response)
+			{
+				return;
+			}
+
+			EnsureBindings();
+			_isFsrsMode = true;
+			_dueJournals = response.Journals ?? new List<JournalDueItemPayload>();
+			_currentDueIndex = 0;
+			RenderDueJournalList(_dueJournals);
+			SetMode(false);
+		}
+
+		/// <summary>
+		/// Handles journal review submitted event.
+		/// Advances to the next due journal or returns to list.
+		/// </summary>
+		/// <param name="payload">Review response payload.</param>
+		[OnEvent(JournalEvents.ReviewSubmitted)]
+		private void OnReviewSubmitted(object payload)
+		{
+			if (!_isFsrsMode)
+			{
+				return;
+			}
+
+			// Remove the reviewed journal from the due list
+			var reviewedId = JournalState.SelectedJournalId;
+			if (reviewedId.HasValue)
+			{
+				_dueJournals.RemoveAll(j => j.Id == reviewedId.Value);
+			}
+
+			// Advance to the next due journal or return to list
+			if (_dueJournals.Count > 0)
+			{
+				if (_currentDueIndex >= _dueJournals.Count)
+				{
+					_currentDueIndex = 0;
+				}
+
+				var next = _dueJournals[_currentDueIndex];
+				SendRequest(JournalRequests.LoadJournalDetail, new JournalDetailRequestPayload
+				{
+					JournalId = next.Id
+				});
+			}
+			else
+			{
+				// All reviewed — exit FSRS mode and go back to normal list
+				_isFsrsMode = false;
+				SetFsrsContainerVisible(false);
+				LoadJournals();
+			}
+		}
+
+		/// <summary>
+		/// Renders the due-journal list using the same item template.
+		/// </summary>
+		/// <param name="dueJournals">Due journal items.</param>
+		private void RenderDueJournalList(List<JournalDueItemPayload> dueJournals)
+		{
+			ClearSpawnedListItems();
+
+			if (_listContent == null || _listItemTemplate == null)
+			{
+				return;
+			}
+
+			_listItemTemplate.gameObject.SetActive(false);
+			if (dueJournals == null || dueJournals.Count == 0)
+			{
+				UpdatePlayAllButton(0);
+				return;
+			}
+
+			for (var i = 0; i < dueJournals.Count; i++)
+			{
+				var journal = dueJournals[i];
+				if (journal == null)
+				{
+					continue;
+				}
+
+				var instance = Instantiate(_listItemTemplate, _listContent);
+				instance.name = "JournalItem-" + journal.Id;
+				instance.gameObject.SetActive(true);
+				var label = BuildDueJournalLabel(journal);
+				instance.Bind(journal.Id, label, false);
+				_spawnedListItems.Add(instance);
+				instance.Clicked += HandleItemClicked;
+				instance.SelectionChanged += HandleItemSelectionChanged;
+			}
+
+			UpdatePlayAllButton(GetSelectedJournalCount());
+		}
+
+		/// <summary>
+		/// Builds the display label for a due-journal item.
+		/// Shows "[New]" or "[Due]" prefix.
+		/// </summary>
+		/// <param name="journal">Due journal item.</param>
+		/// <returns>Formatted label text.</returns>
+		private static string BuildDueJournalLabel(JournalDueItemPayload journal)
+		{
+			var prefix = journal.Review == null ? "[Mới]" : "[Ôn tập]";
+			var summary = string.IsNullOrWhiteSpace(journal.Summary) ? "(Không có tóm tắt)" : journal.Summary.Trim();
+			if (DateTime.TryParse(journal.CreatedAt, out var createdAt))
+			{
+				return prefix + " " + createdAt.ToString("dd/MM/yyyy HH:mm") + " - " + summary;
+			}
+
+			return prefix + " " + summary;
 		}
 	}
 }

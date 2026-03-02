@@ -22,5 +22,15 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 		/// Last selected journal id.
 		/// </summary>
 		public static int? SelectedJournalId { get; set; }
+
+		/// <summary>
+		/// True when the view is in FSRS review mode (due journals list).
+		/// </summary>
+		public static bool IsFsrsMode { get; set; }
+
+		/// <summary>
+		/// Journal id currently being reviewed in FSRS mode.
+		/// </summary>
+		public static int? FsrsReviewingJournalId { get; set; }
 	}
 }

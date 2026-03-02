@@ -195,5 +195,151 @@ namespace Features.GamePlay.SubFeatures.Journal.Tests
 				yield return null;
 			}
 		}
+
+		// ==================================================================
+		// FSRS Journal Review tests
+		// ==================================================================
+
+		[Test]
+		public void HandleSubmitJournalReview_NullPayload_PublishesError()
+		{
+			JournalErrorPayload errorPayload = null;
+			void Handler(object payload)
+			{
+				errorPayload = payload as JournalErrorPayload;
+			}
+
+			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.RequestFailed, Handler);
+			try
+			{
+				JournalController.HandleSubmitJournalReview(null);
+			}
+			finally
+			{
+				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.RequestFailed, Handler);
+			}
+
+			Assert.IsNotNull(errorPayload);
+			Assert.IsFalse(string.IsNullOrWhiteSpace(errorPayload.Message));
+		}
+
+		[Test]
+		public void HandleSubmitJournalReview_InvalidJournalId_PublishesError()
+		{
+			JournalErrorPayload errorPayload = null;
+			void Handler(object payload)
+			{
+				errorPayload = payload as JournalErrorPayload;
+			}
+
+			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.RequestFailed, Handler);
+			try
+			{
+				JournalController.HandleSubmitJournalReview(new JournalSubmitReviewRequestPayload
+				{
+					JournalId = 0,
+					Rating = 3
+				});
+			}
+			finally
+			{
+				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.RequestFailed, Handler);
+			}
+
+			Assert.IsNotNull(errorPayload);
+			StringAssert.Contains("journal id", errorPayload.Message.ToLower());
+		}
+
+		[Test]
+		public void HandleSubmitJournalReview_InvalidRating_PublishesError()
+		{
+			JournalErrorPayload errorPayload = null;
+			void Handler(object payload)
+			{
+				errorPayload = payload as JournalErrorPayload;
+			}
+
+			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.RequestFailed, Handler);
+			try
+			{
+				JournalController.HandleSubmitJournalReview(new JournalSubmitReviewRequestPayload
+				{
+					JournalId = 1,
+					Rating = 5
+				});
+			}
+			finally
+			{
+				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.RequestFailed, Handler);
+			}
+
+			Assert.IsNotNull(errorPayload);
+			StringAssert.Contains("rating", errorPayload.Message.ToLower());
+		}
+
+		[UnityTest]
+		public System.Collections.IEnumerator HandleLoadDueJournals_ValidResponse_PublishesDueJournalsLoaded()
+		{
+			JournalDueListResponsePayload duePayload = null;
+			void Handler(object payload)
+			{
+				duePayload = payload as JournalDueListResponsePayload;
+			}
+
+			FakeServer.Register("GET", NetworkEndpoints.JournalReviewDue, _ =>
+				"{\"journals\":[{\"id\":1,\"summary\":\"Due summary\",\"createdAt\":\"2026-03-01T10:00:00.000Z\",\"review\":null}]}"
+			);
+
+			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.DueJournalsLoaded, Handler);
+			try
+			{
+				JournalController.HandleLoadDueJournals(null);
+				yield return AwaitTask(Task.Delay(100));
+			}
+			finally
+			{
+				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.DueJournalsLoaded, Handler);
+			}
+
+			Assert.IsNotNull(duePayload);
+			Assert.AreEqual(1, duePayload.Journals.Count);
+			Assert.AreEqual(1, duePayload.Journals[0].Id);
+			Assert.IsNull(duePayload.Journals[0].Review);
+		}
+
+		[UnityTest]
+		public System.Collections.IEnumerator HandleSubmitJournalReview_ValidResponse_PublishesReviewSubmitted()
+		{
+			JournalReviewApiResponsePayload reviewPayload = null;
+			void Handler(object payload)
+			{
+				reviewPayload = payload as JournalReviewApiResponsePayload;
+			}
+
+			FakeServer.Register("POST", NetworkEndpoints.JournalReview, _ =>
+				"{\"journal\":{\"id\":1,\"summary\":\"Test\",\"createdAt\":\"2026-03-01T10:00:00.000Z\"},\"review\":{\"id\":1,\"journalId\":1,\"stability\":3.0,\"difficulty\":5.0,\"lapses\":0,\"currentIntervalDays\":1,\"nextReviewDate\":\"2026-03-02T10:00:00.000Z\",\"lastReviewDate\":\"2026-03-01T10:00:00.000Z\",\"reviewHistory\":[]}}"
+			);
+
+			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.ReviewSubmitted, Handler);
+			try
+			{
+				JournalController.HandleSubmitJournalReview(new JournalSubmitReviewRequestPayload
+				{
+					JournalId = 1,
+					Rating = 3
+				});
+				yield return AwaitTask(Task.Delay(100));
+			}
+			finally
+			{
+				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.ReviewSubmitted, Handler);
+			}
+
+			Assert.IsNotNull(reviewPayload);
+			Assert.IsNotNull(reviewPayload.Journal);
+			Assert.AreEqual(1, reviewPayload.Journal.Id);
+			Assert.IsNotNull(reviewPayload.Review);
+			Assert.AreEqual(1, reviewPayload.Review.JournalId);
+		}
 	}
 }

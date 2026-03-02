@@ -231,4 +231,120 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 		public string AudioUrl { get; set; }
 	}
 
+	// ================================================================
+	// FSRS Journal Review payloads
+	// ================================================================
+
+	/// <summary>
+	/// One due-journal item returned by the review/due endpoint.
+	/// </summary>
+	public sealed class JournalDueItemPayload
+	{
+		[JsonProperty("id")]
+		public int Id { get; set; }
+
+		[JsonProperty("summary")]
+		public string Summary { get; set; }
+
+		[JsonProperty("createdAt")]
+		public string CreatedAt { get; set; }
+
+		[JsonProperty("review")]
+		public JournalReviewPayload Review { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload for GET /api/journals/review/due.
+	/// </summary>
+	public sealed class JournalDueListResponsePayload
+	{
+		[JsonProperty("journals")]
+		public List<JournalDueItemPayload> Journals { get; set; } = new List<JournalDueItemPayload>();
+	}
+
+	/// <summary>
+	/// Review scheduling state for a journal.
+	/// </summary>
+	public sealed class JournalReviewPayload
+	{
+		[JsonProperty("id")]
+		public int Id { get; set; }
+
+		[JsonProperty("journalId")]
+		public int JournalId { get; set; }
+
+		[JsonProperty("stability")]
+		public float Stability { get; set; }
+
+		[JsonProperty("difficulty")]
+		public float Difficulty { get; set; }
+
+		[JsonProperty("lapses")]
+		public int Lapses { get; set; }
+
+		[JsonProperty("currentIntervalDays")]
+		public int CurrentIntervalDays { get; set; }
+
+		[JsonProperty("nextReviewDate")]
+		public string NextReviewDate { get; set; }
+
+		[JsonProperty("lastReviewDate")]
+		public string LastReviewDate { get; set; }
+
+		[JsonProperty("reviewHistory")]
+		public List<JournalReviewHistoryEntry> ReviewHistory { get; set; } = new List<JournalReviewHistoryEntry>();
+	}
+
+	/// <summary>
+	/// One entry in the journal review history.
+	/// </summary>
+	public sealed class JournalReviewHistoryEntry
+	{
+		[JsonProperty("rating")]
+		public int Rating { get; set; }
+
+		[JsonProperty("date")]
+		public string Date { get; set; }
+	}
+
+	/// <summary>
+	/// Request payload for submitting a journal FSRS review.
+	/// </summary>
+	public sealed class JournalSubmitReviewRequestPayload
+	{
+		/// <summary>
+		/// Journal id to review.
+		/// </summary>
+		public int JournalId { get; set; }
+
+		/// <summary>
+		/// User rating (1=Again, 2=Hard, 3=Good, 4=Easy).
+		/// </summary>
+		public int Rating { get; set; }
+	}
+
+	/// <summary>
+	/// Request body sent to POST /api/journals/review.
+	/// </summary>
+	public sealed class JournalReviewApiRequestBody
+	{
+		[JsonProperty("journalId")]
+		public int JournalId { get; set; }
+
+		[JsonProperty("rating")]
+		public int Rating { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload returned by POST /api/journals/review.
+	/// </summary>
+	public sealed class JournalReviewApiResponsePayload
+	{
+		[JsonProperty("journal")]
+		public JournalSummaryPayload Journal { get; set; }
+
+		[JsonProperty("review")]
+		public JournalReviewPayload Review { get; set; }
+	}
+
 }

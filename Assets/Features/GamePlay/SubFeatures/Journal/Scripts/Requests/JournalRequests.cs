@@ -18,5 +18,15 @@ namespace Features.GamePlay.SubFeatures.Journal.Requests
 		/// Saves selected journal IDs to GlobalVariables and loads the JournalOverlay scene.
 		/// </summary>
 		public const string StartPlayback = "game.play.journal.start.playback.request";
+
+		/// <summary>
+		/// Loads journals due for FSRS spaced-repetition review.
+		/// </summary>
+		public const string LoadDueJournals = "game.play.journal.load.due.request";
+
+		/// <summary>
+		/// Submits an FSRS review rating for a journal.
+		/// </summary>
+		public const string SubmitJournalReview = "game.play.journal.submit.review.request";
 	}
 }
