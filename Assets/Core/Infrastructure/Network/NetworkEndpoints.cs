@@ -15,6 +15,7 @@ namespace Core.Infrastructure.Network
 		public const string Levels = "/api/levels";
 		public const string ChatHistory = "/api/chat/history";
 		public const string ChatSend = "/api/chat/send";
+		public const string ChatRespond = "/api/chat/respond";
 		public const string ChatTranscribe = "/api/chat/transcribe";
 		public const string ChatDeveloperState = "/api/chat/developer-state";
 		public const string ChatDeveloper = "/api/chat/developer";

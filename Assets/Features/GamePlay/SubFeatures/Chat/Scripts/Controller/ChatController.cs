@@ -111,6 +111,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
+		/// Requests one assistant reply from current history without appending a user message.
+		/// </summary>
+		/// <param name="payload">Optional payload for session/model/story context.</param>
+		[Request(ChatRequests.GenerateReplyFromHistory)]
+		public static void HandleGenerateReplyFromHistory(ChatSendRequestPayload payload)
+		{
+			_ = GenerateReplyFromHistoryInternalAsync(payload ?? new ChatSendRequestPayload());
+		}
+
+		/// <summary>
 		/// Gets cached character avatar sprite from parent signal.
 		/// </summary>
 		/// <param name="payload">Character name payload.</param>
@@ -614,6 +624,52 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
 				{
 					Message = "Failed to send chat message: " + exception.Message
+				});
+			}
+		}
+
+		/// <summary>
+		/// Performs respond API call and publishes assistant reply without user turn.
+		/// </summary>
+		/// <param name="payload">Optional payload for session/model/story context.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task GenerateReplyFromHistoryInternalAsync(ChatSendRequestPayload payload)
+		{
+			try
+			{
+				var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatRespond, payload);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = "Empty chat response from server."
+					});
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<ChatSendResponsePayload>(responseJson);
+				if (response == null || string.IsNullOrWhiteSpace(response.Reply))
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = !string.IsNullOrWhiteSpace(response?.Message) ? response.Message : "Server did not return a reply."
+					});
+					return;
+				}
+
+				EventBus.Publish(ChatEvents.MessageReceived, new ChatAssistantMessagePayload
+				{
+					Reply = response.Reply,
+					Model = response.Model,
+					SessionId = payload?.SessionId,
+					Turns = ParseAssistantTurns(response.Reply),
+				});
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to generate chat reply from history: " + exception.Message
 				});
 			}
 		}

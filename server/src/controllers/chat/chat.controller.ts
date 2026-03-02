@@ -11,6 +11,7 @@ import { createChatHistoryStore, type ChatHistoryMessage, type ChatHistoryStore 
 
 interface ChatController {
   sendMessage: (request: Request, response: Response) => Promise<void>;
+  respondFromHistory: (request: Request, response: Response) => Promise<void>;
   getHistory: (request: Request, response: Response) => Promise<void>;
   appendDeveloperMessage: (request: Request, response: Response) => Promise<void>;
   editMessage: (request: Request, response: Response) => Promise<void>;
@@ -369,9 +370,9 @@ export const createChatController = (
    * @param userMessage - Original user message.
    * @returns Retry prompt text.
    */
-  const buildJsonRetryPrompt = (userMessage: string) => {
+  const buildJsonRetryPrompt = (promptSeed: string) => {
     return [
-      userMessage,
+      promptSeed,
       "",
       "Your previous response did not match the required JSON format.",
       "Retry now and return ONLY valid JSON array.",
@@ -394,13 +395,14 @@ export const createChatController = (
    */
   const requestJsonReplyWithRetry = async (
     service: ChatReplyService,
-    message: string,
+    message: string | undefined,
     history: Array<{ role: "system" | "developer" | "user" | "assistant"; content: string }>,
     modelOverride?: string,
     retryLimit = 2
   ): Promise<JsonReplyResult> => {
     let attempt = 0;
-    let prompt = message;
+    let prompt = typeof message === "string" && message.trim() ? message.trim() : undefined;
+    const retryPromptSeed = prompt || "Continue the conversation naturally based on the current chat history.";
     let lastResult: JsonReplyResult | null = null;
 
     while (attempt <= retryLimit) {
@@ -418,7 +420,7 @@ export const createChatController = (
       }
 
       console.warn(`Assistant reply JSON invalid at attempt ${attempt}. Retrying with strict JSON format reminder.`);
-      prompt = buildJsonRetryPrompt(message);
+      prompt = buildJsonRetryPrompt(retryPromptSeed);
     }
 
     throw new Error("AI returned invalid JSON format after retries");
@@ -696,6 +698,55 @@ export const createChatController = (
     }
   };
 
+  const respondFromHistory: ChatController["respondFromHistory"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const modelOverride = "gemini-3-flash-preview";
+
+    const useGemini = isGeminiModel(modelOverride || openAIModel);
+    const selectedService = useGemini ? geminiService : openAIService;
+    const serviceName = useGemini ? "Gemini" : "OpenAI";
+
+    if (!selectedService) {
+      response.status(500).json({
+        message: `${serviceName} API key is not configured`
+      });
+      return;
+    }
+
+    try {
+      const systemPrompt = await buildSystemPrompt(request.user.id, request.body);
+      await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
+      const history = await historyStore.load(request.user.id);
+      const result = await requestJsonReplyWithRetry(
+        selectedService,
+        undefined,
+        history,
+        modelOverride || undefined
+      );
+
+      const normalizedReply = useGemini
+        ? normalizeAssistantReplyMessageIds(result.reply, collectAssistantMessageIds(history))
+        : result.reply;
+
+      await historyStore.append(request.user.id, [{ role: "assistant", content: normalizedReply }]);
+
+      response.json({
+        reply: normalizedReply,
+        model: result.model
+      });
+    } catch (error) {
+      console.error("Error in respondFromHistory:", error);
+      response.status(500).json({
+        message: "Failed to generate reply",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
   const getHistory: ChatController["getHistory"] = async (request, response) => {
     if (!request.user) {
       response.status(401).json({ message: "Unauthorized" });
@@ -965,6 +1016,7 @@ export const createChatController = (
 
   return {
     sendMessage,
+    respondFromHistory,
     getHistory,
     appendDeveloperMessage,
     editMessage,

@@ -1130,11 +1130,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			var messageToSend = ResolveCurrentInputMessage();
 			if (string.IsNullOrWhiteSpace(messageToSend))
 			{
-				messageToSend = context;
-			}
-
-			if (string.IsNullOrWhiteSpace(messageToSend))
-			{
+				SendRequest(ChatRequests.GenerateReplyFromHistory, new ChatSendRequestPayload
+				{
+					SessionId = string.IsNullOrWhiteSpace(_sessionId) ? null : _sessionId,
+					Model = string.IsNullOrWhiteSpace(_modelOverride) ? null : _modelOverride,
+					StoryId = _storyId > 0 ? _storyId : null,
+				});
 				return;
 			}
 
