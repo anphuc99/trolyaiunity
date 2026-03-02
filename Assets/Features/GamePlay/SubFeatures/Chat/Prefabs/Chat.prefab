@@ -480,6 +480,7 @@ MonoBehaviour:
   _selectCharacterPopupView: {fileID: 1151619655737409475}
   _contextPopupView: {fileID: 4714050178273124050}
   _intputChat: {fileID: 7818494230475252460}
+  _recordButton: {fileID: 7841865889779862676}
   _sendButton: {fileID: 6475588344285969042}
 --- !u!82 &5874510021806240559
 AudioSource:

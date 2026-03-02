@@ -46,6 +46,7 @@ interface JsonReplyResult {
 }
 
 const MAX_AUDIO_BYTES = 12 * 1024 * 1024;
+const DEFAULT_TRANSCRIBE_LANGUAGE = "ko";
 
 /**
  * Parses a base64 audio data URL and extracts mime type + binary buffer.
@@ -932,9 +933,8 @@ export const createChatController = (
       return;
     }
 
-    const payload = (request.body ?? {}) as { audio?: unknown; language?: unknown };
+    const payload = (request.body ?? {}) as { audio?: unknown };
     const audio = typeof payload.audio === "string" ? payload.audio : "";
-    const language = typeof payload.language === "string" ? payload.language : "";
 
     if (!audio.trim()) {
       response.status(400).json({ message: "audio is required" });
@@ -955,7 +955,7 @@ export const createChatController = (
     try {
       const extension = resolveAudioExtension(parsed.mime);
       const file = await toFile(parsed.buffer, `chat.${extension}`, { type: parsed.mime });
-      const transcript = await transcribeWithOpenAI(file, language);
+      const transcript = await transcribeWithOpenAI(file, DEFAULT_TRANSCRIBE_LANGUAGE);
       response.json({ transcript });
     } catch (error) {
       console.error("Error in transcribeAudio:", error);
