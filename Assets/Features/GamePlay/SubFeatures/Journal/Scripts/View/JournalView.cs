@@ -289,6 +289,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				_playAllButton.gameObject.SetActive(!showDetail);
 			}
 
+			if (_fsrsButton != null)
+			{
+				_fsrsButton.gameObject.SetActive(!showDetail);
+			}
+
 			// Show FSRS rating buttons only in FSRS detail mode
 			SetFsrsContainerVisible(_isFsrsMode && showDetail);
 		}
