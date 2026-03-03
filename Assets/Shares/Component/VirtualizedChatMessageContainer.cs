@@ -393,6 +393,44 @@ namespace Share.Components
 			RefreshVisible();
 		}
 
+		/// <summary>
+		/// Scrolls viewport to make a specific message index visible.
+		/// </summary>
+		/// <param name="messageIndex">Target message index.</param>
+		public void ScrollToMessage(int messageIndex)
+		{
+			if (_messages.Count == 0 || messageIndex < 0 || messageIndex >= _messages.Count)
+			{
+				return;
+			}
+
+			if (_prefixHeights.Count <= messageIndex + 1)
+			{
+				RebuildMetrics();
+			}
+
+			if (_viewport == null || _prefixHeights.Count <= messageIndex + 1)
+			{
+				return;
+			}
+
+			var viewportHeight = Mathf.Max(1f, _viewport.rect.height);
+			var itemTop = _prefixHeights[messageIndex];
+			var itemBottom = _prefixHeights[messageIndex + 1];
+
+			if (itemTop < _scrollOffset)
+			{
+				_scrollOffset = itemTop;
+			}
+			else if (itemBottom > _scrollOffset + viewportHeight)
+			{
+				_scrollOffset = itemBottom - viewportHeight;
+			}
+
+			_scrollOffset = Mathf.Clamp(_scrollOffset, 0f, GetMaxScrollOffset());
+			RefreshVisible();
+		}
+
 		private void EnsureReferences()
 		{
 			if (_viewport == null)

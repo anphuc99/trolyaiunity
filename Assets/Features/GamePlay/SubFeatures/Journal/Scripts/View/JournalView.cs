@@ -769,6 +769,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				}
 
 				_currentAutoPlayListIndex = listIndex;
+				if (_chatVariantRoot != null)
+				{
+					_chatVariantRoot.ScrollToMessage(messageData.MessageIndex);
+				}
+
 				RequestMessageAudio(messageData, false);
 				return;
 			}

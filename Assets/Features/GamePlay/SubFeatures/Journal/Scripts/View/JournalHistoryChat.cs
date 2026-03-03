@@ -64,6 +64,20 @@ namespace Features.GamePlay.SubFeatures.Journal.View
         }
 
         /// <summary>
+        /// Scrolls chat viewport to ensure the target message is visible.
+        /// </summary>
+        /// <param name="messageIndex">Target message index.</param>
+        public void ScrollToMessage(int messageIndex)
+        {
+            if (messageContainer == null)
+            {
+                return;
+            }
+
+            messageContainer.ScrollToMessage(messageIndex);
+        }
+
+        /// <summary>
         /// Clears all pooled objects and invokes the back callback.
         /// </summary>
         public void Callback()
