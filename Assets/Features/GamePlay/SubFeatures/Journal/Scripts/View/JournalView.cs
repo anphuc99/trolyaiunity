@@ -70,6 +70,9 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		private List<MessageBubbleData> _currentChatMessages = new List<MessageBubbleData>();
 		private bool _isChatAutoPlaying;
 		private int _currentAutoPlayListIndex = -1;
+		private bool _hasCapturedRunInBackground;
+		private bool _previousRunInBackground;
+		private bool _isBackgroundPlaybackActive;
 
 		/// <summary>
 		/// Tracks whether the view is in FSRS review mode.
@@ -205,11 +208,13 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			if (string.IsNullOrWhiteSpace(audioPayload.AudioUrl))
 			{
 				ClearReloadingState(audioPayload.MessageIndex);
+				TryRestoreForegroundPlaybackMode();
 				Debug.LogWarning("[JournalView] Missing audio URL for playback.", this);
 				return;
 			}
 
 			EnsureAudioSource();
+			EnableBackgroundPlaybackMode();
 			StartCoroutine(PlayJournalAudioAsync(audioPayload));
 		}
 
@@ -255,7 +260,29 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				_voiceAudioSource.Stop();
 			}
 
+			TryRestoreForegroundPlaybackMode();
+
 			gameObject.SetActive(false);
+		}
+
+		private void OnApplicationFocus(bool hasFocus)
+		{
+			if (hasFocus || !ShouldKeepAudioAliveInBackground())
+			{
+				return;
+			}
+
+			AudioListener.pause = false;
+		}
+
+		private void OnApplicationPause(bool pauseStatus)
+		{
+			if (!pauseStatus || !ShouldKeepAudioAliveInBackground())
+			{
+				return;
+			}
+
+			AudioListener.pause = false;
 		}
 
 		/// <summary>
@@ -420,6 +447,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			if (string.IsNullOrWhiteSpace(resolvedUrl))
 			{
 				ClearReloadingState(payload.MessageIndex);
+				TryRestoreForegroundPlaybackMode();
 				yield break;
 			}
 
@@ -429,6 +457,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			if (audioRequest.result != UnityWebRequest.Result.Success)
 			{
 				ClearReloadingState(payload.MessageIndex);
+				TryRestoreForegroundPlaybackMode();
 				Debug.LogWarning("[JournalView] Failed to download audio: " + audioRequest.error, this);
 				yield break;
 			}
@@ -437,6 +466,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			if (clip == null)
 			{
 				ClearReloadingState(payload.MessageIndex);
+				TryRestoreForegroundPlaybackMode();
 				yield break;
 			}
 
@@ -454,7 +484,10 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			if (_isChatAutoPlaying)
 			{
 				PlayNextAutoMessage();
+				yield break;
 			}
+
+			TryRestoreForegroundPlaybackMode();
 		}
 
 		private void ClearReloadingState(int messageIndex)
@@ -482,6 +515,8 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			{
 				_voiceAudioSource = gameObject.AddComponent<AudioSource>();
 			}
+
+			_voiceAudioSource.ignoreListenerPause = true;
 		}
 
 		private string ResolveAudioUrl(string audioUrl)
@@ -746,6 +781,76 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			}
 
 			UpdateAutoPlayButtonText();
+			TryRestoreForegroundPlaybackMode();
+		}
+
+		/// <summary>
+		/// Enables app/background audio mode while journal audio is playing.
+		/// </summary>
+		private void EnableBackgroundPlaybackMode()
+		{
+			if (!_hasCapturedRunInBackground)
+			{
+				_previousRunInBackground = Application.runInBackground;
+				_hasCapturedRunInBackground = true;
+			}
+
+			Application.runInBackground = true;
+			_isBackgroundPlaybackActive = true;
+
+			if (_voiceAudioSource != null)
+			{
+				_voiceAudioSource.ignoreListenerPause = true;
+			}
+
+			AudioListener.pause = false;
+		}
+
+		/// <summary>
+		/// Restores original foreground-only mode when no journal audio is active.
+		/// </summary>
+		private void TryRestoreForegroundPlaybackMode()
+		{
+			if (!_isBackgroundPlaybackActive)
+			{
+				return;
+			}
+
+			if (_isChatAutoPlaying)
+			{
+				return;
+			}
+
+			if (_voiceAudioSource != null && _voiceAudioSource.isPlaying)
+			{
+				return;
+			}
+
+			if (_hasCapturedRunInBackground)
+			{
+				Application.runInBackground = _previousRunInBackground;
+			}
+
+			_isBackgroundPlaybackActive = false;
+		}
+
+		/// <summary>
+		/// Indicates whether the journal view should keep audio alive while app is unfocused.
+		/// </summary>
+		/// <returns>True when background audio mode is currently active.</returns>
+		private bool ShouldKeepAudioAliveInBackground()
+		{
+			if (!_isBackgroundPlaybackActive)
+			{
+				return false;
+			}
+
+			if (_isChatAutoPlaying)
+			{
+				return true;
+			}
+
+			return _voiceAudioSource != null && _voiceAudioSource.isPlaying;
 		}
 
 		/// <summary>
