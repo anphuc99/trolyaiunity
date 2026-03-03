@@ -61,10 +61,15 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		private Button _goodButton;
 		[SerializeField]
 		private Button _easyButton;
+		[SerializeField]
+		private Button _autoPlayButton;
 
 		private readonly List<JournalItemView> _spawnedListItems = new List<JournalItemView>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
 		private NetworkSettings _networkSettings;
+		private List<MessageBubbleData> _currentChatMessages = new List<MessageBubbleData>();
+		private bool _isChatAutoPlaying;
+		private int _currentAutoPlayListIndex = -1;
 
 		/// <summary>
 		/// Tracks whether the view is in FSRS review mode.
@@ -169,6 +174,20 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			}
 
 			Debug.LogError("[JournalView] " + message, this);
+
+			if (_reloadingTtsMessageIndices.Count > 0)
+			{
+				var failedIndices = new List<int>(_reloadingTtsMessageIndices);
+				for (var i = 0; i < failedIndices.Count; i++)
+				{
+					ClearReloadingState(failedIndices[i]);
+				}
+
+				if (_isChatAutoPlaying)
+				{
+					PlayNextAutoMessage();
+				}
+			}
 		}
 
 		/// <summary>
@@ -203,6 +222,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		{
 			EnsureBindings();
 			EnsurePlayAllBinding();
+			EnsureAutoPlayBinding();
 			EnsureFsrsBindings();
 			_isFsrsMode = false;
 			SetMode(false);
@@ -223,9 +243,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		[OnEvent(JournalEvents.Uninstalled)]
 		private void OnUninstalled(object payload)
 		{
+			StopChatAutoPlay();
 			StopAllCoroutines();
 			_reloadingTtsMessageIndices.Clear();
 			_isFsrsMode = false;
+			_currentChatMessages.Clear();
 			_dueJournals.Clear();
 			_currentDueIndex = 0;
 			if (_voiceAudioSource != null)
@@ -278,6 +300,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		/// <param name="showDetail">True to show detail mode.</param>
 		private void SetMode(bool showDetail)
 		{
+			if (!showDetail)
+			{
+				StopChatAutoPlay();
+			}
+
 			if (_listRoot != null)
 			{
 				_listRoot.SetActive(!showDetail);
@@ -294,8 +321,14 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				_fsrsButton.gameObject.SetActive(!showDetail);
 			}
 
+			if (_autoPlayButton != null)
+			{
+				_autoPlayButton.gameObject.SetActive(showDetail);
+			}
+
 			// Show FSRS rating buttons only in FSRS detail mode
 			SetFsrsContainerVisible(_isFsrsMode && showDetail);
+			UpdateAutoPlayButtonText();
 		}
 
 		/// <summary>
@@ -344,7 +377,10 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		/// <param name="payload">Journal detail payload.</param>
 		private void RenderJournalDetail(List<MessageBubbleData> messageBubbleData)
 		{
+			StopChatAutoPlay();
+			_currentChatMessages = messageBubbleData ?? new List<MessageBubbleData>();
 			_chatVariantRoot.SetChatHistory(messageBubbleData);
+			UpdateAutoPlayButtonText();
 		}
 
 		private void HandleMessageSpeakerClicked(MessageBubbleData messageData)
@@ -359,21 +395,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				return;
 			}
 
-			var text = string.IsNullOrWhiteSpace(messageData.OriginalMessage) ? messageData.Message : messageData.OriginalMessage;
-			if (string.IsNullOrWhiteSpace(text))
-			{
-				return;
-			}
-
-			SendRequest(JournalRequests.PlayMessageAudio, new JournalPlayMessageAudioRequestPayload
-			{
-				MessageId = messageData.MessageId,
-				MessageIndex = messageData.MessageIndex,
-				CharacterName = messageData.Type == MessageBubbleType.User ? "User" : messageData.SenderName,
-				Text = text,
-				Tone = messageData.Tone,
-				ForceReload = false
-			});
+			RequestMessageAudio(messageData, false);
 		}
 
 		private void HandleMessageSpeakerLongPressed(MessageBubbleData messageData)
@@ -389,24 +411,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				return;
 			}
 
-			var text = string.IsNullOrWhiteSpace(messageData.OriginalMessage) ? messageData.Message : messageData.OriginalMessage;
-			if (string.IsNullOrWhiteSpace(text))
-			{
-				return;
-			}
-
-			_reloadingTtsMessageIndices.Add(messageIndex);
-			_chatVariantRoot.SetMessageTtsReloading(messageIndex, true);
-
-			SendRequest(JournalRequests.PlayMessageAudio, new JournalPlayMessageAudioRequestPayload
-			{
-				MessageId = messageData.MessageId,
-				MessageIndex = messageIndex,
-				CharacterName = messageData.Type == MessageBubbleType.User ? "User" : messageData.SenderName,
-				Text = text,
-				Tone = messageData.Tone,
-				ForceReload = true
-			});
+			RequestMessageAudio(messageData, true);
 		}
 
 		private IEnumerator PlayJournalAudioAsync(JournalPlayMessageAudioPayload payload)
@@ -445,6 +450,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			}
 
 			ClearReloadingState(payload.MessageIndex);
+
+			if (_isChatAutoPlaying)
+			{
+				PlayNextAutoMessage();
+			}
 		}
 
 		private void ClearReloadingState(int messageIndex)
@@ -601,6 +611,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 
 		private void Callback()
 		{
+			StopChatAutoPlay();
+			_currentChatMessages.Clear();
+			_currentAutoPlayListIndex = -1;
+			UpdateAutoPlayButtonText();
+
 			if (_isFsrsMode)
 			{
 				// Return to due-journals list instead of normal list
@@ -669,6 +684,167 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 					{
 						SelectedIds = GetSelectedJournalIds()
 					}));
+			}
+		}
+
+		/// <summary>
+		/// Wires the Auto Play button to toggle sequential message playback.
+		/// </summary>
+		private void EnsureAutoPlayBinding()
+		{
+			if (_autoPlayButton == null)
+			{
+				return;
+			}
+
+			_autoPlayButton.onClick.RemoveAllListeners();
+			_autoPlayButton.onClick.AddListener(HandleAutoPlayButtonClicked);
+			UpdateAutoPlayButtonText();
+		}
+
+		/// <summary>
+		/// Toggles auto play for currently displayed chat history.
+		/// </summary>
+		private void HandleAutoPlayButtonClicked()
+		{
+			if (_isChatAutoPlaying)
+			{
+				StopChatAutoPlay();
+				return;
+			}
+
+			if (_currentChatMessages == null || _currentChatMessages.Count == 0)
+			{
+				return;
+			}
+
+			_isChatAutoPlaying = true;
+			_currentAutoPlayListIndex = -1;
+			UpdateAutoPlayButtonText();
+			PlayNextAutoMessage();
+		}
+
+		/// <summary>
+		/// Stops auto play state and restores button label.
+		/// </summary>
+		private void StopChatAutoPlay()
+		{
+			_isChatAutoPlaying = false;
+			_currentAutoPlayListIndex = -1;
+			if (_voiceAudioSource != null)
+			{
+				_voiceAudioSource.Stop();
+			}
+
+			if (_reloadingTtsMessageIndices.Count > 0)
+			{
+				var pendingIndices = new List<int>(_reloadingTtsMessageIndices);
+				for (var i = 0; i < pendingIndices.Count; i++)
+				{
+					ClearReloadingState(pendingIndices[i]);
+				}
+			}
+
+			UpdateAutoPlayButtonText();
+		}
+
+		/// <summary>
+		/// Requests audio for the next playable message and loops to the start at the end.
+		/// </summary>
+		private void PlayNextAutoMessage()
+		{
+			if (!_isChatAutoPlaying || _currentChatMessages == null || _currentChatMessages.Count == 0)
+			{
+				return;
+			}
+
+			var count = _currentChatMessages.Count;
+			for (var offset = 1; offset <= count; offset++)
+			{
+				var listIndex = (_currentAutoPlayListIndex + offset + count) % count;
+				var messageData = _currentChatMessages[listIndex];
+				if (!CanAutoPlayMessage(messageData))
+				{
+					continue;
+				}
+
+				_currentAutoPlayListIndex = listIndex;
+				RequestMessageAudio(messageData, false);
+				return;
+			}
+
+			// No playable messages, keep loop disabled.
+			StopChatAutoPlay();
+		}
+
+		/// <summary>
+		/// Checks whether a message can be used in auto-play sequence.
+		/// </summary>
+		/// <param name="messageData">Candidate message data.</param>
+		/// <returns>True when message has playable text and valid index.</returns>
+		private static bool CanAutoPlayMessage(MessageBubbleData messageData)
+		{
+			if (messageData == null || messageData.MessageIndex < 0)
+			{
+				return false;
+			}
+
+			var text = string.IsNullOrWhiteSpace(messageData.OriginalMessage)
+				? messageData.Message
+				: messageData.OriginalMessage;
+
+			return !string.IsNullOrWhiteSpace(text);
+		}
+
+		/// <summary>
+		/// Sends TTS audio request for one message bubble.
+		/// </summary>
+		/// <param name="messageData">Target message data.</param>
+		/// <param name="forceReload">Whether to force server regeneration.</param>
+		private void RequestMessageAudio(MessageBubbleData messageData, bool forceReload)
+		{
+			if (messageData == null)
+			{
+				return;
+			}
+
+			var text = string.IsNullOrWhiteSpace(messageData.OriginalMessage) ? messageData.Message : messageData.OriginalMessage;
+			if (string.IsNullOrWhiteSpace(text))
+			{
+				return;
+			}
+
+			_reloadingTtsMessageIndices.Add(messageData.MessageIndex);
+			if (_chatVariantRoot != null)
+			{
+				_chatVariantRoot.SetMessageTtsReloading(messageData.MessageIndex, true);
+			}
+
+			SendRequest(JournalRequests.PlayMessageAudio, new JournalPlayMessageAudioRequestPayload
+			{
+				MessageId = messageData.MessageId,
+				MessageIndex = messageData.MessageIndex,
+				CharacterName = messageData.Type == MessageBubbleType.User ? "User" : messageData.SenderName,
+				Text = text,
+				Tone = messageData.Tone,
+				ForceReload = forceReload
+			});
+		}
+
+		/// <summary>
+		/// Updates Auto Play button label based on current state.
+		/// </summary>
+		private void UpdateAutoPlayButtonText()
+		{
+			if (_autoPlayButton == null)
+			{
+				return;
+			}
+
+			var label = _autoPlayButton.GetComponentInChildren<TMP_Text>();
+			if (label != null)
+			{
+				label.text = _isChatAutoPlaying ? "Dừng tự phát" : "Tự phát";
 			}
 		}
 		// ==================================================================
