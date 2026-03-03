@@ -3,8 +3,6 @@ import crypto from "crypto";
 import fs from "fs/promises";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import path from "path";
-import { AudioContext, OfflineAudioContext } from "node-web-audio-api";
-import * as WavEncoder from "wav-encoder";
 import { createOpenAIClient } from "./openai.service.js";
 
 const AUDIO_DIR = path.join(process.cwd(), "data", "audio");
@@ -52,61 +50,15 @@ export const buildAudioId = (text: string, tone: string, voice?: string, pitch?:
     .digest("hex");
 };
 
-const toArrayBuffer = (buffer: Buffer) =>
-  buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
-
 const clampPlaybackRate = (value: number) => Math.min(MAX_PLAYBACK_RATE, Math.max(MIN_PLAYBACK_RATE, value));
 
 /**
- * Applies Web Audio API playbackRate + detune transform on a wav buffer.
- * Formula matches legacy client behavior: playbackRate = speakingRate, detune = pitch * 50.
+ * Reads the sample rate from a standard WAV buffer header (bytes 24-27, little-endian uint32).
  *
- * @param wavBuffer - Input wav buffer.
- * @param pitch - Pitch value used for detune calculation.
- * @param speakingRate - Playback speed multiplier.
- * @returns Transformed wav buffer.
+ * @param wavBuffer - WAV file buffer.
+ * @returns Sample rate in Hz.
  */
-const applyWebAudioTransform = async (wavBuffer: Buffer, pitch?: number, speakingRate?: number) => {
-  const resolvedPitch = Number.isFinite(pitch) ? (pitch as number) : DEFAULT_PITCH;
-  const resolvedSpeakingRate = Number.isFinite(speakingRate)
-    ? clampPlaybackRate(speakingRate as number)
-    : DEFAULT_SPEAKING_RATE;
-  const detuneCents = resolvedPitch * DETUNE_PER_PITCH_UNIT;
-  const detuneFactor = Math.pow(2, detuneCents / 1200);
-  const effectiveRate = clampPlaybackRate(resolvedSpeakingRate * detuneFactor);
-
-  const decodeContext = new AudioContext();
-  const decodedBuffer = await decodeContext.decodeAudioData(toArrayBuffer(wavBuffer));
-
-  const renderLength = Math.max(1, Math.ceil(decodedBuffer.length / effectiveRate));
-  const offlineContext = new OfflineAudioContext(
-    decodedBuffer.numberOfChannels,
-    renderLength,
-    decodedBuffer.sampleRate
-  );
-
-  const source = offlineContext.createBufferSource();
-  source.buffer = decodedBuffer;
-  source.playbackRate.value = resolvedSpeakingRate;
-  source.detune.value = detuneCents;
-  source.connect(offlineContext.destination);
-  source.start(0);
-
-  const renderedBuffer = await offlineContext.startRendering();
-  await decodeContext.close();
-
-  const channelData: Float32Array[] = [];
-  for (let channelIndex = 0; channelIndex < renderedBuffer.numberOfChannels; channelIndex++) {
-    channelData.push(Float32Array.from(renderedBuffer.getChannelData(channelIndex)));
-  }
-
-  const encodedBuffer = await WavEncoder.encode({
-    sampleRate: renderedBuffer.sampleRate,
-    channelData
-  });
-
-  return Buffer.from(encodedBuffer);
-};
+const readWavSampleRate = (wavBuffer: Buffer): number => wavBuffer.readUInt32LE(24);
 
 const clampText = (text: string) => {
   let finalText = text.trim();
@@ -135,11 +87,28 @@ const clampText = (text: string) => {
 
 /**
  * Converts a WAV buffer to MP3 using the bundled ffmpeg binary.
+ * Optionally applies a varispeed transform (pitch + speed change) in the same pass.
+ * The varispeed matches legacy Web Audio BufferSource behavior:
+ * effectiveRate = speakingRate * 2^(pitch * DETUNE_PER_PITCH_UNIT / 1200).
  *
  * @param wavBuffer - Input WAV buffer.
+ * @param pitch - Optional pitch adjustment (detune = pitch * 50 cents).
+ * @param speakingRate - Optional playback speed multiplier.
  * @returns MP3 buffer.
  */
-const convertWavToMp3 = async (wavBuffer: Buffer): Promise<Buffer> => {
+const convertWavToMp3 = async (
+  wavBuffer: Buffer,
+  pitch?: number,
+  speakingRate?: number
+): Promise<Buffer> => {
+  const resolvedPitch = Number.isFinite(pitch) ? (pitch as number) : DEFAULT_PITCH;
+  const resolvedSpeakingRate = Number.isFinite(speakingRate)
+    ? clampPlaybackRate(speakingRate as number)
+    : DEFAULT_SPEAKING_RATE;
+  const detuneCents = resolvedPitch * DETUNE_PER_PITCH_UNIT;
+  const detuneFactor = Math.pow(2, detuneCents / 1200);
+  const effectiveRate = clampPlaybackRate(resolvedSpeakingRate * detuneFactor);
+
   const tempId = crypto.randomUUID();
   const tempWavPath = path.join(AUDIO_DIR, `_tmp_${tempId}.wav`);
   const tempMp3Path = path.join(AUDIO_DIR, `_tmp_${tempId}.mp3`);
@@ -147,10 +116,20 @@ const convertWavToMp3 = async (wavBuffer: Buffer): Promise<Buffer> => {
   try {
     await fs.writeFile(tempWavPath, wavBuffer);
 
+    // Build varispeed filter when effectiveRate differs from 1.
+    // asetrate scales the declared sample rate (changing speed + pitch together),
+    // then aresample restores the original rate for correct playback.
+    const filterArgs: string[] = [];
+    if (effectiveRate !== 1) {
+      const sampleRate = readWavSampleRate(wavBuffer);
+      const scaledRate = Math.round(sampleRate * effectiveRate);
+      filterArgs.push("-af", `asetrate=${scaledRate},aresample=${sampleRate}`);
+    }
+
     await new Promise<void>((resolve, reject) => {
       execFile(
         ffmpegInstaller.path,
-        ["-y", "-i", tempWavPath, "-codec:a", "libmp3lame", "-q:a", "2", tempMp3Path],
+        ["-y", "-i", tempWavPath, ...filterArgs, "-codec:a", "libmp3lame", "-q:a", "2", tempMp3Path],
         (error) => {
           if (error) {
             reject(new Error(`ffmpeg conversion failed: ${error.message}`));
@@ -210,8 +189,7 @@ export const createTtsAudio = async (
   });
 
   const rawBuffer = Buffer.from(await response.arrayBuffer());
-  const transformedWav = await applyWebAudioTransform(rawBuffer, pitch, speakingRate);
-  const mp3Buffer = await convertWavToMp3(transformedWav);
+  const mp3Buffer = await convertWavToMp3(rawBuffer, pitch, speakingRate);
   const filePath = path.join(AUDIO_DIR, `${audioId}.mp3`);
   await fs.writeFile(filePath, mp3Buffer);
 
