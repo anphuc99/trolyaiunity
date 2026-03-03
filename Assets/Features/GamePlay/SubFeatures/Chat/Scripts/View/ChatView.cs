@@ -1008,7 +1008,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		private void HandleMessageSpeakerClicked(MessageBubbleData messageData)
 		{
-			if (messageData == null || messageData.Type != MessageBubbleType.Character)
+			if (messageData == null)
 			{
 				return;
 			}
@@ -1026,7 +1026,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			SendRequest(ChatRequests.PlayMessageAudio, new ChatPlayMessageAudioRequestPayload
 			{
 				MessageId = messageData.MessageId,
-				CharacterName = messageData.SenderName,
+				CharacterName = messageData.Type == MessageBubbleType.User ? "User" : messageData.SenderName,
 				Text = string.IsNullOrWhiteSpace(messageData.OriginalMessage) ? messageData.Message : messageData.OriginalMessage,
 				Tone = string.IsNullOrWhiteSpace(messageData.Tone) ? DefaultTtsTone : messageData.Tone,
 			});
@@ -1034,7 +1034,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		private void HandleMessageSpeakerLongPressed(MessageBubbleData messageData)
 		{
-			if (_messageContainer == null || messageData == null || messageData.Type != MessageBubbleType.Character)
+			if (_messageContainer == null || messageData == null)
 			{
 				return;
 			}
@@ -1067,7 +1067,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			var tone = string.IsNullOrWhiteSpace(messageData.Tone) ? DefaultTtsTone : messageData.Tone.Trim();
-			var characterName = string.IsNullOrWhiteSpace(messageData.SenderName) ? DefaultCharacterDisplayName : messageData.SenderName.Trim();
+			var characterName = messageData.Type == MessageBubbleType.User
+				? "User"
+				: (string.IsNullOrWhiteSpace(messageData.SenderName) ? DefaultCharacterDisplayName : messageData.SenderName.Trim());
 
 			AudioClip clip = null;
 			yield return StartCoroutine(RequestCharacterTtsClip(baseText, tone, characterName, true, loadedClip =>

@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import fs from "fs/promises";
 import type { DataSource } from "typeorm";
 import CharacterEntity from "../../models/character.entity.js";
+import UserEntity from "../../models/user.entity.js";
 import { buildAudioId, createTtsAudio, getAudioPath } from "../../services/tts.service.js";
 
 interface TtsController {
@@ -16,12 +17,26 @@ interface TtsController {
  */
 export const createTtsController = (dataSource: DataSource): TtsController => {
   const characterRepository = dataSource.getRepository(CharacterEntity);
+  const userRepository = dataSource.getRepository(UserEntity);
 
   const resolveCharacterVoiceSettings = async (userId: number, characterName: string) => {
     if (!characterName) {
       return {
         voiceName: undefined,
         pitch: undefined,
+        speakingRate: undefined
+      };
+    }
+
+    if (characterName.toLowerCase() === "user") {
+      const user = await userRepository
+        .createQueryBuilder("user")
+        .where("user.id = :userId", { userId })
+        .getOne();
+
+      return {
+        voiceName: user?.voiceName?.trim() || undefined,
+        pitch: user?.pitch ?? undefined,
         speakingRate: undefined
       };
     }

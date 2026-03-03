@@ -349,7 +349,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 
 		private void HandleMessageSpeakerClicked(MessageBubbleData messageData)
 		{
-			if (messageData == null || messageData.Type != MessageBubbleType.Character)
+			if (messageData == null)
 			{
 				return;
 			}
@@ -369,7 +369,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			{
 				MessageId = messageData.MessageId,
 				MessageIndex = messageData.MessageIndex,
-				CharacterName = messageData.SenderName,
+				CharacterName = messageData.Type == MessageBubbleType.User ? "User" : messageData.SenderName,
 				Text = text,
 				Tone = messageData.Tone,
 				ForceReload = false
@@ -378,7 +378,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 
 		private void HandleMessageSpeakerLongPressed(MessageBubbleData messageData)
 		{
-			if (_chatVariantRoot == null || messageData == null || messageData.Type != MessageBubbleType.Character)
+			if (_chatVariantRoot == null || messageData == null)
 			{
 				return;
 			}
@@ -402,7 +402,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			{
 				MessageId = messageData.MessageId,
 				MessageIndex = messageIndex,
-				CharacterName = messageData.SenderName,
+				CharacterName = messageData.Type == MessageBubbleType.User ? "User" : messageData.SenderName,
 				Text = text,
 				Tone = messageData.Tone,
 				ForceReload = true
