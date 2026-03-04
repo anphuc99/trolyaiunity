@@ -12,7 +12,8 @@
         "GamePlay.Task",
         "GamePlay.Chat",
         "Unity.TextMeshPro",
-        "GamePlay.Setting"
+        "GamePlay.Setting",
+        "GamePlay.MyLog"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

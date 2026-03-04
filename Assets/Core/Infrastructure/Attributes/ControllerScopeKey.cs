@@ -21,6 +21,8 @@ namespace Core.Infrastructure.Attributes
 
 		EditCharacterGameplay = 7,
 
-		JournalOverlayGameplay = 8
+		JournalOverlayGameplay = 8,
+
+		MimiLearnGameplay = 9
 	}
 }

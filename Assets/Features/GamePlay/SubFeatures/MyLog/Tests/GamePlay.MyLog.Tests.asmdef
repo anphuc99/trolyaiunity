@@ -1,0 +1,15 @@
+{
+    "name": "GamePlay.MyLog.Tests",
+    "rootNamespace": "",
+    "references": ["GamePlay.MyLog"],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": ["TestAssemblies"]
+}
