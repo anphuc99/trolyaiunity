@@ -2,7 +2,9 @@ using Core.Infrastructure.Views;
 using Features.GamePlay.SubFeatures.MyLog.Events;
 using Features.GamePlay.SubFeatures.MyLog.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.MyLog.Requests;
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Features.GamePlay.SubFeatures.MyLog.View
 {
@@ -11,25 +13,17 @@ namespace Features.GamePlay.SubFeatures.MyLog.View
 	/// </summary>
 	public sealed class MyLogView : BaseView
 	{
+
+		[Header("Tạo nhật ký mới")]
 		[SerializeField]
-		private string _message = "Hello";
+		private TMP_InputField _inputNewLog;
+		[SerializeField]
+		private Button _btnCreateNewLog;
 
-		/// <summary>
-		/// Example method to send a request.
-		/// </summary>
-		public void SendEcho()
-		{
-			SendRequest(MyLogRequests.Echo, _message);
-		}
-
-		/// <summary>
-		/// Example event handler (auto-bound).
-		/// </summary>
-		/// <param name="payload">Payload from controller.</param>
-		[OnEvent(MyLogEvents.Echoed)]
-		private void OnEchoed(object payload)
-		{
-			Debug.Log("[MyLogView] Echoed: " + payload, this);
-		}
-	}
+		[Header("Danh sách nhật ký")]
+		[SerializeField]
+		private MyLogItemView _itemViewPrefab;
+		[SerializeField]
+		private Transform _itemViewContainer;
+    }
 }

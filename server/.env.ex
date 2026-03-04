@@ -48,6 +48,12 @@ REGISTRATION_TOKEN=change-me
 # Defaults to server/data/chat-history
 # CHAT_HISTORY_DIR=
 
+# MyLog (Diary) feature
+# AI model for diary chat (supports any Gemini or OpenAI model)
+MYLOG_AI_MODEL=gemini-3-flash-preview
+# Diary chat history directory (defaults to data/mylog-history)
+# MYLOG_HISTORY_DIR=
+
 # TypeORM / ORM options (optional)
 # TYPEORM_SYNCHRONIZE=false
 # TYPEORM_LOGGING=false
