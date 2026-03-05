@@ -16,6 +16,8 @@
     "dbserver:seed:levels": "node dist/scripts/seed-levels.js",
     "migrate:old": "tsx src/scripts/migrate-from-old.ts",
     "audio:trim": "tsx src/scripts/trim-audio.ts",
+    "audio:trim:all": "tsx src/scripts/trim-audio.ts ./data",
+    "trim": "npm run audio:trim:all",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
