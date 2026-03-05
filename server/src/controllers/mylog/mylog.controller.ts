@@ -1230,21 +1230,77 @@ Please summarize this diary chat conversation and return it in JSON format:
 Return ONLY the JSON object. No markdown. No extra text.
 `.trim();
 
-      const summaryReply = await summaryService.createReply(undefined, [
-        ...history,
-        { role: "developer", content: summaryInstruction }
-      ], mylogModel);
+      const parseSummaryPayload = (input: string) => {
+        const trimmed = input.trim();
+        if (!trimmed) {
+          return null;
+        }
+
+        const tryParseObject = (raw: string) => {
+          try {
+            const parsed = JSON.parse(raw) as unknown;
+            return parsed && typeof parsed === "object" ? (parsed as { Summary?: string; EmotionalSummary?: string }) : null;
+          } catch {
+            return null;
+          }
+        };
+
+        const direct = tryParseObject(trimmed);
+        if (direct) {
+          return direct;
+        }
+
+        const objectStart = trimmed.indexOf("{");
+        const objectEnd = trimmed.lastIndexOf("}");
+        if (objectStart !== -1 && objectEnd > objectStart) {
+          return tryParseObject(trimmed.slice(objectStart, objectEnd + 1));
+        }
+
+        return null;
+      };
+
+      const requestSummaryPayloadWithRetry = async (maxAttempts = 3) => {
+        let attempt = 0;
+        let instruction = summaryInstruction;
+
+        while (attempt < maxAttempts) {
+          const summaryReply = await summaryService.createReply(undefined, [
+            ...history,
+            { role: "developer", content: instruction }
+          ], mylogModel);
+
+          const parsed = parseSummaryPayload(summaryReply.reply);
+          if (parsed) {
+            return parsed;
+          }
+
+          attempt += 1;
+          if (attempt >= maxAttempts) {
+            break;
+          }
+
+          instruction = [
+            summaryInstruction,
+            "",
+            "Your previous response format was invalid.",
+            "Retry now and return ONLY a valid JSON object with exactly two keys:",
+            "Summary, EmotionalSummary.",
+            "No markdown. No extra text."
+          ].join("\n");
+        }
+
+        return null;
+      };
 
       let summary = "Diary chat session.";
       let emotionalSummary: string | null = null;
 
-      try {
-        const parsed = JSON.parse(summaryReply.reply) as { Summary?: string; EmotionalSummary?: string };
-        summary = typeof parsed.Summary === "string" ? parsed.Summary.trim() : summary;
-        emotionalSummary = typeof parsed.EmotionalSummary === "string" ? parsed.EmotionalSummary.trim() : null;
-      } catch {
-        // Use raw reply as summary if JSON parse fails
-        summary = summaryReply.reply.trim() || summary;
+      const parsedSummary = await requestSummaryPayloadWithRetry();
+      if (parsedSummary) {
+        summary = typeof parsedSummary.Summary === "string" ? parsedSummary.Summary.trim() : summary;
+        emotionalSummary = typeof parsedSummary.EmotionalSummary === "string" ? parsedSummary.EmotionalSummary.trim() : null;
+      } else {
+        console.warn("MyLog summary response remained invalid after retries; using fallback summary.");
       }
 
       // Create journal entry
