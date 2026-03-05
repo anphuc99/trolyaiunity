@@ -14,6 +14,8 @@ const DEFAULT_PITCH = 0;
 const DETUNE_PER_PITCH_UNIT = 50;
 const MIN_PLAYBACK_RATE = 0.1;
 const MAX_PLAYBACK_RATE = 4;
+const TRIM_SILENCE_THRESHOLD_DB = -45;
+const TRIM_SILENCE_DURATION_SEC = 0.08;
 
 /**
  * Normalizes text for stable hash generation.
@@ -116,14 +118,25 @@ const convertWavToMp3 = async (
   try {
     await fs.writeFile(tempWavPath, wavBuffer);
 
-    // Build varispeed filter when effectiveRate differs from 1.
-    // asetrate scales the declared sample rate (changing speed + pitch together),
-    // then aresample restores the original rate for correct playback.
+    // Build audio filter chain:
+    // 1) Optional varispeed (pitch + speed) to match legacy behavior.
+    // 2) Trim leading/trailing silence to reduce dead air after TTS.
     const filterArgs: string[] = [];
+    const filters: string[] = [];
+
     if (effectiveRate !== 1) {
       const sampleRate = readWavSampleRate(wavBuffer);
       const scaledRate = Math.round(sampleRate * effectiveRate);
-      filterArgs.push("-af", `asetrate=${scaledRate},aresample=${sampleRate}`);
+      filters.push(`asetrate=${scaledRate}`, `aresample=${sampleRate}`);
+    }
+
+    filters.push(
+      `silenceremove=start_periods=1:start_duration=${TRIM_SILENCE_DURATION_SEC}:start_threshold=${TRIM_SILENCE_THRESHOLD_DB}dB:` +
+        `stop_periods=-1:stop_duration=${TRIM_SILENCE_DURATION_SEC}:stop_threshold=${TRIM_SILENCE_THRESHOLD_DB}dB`
+    );
+
+    if (filters.length > 0) {
+      filterArgs.push("-af", filters.join(","));
     }
 
     await new Promise<void>((resolve, reject) => {
