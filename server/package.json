@@ -15,6 +15,7 @@
     "dbserver:reset": "node dist/scripts/db-reset.js",
     "dbserver:seed:levels": "node dist/scripts/seed-levels.js",
     "migrate:old": "tsx src/scripts/migrate-from-old.ts",
+    "audio:trim": "tsx src/scripts/trim-audio.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
