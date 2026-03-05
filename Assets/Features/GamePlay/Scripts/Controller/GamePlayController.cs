@@ -13,6 +13,8 @@ using Features.GamePlay.SubFeatures.Home.Controller;
 using Features.GamePlay.SubFeatures.Home.Model;
 using Features.GamePlay.SubFeatures.Journal.Controller;
 using Features.GamePlay.SubFeatures.Journal.Model;
+using Features.GamePlay.SubFeatures.MyLog.Controller;
+using Features.GamePlay.SubFeatures.MyLog.Model;
 using Features.GamePlay.SubFeatures.Practice.Controller;
 using Features.GamePlay.SubFeatures.Practice.Model;
 using Features.GamePlay.SubFeatures.Story.Controller;
@@ -186,6 +188,9 @@ namespace Features.GamePlay.Controller
 				case GamePlaySubControllerType.Journal:
 					JournalController.Install();
 					break;
+				case GamePlaySubControllerType.MyLog:
+					MyLogController.Install();
+					break;
 				case GamePlaySubControllerType.Practice:
 					PracticeController.Install();
 					break;
@@ -210,6 +215,7 @@ namespace Features.GamePlay.Controller
 			HomeController.SetParentSignals(new HomeParentSignals { 
 				OnEchoed = OnSubControllerEchoed,
 				OpenJournal = () => HandleOpenSubController(GamePlaySubControllerType.Journal), 
+				OpenMyLog = () => HandleOpenSubController(GamePlaySubControllerType.MyLog),
 				OpenStory = () => HandleOpenSubController(GamePlaySubControllerType.Story),
 				OpenCreateCharacter = HandleOpenCreateCharacter,
 				OpenCharacter = () => HandleOpenSubController(GamePlaySubControllerType.Character),
@@ -240,6 +246,10 @@ namespace Features.GamePlay.Controller
 			JournalController.SetParentSignals(new JournalParentSignals { 
 				OnEchoed = OnSubControllerEchoed,
 				GetAvatar = GetChatCharacterAvatar, 
+			});
+			MyLogController.SetParentSignals(new MyLogParentSignals
+			{
+				OnEchoed = OnSubControllerEchoed
 			});
 			PracticeController.SetParentSignals(new PracticeParentSignals { OnEchoed = OnSubControllerEchoed });
 			StoryController.SetParentSignals(new StoryParentSignals { OnEchoed = OnSubControllerEchoed });
@@ -635,6 +645,7 @@ namespace Features.GamePlay.Controller
 			CharacterController.SetParentSignals(null);
 			ChatController.SetParentSignals(null);
 			JournalController.SetParentSignals(null);
+			MyLogController.SetParentSignals(null);
 			PracticeController.SetParentSignals(null);
 			StoryController.SetParentSignals(null);
 			TaskController.SetParentSignals(null);
@@ -660,6 +671,9 @@ namespace Features.GamePlay.Controller
 					break;
 				case GamePlaySubControllerType.Journal:
 					JournalController.Uninstall();
+					break;
+				case GamePlaySubControllerType.MyLog:
+					MyLogController.Uninstall();
 					break;
 				case GamePlaySubControllerType.Practice:
 					PracticeController.Uninstall();

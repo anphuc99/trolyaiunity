@@ -70,6 +70,12 @@ namespace Features.GamePlay.SubFeatures.Home.Controller
 			HomeState.ParentSignals?.OpenJournal?.Invoke();
 		}
 
+		[Request(HomeRequests.OpenMyLog)]
+		public static void HandleOpenMyLog(object payload)
+		{
+			HomeState.ParentSignals?.OpenMyLog?.Invoke();
+		}
+
 		[Request(HomeRequests.OpenStory)]
 		public static void HandleOpenStory()
 		{

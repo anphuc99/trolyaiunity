@@ -601,7 +601,7 @@ MonoBehaviour:
       - m_Target: {fileID: 9172241123421892854}
         m_TargetAssemblyTypeName: Features.GamePlay.SubFeatures.Home.View.HomeView,
           GamePlay.Home
-        m_MethodName: OpenTask
+        m_MethodName: OpenMyLog
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}

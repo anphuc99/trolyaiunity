@@ -12,7 +12,8 @@ namespace Features.GamePlay.Model
 		Practice,
 		Story,
 		Task,
-		Setting
+		Setting,
+		MyLog
 	}
 
 	/// <summary>

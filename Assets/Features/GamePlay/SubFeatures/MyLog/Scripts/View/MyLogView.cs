@@ -196,7 +196,7 @@ namespace Features.GamePlay.SubFeatures.MyLog.View
 				var instance = Instantiate(_itemViewPrefab, _itemViewContainer);
 				instance.name = "MyLogItem-" + log.Id;
 				instance.gameObject.SetActive(true);
-				instance.Bind(log.Id, log.Content);
+				instance.Bind(log.Id, log.Content, log.CreatedAt);
 				instance.EditRequested += HandleEditRequested;
 				_spawnedItems.Add(instance);
 			}

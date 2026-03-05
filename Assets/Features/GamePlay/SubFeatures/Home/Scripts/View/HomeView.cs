@@ -57,6 +57,11 @@ namespace Features.GamePlay.SubFeatures.Home.View
 			SendRequest(HomeRequests.OpenJournal);
 		}
 
+		public void OpenMyLog()
+		{
+			SendRequest(HomeRequests.OpenMyLog);
+		}
+
 		public void OpenStory()
 		{
 			SendRequest(HomeRequests.OpenStory);

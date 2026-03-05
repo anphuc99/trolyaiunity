@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace Features.GamePlay.SubFeatures.MyLog.Model
 {
@@ -33,6 +34,7 @@ namespace Features.GamePlay.SubFeatures.MyLog.Model
 	/// </summary>
 	public sealed class MyLogCreateRequestPayload
 	{
+		[JsonProperty("content")]
 		public string Content { get; set; }
 	}
 
@@ -41,7 +43,10 @@ namespace Features.GamePlay.SubFeatures.MyLog.Model
 	/// </summary>
 	public sealed class MyLogUpdateRequestPayload
 	{
+		[JsonIgnore]
 		public int LogId { get; set; }
+
+		[JsonProperty("content")]
 		public string Content { get; set; }
 	}
 
@@ -50,6 +55,7 @@ namespace Features.GamePlay.SubFeatures.MyLog.Model
 	/// </summary>
 	public sealed class MyLogEditRequestPayload
 	{
+		[JsonProperty("logId")]
 		public int LogId { get; set; }
 	}
 

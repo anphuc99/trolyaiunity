@@ -2905,6 +2905,10 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1142769532574415196, guid: d8e38f1e0c832ec499a86f16463c1c25, type: 3}
+      propertyPath: _visible
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1142769532574415196, guid: d8e38f1e0c832ec499a86f16463c1c25, type: 3}
       propertyPath: _itemViewPrefab
       value: 
       objectReference: {fileID: -5722611478886269613, guid: bcb32f41f33daeb4298248afcfb180a2, type: 3}

@@ -45,6 +45,15 @@ namespace Features.GamePlay.Tests
 		}
 
 		[Test]
+		public void OpenSubController_ShouldOpenMyLog()
+		{
+			var opened = GamePlayController.HandleOpenSubController(GamePlaySubControllerType.MyLog);
+
+			Assert.IsTrue(opened);
+			Assert.AreEqual(GamePlaySubControllerType.MyLog.ToString(), GamePlayController.HandleGetCurrentSubController());
+		}
+
+		[Test]
 		public void CloseCurrentSubController_ShouldUninstallCurrent()
 		{
 			GamePlayController.HandleOpenSubController(GamePlaySubControllerType.Chat);

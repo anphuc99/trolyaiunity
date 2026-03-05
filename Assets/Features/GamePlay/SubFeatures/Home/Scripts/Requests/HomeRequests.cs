@@ -9,6 +9,7 @@ namespace Features.GamePlay.SubFeatures.Home.Requests
 	{
 		public const string Echo = "game.play.home.echo.request";
 		public const string OpenJournal = "game.play.home.open.journal.request";
+		public const string OpenMyLog = "game.play.home.open.my.log.request";
 		public const string OpenStory = "game.play.home.open.story.request";
 		public const string OpenCreateCharacter = "game.play.home.open.create.character.request";
 		public const string OpenCharacter = "game.play.home.open.character.request";
