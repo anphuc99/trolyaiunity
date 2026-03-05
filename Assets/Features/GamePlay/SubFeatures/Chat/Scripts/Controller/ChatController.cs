@@ -6,6 +6,7 @@ using Features.GamePlay.SubFeatures.Chat.Requests;
 using Core.Infrastructure.Network;
 using Core.Infrastructure.State;
 using Newtonsoft.Json;
+using CoreGlobalModes = Core.Infrastructure.State.GlobalModes;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -54,6 +55,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			UnregisterAddCharacterMenu();
 			UnregisterContextMenu();
 			UnregisterEndConversationMenu();
+			// Clear API mode so the next chat session starts fresh (default mode).
+			GlobalVariables.Remove(CoreGlobalModes.ChatApiModeKey);
 			EventBus.Publish(ChatEvents.Uninstalled, null);
 		}
 

@@ -2,7 +2,9 @@ using NUnit.Framework;
 using Features.GamePlay.Controller;
 using Features.GamePlay.Model;
 using Features.GamePlay.Events;
+using Core.Infrastructure.Attributes;
 using Core.Infrastructure.Events;
+using Core.Infrastructure.State;
 
 namespace Features.GamePlay.Tests
 {
@@ -11,11 +13,29 @@ namespace Features.GamePlay.Tests
 	/// </summary>
 	public sealed class GamePlayControllerTests
 	{
+		/// <summary>
+		/// Proxy controller scoped to Global so tests can mutate GlobalVariables.
+		/// </summary>
+		[ControllerScope(ControllerScopeKey.Global)]
+		private static class GlobalVariablesMutationProxyController
+		{
+			public static void Set(string key, object value)
+			{
+				GlobalVariables.Set(key, value);
+			}
+
+			public static void Remove(string key)
+			{
+				GlobalVariables.Remove(key);
+			}
+		}
+
 		[SetUp]
 		public void SetUp()
 		{
 			EventBus.ClearAll();
 			GamePlayController.HandleCloseCurrentSubController();
+			GlobalVariablesMutationProxyController.Remove(GlobalModes.ChatApiModeKey);
 		}
 
 		[TearDown]
@@ -23,6 +43,7 @@ namespace Features.GamePlay.Tests
 		{
 			EventBus.ClearAll();
 			GamePlayController.HandleCloseCurrentSubController();
+			GlobalVariablesMutationProxyController.Remove(GlobalModes.ChatApiModeKey);
 		}
 
 		[Test]
@@ -99,6 +120,26 @@ namespace Features.GamePlay.Tests
 
 			Assert.IsNotNull(receivedPayload);
 			Assert.AreEqual("menu-123", receivedPayload.Id);
+		}
+
+		[Test]
+		public void HandleOpenChat_ShouldResetChatApiModeToDefault()
+		{
+			GlobalVariablesMutationProxyController.Set(GlobalModes.ChatApiModeKey, GlobalModes.ModeMyLog);
+
+			GamePlayController.HandleOpenChat(null);
+
+			var mode = GlobalVariables.GetOrDefault(GlobalModes.ChatApiModeKey, GlobalModes.ModeDefault);
+			Assert.AreEqual(GlobalModes.ModeDefault, mode);
+			Assert.AreEqual(GamePlaySubControllerType.Chat.ToString(), GamePlayController.HandleGetCurrentSubController());
+		}
+
+		[Test]
+		public void HandleOpenChat_ShouldOpenChatSubController()
+		{
+			GamePlayController.HandleOpenChat(null);
+
+			Assert.AreEqual(GamePlaySubControllerType.Chat.ToString(), GamePlayController.HandleGetCurrentSubController());
 		}
 	}
 }

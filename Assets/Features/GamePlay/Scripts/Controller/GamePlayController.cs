@@ -125,6 +125,19 @@ namespace Features.GamePlay.Controller
 		}
 
 		/// <summary>
+		/// Opens the regular (non-MyLog) Chat subcontroller.
+		/// Explicitly resets the chat API mode to default so developer messages
+		/// always route to the standard chat endpoints.
+		/// </summary>
+		/// <param name="payload">Unused.</param>
+		[Request(GamePlayRequests.OpenChat)]
+		public static void HandleOpenChat(object payload)
+		{
+			GlobalVariables.Set(GlobalModes.ChatApiModeKey, GlobalModes.ModeDefault);
+			HandleOpenSubController(GamePlaySubControllerType.Chat);
+		}
+
+		/// <summary>
 		/// Opens a subcontroller by name or enum value.
 		/// Automatically closes the currently opened subcontroller first.
 		/// </summary>

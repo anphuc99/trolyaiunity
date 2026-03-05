@@ -43,7 +43,7 @@ namespace Features.GamePlay.View
 		
 		public void OpenChat()
 		{
-			SendRequest(GamePlayRequests.OpenSubController, GamePlaySubControllerType.Chat);
+			SendRequest(GamePlayRequests.OpenChat, null);
 		}
 
 		public void OpenSetting()

@@ -61,6 +61,8 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		/// </summary>
 		public static void Uninstall()
 		{
+			// Clear API mode so the next journal session starts fresh (default mode).
+			GlobalVariables.Remove(GlobalModes.JournalApiModeKey);
 			EventBus.Publish(JournalEvents.Uninstalled, null);
 		}
 

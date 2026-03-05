@@ -134,6 +134,23 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 		}
 
 		[Test]
+		public void Uninstall_ShouldClearChatApiMode()
+		{
+			ChatController.SetParentSignals(new ChatParentSignals
+			{
+				AddMenu = (_, __) => "test-menu-id",
+				RemoveMenu = _ => { },
+			});
+
+			GlobalVariablesMutationProxyController.Set(GlobalModes.ChatApiModeKey, GlobalModes.ModeMyLog);
+			ChatController.Install();
+			ChatController.Uninstall();
+
+			var mode = GlobalVariables.GetOrDefault(GlobalModes.ChatApiModeKey, GlobalModes.ModeDefault);
+			Assert.AreEqual(GlobalModes.ModeDefault, mode);
+		}
+
+		[Test]
 		public void ContextMenuClick_ShouldPublishContextInputRequestedEvent()
 		{
 			Action contextMenuAction = null;
