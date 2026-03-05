@@ -3,6 +3,7 @@ using Features.GamePlay.Controller;
 using Features.GamePlay.Model;
 using Features.GamePlay.Events;
 using Core.Infrastructure.Events;
+using Core.Infrastructure.State;
 
 namespace Features.GamePlay.Tests
 {
@@ -99,6 +100,23 @@ namespace Features.GamePlay.Tests
 
 			Assert.IsNotNull(receivedPayload);
 			Assert.AreEqual("menu-123", receivedPayload.Id);
+		}
+
+		/// <summary>
+		/// Verifies that HandleOpenDefaultChat resets the chat API mode to default
+		/// and opens the Chat sub-controller.
+		/// </summary>
+		[Test]
+		public void HandleOpenDefaultChat_ShouldResetChatModeToDefault()
+		{
+			// Simulate a previous MyLog session leaving the mode set
+			GlobalVariables.Set(GlobalModes.ChatApiModeKey, GlobalModes.ModeMyLog);
+
+			var opened = GamePlayController.HandleOpenDefaultChat();
+
+			Assert.IsTrue(opened);
+			Assert.AreEqual(GamePlaySubControllerType.Chat.ToString(), GamePlayController.HandleGetCurrentSubController());
+			Assert.AreEqual(GlobalModes.ModeDefault, GlobalVariables.GetOrDefault<string>(GlobalModes.ChatApiModeKey, null));
 		}
 	}
 }

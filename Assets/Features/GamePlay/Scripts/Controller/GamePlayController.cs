@@ -746,6 +746,17 @@ namespace Features.GamePlay.Controller
 			LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay, LoadSceneMode.Additive);
 		}
 
+		/// <summary>
+		/// Opens Chat sub-controller with the default (non-MyLog) API mode.
+		/// Called from the bottom navigation bar to ensure regular chat endpoints are used.
+		/// </summary>
+		[Request(GamePlayRequests.OpenDefaultChat)]
+		public static bool HandleOpenDefaultChat()
+		{
+			GlobalVariables.Set(GlobalModes.ChatApiModeKey, GlobalModes.ModeDefault);
+			return HandleOpenSubController(GamePlaySubControllerType.Chat);
+		}
+
 		private static void OpenDefaultJournal()
 		{
 			GlobalVariables.Set(GlobalModes.JournalApiModeKey, GlobalModes.ModeDefault);
