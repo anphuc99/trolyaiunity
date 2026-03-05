@@ -24,6 +24,7 @@ namespace Core.Infrastructure.Network
 		public const string JournalReviewDue = "/api/journals/review/due";
 		public const string JournalReview = "/api/journals/review";
 		public const string Stories = "/api/stories";
+		public const string MyLog = "/api/mylog";
 		public const string Translation = "/api/translation";
 		public const string TranslationDue = "/api/translation/due";
 		public const string TranslationLearn = "/api/translation/learn";

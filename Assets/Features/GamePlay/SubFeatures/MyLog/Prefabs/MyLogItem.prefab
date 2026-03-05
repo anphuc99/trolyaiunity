@@ -268,7 +268,7 @@ GameObject:
   - component: {fileID: 8909446404007460484}
   - component: {fileID: 8769287059419559379}
   - component: {fileID: 3488381565145983706}
-  - component: {fileID: 8102414439369630641}
+  - component: {fileID: -5722611478886269613}
   m_Layer: 5
   m_Name: MyLogItem
   m_TagString: Untagged
@@ -357,7 +357,7 @@ MonoBehaviour:
   _paddingTop: 49.7
   _paddingBottom: 20.75
   _includeInactive: 0
---- !u!114 &8102414439369630641
+--- !u!114 &-5722611478886269613
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -366,12 +366,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 5050781505346825922}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4d3a722d409ef8140a87626f336bf03c, type: 3}
+  m_Script: {fileID: 11500000, guid: b1e7493d66c63b64d8e646c9391c58ea, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _nameStoryText: {fileID: 4673869393431035763}
-  _contentStoryText: {fileID: 3329933217230468262}
-  _editButton: {fileID: 2852143738304426946}
 --- !u!1 &5878197674733847847
 GameObject:
   m_ObjectHideFlags: 0

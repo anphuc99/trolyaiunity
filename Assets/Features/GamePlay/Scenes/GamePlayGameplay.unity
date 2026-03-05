@@ -2905,9 +2905,9 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1142769532574415196, guid: d8e38f1e0c832ec499a86f16463c1c25, type: 3}
-      propertyPath: _visible
-      value: 0
-      objectReference: {fileID: 0}
+      propertyPath: _itemViewPrefab
+      value: 
+      objectReference: {fileID: -5722611478886269613, guid: bcb32f41f33daeb4298248afcfb180a2, type: 3}
     - target: {fileID: 1484153268287996851, guid: d8e38f1e0c832ec499a86f16463c1c25, type: 3}
       propertyPath: m_Enabled
       value: 0
@@ -2920,17 +2920,9 @@ PrefabInstance:
       propertyPath: m_Name
       value: MyLog
       objectReference: {fileID: 0}
-    - target: {fileID: 3528797461183062240, guid: d8e38f1e0c832ec499a86f16463c1c25, type: 3}
-      propertyPath: m_VerticalScrollbar
-      value: 
-      objectReference: {fileID: 0}
-    - target: {fileID: 3528797461183062240, guid: d8e38f1e0c832ec499a86f16463c1c25, type: 3}
-      propertyPath: m_HorizontalScrollbar
-      value: 
-      objectReference: {fileID: 0}
     - target: {fileID: 3906905444096604316, guid: d8e38f1e0c832ec499a86f16463c1c25, type: 3}
       propertyPath: m_Enabled
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4310789335247207392, guid: d8e38f1e0c832ec499a86f16463c1c25, type: 3}
       propertyPath: m_Enabled

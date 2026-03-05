@@ -11,6 +11,7 @@ import { requireAuth } from "../middleware/auth.middleware.js";
  * Routes:
  *   POST   /api/mylog              — Create a new diary entry
  *   GET    /api/mylog              — List diary entries (paginated)
+ *   PUT    /api/mylog/:id          — Update an existing diary entry
  *   GET    /api/mylog/review/due   — Get diary entries due for review
  *   POST   /api/mylog/review       — Submit a review for a diary entry
  *   GET    /api/mylog/journals     — List diary chat journals
@@ -30,6 +31,7 @@ export const createMyLogRoutes = (dataSource: DataSource) => {
   // Diary CRUD
   router.post("/", requireAuth, controller.createLog);
   router.get("/", requireAuth, controller.listLogs);
+  router.put("/:id", requireAuth, controller.updateLog);
 
   // Spaced repetition review
   router.get("/review/due", requireAuth, controller.getDueLogs);

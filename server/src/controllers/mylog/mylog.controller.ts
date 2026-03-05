@@ -25,6 +25,7 @@ const PSYCHOLOGIST_CHARACTER = "__PsychologistEval";
 interface MyLogController {
   createLog: (request: Request, response: Response) => Promise<void>;
   listLogs: (request: Request, response: Response) => Promise<void>;
+  updateLog: (request: Request, response: Response) => Promise<void>;
   getLog: (request: Request, response: Response) => Promise<void>;
   getDueLogs: (request: Request, response: Response) => Promise<void>;
   submitReview: (request: Request, response: Response) => Promise<void>;
@@ -623,6 +624,64 @@ export const createMyLogController = (
   };
 
   // ====================================================================
+  // HANDLER: Update a diary entry
+  // ====================================================================
+
+  /**
+   * Updates one diary entry content by ID for the authenticated user.
+   *
+   * PUT /api/mylog/:id
+   * Body: { content: string }
+   */
+  const updateLog: MyLogController["updateLog"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const logId = Number(request.params?.id);
+    if (!Number.isInteger(logId) || logId <= 0) {
+      response.status(400).json({ message: "Invalid diary entry id" });
+      return;
+    }
+
+    const content = typeof request.body?.content === "string" ? request.body.content.trim() : "";
+    if (!content) {
+      response.status(400).json({ message: "Diary content is required" });
+      return;
+    }
+
+    try {
+      const log = await myLogRepository.findOne({
+        where: { id: logId, userId: request.user.id }
+      });
+
+      if (!log) {
+        response.status(404).json({ message: "Diary entry not found" });
+        return;
+      }
+
+      log.content = content;
+      const saved = await myLogRepository.save(log);
+
+      response.json({
+        id: saved.id,
+        content: saved.content,
+        nextReviewDate: saved.nextReviewDate?.toISOString() ?? null,
+        reviewCount: saved.reviewCount,
+        isArchived: saved.isArchived,
+        createdAt: saved.createdAt.toISOString()
+      });
+    } catch (error) {
+      console.error("Error in updateLog:", error);
+      response.status(500).json({
+        message: "Failed to update diary entry",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
+  // ====================================================================
   // HANDLER: Get a single diary entry
   // ====================================================================
 
@@ -1137,6 +1196,7 @@ Return ONLY the JSON object. No markdown. No extra text.
   return {
     createLog,
     listLogs,
+    updateLog,
     getLog,
     getDueLogs,
     submitReview,
