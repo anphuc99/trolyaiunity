@@ -28,6 +28,9 @@ namespace Core.Infrastructure.Network
 		public const string MyLogChatHistory = "/api/mylog/chat/history";
 		public const string MyLogChatSend = "/api/mylog/chat/send";
 		public const string MyLogChatEnd = "/api/mylog/chat/end";
+		public const string MyLogChatDeveloperState = "/api/mylog/chat/developer-state";
+		public const string MyLogChatDeveloper = "/api/mylog/chat/developer";
+		public const string MyLogChatEdit = "/api/mylog/chat/edit";
 		public const string MyLogJournals = "/api/mylog/journals";
 		public const string MyLogJournalReviewDue = "/api/mylog/review/due";
 		public const string MyLogJournalReview = "/api/mylog/review";

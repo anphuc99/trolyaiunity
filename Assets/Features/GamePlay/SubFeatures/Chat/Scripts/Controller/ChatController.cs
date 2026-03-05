@@ -416,7 +416,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 			try
 			{
-				var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.ChatDeveloperState);
+				var responseJson = await HttpClient.GetTaskAsync(GetChatDeveloperStateEndpoint());
 				if (string.IsNullOrWhiteSpace(responseJson))
 				{
 					return activeNames;
@@ -468,7 +468,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					}
 				};
 
-				var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatDeveloper, request);
+				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatDeveloperEndpoint(), request);
 				if (string.IsNullOrWhiteSpace(responseJson))
 				{
 					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
@@ -497,7 +497,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					Context = payload.Context.Trim(),
 				};
 
-				var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatDeveloper, request);
+				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatDeveloperEndpoint(), request);
 				if (string.IsNullOrWhiteSpace(responseJson))
 				{
 					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
@@ -710,6 +710,24 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		private static string GetChatRespondEndpoint()
 		{
 			return IsMyLogChatMode() ? NetworkEndpoints.MyLogChatSend : NetworkEndpoints.ChatRespond;
+		}
+
+		/// <summary>
+		/// Resolves the developer-state endpoint based on the current API mode.
+		/// </summary>
+		/// <returns>Resolved endpoint path.</returns>
+		private static string GetChatDeveloperStateEndpoint()
+		{
+			return IsMyLogChatMode() ? NetworkEndpoints.MyLogChatDeveloperState : NetworkEndpoints.ChatDeveloperState;
+		}
+
+		/// <summary>
+		/// Resolves the developer message endpoint based on the current API mode.
+		/// </summary>
+		/// <returns>Resolved endpoint path.</returns>
+		private static string GetChatDeveloperEndpoint()
+		{
+			return IsMyLogChatMode() ? NetworkEndpoints.MyLogChatDeveloper : NetworkEndpoints.ChatDeveloper;
 		}
 
 		private static bool IsMyLogChatMode()

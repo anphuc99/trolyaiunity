@@ -34,6 +34,9 @@ interface MyLogController {
   endConversation: (request: Request, response: Response) => Promise<void>;
   listJournals: (request: Request, response: Response) => Promise<void>;
   getJournal: (request: Request, response: Response) => Promise<void>;
+  appendDeveloperMessage: (request: Request, response: Response) => Promise<void>;
+  editMessage: (request: Request, response: Response) => Promise<void>;
+  getDeveloperState: (request: Request, response: Response) => Promise<void>;
 }
 
 interface MyLogControllerDeps {
@@ -319,6 +322,224 @@ export const createMyLogController = (
 
     if (!hasChanged) return reply;
     return JSON.stringify(normalizedTurns);
+  };
+
+  // ────────────────────────────────────────────────────────────────────────
+  // Helper: developer message formatting (character add/remove, context)
+  // ────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Formats a developer message for a character being added to the conversation.
+   *
+   * @param payload - Request body containing character details.
+   * @returns Formatted developer message string, or empty when name is missing.
+   */
+  const formatCharacterAddedMessage = (payload: Record<string, unknown>) => {
+    const character = (payload.character ?? {}) as Record<string, unknown>;
+    const name = typeof character.name === "string" ? character.name.trim() : "";
+    const personality = typeof character.personality === "string" ? character.personality.trim() : "";
+    const gender = typeof character.gender === "string" ? character.gender.trim() : "";
+    const ageRaw = typeof character.age === "number" ? character.age : Number.parseInt(String(character.age ?? ""), 10);
+    const age = Number.isInteger(ageRaw) && ageRaw >= 0 && ageRaw <= 150 ? ageRaw : null;
+    const appearance = typeof character.appearance === "string" ? character.appearance.trim() : "";
+
+    if (!name) {
+      return "";
+    }
+
+    const lines = [`Character \"${name}\" has been added.`];
+    if (gender) lines.push(`Gender: ${gender}`);
+    if (age != null) lines.push(`Age: ${age}`);
+    if (personality) lines.push(`Personality: ${personality}`);
+    if (appearance) lines.push(`Appearance: ${appearance}`);
+
+    return lines.join("\n");
+  };
+
+  /**
+   * Formats a developer message for a character being removed from the conversation.
+   *
+   * @param payload - Request body containing character details.
+   * @returns Formatted developer message string, or empty when name is missing.
+   */
+  const formatCharacterRemovedMessage = (payload: Record<string, unknown>) => {
+    const character = (payload.character ?? {}) as Record<string, unknown>;
+    const name = typeof character.name === "string" ? character.name.trim() : "";
+
+    if (!name) {
+      return "";
+    }
+
+    return [
+      `Character \"${name}\" has been removed from this conversation.`,
+      "Do not use this character again unless it is added back."
+    ].join("\n");
+  };
+
+  /**
+   * Builds a developer context update message.
+   *
+   * @param payload - Request payload containing the context string.
+   * @returns A formatted developer message or an empty string when missing.
+   */
+  const formatContextMessage = (payload: Record<string, unknown>) => {
+    const context = typeof payload.context === "string" ? payload.context.trim() : "";
+
+    if (!context) {
+      return "";
+    }
+
+    return ["Developer context update:", context].join("\n");
+  };
+
+  /**
+   * Formats a developer note for edited assistant messages.
+   *
+   * @param messageId - Message identifier from the assistant output.
+   * @param content - Updated assistant text.
+   * @returns A developer message string.
+   */
+  const formatAssistantEditMessage = (messageId: string, content: string) => {
+    const trimmed = messageId.trim();
+    if (!trimmed) return "";
+
+    const updatedContent = content.trim();
+    if (!updatedContent) return "";
+
+    return [
+      `Assistant message edited: ${trimmed}.`,
+      "New content:",
+      updatedContent
+    ].join("\n");
+  };
+
+  // ────────────────────────────────────────────────────────────────────────
+  // Helper: parse developer character actions and assistant edits
+  // ────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Parses a developer message to extract character add/remove actions.
+   *
+   * @param content - Developer message content.
+   * @returns Object with character name and active state, or null.
+   */
+  const parseDeveloperCharacterAction = (content: string) => {
+    const addedMatch = content.match(/^Character\s+"([^"]+)"\s+has been added\./m);
+    if (addedMatch) {
+      return { name: addedMatch[1].trim(), active: true };
+    }
+
+    const removedMatch = content.match(/^Character\s+"([^"]+)"\s+has been removed from this conversation\./m);
+    if (removedMatch) {
+      return { name: removedMatch[1].trim(), active: false };
+    }
+
+    return null;
+  };
+
+  /**
+   * Parses a developer edit note to extract the target message ID and updated text.
+   *
+   * @param content - Developer message content.
+   * @returns Object with messageId and updatedText, or null.
+   */
+  const parseAssistantEditNote = (content: string) => {
+    const englishMatch = content.match(/^Assistant\s+message\s+edited:\s+([^\.\n]+)\./i);
+    const vietnameseMatch = content.match(/^Chat\s+co\s+messageID\s+duoc\s+sua\s+thanh\s+([^\.\n]+)\./i);
+    const idMatch = englishMatch ?? vietnameseMatch;
+
+    if (!idMatch) return null;
+
+    const messageId = idMatch[1].trim();
+    if (!messageId) return null;
+
+    const englishContentMatch = content.match(/New\s+content:\s*([\s\S]+)/i);
+    const vietnameseContentMatch = content.match(/Noi\s+dung\s+moi:\s*([\s\S]+)/i);
+    const contentMatch = englishContentMatch ?? vietnameseContentMatch;
+    const updatedText = contentMatch ? contentMatch[1].trim() : "";
+    if (!updatedText) return null;
+
+    return { messageId, updatedText };
+  };
+
+  /**
+   * Applies developer edit notes to assistant messages in the history.
+   * Used by getHistory to reflect edits before returning to the client.
+   *
+   * @param history - Full chat history.
+   * @returns History with edits applied to assistant turns.
+   */
+  const applyAssistantEdits = (history: { role: string; content: string }[]) => {
+    const edits = new Map<string, string>();
+
+    for (const message of history) {
+      if (message.role !== "developer") continue;
+
+      const edit = parseAssistantEditNote(message.content);
+      if (edit) {
+        edits.set(edit.messageId, edit.updatedText);
+      }
+    }
+
+    if (!edits.size) return history;
+
+    return history.map((message) => {
+      if (message.role !== "assistant") return message;
+
+      const turns = parseAssistantReply(message.content);
+      if (!turns.length) return message;
+
+      let didUpdate = false;
+      const nextTurns = turns.map((turn) => {
+        const turnId = typeof turn.MessageId === "string" ? turn.MessageId.trim() : "";
+        const updatedText = turnId ? edits.get(turnId) : null;
+
+        if (updatedText) {
+          didUpdate = true;
+          return { ...turn, Text: updatedText };
+        }
+
+        return turn;
+      });
+
+      if (!didUpdate) return message;
+
+      return { ...message, content: JSON.stringify(nextTurns) };
+    });
+  };
+
+  // ────────────────────────────────────────────────────────────────────────
+  // Helper: user message index parsing and lookup
+  // ────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Parses a zero-based user message index from request input.
+   *
+   * @param value - Input value from the request body.
+   * @returns The parsed index or null when invalid.
+   */
+  const parseUserMessageIndex = (value: unknown) => {
+    const parsed = typeof value === "number" ? value : Number.parseInt(String(value ?? ""), 10);
+    if (!Number.isInteger(parsed) || parsed < 0) return null;
+    return parsed;
+  };
+
+  /**
+   * Finds the history index for the Nth user message.
+   *
+   * @param history - Full chat history for the session.
+   * @param userIndex - Zero-based user message index.
+   * @returns Index within the history array or -1 when missing.
+   */
+  const findUserHistoryIndex = (history: { role: string }[], userIndex: number) => {
+    let count = 0;
+    for (let i = 0; i < history.length; i += 1) {
+      if (history[i].role !== "user") continue;
+
+      if (count === userIndex) return i;
+      count += 1;
+    }
+    return -1;
   };
 
   // ────────────────────────────────────────────────────────────────────────
@@ -937,8 +1158,11 @@ export const createMyLogController = (
     try {
       const messages = await historyStore.load(request.user.id);
 
+      // Apply assistant edits from developer notes before filtering
+      const adjustedMessages = applyAssistantEdits(messages);
+
       // Filter out system/developer messages
-      const filtered = messages.filter((msg) => msg.role !== "system" && msg.role !== "developer");
+      const filtered = adjustedMessages.filter((msg) => msg.role !== "system" && msg.role !== "developer");
 
       // For assistant messages, remove psychologist entries from the content
       const clientMessages = filtered.map((msg) => {
@@ -1193,6 +1417,250 @@ Return ONLY the JSON object. No markdown. No extra text.
     }
   };
 
+  // ====================================================================
+  // HANDLER: Append a developer message to diary chat
+  // ====================================================================
+
+  /**
+   * Appends a developer-role message to the diary chat history.
+   * Supports character_added, character_removed, and context_update kinds.
+   *
+   * POST /api/mylog/chat/developer
+   * Body: { kind: string, character?: object, context?: string }
+   */
+  const appendDeveloperMessage: MyLogController["appendDeveloperMessage"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const payload = (request.body ?? {}) as Record<string, unknown>;
+    const kind = typeof payload.kind === "string" ? payload.kind.trim() : "";
+
+    if (kind !== "character_added" && kind !== "character_removed" && kind !== "context_update") {
+      response.status(400).json({ message: "Invalid developer message kind" });
+      return;
+    }
+
+    const content =
+      kind === "character_added"
+        ? formatCharacterAddedMessage(payload)
+        : kind === "character_removed"
+        ? formatCharacterRemovedMessage(payload)
+        : formatContextMessage(payload);
+
+    if (!content) {
+      const message = kind === "context_update" ? "Context is required" : "Character name is required";
+      response.status(400).json({ message });
+      return;
+    }
+
+    try {
+      await historyStore.append(request.user.id, [{ role: "developer", content }]);
+      response.json({ ok: true });
+    } catch (error) {
+      console.error("Error in MyLog appendDeveloperMessage:", error);
+      response.status(500).json({
+        message: "Failed to append developer message",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
+  // ====================================================================
+  // HANDLER: Edit a user or assistant message in diary chat
+  // ====================================================================
+
+  /**
+   * Applies edits to a user or assistant message in the diary chat history.
+   *
+   * For assistant edits: appends a developer note with the new content.
+   * For user edits: truncates history at the target message, replaces it,
+   * and re-generates the AI reply.
+   *
+   * POST /api/mylog/chat/edit
+   * Body: { kind: "user"|"assistant", ... }
+   */
+  const editMessage: MyLogController["editMessage"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const payload = (request.body ?? {}) as Record<string, unknown>;
+    const kind = typeof payload.kind === "string" ? payload.kind.trim() : "";
+
+    if (kind !== "user" && kind !== "assistant") {
+      response.status(400).json({ message: "Invalid edit kind" });
+      return;
+    }
+
+    // --- Assistant message edit: append developer note ---
+    if (kind === "assistant") {
+      const messageId = typeof payload.assistantMessageId === "string" ? payload.assistantMessageId.trim() : "";
+      const editedContent = typeof payload.content === "string" ? payload.content.trim() : "";
+      const content = formatAssistantEditMessage(messageId, editedContent);
+
+      if (!messageId) {
+        response.status(400).json({ message: "Assistant messageId is required" });
+        return;
+      }
+
+      if (!editedContent) {
+        response.status(400).json({ message: "Edited content is required" });
+        return;
+      }
+
+      if (!content) {
+        response.status(400).json({ message: "Edited content is required" });
+        return;
+      }
+
+      try {
+        await historyStore.append(request.user.id, [{ role: "developer", content }]);
+        response.json({ ok: true });
+      } catch (error) {
+        console.error("Error in MyLog editMessage (assistant):", error);
+        response.status(500).json({
+          message: "Failed to append developer message",
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+
+      return;
+    }
+
+    // --- User message edit: truncate + re-generate ---
+    const editedContent = typeof payload.content === "string" ? payload.content.trim() : "";
+    const userIndex = parseUserMessageIndex(payload.userMessageIndex);
+
+    if (!editedContent) {
+      response.status(400).json({ message: "Edited content is required" });
+      return;
+    }
+
+    if (userIndex === null) {
+      response.status(400).json({ message: "User message index is required" });
+      return;
+    }
+
+    // Determine which AI service to use
+    const useGemini = isGeminiModel(mylogModel);
+    const selectedService = useGemini ? geminiService : openAIService;
+    const serviceName = useGemini ? "Gemini" : "OpenAI";
+
+    if (!selectedService) {
+      response.status(500).json({ message: `${serviceName} API key is not configured` });
+      return;
+    }
+
+    try {
+      const history = await historyStore.load(request.user.id);
+      const targetIndex = findUserHistoryIndex(history, userIndex);
+
+      if (targetIndex < 0) {
+        response.status(404).json({ message: "User message not found" });
+        return;
+      }
+
+      const prefix = history.slice(0, targetIndex);
+      const systemPrompt = await buildSystemPrompt(request.user.id, request.body);
+      const prefixWithoutSystem = prefix.filter((message) => message.role !== "system");
+      const historyForAI: ChatHistoryMessage[] = [
+        { role: "system", content: systemPrompt },
+        ...prefixWithoutSystem
+      ];
+
+      await historyStore.clear(request.user.id);
+      await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
+
+      const result = await requestJsonReplyWithRetry(
+        selectedService,
+        editedContent,
+        historyForAI,
+        mylogModel
+      );
+
+      const normalizedReply = useGemini
+        ? normalizeAssistantReplyMessageIds(result.reply, collectAssistantMessageIds(prefixWithoutSystem))
+        : result.reply;
+      const nextMessages: ChatHistoryMessage[] = [
+        ...prefixWithoutSystem,
+        { role: "user", content: editedContent },
+        { role: "assistant", content: normalizedReply }
+      ];
+
+      await historyStore.append(request.user.id, nextMessages);
+
+      // Filter out psychologist eval and system/developer messages for client
+      const clientMessages = nextMessages
+        .filter((message) => message.role !== "system" && message.role !== "developer")
+        .map((msg) => {
+          if (msg.role === "assistant") {
+            return { ...msg, content: filterPsychologistFromReply(msg.content) };
+          }
+          return msg;
+        });
+
+      const clientReply = filterPsychologistFromReply(normalizedReply);
+
+      response.json({
+        messages: clientMessages,
+        reply: clientReply,
+        model: result.model
+      });
+    } catch (error) {
+      console.error("Error in MyLog editMessage (user):", error);
+      response.status(500).json({
+        message: "Failed to edit chat message",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
+  // ====================================================================
+  // HANDLER: Get developer state for diary chat
+  // ====================================================================
+
+  /**
+   * Returns the list of currently active character names based on
+   * developer messages in the diary chat history.
+   *
+   * GET /api/mylog/chat/developer-state
+   */
+  const getDeveloperState: MyLogController["getDeveloperState"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    try {
+      const messages = await historyStore.load(request.user.id);
+      const activeMap = new Map<string, boolean>();
+
+      for (const message of messages) {
+        if (message.role !== "developer") continue;
+
+        const action = parseDeveloperCharacterAction(message.content);
+        if (action?.name) {
+          activeMap.set(action.name, action.active);
+        }
+      }
+
+      const activeCharacterNames = Array.from(activeMap.entries())
+        .filter(([, isActive]) => isActive)
+        .map(([name]) => name);
+
+      response.json({ activeCharacterNames });
+    } catch (error) {
+      console.error("Error in MyLog getDeveloperState:", error);
+      response.status(500).json({
+        message: "Failed to load developer state",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
   return {
     createLog,
     listLogs,
@@ -1204,6 +1672,9 @@ Return ONLY the JSON object. No markdown. No extra text.
     getHistory,
     endConversation,
     listJournals,
-    getJournal
+    getJournal,
+    appendDeveloperMessage,
+    editMessage,
+    getDeveloperState
   };
 };
