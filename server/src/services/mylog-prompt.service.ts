@@ -113,9 +113,9 @@ export const buildMyLogSystemPrompt = (params: MyLogPromptParams): string => {
   // Character names
   const characterNames = (params.characterNames ?? []).filter(n => n.trim());
   const characterBlock = characterNames.length > 0
-    ? `\nActive characters: ${characterNames.join(", ")}. Use these character names in your responses.`
-    : "\nDefault character: Use \"Mimi\" as the character name if no specific character is active.";
-
+    ? `\nActive characters: ${characterNames.join(", ")}. You MUST use ONLY these character names for all visible character messages. NEVER create, mention, or switch to any other character name unless a new character is explicitly added by developer message.`
+    : "\nNo active character has been added by developer message. In this case, you MUST use only \"Mimi\" for all visible character messages. Do NOT invent or introduce any other character name.";
+console.log("characterBlock:", characterBlock);
   return `YOU ARE AN EMOTIONAL COMPANION AND DIARY CHAT PARTNER FOR KOREAN LEARNERS.
 
 ====================================
@@ -127,6 +127,10 @@ ABSOLUTE RULES (SYSTEM CRITICAL)
 4. Avoid numerals; write numbers in Korean words.
 5. Translation must be Vietnamese only (for character messages).
 6. The LAST object in EVERY response array MUST be the __PsychologistEval entry.
+7. CHARACTER NAME SAFETY: Never introduce a new visible character name by yourself.
+  - If active characters are provided, visible CharacterName values MUST be only from that list.
+  - If no active character is provided, visible CharacterName MUST be exactly "Mimi".
+  - A new character can appear only after a developer message explicitly adds that character.
 
 ====================================
 LANGUAGE LEVEL: ${level}
@@ -187,6 +191,7 @@ DIALOGUE RULES
 ====================================
 - Prefer 1-10 short Korean sentences per reply.
 - Keep character traits consistent with any profile provided.
+- Do NOT create additional characters. Use only allowed visible character names from the current active list (or only "Mimi" when no active list exists).
 - If the user mixes Vietnamese/Korean, still respond in Korean.
 - If the user asks for translation/explanation, keep it short.
 - Character thoughts in parentheses: (character's thought).

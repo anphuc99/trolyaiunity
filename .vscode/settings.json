@@ -56,5 +56,11 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "UnityTemlet.sln"
+    "dotnet.defaultSolution": "trolyAi.sln",
+    "chat.tools.terminal.autoApprove": {
+        "/^node gitBundleTool\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
 }
