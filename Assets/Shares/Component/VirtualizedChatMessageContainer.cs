@@ -317,6 +317,48 @@ namespace Share.Components
 		}
 
 		/// <summary>
+		/// Sets TTS playing state for a message matched by message id and refreshes visible bubbles.
+		/// </summary>
+		/// <param name="messageId">Target message id.</param>
+		/// <param name="isPlaying">Playing state.</param>
+		public void SetMessageTtsPlaying(string messageId, bool isPlaying)
+		{
+			if (string.IsNullOrWhiteSpace(messageId))
+			{
+				return;
+			}
+
+			var updated = false;
+			for (var i = 0; i < _messages.Count; i++)
+			{
+				var message = _messages[i];
+				if (message == null)
+				{
+					continue;
+				}
+
+				if (message.MessageId != messageId)
+				{
+					continue;
+				}
+
+				if (message.IsTtsPlaying == isPlaying)
+				{
+					break;
+				}
+
+				message.IsTtsPlaying = isPlaying;
+				updated = true;
+				break;
+			}
+
+			if (updated)
+			{
+				RefreshVisible();
+			}
+		}
+
+		/// <summary>
 		/// Inserts one message at the beginning (older message).
 		/// </summary>
 		/// <param name="message">Message text.</param>

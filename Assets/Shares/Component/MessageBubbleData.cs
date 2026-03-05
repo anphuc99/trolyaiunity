@@ -51,6 +51,9 @@ namespace Share.Components
 		private bool _isTtsReloading;
 
 		[SerializeField]
+		private bool _isTtsPlaying;
+
+		[SerializeField]
 		private int _messageIndex = -1;
 
 		/// <summary>
@@ -141,6 +144,15 @@ namespace Share.Components
 		{
 			get => _isTtsReloading;
 			set => _isTtsReloading = value;
+		}
+
+		/// <summary>
+		/// Indicates whether TTS audio is currently playing for this message.
+		/// </summary>
+		public bool IsTtsPlaying
+		{
+			get => _isTtsPlaying;
+			set => _isTtsPlaying = value;
 		}
 
 		/// <summary>

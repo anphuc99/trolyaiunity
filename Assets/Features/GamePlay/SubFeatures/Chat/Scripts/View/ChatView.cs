@@ -1013,7 +1013,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			if (_reloadingTtsMessageIndices.Contains(messageData.MessageIndex) || messageData.IsTtsReloading)
+			if (_reloadingTtsMessageIndices.Contains(messageData.MessageIndex) || messageData.IsTtsReloading || messageData.IsTtsPlaying)
 			{
 				return;
 			}
@@ -1191,7 +1191,19 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				yield break;
 			}
 
+			// Hide speaker button for the playing message
+			if (_messageContainer != null && !string.IsNullOrWhiteSpace(playback.MessageId))
+			{
+				_messageContainer.SetMessageTtsPlaying(playback.MessageId, true);
+			}
+
 			yield return StartCoroutine(PlayCharacterVoiceAsync(clip));
+
+			// Show speaker button again after playback finishes
+			if (_messageContainer != null && !string.IsNullOrWhiteSpace(playback.MessageId))
+			{
+				_messageContainer.SetMessageTtsPlaying(playback.MessageId, false);
+			}
 		}
 
 		private string BuildTextToSpeechRequestUrl(string text, string tone, string characterName, bool forceReload = false)

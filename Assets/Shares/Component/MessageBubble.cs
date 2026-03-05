@@ -165,7 +165,7 @@ namespace Share.Components
 
 			if (_speakerButton != null)
 			{
-				_speakerButton.gameObject.SetActive(!data.IsTtsReloading);
+				_speakerButton.gameObject.SetActive(!data.IsTtsReloading && !data.IsTtsPlaying);
 				_speakerButton.interactable = !string.IsNullOrWhiteSpace(data.Message);
 			}
 
