@@ -61,9 +61,12 @@ const trimAudioFileInPlace = async (filePath: string): Promise<void> => {
   const baseName = path.basename(filePath, extension);
   const tempPath = path.join(directory, `${baseName}.__trim_tmp__${Date.now()}${extension}`);
 
-  const filter =
-    `silenceremove=start_periods=1:start_duration=${TRIM_SILENCE_DURATION_SEC}:start_threshold=${TRIM_SILENCE_THRESHOLD_DB}dB:` +
-    `stop_periods=-1:stop_duration=${TRIM_SILENCE_DURATION_SEC}:stop_threshold=${TRIM_SILENCE_THRESHOLD_DB}dB`;
+  const filter = [
+    `silenceremove=start_periods=1:start_duration=${TRIM_SILENCE_DURATION_SEC}:start_threshold=${TRIM_SILENCE_THRESHOLD_DB}dB`,
+    "areverse",
+    `silenceremove=start_periods=1:start_duration=${TRIM_SILENCE_DURATION_SEC}:start_threshold=${TRIM_SILENCE_THRESHOLD_DB}dB`,
+    "areverse"
+  ].join(",");
 
   try {
     await new Promise<void>((resolve, reject) => {

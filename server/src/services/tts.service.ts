@@ -131,8 +131,10 @@ const convertWavToMp3 = async (
     }
 
     filters.push(
-      `silenceremove=start_periods=1:start_duration=${TRIM_SILENCE_DURATION_SEC}:start_threshold=${TRIM_SILENCE_THRESHOLD_DB}dB:` +
-        `stop_periods=-1:stop_duration=${TRIM_SILENCE_DURATION_SEC}:stop_threshold=${TRIM_SILENCE_THRESHOLD_DB}dB`
+      `silenceremove=start_periods=1:start_duration=${TRIM_SILENCE_DURATION_SEC}:start_threshold=${TRIM_SILENCE_THRESHOLD_DB}dB`,
+      "areverse",
+      `silenceremove=start_periods=1:start_duration=${TRIM_SILENCE_DURATION_SEC}:start_threshold=${TRIM_SILENCE_THRESHOLD_DB}dB`,
+      "areverse"
     );
 
     if (filters.length > 0) {
