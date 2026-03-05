@@ -25,6 +25,12 @@ namespace Core.Infrastructure.Network
 		public const string JournalReview = "/api/journals/review";
 		public const string Stories = "/api/stories";
 		public const string MyLog = "/api/mylog";
+		public const string MyLogChatHistory = "/api/mylog/chat/history";
+		public const string MyLogChatSend = "/api/mylog/chat/send";
+		public const string MyLogChatEnd = "/api/mylog/chat/end";
+		public const string MyLogJournals = "/api/mylog/journals";
+		public const string MyLogJournalReviewDue = "/api/mylog/review/due";
+		public const string MyLogJournalReview = "/api/mylog/review";
 		public const string Translation = "/api/translation";
 		public const string TranslationDue = "/api/translation/due";
 		public const string TranslationLearn = "/api/translation/learn";

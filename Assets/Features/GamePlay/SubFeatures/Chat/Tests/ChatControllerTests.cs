@@ -1,10 +1,15 @@
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Core.Infrastructure.Attributes;
 using Core.Infrastructure.Events;
+using Core.Infrastructure.Network;
+using Core.Infrastructure.State;
 using Features.GamePlay.SubFeatures.Chat.Controller;
 using Features.GamePlay.SubFeatures.Chat.Events;
 using Features.GamePlay.SubFeatures.Chat.Model;
+using UnityEngine.TestTools;
 
 namespace Features.GamePlay.SubFeatures.Chat.Tests
 {
@@ -13,10 +18,26 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 	/// </summary>
 	public sealed class ChatControllerTests
 	{
+		[ControllerScope(ControllerScopeKey.Global)]
+		private static class GlobalVariablesMutationProxyController
+		{
+			public static void Set(string key, object value)
+			{
+				GlobalVariables.Set(key, value);
+			}
+
+			public static void Remove(string key)
+			{
+				GlobalVariables.Remove(key);
+			}
+		}
+
 		[SetUp]
 		public void SetUp()
 		{
 			EventBus.ClearAll();
+			FakeServer.ResetToDefaults();
+			GlobalVariablesMutationProxyController.Remove(GlobalModes.ChatApiModeKey);
 			ChatState.ParentSignals = null;
 			ChatState.AddCharacterMenuId = null;
 			ChatState.ContextMenuId = null;
@@ -27,6 +48,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 		public void TearDown()
 		{
 			EventBus.ClearAll();
+			FakeServer.ResetToDefaults();
+			GlobalVariablesMutationProxyController.Remove(GlobalModes.ChatApiModeKey);
 			ChatState.ParentSignals = null;
 			ChatState.AddCharacterMenuId = null;
 			ChatState.ContextMenuId = null;
@@ -208,6 +231,45 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 
 			Assert.IsNotNull(errorPayload);
 			Assert.AreEqual("Context is required when saving developer context.", errorPayload.Message);
+		}
+
+		[UnityTest]
+		public System.Collections.IEnumerator HandleLoadHistory_WhenMyLogMode_UsesMyLogHistoryEndpoint()
+		{
+			GlobalVariablesMutationProxyController.Set(GlobalModes.ChatApiModeKey, GlobalModes.ModeMyLog);
+
+			ChatHistoryResponsePayload historyPayload = null;
+			void Handler(object payload)
+			{
+				historyPayload = payload as ChatHistoryResponsePayload;
+			}
+
+			FakeServer.Register("GET", NetworkEndpoints.MyLogChatHistory,
+				_ => "{\"messages\":[{\"id\":\"m1\",\"role\":\"assistant\",\"content\":\"hello\"}],\"sessionId\":\"s1\"}"
+			);
+
+			EventBus.Subscribe(ChatEvents.HistoryLoaded, Handler);
+			try
+			{
+				ChatController.HandleLoadHistory(new ChatHistoryRequestPayload());
+				yield return AwaitTask(Task.Delay(100));
+			}
+			finally
+			{
+				EventBus.Unsubscribe(ChatEvents.HistoryLoaded, Handler);
+			}
+
+			Assert.IsNotNull(historyPayload);
+			Assert.IsNotNull(historyPayload.Messages);
+			Assert.AreEqual(1, historyPayload.Messages.Count);
+		}
+
+		private static System.Collections.IEnumerator AwaitTask(Task task)
+		{
+			while (!task.IsCompleted)
+			{
+				yield return null;
+			}
 		}
 	}
 }

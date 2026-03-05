@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Core.Infrastructure.Network;
+using Core.Infrastructure.Events;
 using Features.GamePlay.SubFeatures.MyLog.Controller;
 using Features.GamePlay.SubFeatures.MyLog.Events;
 using Features.GamePlay.SubFeatures.MyLog.Model;
@@ -20,7 +21,52 @@ namespace Features.GamePlay.SubFeatures.MyLog.Tests
 			FakeServer.ResetToDefaults();
 			MyLogState.CachedList = new MyLogListResponsePayload();
 			MyLogState.EditingLogId = null;
+			MyLogState.ChatMenuId = null;
+			MyLogState.JournalMenuId = null;
 			MyLogController.SetParentSignals(null);
+			EventBus.ClearAll();
+		}
+
+		[Test]
+		public void Install_ShouldRegisterChatAndJournalMenus()
+		{
+			var requestedMenus = new List<string>();
+
+			MyLogController.SetParentSignals(new MyLogParentSignals
+			{
+				AddMenu = (text, _) =>
+				{
+					requestedMenus.Add(text);
+					return "menu-mylog-" + text;
+				}
+			});
+
+			MyLogController.Install();
+
+			CollectionAssert.Contains(requestedMenus, "chat");
+			CollectionAssert.Contains(requestedMenus, "journal");
+			Assert.AreEqual("menu-mylog-chat", MyLogState.ChatMenuId);
+			Assert.AreEqual("menu-mylog-journal", MyLogState.JournalMenuId);
+		}
+
+		[Test]
+		public void Uninstall_ShouldRemoveRegisteredMenus()
+		{
+			var removedMenuIds = new List<string>();
+
+			MyLogController.SetParentSignals(new MyLogParentSignals
+			{
+				AddMenu = (text, _) => "menu-mylog-" + text,
+				RemoveMenu = menuId => removedMenuIds.Add(menuId)
+			});
+
+			MyLogController.Install();
+			MyLogController.Uninstall();
+
+			CollectionAssert.Contains(removedMenuIds, "menu-mylog-chat");
+			CollectionAssert.Contains(removedMenuIds, "menu-mylog-journal");
+			Assert.IsNull(MyLogState.ChatMenuId);
+			Assert.IsNull(MyLogState.JournalMenuId);
 		}
 
 		[UnityTest]

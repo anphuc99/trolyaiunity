@@ -4,6 +4,7 @@ using Features.GamePlay.SubFeatures.Chat.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.Chat.Model;
 using Features.GamePlay.SubFeatures.Chat.Requests;
 using Core.Infrastructure.Network;
+using Core.Infrastructure.State;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -518,7 +519,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				var responseJson = await HttpClient.PostJsonTaskAsync<object>(NetworkEndpoints.JournalsEnd, null);
+				var responseJson = await HttpClient.PostJsonTaskAsync<object>(GetChatEndEndpoint(), null);
 				if (string.IsNullOrWhiteSpace(responseJson))
 				{
 					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
@@ -591,7 +592,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatSend, payload);
+				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatSendEndpoint(), payload);
 				if (string.IsNullOrWhiteSpace(responseJson))
 				{
 					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
@@ -637,7 +638,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatRespond, payload);
+				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatRespondEndpoint(), payload);
 				if (string.IsNullOrWhiteSpace(responseJson))
 				{
 					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
@@ -681,12 +682,40 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		/// <returns>Resolved endpoint path.</returns>
 		private static string BuildHistoryEndpoint(string sessionId)
 		{
+			var historyEndpoint = GetChatHistoryEndpoint();
+
 			if (string.IsNullOrWhiteSpace(sessionId))
 			{
-				return NetworkEndpoints.ChatHistory;
+				return historyEndpoint;
 			}
 
-			return NetworkEndpoints.ChatHistory + "?sessionId=" + Uri.EscapeDataString(sessionId.Trim());
+			return historyEndpoint + "?sessionId=" + Uri.EscapeDataString(sessionId.Trim());
+		}
+
+		private static string GetChatHistoryEndpoint()
+		{
+			return IsMyLogChatMode() ? NetworkEndpoints.MyLogChatHistory : NetworkEndpoints.ChatHistory;
+		}
+
+		private static string GetChatSendEndpoint()
+		{
+			return IsMyLogChatMode() ? NetworkEndpoints.MyLogChatSend : NetworkEndpoints.ChatSend;
+		}
+
+		private static string GetChatEndEndpoint()
+		{
+			return IsMyLogChatMode() ? NetworkEndpoints.MyLogChatEnd : NetworkEndpoints.JournalsEnd;
+		}
+
+		private static string GetChatRespondEndpoint()
+		{
+			return IsMyLogChatMode() ? NetworkEndpoints.MyLogChatSend : NetworkEndpoints.ChatRespond;
+		}
+
+		private static bool IsMyLogChatMode()
+		{
+			var mode = GlobalVariables.GetOrDefault(GlobalModes.ChatApiModeKey, GlobalModes.ModeDefault);
+			return string.Equals(mode, GlobalModes.ModeMyLog, StringComparison.OrdinalIgnoreCase);
 		}
 
 		/// <summary>

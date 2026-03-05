@@ -214,7 +214,7 @@ namespace Features.GamePlay.Controller
 		{
 			HomeController.SetParentSignals(new HomeParentSignals { 
 				OnEchoed = OnSubControllerEchoed,
-				OpenJournal = () => HandleOpenSubController(GamePlaySubControllerType.Journal), 
+				OpenJournal = OpenDefaultJournal,
 				OpenMyLog = () => HandleOpenSubController(GamePlaySubControllerType.MyLog),
 				OpenStory = () => HandleOpenSubController(GamePlaySubControllerType.Story),
 				OpenCreateCharacter = HandleOpenCreateCharacter,
@@ -249,7 +249,11 @@ namespace Features.GamePlay.Controller
 			});
 			MyLogController.SetParentSignals(new MyLogParentSignals
 			{
-				OnEchoed = OnSubControllerEchoed
+				OnEchoed = OnSubControllerEchoed,
+				AddMenu = AddMenu,
+				RemoveMenu = RemoveMenu,
+				OpenChat = OpenMyLogChat,
+				OpenJournal = OpenMyLogJournal,
 			});
 			PracticeController.SetParentSignals(new PracticeParentSignals { OnEchoed = OnSubControllerEchoed });
 			StoryController.SetParentSignals(new StoryParentSignals { OnEchoed = OnSubControllerEchoed });
@@ -740,6 +744,24 @@ namespace Features.GamePlay.Controller
 		private static void HandleOpenCreateCharacter()
 		{
 			LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay, LoadSceneMode.Additive);
+		}
+
+		private static void OpenDefaultJournal()
+		{
+			GlobalVariables.Set(GlobalModes.JournalApiModeKey, GlobalModes.ModeDefault);
+			HandleOpenSubController(GamePlaySubControllerType.Journal);
+		}
+
+		private static void OpenMyLogChat()
+		{
+			GlobalVariables.Set(GlobalModes.ChatApiModeKey, GlobalModes.ModeMyLog);
+			HandleOpenSubController(GamePlaySubControllerType.Chat);
+		}
+
+		private static void OpenMyLogJournal()
+		{
+			GlobalVariables.Set(GlobalModes.JournalApiModeKey, GlobalModes.ModeMyLog);
+			HandleOpenSubController(GamePlaySubControllerType.Journal);
 		}
 
 		/// <summary>

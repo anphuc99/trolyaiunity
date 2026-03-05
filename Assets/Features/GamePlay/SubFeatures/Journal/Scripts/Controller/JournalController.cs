@@ -318,6 +318,11 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		/// <returns>Resolved endpoint path.</returns>
 		private static string BuildJournalsEndpoint(int? storyId)
 		{
+			if (IsMyLogJournalMode())
+			{
+				return NetworkEndpoints.MyLogJournals;
+			}
+
 			if (!storyId.HasValue || storyId.Value <= 0)
 			{
 				return NetworkEndpoints.Journals;
@@ -333,6 +338,11 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		/// <returns>Resolved endpoint path.</returns>
 		private static string BuildJournalDetailEndpoint(int journalId)
 		{
+			if (IsMyLogJournalMode())
+			{
+				return NetworkEndpoints.MyLogJournals + "/" + journalId;
+			}
+
 			return NetworkEndpoints.Journals + "/" + journalId;
 		}
 
@@ -453,7 +463,7 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		{
 			try
 			{
-				var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.JournalReviewDue);
+				var responseJson = await HttpClient.GetTaskAsync(GetJournalReviewDueEndpoint());
 				if (string.IsNullOrWhiteSpace(responseJson))
 				{
 					PublishError("Empty due journals response from server.");
@@ -490,7 +500,7 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 					Rating = payload.Rating
 				};
 
-				var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.JournalReview, body);
+				var responseJson = await HttpClient.PostJsonTaskAsync(GetJournalReviewEndpoint(), body);
 				if (string.IsNullOrWhiteSpace(responseJson))
 				{
 					PublishError("Empty journal review response from server.");
@@ -515,6 +525,22 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		private static Sprite GetAvatar(string characterName)
 		{
 			return JournalState.ParentSignals?.GetAvatar?.Invoke(characterName);
+		}
+
+		private static string GetJournalReviewDueEndpoint()
+		{
+			return IsMyLogJournalMode() ? NetworkEndpoints.MyLogJournalReviewDue : NetworkEndpoints.JournalReviewDue;
+		}
+
+		private static string GetJournalReviewEndpoint()
+		{
+			return IsMyLogJournalMode() ? NetworkEndpoints.MyLogJournalReview : NetworkEndpoints.JournalReview;
+		}
+
+		private static bool IsMyLogJournalMode()
+		{
+			var mode = GlobalVariables.GetOrDefault(GlobalModes.JournalApiModeKey, GlobalModes.ModeDefault);
+			return string.Equals(mode, GlobalModes.ModeMyLog, StringComparison.OrdinalIgnoreCase);
 		}
 	}
 }

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Core.Infrastructure.Attributes;
 using Core.Infrastructure.Network;
 using Core.Infrastructure.State;
 using Features.GamePlay.SubFeatures.Journal.Controller;
@@ -16,11 +17,26 @@ namespace Features.GamePlay.SubFeatures.Journal.Tests
 	/// </summary>
 	public sealed class JournalControllerTests
 	{
+		[ControllerScope(ControllerScopeKey.Global)]
+		private static class GlobalVariablesMutationProxyController
+		{
+			public static void Set(string key, object value)
+			{
+				GlobalVariables.Set(key, value);
+			}
+
+			public static void Remove(string key)
+			{
+				GlobalVariables.Remove(key);
+			}
+		}
+
 		[TearDown]
 		public void TearDown()
 		{
 			FakeServer.ResetToDefaults();
-			GlobalVariables.Remove("global.journal.overlay.selected.ids");
+			GlobalVariablesMutationProxyController.Remove("global.journal.overlay.selected.ids");
+			GlobalVariablesMutationProxyController.Remove(GlobalModes.JournalApiModeKey);
 		}
 
 		[Test]
@@ -96,6 +112,37 @@ namespace Features.GamePlay.SubFeatures.Journal.Tests
 			Assert.IsNotNull(listPayload);
 			Assert.AreEqual(1, listPayload.Journals.Count);
 			Assert.AreEqual(1, listPayload.Journals[0].Id);
+		}
+
+		[UnityTest]
+		public System.Collections.IEnumerator HandleLoadJournals_WhenMyLogMode_UsesMyLogJournalsEndpoint()
+		{
+			GlobalVariablesMutationProxyController.Set(GlobalModes.JournalApiModeKey, GlobalModes.ModeMyLog);
+
+			JournalListResponsePayload listPayload = null;
+			void Handler(object payload)
+			{
+				listPayload = payload as JournalListResponsePayload;
+			}
+
+			FakeServer.Register("GET", NetworkEndpoints.MyLogJournals, _ =>
+				"{\"journals\":[{\"id\":5,\"summary\":\"MyLog summary\",\"createdAt\":\"2026-02-25T10:00:00.000Z\"}]}"
+			);
+
+			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.JournalsLoaded, Handler);
+			try
+			{
+				JournalController.HandleLoadJournals(new JournalListRequestPayload());
+				yield return AwaitTask(Task.Delay(100));
+			}
+			finally
+			{
+				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.JournalsLoaded, Handler);
+			}
+
+			Assert.IsNotNull(listPayload);
+			Assert.AreEqual(1, listPayload.Journals.Count);
+			Assert.AreEqual(5, listPayload.Journals[0].Id);
 		}
 
 		[UnityTest]

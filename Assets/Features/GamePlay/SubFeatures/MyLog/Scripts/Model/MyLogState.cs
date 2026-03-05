@@ -7,6 +7,10 @@ namespace Features.GamePlay.SubFeatures.MyLog.Model
 	{
 		public static MyLogParentSignals ParentSignals { get; set; }
 
+		public static string ChatMenuId { get; set; }
+
+		public static string JournalMenuId { get; set; }
+
 		/// <summary>
 		/// Cached log list from latest load or save operations.
 		/// </summary>

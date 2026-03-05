@@ -33,6 +33,8 @@ namespace Features.GamePlay.SubFeatures.MyLog.Controller
 		{
 			MyLogState.CachedList = new MyLogListResponsePayload();
 			MyLogState.EditingLogId = null;
+			MyLogState.ChatMenuId = null;
+			MyLogState.JournalMenuId = null;
 		}
 
 		/// <summary>
@@ -40,6 +42,8 @@ namespace Features.GamePlay.SubFeatures.MyLog.Controller
 		/// </summary>
 		public static void Install()
 		{
+			RegisterChatMenu();
+			RegisterJournalMenu();
 			EventBus.Publish(MyLogEvents.Installed, null);
 		}
 
@@ -48,6 +52,8 @@ namespace Features.GamePlay.SubFeatures.MyLog.Controller
 		/// </summary>
 		public static void Uninstall()
 		{
+			UnregisterChatMenu();
+			UnregisterJournalMenu();
 			EventBus.Publish(MyLogEvents.Uninstalled, null);
 		}
 
@@ -57,7 +63,73 @@ namespace Features.GamePlay.SubFeatures.MyLog.Controller
 		/// <param name="signals">Signals implemented by the parent feature.</param>
 		public static void SetParentSignals(MyLogParentSignals signals)
 		{
+			if (signals == null)
+			{
+				UnregisterChatMenu();
+				UnregisterJournalMenu();
+			}
+
 			MyLogState.ParentSignals = signals;
+		}
+
+		private static void RegisterChatMenu()
+		{
+			UnregisterChatMenu();
+
+			var menuId = MyLogState.ParentSignals?.AddMenu?.Invoke("chat", HandleOpenChatMenu);
+			if (string.IsNullOrWhiteSpace(menuId))
+			{
+				return;
+			}
+
+			MyLogState.ChatMenuId = menuId;
+		}
+
+		private static void UnregisterChatMenu()
+		{
+			if (string.IsNullOrWhiteSpace(MyLogState.ChatMenuId))
+			{
+				MyLogState.ChatMenuId = null;
+				return;
+			}
+
+			MyLogState.ParentSignals?.RemoveMenu?.Invoke(MyLogState.ChatMenuId);
+			MyLogState.ChatMenuId = null;
+		}
+
+		private static void RegisterJournalMenu()
+		{
+			UnregisterJournalMenu();
+
+			var menuId = MyLogState.ParentSignals?.AddMenu?.Invoke("journal", HandleOpenJournalMenu);
+			if (string.IsNullOrWhiteSpace(menuId))
+			{
+				return;
+			}
+
+			MyLogState.JournalMenuId = menuId;
+		}
+
+		private static void UnregisterJournalMenu()
+		{
+			if (string.IsNullOrWhiteSpace(MyLogState.JournalMenuId))
+			{
+				MyLogState.JournalMenuId = null;
+				return;
+			}
+
+			MyLogState.ParentSignals?.RemoveMenu?.Invoke(MyLogState.JournalMenuId);
+			MyLogState.JournalMenuId = null;
+		}
+
+		private static void HandleOpenChatMenu()
+		{
+			MyLogState.ParentSignals?.OpenChat?.Invoke();
+		}
+
+		private static void HandleOpenJournalMenu()
+		{
+			MyLogState.ParentSignals?.OpenJournal?.Invoke();
 		}
 
 		/// <summary>
