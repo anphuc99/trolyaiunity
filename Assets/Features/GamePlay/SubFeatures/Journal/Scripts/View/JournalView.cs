@@ -66,6 +66,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 
 		private readonly List<JournalItemView> _spawnedListItems = new List<JournalItemView>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
+		private const float AutoPlayNextMessageDelaySeconds = 2f;
 		private NetworkSettings _networkSettings;
 		private List<MessageBubbleData> _currentChatMessages = new List<MessageBubbleData>();
 		private bool _isChatAutoPlaying;
@@ -483,6 +484,14 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 
 			if (_isChatAutoPlaying)
 			{
+				yield return new WaitForSeconds(AutoPlayNextMessageDelaySeconds);
+
+				if (!_isChatAutoPlaying)
+				{
+					TryRestoreForegroundPlaybackMode();
+					yield break;
+				}
+
 				PlayNextAutoMessage();
 				yield break;
 			}
