@@ -89,9 +89,10 @@ const clampText = (text: string) => {
 
 /**
  * Converts a WAV buffer to MP3 using the bundled ffmpeg binary.
- * Optionally applies a varispeed transform (pitch + speed change) in the same pass.
- * The varispeed matches legacy Web Audio BufferSource behavior:
- * effectiveRate = speakingRate * 2^(pitch * DETUNE_PER_PITCH_UNIT / 1200).
+ * Optionally applies a varispeed transform (pitch + speed change) in a first pass.
+ * Silence trimming runs in a second pass on the encoded MP3 so that encoder-delay
+ * padding introduced by libmp3lame is also removed — matching the behavior of the
+ * standalone trim-audio script.
  *
  * @param wavBuffer - Input WAV buffer.
  * @param pitch - Optional pitch adjustment (detune = pitch * 50 cents).
@@ -114,37 +115,26 @@ const convertWavToMp3 = async (
   const tempId = crypto.randomUUID();
   const tempWavPath = path.join(AUDIO_DIR, `_tmp_${tempId}.wav`);
   const tempMp3Path = path.join(AUDIO_DIR, `_tmp_${tempId}.mp3`);
+  const tempTrimmedPath = path.join(AUDIO_DIR, `_tmp_${tempId}_trimmed.mp3`);
 
   try {
     await fs.writeFile(tempWavPath, wavBuffer);
 
-    // Build audio filter chain:
-    // 1) Optional varispeed (pitch + speed) to match legacy behavior.
-    // 2) Trim leading/trailing silence to reduce dead air after TTS.
-    const filterArgs: string[] = [];
-    const filters: string[] = [];
+    // Pass 1: Convert WAV to MP3 with optional varispeed (pitch + speed).
+    const pass1Args = ["-y", "-i", tempWavPath];
 
     if (effectiveRate !== 1) {
       const sampleRate = readWavSampleRate(wavBuffer);
       const scaledRate = Math.round(sampleRate * effectiveRate);
-      filters.push(`asetrate=${scaledRate}`, `aresample=${sampleRate}`);
+      pass1Args.push("-af", `asetrate=${scaledRate},aresample=${sampleRate}`);
     }
 
-    filters.push(
-      `silenceremove=start_periods=1:start_duration=${TRIM_SILENCE_DURATION_SEC}:start_threshold=${TRIM_SILENCE_THRESHOLD_DB}dB`,
-      "areverse",
-      `silenceremove=start_periods=1:start_duration=${TRIM_SILENCE_DURATION_SEC}:start_threshold=${TRIM_SILENCE_THRESHOLD_DB}dB`,
-      "areverse"
-    );
-
-    if (filters.length > 0) {
-      filterArgs.push("-af", filters.join(","));
-    }
+    pass1Args.push("-codec:a", "libmp3lame", "-q:a", "2", tempMp3Path);
 
     await new Promise<void>((resolve, reject) => {
       execFile(
         ffmpegInstaller.path,
-        ["-y", "-i", tempWavPath, ...filterArgs, "-codec:a", "libmp3lame", "-q:a", "2", tempMp3Path],
+        pass1Args,
         (error) => {
           if (error) {
             reject(new Error(`ffmpeg conversion failed: ${error.message}`));
@@ -156,10 +146,35 @@ const convertWavToMp3 = async (
       );
     });
 
-    return await fs.readFile(tempMp3Path);
+    // Pass 2: Trim leading/trailing silence from the encoded MP3.
+    // Running on the MP3 ensures encoder-delay padding is also removed.
+    const trimFilter = [
+      `silenceremove=start_periods=1:start_duration=${TRIM_SILENCE_DURATION_SEC}:start_threshold=${TRIM_SILENCE_THRESHOLD_DB}dB`,
+      "areverse",
+      `silenceremove=start_periods=1:start_duration=${TRIM_SILENCE_DURATION_SEC}:start_threshold=${TRIM_SILENCE_THRESHOLD_DB}dB`,
+      "areverse"
+    ].join(",");
+
+    await new Promise<void>((resolve, reject) => {
+      execFile(
+        ffmpegInstaller.path,
+        ["-y", "-i", tempMp3Path, "-af", trimFilter, tempTrimmedPath],
+        (error) => {
+          if (error) {
+            reject(new Error(`ffmpeg silence trim failed: ${error.message}`));
+            return;
+          }
+
+          resolve();
+        }
+      );
+    });
+
+    return await fs.readFile(tempTrimmedPath);
   } finally {
     await fs.unlink(tempWavPath).catch(() => {});
     await fs.unlink(tempMp3Path).catch(() => {});
+    await fs.unlink(tempTrimmedPath).catch(() => {});
   }
 };
 
