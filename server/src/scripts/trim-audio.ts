@@ -4,8 +4,8 @@ import path from "path";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 
 const DEFAULT_SCAN_DIR = path.join(process.cwd(), "data", "audio");
-const TRIM_SILENCE_THRESHOLD_DB = -35;
-const TRIM_SILENCE_DURATION_SEC = 0.1;
+const TRIM_SILENCE_THRESHOLD_DB = -45;
+const TRIM_SILENCE_DURATION_SEC = 0.08;
 
 const SUPPORTED_AUDIO_EXTENSIONS = new Set([
   ".mp3",
