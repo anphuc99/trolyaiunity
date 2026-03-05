@@ -14,8 +14,8 @@ const DEFAULT_PITCH = 0;
 const DETUNE_PER_PITCH_UNIT = 50;
 const MIN_PLAYBACK_RATE = 0.1;
 const MAX_PLAYBACK_RATE = 4;
-const TRIM_SILENCE_THRESHOLD_DB = -45;
-const TRIM_SILENCE_DURATION_SEC = 0.08;
+const TRIM_SILENCE_THRESHOLD_DB = -35;
+const TRIM_SILENCE_DURATION_SEC = 0.1;
 
 /**
  * Normalizes text for stable hash generation.
