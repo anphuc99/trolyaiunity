@@ -71,6 +71,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		private List<MessageBubbleData> _currentChatMessages = new List<MessageBubbleData>();
 		private bool _isChatAutoPlaying;
 		private int _currentAutoPlayListIndex = -1;
+		private bool _hasPausedAutoPlayClip;
 		private bool _hasCapturedRunInBackground;
 		private bool _previousRunInBackground;
 		private bool _isBackgroundPlaybackActive;
@@ -249,7 +250,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		[OnEvent(JournalEvents.Uninstalled)]
 		private void OnUninstalled(object payload)
 		{
-			StopChatAutoPlay();
+			StopChatAutoPlay(true);
 			StopAllCoroutines();
 			_reloadingTtsMessageIndices.Clear();
 			_isFsrsMode = false;
@@ -330,7 +331,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		{
 			if (!showDetail)
 			{
-				StopChatAutoPlay();
+				StopChatAutoPlay(true);
 			}
 
 			if (_listRoot != null)
@@ -405,7 +406,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		/// <param name="payload">Journal detail payload.</param>
 		private void RenderJournalDetail(List<MessageBubbleData> messageBubbleData)
 		{
-			StopChatAutoPlay();
+			StopChatAutoPlay(true);
 			_currentChatMessages = messageBubbleData ?? new List<MessageBubbleData>();
 			_chatVariantRoot.SetChatHistory(messageBubbleData);
 			UpdateAutoPlayButtonText();
@@ -655,7 +656,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 
 		private void Callback()
 		{
-			StopChatAutoPlay();
+			StopChatAutoPlay(true);
 			_currentChatMessages.Clear();
 			_currentAutoPlayListIndex = -1;
 			UpdateAutoPlayButtonText();
@@ -763,21 +764,53 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			}
 
 			_isChatAutoPlaying = true;
-			_currentAutoPlayListIndex = -1;
 			UpdateAutoPlayButtonText();
-			PlayNextAutoMessage();
+
+			if (_hasPausedAutoPlayClip && _voiceAudioSource != null && _voiceAudioSource.clip != null)
+			{
+				_hasPausedAutoPlayClip = false;
+				_voiceAudioSource.UnPause();
+				return;
+			}
+
+			PlayNextAutoMessage(true);
 		}
 
 		/// <summary>
 		/// Stops auto play state and restores button label.
 		/// </summary>
-		private void StopChatAutoPlay()
+		/// <param name="resetSequencePosition">
+		/// True to clear the current message pointer (use when leaving chat or loading a new chat).
+		/// False to keep current pointer so pressing play can continue from the paused message.
+		/// </param>
+		private void StopChatAutoPlay(bool resetSequencePosition = false)
 		{
 			_isChatAutoPlaying = false;
-			_currentAutoPlayListIndex = -1;
 			if (_voiceAudioSource != null)
 			{
-				_voiceAudioSource.Stop();
+				if (resetSequencePosition)
+				{
+					_voiceAudioSource.Stop();
+					_hasPausedAutoPlayClip = false;
+				}
+				else if (_voiceAudioSource.isPlaying)
+				{
+					_voiceAudioSource.Pause();
+					_hasPausedAutoPlayClip = true;
+				}
+				else
+				{
+					_hasPausedAutoPlayClip = false;
+				}
+			}
+			else
+			{
+				_hasPausedAutoPlayClip = false;
+			}
+
+			if (resetSequencePosition)
+			{
+				_currentAutoPlayListIndex = -1;
 			}
 
 			if (_reloadingTtsMessageIndices.Count > 0)
@@ -865,7 +898,10 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		/// <summary>
 		/// Requests audio for the next playable message and loops to the start at the end.
 		/// </summary>
-		private void PlayNextAutoMessage()
+		/// <param name="allowCurrentIndex">
+		/// True to first attempt replaying current index (resume case), false to move to next index.
+		/// </param>
+		private void PlayNextAutoMessage(bool allowCurrentIndex = false)
 		{
 			if (!_isChatAutoPlaying || _currentChatMessages == null || _currentChatMessages.Count == 0)
 			{
@@ -873,7 +909,8 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			}
 
 			var count = _currentChatMessages.Count;
-			for (var offset = 1; offset <= count; offset++)
+			var startOffset = allowCurrentIndex ? 0 : 1;
+			for (var offset = startOffset; offset <= count; offset++)
 			{
 				var listIndex = (_currentAutoPlayListIndex + offset + count) % count;
 				var messageData = _currentChatMessages[listIndex];
@@ -893,7 +930,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			}
 
 			// No playable messages, keep loop disabled.
-			StopChatAutoPlay();
+			StopChatAutoPlay(true);
 		}
 
 		/// <summary>
