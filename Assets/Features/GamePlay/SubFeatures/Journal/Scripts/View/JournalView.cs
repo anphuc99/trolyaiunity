@@ -773,7 +773,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				return;
 			}
 
-			PlayNextAutoMessage(true);
+			PlayNextAutoMessage(_currentAutoPlayListIndex >= 0);
 		}
 
 		/// <summary>
