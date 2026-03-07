@@ -1,0 +1,305 @@
+/* ============================================
+   LoginView.uss — Login page stylesheet
+   Matches the Mimi Learning login screen design
+   ============================================ */
+
+/* ---- Root & Background ---- */
+
+.root {
+    flex-grow: 1;
+    background-color: rgb(200, 225, 240);
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.scroll-view {
+    flex-grow: 1;
+    width: 100%;
+}
+
+.scroll-view > .unity-scroll-view__content-container {
+    align-items: center;
+    padding-top: 40px;
+    padding-bottom: 40px;
+    padding-left: 24px;
+    padding-right: 24px;
+}
+
+/* ---- Title Image (MIMI LEARNING logo) ---- */
+
+.title-image {
+    width: 280px;
+    height: 100px;
+    margin-bottom: 0;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+/* ---- Character Image (Mimi mascot) ---- */
+
+.character-image {
+    width: 220px;
+    height: 260px;
+    margin-bottom: -30px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+/* ---- Login Card ---- */
+
+.login-card {
+    width: 340px;
+    background-color: rgba(255, 255, 255, 0.85);
+    border-radius: 24px;
+    padding-top: 28px;
+    padding-bottom: 28px;
+    padding-left: 24px;
+    padding-right: 24px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.6);
+    align-items: stretch;
+}
+
+/* ---- Field Labels ---- */
+
+.field-label {
+    color: rgb(45, 55, 72);
+    font-size: 15px;
+    -unity-font-style: bold;
+    margin-bottom: 8px;
+    margin-left: 4px;
+}
+
+.field-label--password {
+    margin-top: 16px;
+}
+
+/* ---- Input Container (icon + field wrapper) ---- */
+
+.input-container {
+    flex-direction: row;
+    align-items: center;
+    background-color: rgb(255, 255, 255);
+    border-radius: 14px;
+    border-width: 1.5px;
+    border-color: rgb(210, 218, 230);
+    padding-left: 12px;
+    padding-right: 12px;
+    height: 50px;
+    margin-bottom: 4px;
+}
+
+.input-container:hover {
+    border-color: rgb(160, 195, 210);
+}
+
+.input-container:focus-within {
+    border-color: rgb(45, 125, 140);
+    border-width: 2px;
+}
+
+/* ---- Input Icon ---- */
+
+.input-icon {
+    font-size: 18px;
+    color: rgb(140, 160, 180);
+    margin-right: 8px;
+    width: 24px;
+    -unity-text-align: middle-center;
+}
+
+/* ---- Input Field (TextField inside container) ---- */
+
+.input-field {
+    flex-grow: 1;
+    margin: 0;
+    padding: 0;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+    font-size: 14px;
+    color: rgb(45, 55, 72);
+}
+
+.input-field > .unity-base-text-field__input {
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+    padding: 0;
+    margin: 0;
+    font-size: 14px;
+    color: rgb(45, 55, 72);
+}
+
+.input-field > .unity-base-text-field__input:focus {
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+/* ---- Password Toggle (eye icon) ---- */
+
+.password-toggle {
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 16px;
+    cursor: link;
+}
+
+.password-toggle:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.password-toggle-icon {
+    font-size: 18px;
+    color: rgb(140, 160, 180);
+    -unity-text-align: middle-center;
+}
+
+/* ---- Login Button ---- */
+
+.login-button {
+    height: 52px;
+    margin-top: 20px;
+    margin-bottom: 12px;
+    border-radius: 16px;
+    background-color: rgb(30, 110, 125);
+    color: rgb(255, 255, 255);
+    font-size: 18px;
+    -unity-font-style: bold;
+    border-width: 0;
+    letter-spacing: 2px;
+    transition-property: background-color;
+    transition-duration: 0.15s;
+}
+
+.login-button:hover {
+    background-color: rgb(25, 95, 108);
+}
+
+.login-button:active {
+    background-color: rgb(20, 80, 92);
+}
+
+/* ---- Forgot Password ---- */
+
+.forgot-password {
+    color: rgb(80, 90, 110);
+    font-size: 13px;
+    -unity-text-align: middle-center;
+    margin-bottom: 16px;
+    cursor: link;
+}
+
+.forgot-password:hover {
+    color: rgb(30, 110, 125);
+}
+
+/* ---- Divider ---- */
+
+.divider-container {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.divider-line {
+    flex-grow: 1;
+    height: 1px;
+    background-color: rgb(200, 210, 220);
+}
+
+.divider-text {
+    color: rgb(120, 130, 150);
+    font-size: 12px;
+    margin-left: 10px;
+    margin-right: 10px;
+    -unity-font-style: bold;
+    white-space: nowrap;
+}
+
+/* ---- Social Login Buttons ---- */
+
+.social-buttons-container {
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+}
+
+.social-button {
+    width: 50px;
+    height: 50px;
+    border-radius: 25px;
+    margin-left: 10px;
+    margin-right: 10px;
+    border-width: 0;
+    align-items: center;
+    justify-content: center;
+    transition-property: scale;
+    transition-duration: 0.1s;
+}
+
+.social-button:hover {
+    scale: 1.1 1.1;
+}
+
+.social-button:active {
+    scale: 0.95 0.95;
+}
+
+.social-button--google {
+    background-color: rgb(255, 255, 255);
+    border-width: 1.5px;
+    border-color: rgb(210, 215, 220);
+}
+
+.social-button--facebook {
+    background-color: rgb(24, 119, 242);
+}
+
+.social-button--apple {
+    background-color: rgb(0, 0, 0);
+}
+
+/* ---- Social Button Labels ---- */
+
+.social-button-label {
+    font-size: 22px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.social-button-label--google {
+    color: rgb(66, 133, 244);
+}
+
+.social-button-label--facebook {
+    color: rgb(255, 255, 255);
+}
+
+.social-button-label--apple {
+    color: rgb(255, 255, 255);
+}
+
+/* ---- Register Link ---- */
+
+.register-container {
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.register-text {
+    color: rgb(80, 90, 110);
+    font-size: 14px;
+}
+
+.register-link {
+    color: rgb(30, 55, 72);
+    font-size: 14px;
+    -unity-font-style: bold;
+    cursor: link;
+}
+
+.register-link:hover {
+    color: rgb(30, 110, 125);
+}

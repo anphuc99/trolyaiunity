@@ -1,0 +1,72 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <ui:Style src="LoginView.uss" />
+
+    <!-- Root container fills the screen -->
+    <ui:VisualElement name="root" class="root">
+
+        <!-- Scrollable content area -->
+        <ui:ScrollView name="scroll-view" class="scroll-view">
+
+            <!-- Title image: MIMI LEARNING logo -->
+            <ui:VisualElement name="title-image" class="title-image" />
+
+            <!-- Character image: Mimi mascot -->
+            <ui:VisualElement name="character-image" class="character-image" />
+
+            <!-- Login card container -->
+            <ui:VisualElement name="login-card" class="login-card">
+
+                <!-- Username section -->
+                <ui:Label text="Tên cậu là gì nhỉ?" class="field-label" />
+                <ui:VisualElement class="input-container">
+                    <ui:Label text="&#x2709;" class="input-icon" />
+                    <ui:TextField name="username-field" class="input-field" />
+                </ui:VisualElement>
+
+                <!-- Password section -->
+                <ui:Label text="Mật mã bí mật:" class="field-label field-label--password" />
+                <ui:VisualElement class="input-container">
+                    <ui:Label text="&#x1F512;" class="input-icon" />
+                    <ui:TextField name="password-field" password="true" class="input-field" />
+                    <ui:VisualElement name="password-toggle" class="password-toggle">
+                        <ui:Label name="password-toggle-icon" text="&#x1F441;" class="password-toggle-icon" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- Login button -->
+                <ui:Button name="login-button" text="ĐĂNG NHẬP" class="login-button" />
+
+                <!-- Forgot password link -->
+                <ui:Label name="forgot-password" text="Câu quên mật mã rồi sao?" class="forgot-password" />
+
+                <!-- Divider -->
+                <ui:VisualElement class="divider-container">
+                    <ui:VisualElement class="divider-line" />
+                    <ui:Label text="Hoặc vào nhanh bằng" class="divider-text" />
+                    <ui:VisualElement class="divider-line" />
+                </ui:VisualElement>
+
+                <!-- Social login buttons -->
+                <ui:VisualElement class="social-buttons-container">
+                    <ui:Button name="google-button" class="social-button social-button--google">
+                        <ui:Label text="G" class="social-button-label social-button-label--google" />
+                    </ui:Button>
+                    <ui:Button name="facebook-button" class="social-button social-button--facebook">
+                        <ui:Label text="f" class="social-button-label social-button-label--facebook" />
+                    </ui:Button>
+                    <ui:Button name="apple-button" class="social-button social-button--apple">
+                        <ui:Label text="&#xF8FF;" class="social-button-label social-button-label--apple" />
+                    </ui:Button>
+                </ui:VisualElement>
+
+            </ui:VisualElement>
+
+            <!-- Register link -->
+            <ui:VisualElement class="register-container">
+                <ui:Label text="Cậu là người mới? " class="register-text" />
+                <ui:Label name="register-link" text="Đăng ký ngay" class="register-link" />
+            </ui:VisualElement>
+
+        </ui:ScrollView>
+    </ui:VisualElement>
+</ui:UXML>
