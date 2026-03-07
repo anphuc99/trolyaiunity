@@ -173,6 +173,17 @@ Before ending any response that includes code, the AI MUST:
 
 ---
 
+## ✅ Mandatory Full Test Run
+
+**After every code change, the AI MUST run the full test suite.**
+
+1. Run **all tests** (not a subset).
+2. If any test fails, investigate, fix the issue, and run the full suite again.
+3. Repeat until all tests pass.
+4. If the full suite cannot be executed, explicitly state why and request guidance.
+
+---
+
 ## 🔒 Mandatory Git Commit (NON-NEGOTIABLE)
 
 **AFTER EVERY CODE GENERATION OR MODIFICATION:**
@@ -198,6 +209,9 @@ Before ending any response that includes code, the AI MUST:
    - Why it was changed
    - Key files affected
 
+## PUSH GIT
+   - Use only `node gitBundleTool` do not use `git push` directly
+   - Always push after a commit, never leave commits unpushed
 
 #### Allowed `<type>` values
 - `feat` — new feature
@@ -221,6 +235,7 @@ Before ending any response that includes code, the AI MUST:
 - ❌ Do NOT generate code before reading `README.md`
 - ❌ Do NOT guess project structure or logic
 - ❌ Do NOT skip Git commit
+- ❌ Do NOT skip Git push
 - ❌ Do NOT end with syntax errors
 - ❌ Do NOT mix unrelated changes
 - ❌ Do NOT remove existing documentation unless explicitly requested
