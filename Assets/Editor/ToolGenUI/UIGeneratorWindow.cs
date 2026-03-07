@@ -1,0 +1,1762 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace EditorTools.UIGenerator
+{
+    /// <summary>
+    /// Main window for AI-powered UI generation using Gemini API.
+    /// Features: image generation, background removal, color adjustments, brush/eraser tools, auto-crop.
+    /// </summary>
+    public sealed class UIGeneratorWindow : EditorWindow
+    {
+        /// <summary>
+        /// Snapshot state for undo/redo operations.
+        /// </summary>
+        private sealed class EditHistoryState
+        {
+            public int EditingWidth;
+            public int EditingHeight;
+            public Color[] EditingPixels;
+            public int ProtectionWidth;
+            public int ProtectionHeight;
+            public Color[] ProtectionPixels;
+            public bool EnableBackgroundRemoval;
+            public Color BackgroundColor;
+            public float HueTolerance;
+            public float SaturationTolerance;
+            public float ValueTolerance;
+            public float HueShift;
+            public float SaturationAdjust;
+            public float BrightnessAdjust;
+            public List<Color> SampledColors;
+            public Vector3 AvgBackgroundHsv;
+        }
+
+        private const string WindowTitle = "AI UI Generator";
+        private const string MenuPath = "Tools/AI UI Generator";
+        private const int MaxHistorySteps = 30;
+
+        // Target Image component
+        private Image _targetImage;
+
+        // Generation settings (Left panel - 1/3)
+        private string _prompt = "A stylish game button with glossy effect";
+        private bool _generateUI = true;
+        private int _numberOfImages = 2;
+        private Texture2D _referenceBackground;
+        private bool _useReferenceBackground;
+        private bool _isGenerating;
+        private string _generationStatus = "";
+
+        // Generated images selection
+        private List<Texture2D> _generatedImages = new List<Texture2D>();
+        private int _selectedImageIndex = -1;
+        private Vector2 _generatedImagesScroll;
+
+        // Direct image editing
+        private Texture2D _directEditImage;
+
+        // Editing settings (Right panel - 2/3)
+        private Texture2D _editingTexture;
+        private Texture2D _previewTexture;
+        private Texture2D _originalTexture; // For undo
+        private Texture2D _protectionMask; // Tracks manually edited pixels to protect from BG removal
+        private Vector2 _editingScroll;
+        private bool _needsPreviewUpdate;
+
+        // Background removal
+        private bool _enableBackgroundRemoval = false;
+        private Color _backgroundColor = Color.green;
+        private float _hueTolerance = 0.15f;
+        private float _saturationTolerance = 0.5f;
+        private float _valueTolerance = 0.5f;
+        private bool _autoSampleBackground = true;
+
+        // Color adjustments
+        private float _hueShift = 0f;
+        private float _saturationAdjust = 0f;
+        private float _brightnessAdjust = 0f;
+
+        // Brush/Eraser tools
+        private enum ToolMode { None, Brush, Eraser, Restore, Unprotect }
+        private ToolMode _currentTool = ToolMode.None;
+        private Color _brushColor = Color.white;
+        private int _brushSize = 10;
+        private bool _isPainting;
+        private Vector2 _lastPaintPos;
+
+        // Zoom and pan
+        private float _zoomLevel = 1f;
+        private Vector2 _panOffset = Vector2.zero;
+        private bool _isZooming;
+        private float _zoomStartX;
+        private float _zoomStartLevel;
+
+        // Canvas for painting
+        private RenderTexture _paintCanvas;
+        private Texture2D _paintTexture;
+
+        // Undo/Redo history
+        private readonly List<EditHistoryState> _undoHistory = new List<EditHistoryState>();
+        private readonly List<EditHistoryState> _redoHistory = new List<EditHistoryState>();
+
+        // Sampled colors for background removal
+        private List<Color> _sampledColors = new List<Color>();
+        private Vector3 _avgBackgroundHsv;
+
+        // Scroll positions
+        private Vector2 _leftPanelScroll;
+        private Vector2 _rightPanelScroll;
+
+        /// <summary>
+        /// Opens the window with optional target Image component.
+        /// </summary>
+        public static void Open(Image targetImage = null)
+        {
+            var window = GetWindow<UIGeneratorWindow>(WindowTitle);
+            window.minSize = new Vector2(900, 600);
+            window._targetImage = targetImage;
+
+            if (targetImage != null && targetImage.sprite != null)
+            {
+                window._referenceBackground = targetImage.sprite.texture;
+            }
+        }
+
+        [MenuItem(MenuPath)]
+        private static void OpenFromMenu()
+        {
+            Open(null);
+        }
+
+        private void OnEnable()
+        {
+            _paintTexture = new Texture2D(1, 1);
+        }
+
+        private void OnDisable()
+        {
+            CleanupTextures();
+        }
+
+        private void OnDestroy()
+        {
+            CleanupTextures();
+        }
+
+        private void CleanupTextures()
+        {
+            if (_paintCanvas != null)
+            {
+                _paintCanvas.Release();
+                DestroyImmediate(_paintCanvas);
+            }
+            if (_previewTexture != null) DestroyImmediate(_previewTexture);
+            if (_paintTexture != null) DestroyImmediate(_paintTexture);
+            foreach (var tex in _generatedImages)
+            {
+                if (tex != null) DestroyImmediate(tex);
+            }
+            _generatedImages.Clear();
+        }
+
+        private void OnGUI()
+        {
+            // Handle undo/redo shortcuts first
+            HandleUndoRedoShortcuts();
+
+            // Handle keyboard shortcuts for tools
+            HandleToolShortcuts();
+
+            EditorGUILayout.BeginHorizontal();
+
+            // Left panel (1/3) - Generation
+            DrawLeftPanel();
+
+            // Separator
+            GUILayout.Box("", GUILayout.Width(2), GUILayout.ExpandHeight(true));
+
+            // Right panel (2/3) - Editing
+            DrawRightPanel();
+
+            EditorGUILayout.EndHorizontal();
+
+            // Handle preview updates
+            if (_needsPreviewUpdate && _editingTexture != null)
+            {
+                _needsPreviewUpdate = false;
+                UpdatePreview();
+            }
+        }
+
+        #region Left Panel - Generation
+
+        private void DrawLeftPanel()
+        {
+            var panelWidth = position.width / 3f - 10f;
+            EditorGUILayout.BeginVertical(GUILayout.Width(panelWidth));
+            _leftPanelScroll = EditorGUILayout.BeginScrollView(_leftPanelScroll);
+
+            EditorGUILayout.LabelField("AI Image Generation", EditorStyles.boldLabel);
+            EditorGUILayout.Space(5);
+
+            // API Settings
+            DrawApiSettings();
+            EditorGUILayout.Space(10);
+
+            // Target Image
+            DrawTargetImageSection();
+            EditorGUILayout.Space(10);
+
+            // Generation Type
+            DrawGenerationTypeSection();
+            EditorGUILayout.Space(10);
+
+            // Prompt
+            DrawPromptSection();
+            EditorGUILayout.Space(10);
+
+            // Reference Background
+            DrawReferenceBackgroundSection();
+            EditorGUILayout.Space(10);
+
+            // Direct Edit Image
+            DrawDirectEditSection();
+            EditorGUILayout.Space(10);
+
+            // Generate Button
+            DrawGenerateButton();
+            EditorGUILayout.Space(10);
+
+            // Generated Images Selection
+            DrawGeneratedImagesSection();
+
+            EditorGUILayout.EndScrollView();
+            EditorGUILayout.EndVertical();
+        }
+
+        private void DrawApiSettings()
+        {
+            EditorGUILayout.LabelField("API Settings", EditorStyles.boldLabel);
+
+            EditorGUI.BeginChangeCheck();
+            var apiKey = EditorGUILayout.PasswordField("API Key", GeminiAPIClient.ApiKey);
+            if (EditorGUI.EndChangeCheck())
+            {
+                GeminiAPIClient.ApiKey = apiKey;
+            }
+
+            EditorGUI.BeginChangeCheck();
+            var modelIndex = EditorGUILayout.Popup("Model", GeminiAPIClient.SelectedModelIndex, GeminiAPIClient.AvailableModels);
+            if (EditorGUI.EndChangeCheck())
+            {
+                GeminiAPIClient.SelectedModelIndex = modelIndex;
+            }
+
+            if (string.IsNullOrEmpty(GeminiAPIClient.ApiKey))
+            {
+                EditorGUILayout.HelpBox("Enter your Gemini API key to enable generation.", MessageType.Warning);
+            }
+        }
+
+        private void DrawTargetImageSection()
+        {
+            EditorGUILayout.LabelField("Target", EditorStyles.boldLabel);
+            _targetImage = (Image)EditorGUILayout.ObjectField("Image Component", _targetImage, typeof(Image), true);
+
+            if (_targetImage != null && _targetImage.sprite != null)
+            {
+                EditorGUILayout.LabelField($"Current: {_targetImage.sprite.texture.width}x{_targetImage.sprite.texture.height}");
+            }
+        }
+
+        private void DrawGenerationTypeSection()
+        {
+            EditorGUILayout.LabelField("Generation Type", EditorStyles.boldLabel);
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Toggle(_generateUI, "UI Element", "Button"))
+            {
+                _generateUI = true;
+            }
+            if (GUILayout.Toggle(!_generateUI, "Background", "Button"))
+            {
+                _generateUI = false;
+            }
+            EditorGUILayout.EndHorizontal();
+
+            _numberOfImages = EditorGUILayout.IntSlider("Number of Images", _numberOfImages, 1, 4);
+        }
+
+        private void DrawPromptSection()
+        {
+            EditorGUILayout.LabelField("Prompt", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                _generateUI
+                    ? "Describe the UI element you want (button, icon, panel, etc.)"
+                    : "Describe the background scene you want",
+                MessageType.Info);
+
+            _prompt = EditorGUILayout.TextArea(_prompt, GUILayout.Height(80));
+        }
+
+        private void DrawReferenceBackgroundSection()
+        {
+            EditorGUILayout.LabelField("Reference Background", EditorStyles.boldLabel);
+
+            _useReferenceBackground = EditorGUILayout.Toggle("Use Reference for Context", _useReferenceBackground);
+
+            if (_useReferenceBackground)
+            {
+                _referenceBackground = (Texture2D)EditorGUILayout.ObjectField(
+                    "Background Image", _referenceBackground, typeof(Texture2D), false);
+
+                if (_targetImage != null && _targetImage.sprite != null)
+                {
+                    if (GUILayout.Button("Use Current Image Sprite"))
+                    {
+                        _referenceBackground = _targetImage.sprite.texture;
+                    }
+                }
+
+                EditorGUILayout.HelpBox(
+                    "AI will consider this background when generating to ensure visual compatibility.",
+                    MessageType.Info);
+            }
+        }
+
+        private void DrawDirectEditSection()
+        {
+            EditorGUILayout.LabelField("Edit Existing Image", EditorStyles.boldLabel);
+
+            EditorGUI.BeginChangeCheck();
+            _directEditImage = (Texture2D)EditorGUILayout.ObjectField(
+                "Image to Edit", _directEditImage, typeof(Texture2D), false);
+
+            if (EditorGUI.EndChangeCheck() && _directEditImage != null)
+            {
+                LoadDirectImageForEditing(_directEditImage);
+            }
+
+            EditorGUILayout.BeginHorizontal();
+
+            using (new EditorGUI.DisabledScope(_directEditImage == null))
+            {
+                if (GUILayout.Button("Load for Editing"))
+                {
+                    LoadDirectImageForEditing(_directEditImage);
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(_targetImage == null || _targetImage.sprite == null))
+            {
+                if (GUILayout.Button("Load Target Sprite"))
+                {
+                    _directEditImage = _targetImage.sprite.texture;
+                    LoadDirectImageForEditing(_directEditImage);
+                }
+            }
+
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.HelpBox(
+                "Drag an image here to edit it directly without generating new images.",
+                MessageType.Info);
+        }
+
+        /// <summary>
+        /// Loads an existing image directly into the editing panel.
+        /// </summary>
+        private void LoadDirectImageForEditing(Texture2D sourceTexture)
+        {
+            if (sourceTexture == null) return;
+
+            // Get readable version of the texture
+            var readableSource = GetReadableTexture(sourceTexture);
+
+            // Create editing texture
+            _editingTexture = new Texture2D(readableSource.width, readableSource.height, TextureFormat.RGBA32, false);
+            _editingTexture.SetPixels(readableSource.GetPixels());
+            _editingTexture.Apply();
+
+            // Store original for undo
+            _originalTexture = new Texture2D(readableSource.width, readableSource.height, TextureFormat.RGBA32, false);
+            _originalTexture.SetPixels(readableSource.GetPixels());
+            _originalTexture.Apply();
+
+            // Initialize protection mask (all black = no protection)
+            if (_protectionMask != null) DestroyImmediate(_protectionMask);
+            _protectionMask = new Texture2D(readableSource.width, readableSource.height, TextureFormat.RGBA32, false);
+            var clearPixels = new Color[readableSource.width * readableSource.height];
+            for (int i = 0; i < clearPixels.Length; i++) clearPixels[i] = Color.black;
+            _protectionMask.SetPixels(clearPixels);
+            _protectionMask.Apply();
+
+            // Clean up temporary texture if created
+            if (readableSource != sourceTexture)
+            {
+                DestroyImmediate(readableSource);
+            }
+
+            // Reset editing state
+            _sampledColors.Clear();
+            _currentTool = ToolMode.None;
+            _needsPreviewUpdate = true;
+            _selectedImageIndex = -1;
+            ClearHistory();
+
+            // Sample background colors
+            if (_autoSampleBackground)
+            {
+                SampleBackgroundColors();
+            }
+
+            _generationStatus = $"Loaded image for editing: {sourceTexture.width}x{sourceTexture.height}";
+            Repaint();
+        }
+
+        /// <summary>
+        /// Gets a readable copy of the texture. If already readable, returns the original.
+        /// </summary>
+        private Texture2D GetReadableTexture(Texture2D source)
+        {
+            if (source == null) return null;
+            if (source.isReadable) return source;
+
+            // Create a temporary RenderTexture to copy the texture
+            var renderTex = RenderTexture.GetTemporary(
+                source.width,
+                source.height,
+                0,
+                RenderTextureFormat.ARGB32,
+                RenderTextureReadWrite.sRGB);
+
+            Graphics.Blit(source, renderTex);
+
+            var previousActive = RenderTexture.active;
+            RenderTexture.active = renderTex;
+
+            var readableTexture = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
+            readableTexture.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0);
+            readableTexture.Apply();
+
+            RenderTexture.active = previousActive;
+            RenderTexture.ReleaseTemporary(renderTex);
+
+            return readableTexture;
+        }
+
+        private void DrawGenerateButton()
+        {
+            using (new EditorGUI.DisabledScope(_isGenerating || string.IsNullOrEmpty(GeminiAPIClient.ApiKey)))
+            {
+                if (GUILayout.Button(_isGenerating ? "Generating..." : "Generate Images", GUILayout.Height(35)))
+                {
+                    StartGeneration();
+                }
+            }
+
+            if (!string.IsNullOrEmpty(_generationStatus))
+            {
+                EditorGUILayout.HelpBox(_generationStatus, MessageType.Info);
+            }
+        }
+
+        private void DrawGeneratedImagesSection()
+        {
+            if (_generatedImages.Count == 0) return;
+
+            EditorGUILayout.LabelField("Generated Images", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("Click an image to select it for editing.", MessageType.Info);
+
+            _generatedImagesScroll = EditorGUILayout.BeginScrollView(_generatedImagesScroll, GUILayout.Height(200));
+            EditorGUILayout.BeginHorizontal();
+
+            for (int i = 0; i < _generatedImages.Count; i++)
+            {
+                var tex = _generatedImages[i];
+                if (tex == null) continue;
+
+                var isSelected = i == _selectedImageIndex;
+                var style = isSelected ? "Button" : "Box";
+
+                EditorGUILayout.BeginVertical(GUILayout.Width(100));
+
+                var rect = GUILayoutUtility.GetRect(90, 90);
+                if (isSelected)
+                {
+                    EditorGUI.DrawRect(new Rect(rect.x - 2, rect.y - 2, rect.width + 4, rect.height + 4), Color.cyan);
+                }
+                GUI.DrawTexture(rect, tex, ScaleMode.ScaleToFit);
+
+                if (GUILayout.Button(isSelected ? "Selected" : "Select", GUILayout.Width(90)))
+                {
+                    SelectGeneratedImage(i);
+                }
+
+                EditorGUILayout.EndVertical();
+            }
+
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.EndScrollView();
+        }
+
+        private void StartGeneration()
+        {
+            _isGenerating = true;
+            _generationStatus = "Generating images...";
+
+            // Clear previous images
+            foreach (var tex in _generatedImages)
+            {
+                if (tex != null) DestroyImmediate(tex);
+            }
+            _generatedImages.Clear();
+            _selectedImageIndex = -1;
+
+            var refImage = _useReferenceBackground ? _referenceBackground : null;
+
+            GeminiAPIClient.GenerateImages(_prompt, refImage, _numberOfImages, _generateUI, result =>
+            {
+                _isGenerating = false;
+
+                if (result.Success)
+                {
+                    _generatedImages = result.GeneratedImages;
+                    _generationStatus = $"Generated {result.GeneratedImages.Count} image(s). Select one to edit.";
+
+                    if (_generatedImages.Count == 1)
+                    {
+                        SelectGeneratedImage(0);
+                    }
+                }
+                else
+                {
+                    _generationStatus = $"Error: {result.Error}";
+                }
+
+                Repaint();
+            });
+        }
+
+        private void SelectGeneratedImage(int index)
+        {
+            _selectedImageIndex = index;
+
+            if (index >= 0 && index < _generatedImages.Count)
+            {
+                // Copy to editing texture using GetReadableTexture to handle format differences
+                var source = _generatedImages[index];
+                var readableSource = GetReadableTexture(source);
+
+                _editingTexture = new Texture2D(readableSource.width, readableSource.height, TextureFormat.RGBA32, false);
+                _editingTexture.SetPixels(readableSource.GetPixels());
+                _editingTexture.Apply();
+
+                // Store original for undo
+                _originalTexture = new Texture2D(readableSource.width, readableSource.height, TextureFormat.RGBA32, false);
+                _originalTexture.SetPixels(readableSource.GetPixels());
+                _originalTexture.Apply();
+
+                // Initialize protection mask (all black = no protection)
+                if (_protectionMask != null) DestroyImmediate(_protectionMask);
+                _protectionMask = new Texture2D(readableSource.width, readableSource.height, TextureFormat.RGBA32, false);
+                var clearPixels = new Color[readableSource.width * readableSource.height];
+                for (int i = 0; i < clearPixels.Length; i++) clearPixels[i] = Color.black;
+                _protectionMask.SetPixels(clearPixels);
+                _protectionMask.Apply();
+
+                // Clean up if we created a copy
+                if (readableSource != source)
+                {
+                    DestroyImmediate(readableSource);
+                }
+
+                // Reset editing state
+                _sampledColors.Clear();
+                _currentTool = ToolMode.None;
+                _needsPreviewUpdate = true;
+                ClearHistory();
+
+                // Sample background colors
+                if (_autoSampleBackground)
+                {
+                    SampleBackgroundColors();
+                }
+            }
+        }
+
+        #endregion
+
+        #region Right Panel - Editing
+
+        private void DrawRightPanel()
+        {
+            EditorGUILayout.BeginVertical();
+            _rightPanelScroll = EditorGUILayout.BeginScrollView(_rightPanelScroll);
+
+            EditorGUILayout.LabelField("Image Editing", EditorStyles.boldLabel);
+
+            if (_editingTexture == null)
+            {
+                EditorGUILayout.HelpBox("Generate or select an image to start editing.", MessageType.Info);
+                EditorGUILayout.EndScrollView();
+                EditorGUILayout.EndVertical();
+                return;
+            }
+
+            EditorGUI.BeginChangeCheck();
+
+            // Preview
+            DrawPreviewSection();
+            EditorGUILayout.Space(10);
+
+            // Tools
+            DrawToolsSection();
+            EditorGUILayout.Space(10);
+
+            // Background Removal
+            DrawBackgroundRemovalSection();
+            EditorGUILayout.Space(10);
+
+            // Color Adjustments
+            DrawColorAdjustmentsSection();
+            EditorGUILayout.Space(10);
+
+            // Auto Crop
+            DrawAutoCropSection();
+            EditorGUILayout.Space(10);
+
+            // Actions
+            DrawActionsSection();
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                _needsPreviewUpdate = true;
+            }
+
+            EditorGUILayout.EndScrollView();
+            EditorGUILayout.EndVertical();
+        }
+
+        private void DrawPreviewSection()
+        {
+            EditorGUILayout.LabelField("Preview", EditorStyles.boldLabel);
+
+            // Zoom info and controls
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField($"Zoom: {(_zoomLevel * 100f):F0}%", GUILayout.Width(80));
+            if (GUILayout.Button("Reset", GUILayout.Width(50)))
+            {
+                _zoomLevel = 1f;
+                _panOffset = Vector2.zero;
+            }
+            EditorGUILayout.LabelField("[Z+Drag] zoom | [Select+Drag] pan", EditorStyles.miniLabel);
+            EditorGUILayout.EndHorizontal();
+
+            // Show _editingTexture directly while painting for immediate feedback (Brush/Eraser)
+            // For Restore/Unprotect tools, keep showing _previewTexture so users see the effect
+            // Show _previewTexture when not painting (with processed effects)
+            Texture2D previewTex;
+            if (_isPainting && _currentTool != ToolMode.Restore && _currentTool != ToolMode.Unprotect)
+            {
+                previewTex = _editingTexture;
+            }
+            else
+            {
+                previewTex = _previewTexture ?? _editingTexture;
+            }
+            
+            if (previewTex != null)
+            {
+                var maxSize = Mathf.Min(position.width * 2f / 3f - 40f, 400f);
+                var aspect = (float)previewTex.height / previewTex.width;
+                var basePreviewWidth = Mathf.Min(maxSize, previewTex.width);
+                var basePreviewHeight = basePreviewWidth * aspect;
+
+                // Apply zoom
+                var zoomedWidth = basePreviewWidth * _zoomLevel;
+                var zoomedHeight = basePreviewHeight * _zoomLevel;
+
+                // Create scrollable area for zoomed content
+                var containerRect = GUILayoutUtility.GetRect(basePreviewWidth, basePreviewHeight);
+                
+                // Clip to container
+                GUI.BeginClip(containerRect);
+                
+                // Calculate texture rect with pan offset
+                var textureRect = new Rect(
+                    (containerRect.width - zoomedWidth) / 2f + _panOffset.x,
+                    (containerRect.height - zoomedHeight) / 2f + _panOffset.y,
+                    zoomedWidth,
+                    zoomedHeight
+                );
+
+                // Draw checkerboard background
+                DrawCheckerboard(textureRect);
+
+                // Draw preview
+                GUI.DrawTexture(textureRect, previewTex, ScaleMode.StretchToFill);
+                
+                GUI.EndClip();
+
+                // Handle zoom and pan (use container rect for input)
+                HandleZoomAndPan(containerRect, textureRect);
+
+                // Handle painting with the actual texture rect (adjusted for clip)
+                var paintRect = new Rect(
+                    containerRect.x + textureRect.x,
+                    containerRect.y + textureRect.y,
+                    textureRect.width,
+                    textureRect.height
+                );
+                HandlePainting(paintRect);
+            }
+        }
+
+        /// <summary>
+        /// Handles zoom (Z + drag) and pan (middle mouse or space + drag) for the preview.
+        /// </summary>
+        private void HandleZoomAndPan(Rect containerRect, Rect textureRect)
+        {
+            var e = Event.current;
+            
+            // Check if Z key is held
+            var zKeyHeld = e.keyCode == KeyCode.Z || (e.modifiers & EventModifiers.None) == 0 && Event.current.type == EventType.KeyDown && e.keyCode == KeyCode.Z;
+            
+            // Zoom with Z + drag
+            if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Z && containerRect.Contains(e.mousePosition))
+            {
+                _isZooming = true;
+                _zoomStartX = e.mousePosition.x;
+                _zoomStartLevel = _zoomLevel;
+                e.Use();
+            }
+            else if (e.type == EventType.KeyUp && e.keyCode == KeyCode.Z)
+            {
+                _isZooming = false;
+                e.Use();
+            }
+            
+            if (_isZooming && e.type == EventType.MouseDrag)
+            {
+                var deltaX = e.mousePosition.x - _zoomStartX;
+                var zoomDelta = deltaX * 0.01f; // Sensitivity
+                _zoomLevel = Mathf.Clamp(_zoomStartLevel + zoomDelta, 0.1f, 10f);
+                e.Use();
+                Repaint();
+            }
+            
+            // Also handle scroll wheel for zoom
+            if (e.type == EventType.ScrollWheel && containerRect.Contains(e.mousePosition))
+            {
+                var zoomDelta = -e.delta.y * 0.1f;
+                _zoomLevel = Mathf.Clamp(_zoomLevel + zoomDelta, 0.1f, 10f);
+                e.Use();
+                Repaint();
+            }
+            
+            // Pan with middle mouse button
+            if (e.type == EventType.MouseDrag && e.button == 2 && containerRect.Contains(e.mousePosition))
+            {
+                _panOffset += e.delta;
+                e.Use();
+                Repaint();
+            }
+            
+            // Pan with left mouse button in Select mode (ToolMode.None)
+            if (_currentTool == ToolMode.None && e.type == EventType.MouseDrag && e.button == 0 && containerRect.Contains(e.mousePosition))
+            {
+                _panOffset += e.delta;
+                e.Use();
+                Repaint();
+            }
+        }
+
+        /// <summary>
+        /// Handles keyboard shortcuts for undo/redo.
+        /// Ctrl/Cmd + Z = Undo, Ctrl/Cmd + Shift + Z = Redo.
+        /// </summary>
+        private void HandleUndoRedoShortcuts()
+        {
+            var e = Event.current;
+            if (e.type != EventType.KeyDown) return;
+            if (EditorGUIUtility.editingTextField) return;
+
+            var hasUndoModifier = e.control || e.command;
+            if (!hasUndoModifier || e.keyCode != KeyCode.Z) return;
+
+            if (e.shift)
+            {
+                RedoLastEdit();
+            }
+            else
+            {
+                UndoLastEdit();
+            }
+
+            e.Use();
+        }
+
+        /// <summary>
+        /// Handles keyboard shortcuts for tool selection.
+        /// 1=Select, 2=Brush, 3=Eraser, 4=Restore, 5=Unprotect
+        /// </summary>
+        private void HandleToolShortcuts()
+        {
+            var e = Event.current;
+            if (e.type != EventType.KeyDown) return;
+            
+            // Ignore shortcuts only while actively typing in text fields
+            if (EditorGUIUtility.editingTextField) return;
+
+            // Ignore combinations with modifiers to avoid clashing with editor/system shortcuts
+            if (e.alt || e.control || e.command) return;
+            
+            switch (e.keyCode)
+            {
+                case KeyCode.Alpha1:
+                case KeyCode.Keypad1:
+                    _currentTool = ToolMode.None;
+                    e.Use();
+                    Repaint();
+                    break;
+                case KeyCode.Alpha2:
+                case KeyCode.Keypad2:
+                    _currentTool = ToolMode.Brush;
+                    e.Use();
+                    Repaint();
+                    break;
+                case KeyCode.Alpha3:
+                case KeyCode.Keypad3:
+                    _currentTool = ToolMode.Eraser;
+                    e.Use();
+                    Repaint();
+                    break;
+                case KeyCode.Alpha4:
+                case KeyCode.Keypad4:
+                    _currentTool = ToolMode.Restore;
+                    e.Use();
+                    Repaint();
+                    break;
+                case KeyCode.Alpha5:
+                case KeyCode.Keypad5:
+                    _currentTool = ToolMode.Unprotect;
+                    e.Use();
+                    Repaint();
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Calculates the actual rect where the texture will be drawn with ScaleToFit behavior.
+        /// </summary>
+        private Rect CalculateScaledTextureRect(Rect containerRect, Texture2D texture)
+        {
+            var texAspect = (float)texture.width / texture.height;
+            var rectAspect = containerRect.width / containerRect.height;
+
+            float width, height, x, y;
+
+            if (texAspect > rectAspect)
+            {
+                // Texture is wider - fit to width
+                width = containerRect.width;
+                height = width / texAspect;
+                x = containerRect.x;
+                y = containerRect.y + (containerRect.height - height) / 2f;
+            }
+            else
+            {
+                // Texture is taller - fit to height
+                height = containerRect.height;
+                width = height * texAspect;
+                x = containerRect.x + (containerRect.width - width) / 2f;
+                y = containerRect.y;
+            }
+
+            return new Rect(x, y, width, height);
+        }
+
+        private void DrawToolsSection()
+        {
+            EditorGUILayout.LabelField("Drawing Tools", EditorStyles.boldLabel);
+
+            EditorGUILayout.BeginHorizontal();
+
+            GUI.backgroundColor = _currentTool == ToolMode.None ? Color.cyan : Color.white;
+            if (GUILayout.Button("1: Select", GUILayout.Height(25)))
+            {
+                _currentTool = ToolMode.None;
+            }
+
+            GUI.backgroundColor = _currentTool == ToolMode.Brush ? Color.cyan : Color.white;
+            if (GUILayout.Button("2: Brush", GUILayout.Height(25)))
+            {
+                _currentTool = ToolMode.Brush;
+            }
+
+            GUI.backgroundColor = _currentTool == ToolMode.Eraser ? Color.cyan : Color.white;
+            if (GUILayout.Button("3: Eraser", GUILayout.Height(25)))
+            {
+                _currentTool = ToolMode.Eraser;
+            }
+
+            GUI.backgroundColor = _currentTool == ToolMode.Restore ? Color.green : Color.white;
+            if (GUILayout.Button("4: Restore", GUILayout.Height(25)))
+            {
+                _currentTool = ToolMode.Restore;
+            }
+
+            GUI.backgroundColor = _currentTool == ToolMode.Unprotect ? Color.red : Color.white;
+            if (GUILayout.Button("5: Unprotect", GUILayout.Height(25)))
+            {
+                _currentTool = ToolMode.Unprotect;
+            }
+
+            GUI.backgroundColor = Color.white;
+            EditorGUILayout.EndHorizontal();
+
+            if (_currentTool == ToolMode.Restore)
+            {
+                EditorGUILayout.HelpBox("Tô lên vùng bị xóa nhầm để khôi phục màu gốc.", MessageType.Info);
+                
+                if (GUILayout.Button("Clear All Protected Areas"))
+                {
+                    ClearProtectionMask();
+                }
+            }
+
+            if (_currentTool == ToolMode.Unprotect)
+            {
+                EditorGUILayout.HelpBox("Tô lên vùng đã restore để xóa bảo vệ, cho phép BG Removal xóa lại.", MessageType.Info);
+            }
+
+            if (_currentTool == ToolMode.Brush)
+            {
+                _brushColor = EditorGUILayout.ColorField("Brush Color", _brushColor);
+            }
+
+            if (_currentTool != ToolMode.None)
+            {
+                _brushSize = EditorGUILayout.IntSlider("Brush Size", _brushSize, 1, 50);
+
+                if (GUILayout.Button("Regenerate with Edits"))
+                {
+                    // TODO: Implement inpainting regeneration
+                    EditorUtility.DisplayDialog("Info", "Inpainting regeneration coming soon!", "OK");
+                }
+            }
+        }
+
+        private void DrawBackgroundRemovalSection()
+        {
+            EditorGUILayout.LabelField("Background Removal", EditorStyles.boldLabel);
+
+            _enableBackgroundRemoval = EditorGUILayout.Toggle("Enable Background Removal", _enableBackgroundRemoval);
+
+            using (new EditorGUI.DisabledScope(!_enableBackgroundRemoval))
+            {
+                _autoSampleBackground = EditorGUILayout.Toggle("Auto Sample Background", _autoSampleBackground);
+
+            if (GUILayout.Button("Sample Background Colors"))
+            {
+                SaveUndoState();
+                SampleBackgroundColors();
+                _needsPreviewUpdate = true;
+            }
+
+            _backgroundColor = EditorGUILayout.ColorField("Background Color", _backgroundColor);
+
+            _hueTolerance = EditorGUILayout.Slider("Hue Tolerance", _hueTolerance, 0f, 0.5f);
+            _saturationTolerance = EditorGUILayout.Slider("Saturation Tolerance", _saturationTolerance, 0f, 1f);
+            _valueTolerance = EditorGUILayout.Slider("Value Tolerance", _valueTolerance, 0f, 1f);
+
+            if (_sampledColors.Count > 0)
+            {
+                EditorGUILayout.LabelField($"Sampled {_sampledColors.Count} background colors");
+            }
+            } // End disabled scope
+        }
+
+        private void DrawColorAdjustmentsSection()
+        {
+            EditorGUILayout.LabelField("Color Adjustments", EditorStyles.boldLabel);
+
+            _hueShift = EditorGUILayout.Slider("Hue Shift (Chuyển màu)", _hueShift, -0.5f, 0.5f);
+            _saturationAdjust = EditorGUILayout.Slider("Saturation (Độ tươi)", _saturationAdjust, -1f, 1f);
+            _brightnessAdjust = EditorGUILayout.Slider("Brightness (Độ sáng)", _brightnessAdjust, -1f, 1f);
+
+            if (GUILayout.Button("Reset Adjustments"))
+            {
+                SaveUndoState();
+                _hueShift = 0f;
+                _saturationAdjust = 0f;
+                _brightnessAdjust = 0f;
+                _needsPreviewUpdate = true;
+            }
+        }
+
+        private void DrawAutoCropSection()
+        {
+            EditorGUILayout.LabelField("Auto Crop", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("Crop image to fit content with 1px transparent border.", MessageType.Info);
+
+            if (GUILayout.Button("Auto Crop to Alpha"))
+            {
+                SaveUndoState();
+                AutoCropToAlpha();
+            }
+        }
+
+        private void DrawActionsSection()
+        {
+            EditorGUILayout.LabelField("Actions", EditorStyles.boldLabel);
+
+            EditorGUILayout.BeginHorizontal();
+
+            if (GUILayout.Button("Undo All Edits", GUILayout.Height(30)))
+            {
+                if (_originalTexture != null)
+                {
+                    SaveUndoState();
+                    Graphics.CopyTexture(_originalTexture, _editingTexture);
+                    _editingTexture.Apply();
+                    _hueShift = 0f;
+                    _saturationAdjust = 0f;
+                    _brightnessAdjust = 0f;
+                    
+                    // Reset protection mask
+                    if (_protectionMask != null)
+                    {
+                        var clearPixels = new Color[_protectionMask.width * _protectionMask.height];
+                        for (int i = 0; i < clearPixels.Length; i++) clearPixels[i] = Color.black;
+                        _protectionMask.SetPixels(clearPixels);
+                        _protectionMask.Apply();
+                    }
+                    
+                    _needsPreviewUpdate = true;
+                }
+            }
+
+            if (GUILayout.Button("Apply to Image", GUILayout.Height(30)))
+            {
+                ApplyToTargetImage();
+            }
+
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.Space(5);
+
+            if (GUILayout.Button("Save as PNG", GUILayout.Height(30)))
+            {
+                SaveAsPng();
+            }
+        }
+
+        private void HandlePainting(Rect previewRect)
+        {
+            if (_currentTool == ToolMode.None) return;
+            if (_editingTexture == null) return;
+
+            var e = Event.current;
+            if (!previewRect.Contains(e.mousePosition)) return;
+
+            if (e.type == EventType.MouseDown && e.button == 0)
+            {
+                SaveUndoState();
+                _isPainting = true;
+                _lastPaintPos = GetTextureCoordinate(e.mousePosition, previewRect);
+                PaintAt(_lastPaintPos);
+                e.Use();
+            }
+            else if (e.type == EventType.MouseDrag && _isPainting)
+            {
+                var currentPos = GetTextureCoordinate(e.mousePosition, previewRect);
+                PaintLine(_lastPaintPos, currentPos);
+                _lastPaintPos = currentPos;
+                e.Use();
+            }
+            else if (e.type == EventType.MouseUp && _isPainting)
+            {
+                _isPainting = false;
+                _needsPreviewUpdate = true;
+                e.Use();
+            }
+
+            if (_currentTool != ToolMode.None)
+            {
+                EditorGUIUtility.AddCursorRect(previewRect, MouseCursor.Arrow);
+            }
+        }
+
+        private Vector2 GetTextureCoordinate(Vector2 mousePos, Rect previewRect)
+        {
+            // Always use _editingTexture dimensions since that's what we paint on
+            if (_editingTexture == null) return Vector2.zero;
+            
+            var normalizedX = (mousePos.x - previewRect.x) / previewRect.width;
+            var normalizedY = 1f - (mousePos.y - previewRect.y) / previewRect.height;
+
+            return new Vector2(
+                Mathf.Clamp(normalizedX * _editingTexture.width, 0, _editingTexture.width - 1),
+                Mathf.Clamp(normalizedY * _editingTexture.height, 0, _editingTexture.height - 1)
+            );
+        }
+
+        private void PaintAt(Vector2 pos)
+        {
+            if (_editingTexture == null) return;
+
+            var x = Mathf.RoundToInt(pos.x);
+            var y = Mathf.RoundToInt(pos.y);
+            var radius = _brushSize / 2;
+
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    if (dx * dx + dy * dy <= radius * radius)
+                    {
+                        var px = x + dx;
+                        var py = y + dy;
+
+                        if (px >= 0 && px < _editingTexture.width && py >= 0 && py < _editingTexture.height)
+                        {
+                            if (_currentTool == ToolMode.Brush)
+                            {
+                                _editingTexture.SetPixel(px, py, _brushColor);
+                                // Mark as protected so BG removal doesn't affect it
+                                if (_protectionMask != null)
+                                    _protectionMask.SetPixel(px, py, Color.white);
+                            }
+                            else if (_currentTool == ToolMode.Eraser)
+                            {
+                                _editingTexture.SetPixel(px, py, Color.clear);
+                                // Mark as protected (user explicitly erased)
+                                if (_protectionMask != null)
+                                    _protectionMask.SetPixel(px, py, Color.white);
+                                // Also update preview texture directly for immediate feedback
+                                if (_previewTexture != null)
+                                    _previewTexture.SetPixel(px, py, Color.clear);
+                            }
+                            else if (_currentTool == ToolMode.Restore && _originalTexture != null)
+                            {
+                                // Restore original pixel color from before any edits
+                                var originalColor = _originalTexture.GetPixel(px, py);
+                                _editingTexture.SetPixel(px, py, originalColor);
+                                // Mark as protected so BG removal won't remove it again
+                                if (_protectionMask != null)
+                                    _protectionMask.SetPixel(px, py, Color.white);
+                                // Also update preview texture directly for immediate feedback (with color adjustments)
+                                if (_previewTexture != null)
+                                    _previewTexture.SetPixel(px, py, ApplyColorAdjustments(originalColor));
+                            }
+                            else if (_currentTool == ToolMode.Unprotect)
+                            {
+                                // Remove protection from this pixel
+                                if (_protectionMask != null)
+                                    _protectionMask.SetPixel(px, py, Color.black);
+                                // Re-apply background removal logic to this pixel
+                                var currentPixel = _editingTexture.GetPixel(px, py);
+                                if (_previewTexture != null)
+                                {
+                                    if (_enableBackgroundRemoval && IsBackgroundColor(currentPixel))
+                                        _previewTexture.SetPixel(px, py, Color.clear);
+                                    else
+                                        _previewTexture.SetPixel(px, py, ApplyColorAdjustments(currentPixel));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            _editingTexture.Apply();
+            if (_protectionMask != null)
+                _protectionMask.Apply();
+            // Apply preview texture updates for Restore/Eraser/Unprotect tools
+            if (_previewTexture != null && (_currentTool == ToolMode.Restore || _currentTool == ToolMode.Eraser || _currentTool == ToolMode.Unprotect))
+                _previewTexture.Apply();
+            Repaint();
+        }
+
+        private void PaintLine(Vector2 from, Vector2 to)
+        {
+            var distance = Vector2.Distance(from, to);
+            var steps = Mathf.Max(1, Mathf.CeilToInt(distance / (_brushSize / 2f)));
+
+            for (int i = 0; i <= steps; i++)
+            {
+                var t = (float)i / steps;
+                var pos = Vector2.Lerp(from, to, t);
+                PaintAt(pos);
+            }
+        }
+
+        /// <summary>
+        /// Clears undo/redo history for the current editing session.
+        /// </summary>
+        private void ClearHistory()
+        {
+            _undoHistory.Clear();
+            _redoHistory.Clear();
+        }
+
+        /// <summary>
+        /// Saves current state to undo history and clears redo history.
+        /// </summary>
+        private void SaveUndoState()
+        {
+            var snapshot = CaptureCurrentState();
+            if (snapshot == null) return;
+
+            _undoHistory.Add(snapshot);
+            if (_undoHistory.Count > MaxHistorySteps)
+            {
+                _undoHistory.RemoveAt(0);
+            }
+
+            _redoHistory.Clear();
+        }
+
+        /// <summary>
+        /// Restores the latest undo snapshot.
+        /// </summary>
+        private void UndoLastEdit()
+        {
+            if (_undoHistory.Count == 0) return;
+
+            var current = CaptureCurrentState();
+            if (current != null)
+            {
+                _redoHistory.Add(current);
+                if (_redoHistory.Count > MaxHistorySteps)
+                {
+                    _redoHistory.RemoveAt(0);
+                }
+            }
+
+            var targetIndex = _undoHistory.Count - 1;
+            var snapshot = _undoHistory[targetIndex];
+            _undoHistory.RemoveAt(targetIndex);
+            RestoreState(snapshot);
+        }
+
+        /// <summary>
+        /// Restores the latest redo snapshot.
+        /// </summary>
+        private void RedoLastEdit()
+        {
+            if (_redoHistory.Count == 0) return;
+
+            var current = CaptureCurrentState();
+            if (current != null)
+            {
+                _undoHistory.Add(current);
+                if (_undoHistory.Count > MaxHistorySteps)
+                {
+                    _undoHistory.RemoveAt(0);
+                }
+            }
+
+            var targetIndex = _redoHistory.Count - 1;
+            var snapshot = _redoHistory[targetIndex];
+            _redoHistory.RemoveAt(targetIndex);
+            RestoreState(snapshot);
+        }
+
+        /// <summary>
+        /// Captures the current editable state into a history snapshot.
+        /// </summary>
+        private EditHistoryState CaptureCurrentState()
+        {
+            if (_editingTexture == null) return null;
+
+            return new EditHistoryState
+            {
+                EditingWidth = _editingTexture.width,
+                EditingHeight = _editingTexture.height,
+                EditingPixels = _editingTexture.GetPixels(),
+                ProtectionWidth = _protectionMask != null ? _protectionMask.width : 0,
+                ProtectionHeight = _protectionMask != null ? _protectionMask.height : 0,
+                ProtectionPixels = _protectionMask != null ? _protectionMask.GetPixels() : null,
+                EnableBackgroundRemoval = _enableBackgroundRemoval,
+                BackgroundColor = _backgroundColor,
+                HueTolerance = _hueTolerance,
+                SaturationTolerance = _saturationTolerance,
+                ValueTolerance = _valueTolerance,
+                HueShift = _hueShift,
+                SaturationAdjust = _saturationAdjust,
+                BrightnessAdjust = _brightnessAdjust,
+                SampledColors = new List<Color>(_sampledColors),
+                AvgBackgroundHsv = _avgBackgroundHsv
+            };
+        }
+
+        /// <summary>
+        /// Restores a history snapshot to current editing state.
+        /// </summary>
+        private void RestoreState(EditHistoryState state)
+        {
+            if (state == null) return;
+
+            if (_editingTexture == null ||
+                _editingTexture.width != state.EditingWidth ||
+                _editingTexture.height != state.EditingHeight)
+            {
+                if (_editingTexture != null) DestroyImmediate(_editingTexture);
+                _editingTexture = new Texture2D(state.EditingWidth, state.EditingHeight, TextureFormat.RGBA32, false);
+            }
+
+            _editingTexture.SetPixels(state.EditingPixels);
+            _editingTexture.Apply();
+
+            if (state.ProtectionPixels != null)
+            {
+                if (_protectionMask == null ||
+                    _protectionMask.width != state.ProtectionWidth ||
+                    _protectionMask.height != state.ProtectionHeight)
+                {
+                    if (_protectionMask != null) DestroyImmediate(_protectionMask);
+                    _protectionMask = new Texture2D(state.ProtectionWidth, state.ProtectionHeight, TextureFormat.RGBA32, false);
+                }
+
+                _protectionMask.SetPixels(state.ProtectionPixels);
+                _protectionMask.Apply();
+            }
+            else if (_protectionMask != null)
+            {
+                DestroyImmediate(_protectionMask);
+                _protectionMask = null;
+            }
+
+            _enableBackgroundRemoval = state.EnableBackgroundRemoval;
+            _backgroundColor = state.BackgroundColor;
+            _hueTolerance = state.HueTolerance;
+            _saturationTolerance = state.SaturationTolerance;
+            _valueTolerance = state.ValueTolerance;
+            _hueShift = state.HueShift;
+            _saturationAdjust = state.SaturationAdjust;
+            _brightnessAdjust = state.BrightnessAdjust;
+            _sampledColors = new List<Color>(state.SampledColors ?? new List<Color>());
+            _avgBackgroundHsv = state.AvgBackgroundHsv;
+
+            _needsPreviewUpdate = true;
+            Repaint();
+        }
+
+        /// <summary>
+        /// Clears the protection mask, allowing background removal to re-process all pixels.
+        /// </summary>
+        private void ClearProtectionMask()
+        {
+            if (_protectionMask == null) return;
+
+            var clearPixels = new Color[_protectionMask.width * _protectionMask.height];
+            for (int i = 0; i < clearPixels.Length; i++)
+                clearPixels[i] = Color.black;
+            
+            _protectionMask.SetPixels(clearPixels);
+            _protectionMask.Apply();
+            
+            _needsPreviewUpdate = true;
+        }
+
+        #endregion
+
+        #region Processing
+
+        private void SampleBackgroundColors()
+        {
+            if (_editingTexture == null) return;
+
+            _sampledColors.Clear();
+            var width = _editingTexture.width;
+            var height = _editingTexture.height;
+
+            // Sample from corners
+            _sampledColors.Add(_editingTexture.GetPixel(0, height - 1));
+            _sampledColors.Add(_editingTexture.GetPixel(width - 1, height - 1));
+            _sampledColors.Add(_editingTexture.GetPixel(0, 0));
+            _sampledColors.Add(_editingTexture.GetPixel(width - 1, 0));
+
+            // Sample from edges
+            var edgeSamples = 5;
+            for (int i = 0; i < edgeSamples; i++)
+            {
+                var t = (float)i / (edgeSamples - 1);
+                var x = Mathf.FloorToInt(t * (width - 1));
+                var y = Mathf.FloorToInt(t * (height - 1));
+
+                _sampledColors.Add(_editingTexture.GetPixel(x, height - 1));
+                _sampledColors.Add(_editingTexture.GetPixel(x, 0));
+                _sampledColors.Add(_editingTexture.GetPixel(0, y));
+                _sampledColors.Add(_editingTexture.GetPixel(width - 1, y));
+            }
+
+            // Calculate average and set as background color
+            var avgColor = Color.black;
+            foreach (var c in _sampledColors)
+            {
+                avgColor += c;
+            }
+            avgColor /= _sampledColors.Count;
+            _backgroundColor = avgColor;
+            _backgroundColor.a = 1f;
+
+            // Calculate average HSV
+            UpdateAverageBackgroundHsv();
+        }
+
+        private void UpdateAverageBackgroundHsv()
+        {
+            if (_sampledColors.Count == 0)
+            {
+                Color.RGBToHSV(_backgroundColor, out var h, out var s, out var v);
+                _avgBackgroundHsv = new Vector3(h, s, v);
+                return;
+            }
+
+            var totalH = 0f;
+            var totalS = 0f;
+            var totalV = 0f;
+
+            foreach (var color in _sampledColors)
+            {
+                Color.RGBToHSV(color, out var h, out var s, out var v);
+                totalH += h;
+                totalS += s;
+                totalV += v;
+            }
+
+            _avgBackgroundHsv = new Vector3(
+                totalH / _sampledColors.Count,
+                totalS / _sampledColors.Count,
+                totalV / _sampledColors.Count
+            );
+        }
+
+        private void UpdatePreview()
+        {
+            if (_editingTexture == null) return;
+
+            if (_previewTexture != null)
+            {
+                DestroyImmediate(_previewTexture);
+            }
+
+            _previewTexture = ProcessTexture(_editingTexture);
+            Repaint();
+        }
+
+        private Texture2D ProcessTexture(Texture2D source)
+        {
+            var width = source.width;
+            var height = source.height;
+            var result = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            var sourcePixels = source.GetPixels();
+            var maskPixels = _protectionMask != null ? _protectionMask.GetPixels() : null;
+            var resultPixels = new Color[sourcePixels.Length];
+
+            for (var i = 0; i < sourcePixels.Length; i++)
+            {
+                var pixel = sourcePixels[i];
+                
+                // Check if pixel is protected (manually edited by user)
+                var isProtected = maskPixels != null && maskPixels[i].r > 0.5f;
+
+                // Only remove background if enabled AND pixel is not protected
+                if (_enableBackgroundRemoval && !isProtected && IsBackgroundColor(pixel))
+                {
+                    resultPixels[i] = Color.clear;
+                }
+                else
+                {
+                    resultPixels[i] = ApplyColorAdjustments(pixel);
+                }
+            }
+
+            result.SetPixels(resultPixels);
+            result.Apply();
+            return result;
+        }
+
+        private bool IsBackgroundColor(Color pixel)
+        {
+            if (pixel.a < 0.1f) return false; // Already transparent
+
+            Color.RGBToHSV(pixel, out var h, out var s, out var v);
+
+            var hueDiff = Mathf.Abs(h - _avgBackgroundHsv.x);
+            if (hueDiff > 0.5f) hueDiff = 1f - hueDiff;
+
+            var satDiff = Mathf.Abs(s - _avgBackgroundHsv.y);
+            var valDiff = Mathf.Abs(v - _avgBackgroundHsv.z);
+
+            if (hueDiff <= _hueTolerance && satDiff <= _saturationTolerance && valDiff <= _valueTolerance)
+            {
+                return true;
+            }
+
+            // Check against sampled colors
+            foreach (var sampledColor in _sampledColors)
+            {
+                Color.RGBToHSV(sampledColor, out var sh, out var ss, out var sv);
+                hueDiff = Mathf.Abs(h - sh);
+                if (hueDiff > 0.5f) hueDiff = 1f - hueDiff;
+
+                if (hueDiff <= _hueTolerance &&
+                    Mathf.Abs(s - ss) <= _saturationTolerance &&
+                    Mathf.Abs(v - sv) <= _valueTolerance)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private Color ApplyColorAdjustments(Color color)
+        {
+            if (Mathf.Abs(_hueShift) < 0.001f && Mathf.Abs(_saturationAdjust) < 0.001f && Mathf.Abs(_brightnessAdjust) < 0.001f)
+            {
+                return color;
+            }
+
+            Color.RGBToHSV(color, out var h, out var s, out var v);
+
+            h = (h + _hueShift + 1f) % 1f;
+            s = Mathf.Clamp01(s + _saturationAdjust);
+            v = Mathf.Clamp01(v + _brightnessAdjust);
+
+            var result = Color.HSVToRGB(h, s, v);
+            result.a = color.a;
+            return result;
+        }
+
+        private void AutoCropToAlpha()
+        {
+            if (_editingTexture == null) return;
+
+            // Use preview alpha (if available) to detect visible area,
+            // but always crop the editable source textures consistently.
+            var boundsSource = _previewTexture ?? _editingTexture;
+            var pixels = boundsSource.GetPixels();
+            var width = boundsSource.width;
+            var height = boundsSource.height;
+
+            // Find bounds
+            int minX = width, maxX = 0, minY = height, maxY = 0;
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    var pixel = pixels[y * width + x];
+                    if (pixel.a > 0.01f)
+                    {
+                        minX = Mathf.Min(minX, x);
+                        maxX = Mathf.Max(maxX, x);
+                        minY = Mathf.Min(minY, y);
+                        maxY = Mathf.Max(maxY, y);
+                    }
+                }
+            }
+
+            if (minX > maxX || minY > maxY)
+            {
+                EditorUtility.DisplayDialog("Auto Crop", "No visible content found.", "OK");
+                return;
+            }
+
+            // Add 1px border
+            minX = Mathf.Max(0, minX - 1);
+            minY = Mathf.Max(0, minY - 1);
+            maxX = Mathf.Min(width - 1, maxX + 1);
+            maxY = Mathf.Min(height - 1, maxY + 1);
+
+            var newWidth = maxX - minX + 1;
+            var newHeight = maxY - minY + 1;
+
+            var croppedEditing = CropTextureRegion(_editingTexture, minX, minY, newWidth, newHeight);
+            Texture2D croppedOriginal = null;
+            Texture2D croppedMask = null;
+
+            if (_originalTexture != null)
+            {
+                croppedOriginal = CropTextureRegion(_originalTexture, minX, minY, newWidth, newHeight);
+            }
+
+            if (_protectionMask != null)
+            {
+                croppedMask = CropTextureRegion(_protectionMask, minX, minY, newWidth, newHeight);
+            }
+
+            // Replace editing texture
+            DestroyImmediate(_editingTexture);
+            _editingTexture = croppedEditing;
+
+            if (_originalTexture != null)
+            {
+                DestroyImmediate(_originalTexture);
+                _originalTexture = croppedOriginal;
+            }
+
+            if (_protectionMask != null)
+            {
+                DestroyImmediate(_protectionMask);
+                _protectionMask = croppedMask;
+            }
+
+            if (_previewTexture != null)
+            {
+                DestroyImmediate(_previewTexture);
+                _previewTexture = null;
+            }
+
+            _needsPreviewUpdate = true;
+
+            EditorUtility.DisplayDialog("Auto Crop", $"Cropped from {width}x{height} to {newWidth}x{newHeight}", "OK");
+        }
+
+        /// <summary>
+        /// Creates a cropped copy of a texture region.
+        /// </summary>
+        private Texture2D CropTextureRegion(Texture2D source, int minX, int minY, int newWidth, int newHeight)
+        {
+            var sourcePixels = source.GetPixels();
+            var sourceWidth = source.width;
+
+            var cropped = new Texture2D(newWidth, newHeight, TextureFormat.RGBA32, false);
+            var croppedPixels = new Color[newWidth * newHeight];
+
+            for (int y = 0; y < newHeight; y++)
+            {
+                for (int x = 0; x < newWidth; x++)
+                {
+                    croppedPixels[y * newWidth + x] = sourcePixels[(minY + y) * sourceWidth + (minX + x)];
+                }
+            }
+
+            cropped.SetPixels(croppedPixels);
+            cropped.Apply();
+            return cropped;
+        }
+
+        private void ApplyToTargetImage()
+        {
+            if (_targetImage == null)
+            {
+                EditorUtility.DisplayDialog("Error", "No target Image component selected.", "OK");
+                return;
+            }
+
+            var texToApply = _previewTexture ?? _editingTexture;
+            if (texToApply == null)
+            {
+                EditorUtility.DisplayDialog("Error", "No image to apply.", "OK");
+                return;
+            }
+
+            // Save texture to project
+            var path = EditorUtility.SaveFilePanelInProject(
+                "Save Generated Image",
+                "GeneratedUI",
+                "png",
+                "Save the generated image as PNG");
+
+            if (string.IsNullOrEmpty(path)) return;
+
+            SaveTextureAsPng(texToApply, path);
+
+            // Load as sprite and assign
+            AssetDatabase.Refresh();
+            var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (importer != null)
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                importer.alphaIsTransparency = true;
+                importer.SaveAndReimport();
+            }
+
+            var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (sprite != null)
+            {
+                Undo.RecordObject(_targetImage, "Apply Generated UI");
+                _targetImage.sprite = sprite;
+                EditorUtility.SetDirty(_targetImage);
+            }
+
+            EditorUtility.DisplayDialog("Success", $"Applied to {_targetImage.gameObject.name}", "OK");
+        }
+
+        private void SaveAsPng()
+        {
+            var texToSave = _previewTexture ?? _editingTexture;
+            if (texToSave == null)
+            {
+                EditorUtility.DisplayDialog("Error", "No image to save.", "OK");
+                return;
+            }
+
+            var path = EditorUtility.SaveFilePanelInProject(
+                "Save as PNG",
+                "GeneratedImage",
+                "png",
+                "Save the image as PNG");
+
+            if (string.IsNullOrEmpty(path)) return;
+
+            SaveTextureAsPng(texToSave, path);
+
+            AssetDatabase.Refresh();
+            var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (importer != null)
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                importer.alphaIsTransparency = true;
+                importer.SaveAndReimport();
+            }
+
+            EditorUtility.DisplayDialog("Success", $"Saved to {path}", "OK");
+            Selection.activeObject = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        }
+
+        private void SaveTextureAsPng(Texture2D texture, string path)
+        {
+            var bytes = texture.EncodeToPNG();
+            File.WriteAllBytes(path, bytes);
+        }
+
+        private void DrawCheckerboard(Rect rect)
+        {
+            var checkerSize = 10f;
+            var light = new Color(0.8f, 0.8f, 0.8f);
+            var dark = new Color(0.6f, 0.6f, 0.6f);
+
+            var xCount = Mathf.CeilToInt(rect.width / checkerSize);
+            var yCount = Mathf.CeilToInt(rect.height / checkerSize);
+
+            for (var y = 0; y < yCount; y++)
+            {
+                for (var x = 0; x < xCount; x++)
+                {
+                    var isLight = (x + y) % 2 == 0;
+                    EditorGUI.DrawRect(new Rect(
+                        rect.x + x * checkerSize,
+                        rect.y + y * checkerSize,
+                        Mathf.Min(checkerSize, rect.width - x * checkerSize),
+                        Mathf.Min(checkerSize, rect.height - y * checkerSize)
+                    ), isLight ? light : dark);
+                }
+            }
+        }
+
+        #endregion
+    }
+}

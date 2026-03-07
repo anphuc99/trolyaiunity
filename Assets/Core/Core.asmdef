@@ -1,7 +1,10 @@
 {
     "name": "Core",
     "rootNamespace": "",
-    "references": [],
+    "references": [
+        "UniTask",
+        "Unity.Newtonsoft.Json"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

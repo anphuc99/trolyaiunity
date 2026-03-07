@@ -1,0 +1,434 @@
+using Newtonsoft.Json;
+using UnityEngine;
+
+namespace Features.GamePlay.SubFeatures.Chat.Model
+{
+	/// <summary>
+	/// Payload for loading chat history from server.
+	/// </summary>
+	public sealed class ChatHistoryRequestPayload
+	{
+		/// <summary>
+		/// Optional session id for segmented history streams.
+		/// </summary>
+		[JsonProperty("sessionId")]
+		public string SessionId { get; set; }
+	}
+
+	/// <summary>
+	/// Payload for sending a chat message to server.
+	/// </summary>
+	public sealed class ChatSendRequestPayload
+	{
+		/// <summary>
+		/// User message content.
+		/// </summary>
+		[JsonProperty("message")]
+		public string Message { get; set; }
+
+		/// <summary>
+		/// Optional session id for segmented history streams.
+		/// </summary>
+		[JsonProperty("sessionId")]
+		public string SessionId { get; set; }
+
+		/// <summary>
+		/// Optional model override.
+		/// </summary>
+		[JsonProperty("model")]
+		public string Model { get; set; }
+
+		/// <summary>
+		/// Optional story id for prompt enrichment.
+		/// </summary>
+		[JsonProperty("storyId")]
+		public int? StoryId { get; set; }
+	}
+
+	/// <summary>
+	/// Payload from view to request replaying message audio.
+	/// </summary>
+	public sealed class ChatPlayMessageAudioRequestPayload
+	{
+		/// <summary>
+		/// Message id to replay.
+		/// </summary>
+		public string MessageId { get; set; }
+
+		/// <summary>
+		/// Character display name.
+		/// </summary>
+		public string CharacterName { get; set; }
+
+		/// <summary>
+		/// Message text to synthesize.
+		/// </summary>
+		public string Text { get; set; }
+
+		/// <summary>
+		/// Optional tone hint.
+		/// </summary>
+		public string Tone { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload from controller to view for playing message audio.
+	/// </summary>
+	public sealed class ChatPlayMessageAudioPayload
+	{
+		/// <summary>
+		/// Message id to replay.
+		/// </summary>
+		public string MessageId { get; set; }
+
+		/// <summary>
+		/// Character display name.
+		/// </summary>
+		public string CharacterName { get; set; }
+
+		/// <summary>
+		/// Message text to synthesize.
+		/// </summary>
+		public string Text { get; set; }
+
+		/// <summary>
+		/// Tone hint used for TTS.
+		/// </summary>
+		public string Tone { get; set; }
+
+		/// <summary>
+		/// Voice name resolved by controller from cache/signals.
+		/// </summary>
+		public string VoiceName { get; set; }
+
+		/// <summary>
+		/// Character pitch value from cache.
+		/// </summary>
+		public float? Pitch { get; set; }
+
+		/// <summary>
+		/// Character speaking rate value from cache.
+		/// </summary>
+		public float? SpeakingRate { get; set; }
+	}
+
+	/// <summary>
+	/// One role/content message entry returned by chat APIs.
+	/// </summary>
+	public sealed class ChatHistoryMessagePayload
+	{
+		/// <summary>
+		/// Role value from server: user or assistant.
+		/// </summary>
+		[JsonProperty("role")]
+		public string Role { get; set; }
+
+		/// <summary>
+		/// Message text content.
+		/// </summary>
+		[JsonProperty("content")]
+		public string Content { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload for history endpoint.
+	/// </summary>
+	public sealed class ChatHistoryResponsePayload
+	{
+		/// <summary>
+		/// Message list excluding system/developer entries.
+		/// </summary>
+		[JsonProperty("messages")]
+		public System.Collections.Generic.List<ChatHistoryMessagePayload> Messages { get; set; } = new System.Collections.Generic.List<ChatHistoryMessagePayload>();
+	}
+
+	/// <summary>
+	/// Response payload for send endpoint.
+	/// </summary>
+	public sealed class ChatSendResponsePayload
+	{
+		/// <summary>
+		/// Assistant reply text.
+		/// </summary>
+		[JsonProperty("reply")]
+		public string Reply { get; set; }
+
+		/// <summary>
+		/// Effective model used by server.
+		/// </summary>
+		[JsonProperty("model")]
+		public string Model { get; set; }
+
+		/// <summary>
+		/// Error or status message from server.
+		/// </summary>
+		[JsonProperty("message")]
+		public string Message { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload for ending a conversation and creating a journal.
+	/// </summary>
+	public sealed class ChatEndConversationResponsePayload
+	{
+		/// <summary>
+		/// Newly created journal id.
+		/// </summary>
+		[JsonProperty("journalId")]
+		public int JournalId { get; set; }
+
+		/// <summary>
+		/// Summary returned by server.
+		/// </summary>
+		[JsonProperty("summary")]
+		public string Summary { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload for /api/text-to-speech.
+	/// </summary>
+	public sealed class ChatTextToSpeechResponsePayload
+	{
+		/// <summary>
+		/// Generated audio id on server.
+		/// </summary>
+		[JsonProperty("output")]
+		public string Output { get; set; }
+
+		/// <summary>
+		/// URL to the generated audio file.
+		/// </summary>
+		[JsonProperty("url")]
+		public string Url { get; set; }
+	}
+
+	/// <summary>
+	/// Character entry returned by /api/characters.
+	/// </summary>
+	public sealed class ChatCharacterPayload
+	{
+		/// <summary>
+		/// Character display name.
+		/// </summary>
+		[JsonProperty("name")]
+		public string Name { get; set; }
+
+		/// <summary>
+		/// Character avatar URL.
+		/// </summary>
+		[JsonProperty("avatar")]
+		public string Avatar { get; set; }
+	}
+
+	/// <summary>
+	/// One assistant turn in JSON reply format.
+	/// </summary>
+	public sealed class ChatAssistantTurnPayload
+	{
+		/// <summary>
+		/// Unique message id.
+		/// </summary>
+		[JsonProperty("MessageId")]
+		public string MessageId { get; set; }
+
+		/// <summary>
+		/// Character speaking this turn.
+		/// </summary>
+		[JsonProperty("CharacterName")]
+		public string CharacterName { get; set; }
+
+		/// <summary>
+		/// Main chat text.
+		/// </summary>
+		[JsonProperty("Text")]
+		public string Text { get; set; }
+
+		/// <summary>
+		/// Tone hint from server.
+		/// </summary>
+		[JsonProperty("Tone")]
+		public string Tone { get; set; }
+
+		/// <summary>
+		/// Translation text from server.
+		/// </summary>
+		[JsonProperty("Translation")]
+		public string Translation { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload for a newly received assistant reply.
+	/// </summary>
+	public sealed class ChatAssistantMessagePayload
+	{
+		/// <summary>
+		/// Assistant reply text.
+		/// </summary>
+		public string Reply { get; set; }
+
+		/// <summary>
+		/// Effective model returned by server.
+		/// </summary>
+		public string Model { get; set; }
+
+		/// <summary>
+		/// Optional session id associated with the reply.
+		/// </summary>
+		public string SessionId { get; set; }
+
+		/// <summary>
+		/// Parsed assistant turns when reply is JSON array/object.
+		/// </summary>
+		public System.Collections.Generic.List<ChatAssistantTurnPayload> Turns { get; set; } = new System.Collections.Generic.List<ChatAssistantTurnPayload>();
+	}
+
+	/// <summary>
+	/// Event payload for request failures.
+	/// </summary>
+	public sealed class ChatErrorPayload
+	{
+		/// <summary>
+		/// Human-readable error message.
+		/// </summary>
+		public string Message { get; set; }
+	}
+
+	/// <summary>
+	/// Character item payload for add-character popup in chat.
+	/// </summary>
+	public sealed class ChatSelectableCharacterPayload
+	{
+		/// <summary>
+		/// Character display name.
+		/// </summary>
+		public string Name { get; set; }
+
+		/// <summary>
+		/// Character avatar sprite.
+		/// </summary>
+		public Sprite Avatar { get; set; }
+
+		/// <summary>
+		/// Indicates whether this character is active in current chat context.
+		/// </summary>
+		public bool IsActive { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload from /api/chat/developer-state.
+	/// </summary>
+	public sealed class ChatDeveloperStatePayload
+	{
+		/// <summary>
+		/// Active character names parsed from developer messages.
+		/// </summary>
+		[JsonProperty("activeCharacterNames")]
+		public System.Collections.Generic.List<string> ActiveCharacterNames { get; set; }
+	}
+
+	/// <summary>
+	/// Request payload from view when character toggle changes in popup.
+	/// </summary>
+	public sealed class ChatSetCharacterActiveRequestPayload
+	{
+		/// <summary>
+		/// Optional chat session id.
+		/// </summary>
+		public string SessionId { get; set; }
+
+		/// <summary>
+		/// Character name from popup item.
+		/// </summary>
+		public string CharacterName { get; set; }
+
+		/// <summary>
+		/// True if character is selected (toggle on), false if removed (toggle off).
+		/// </summary>
+		public bool IsActive { get; set; }
+	}
+
+	/// <summary>
+	/// Request payload from view to save chat context via developer API.
+	/// </summary>
+	public sealed class ChatSaveContextRequestPayload
+	{
+		/// <summary>
+		/// Optional chat session id.
+		/// </summary>
+		public string SessionId { get; set; }
+
+		/// <summary>
+		/// Context text to append into developer history.
+		/// </summary>
+		public string Context { get; set; }
+	}
+
+	/// <summary>
+	/// API payload for /api/chat/developer endpoint.
+	/// </summary>
+	public sealed class ChatDeveloperMessageRequestPayload
+	{
+		[JsonProperty("sessionId")]
+		public string SessionId { get; set; }
+
+		[JsonProperty("kind")]
+		public string Kind { get; set; }
+
+		[JsonProperty("character")]
+		public ChatDeveloperMessageCharacterPayload Character { get; set; }
+
+		[JsonProperty("context")]
+		public string Context { get; set; }
+	}
+
+	/// <summary>
+	/// Character object used in /api/chat/developer payload.
+	/// </summary>
+	public sealed class ChatDeveloperMessageCharacterPayload
+	{
+		[JsonProperty("name")]
+		public string Name { get; set; }
+
+		[JsonProperty("age")]
+		public int? Age { get; set; }
+
+		[JsonProperty("personality")]
+		public string Personality { get; set; }
+
+		[JsonProperty("gender")]
+		public string Gender { get; set; }
+
+		[JsonProperty("appearance")]
+		public string Appearance { get; set; }
+	}
+
+	/// <summary>
+	/// Request payload for /api/chat/transcribe.
+	/// </summary>
+	public sealed class ChatSpeechToTextRequestPayload
+	{
+		/// <summary>
+		/// Base64 audio data URL.
+		/// </summary>
+		[JsonProperty("audio")]
+		public string Audio { get; set; }
+
+		/// <summary>
+		/// Optional language hint (for example: vi, ko, en).
+		/// </summary>
+		[JsonProperty("language")]
+		public string Language { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload from /api/chat/transcribe.
+	/// </summary>
+	public sealed class ChatSpeechToTextResponsePayload
+	{
+		/// <summary>
+		/// Transcribed plain text.
+		/// </summary>
+		[JsonProperty("transcript")]
+		public string Transcript { get; set; }
+	}
+}

@@ -2,6 +2,7 @@ using Core.Infrastructure.Attributes;
 using Core.Infrastructure.Requests;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace Core.Infrastructure.Views
 {
@@ -11,8 +12,47 @@ namespace Core.Infrastructure.Views
 	/// </summary>
 	public abstract class BaseView : MonoBehaviour
 	{
+		[SerializeField]
+		private bool _visible = true;
+
 		private ViewEventBinder _binder;
 		private bool _enabledAfterScope;
+
+		/// <summary>
+		/// Toggles the visibility of the view.
+		/// If false, logic remains active (EventBus subscriptions intact) but visual components are hidden.
+		/// </summary>
+		/// <param name="visible">True to show, false to hide.</param>
+		public void SetVisible(bool visible)
+		{
+			_visible = visible;
+			ApplyVisibility(visible);
+		}
+
+		private void ApplyVisibility(bool visible)
+		{
+			var graphics = GetComponentsInChildren<Graphic>(true);
+			for (int i = 0; i < graphics.Length; i++)
+			{
+				graphics[i].enabled = visible;
+			}
+
+			var renderers = GetComponentsInChildren<Renderer>(true);
+			for (int i = 0; i < renderers.Length; i++)
+			{
+				renderers[i].enabled = visible;
+			}
+		}
+
+#if UNITY_EDITOR
+		protected virtual void OnValidate()
+		{
+			if (!Application.isPlaying)
+			{
+				ApplyVisibility(_visible);
+			}
+		}
+#endif
 
 		/// <summary>
 		/// Sends a request to the Controller layer via string key.
@@ -42,6 +82,14 @@ namespace Core.Infrastructure.Views
 		protected virtual void Awake()
 		{
 			_binder = new ViewEventBinder(this);
+			_binder.Bind();
+			_enabledAfterScope = true;
+
+			if (!_visible && Application.isPlaying)
+			{
+				ApplyVisibility(true);
+				gameObject.SetActive(false);
+			}
 		}
 
 		/// <summary>
@@ -49,14 +97,6 @@ namespace Core.Infrastructure.Views
 		/// </summary>
 		protected virtual void OnEnable()
 		{
-			if (_binder == null)
-			{
-				_binder = new ViewEventBinder(this);
-			}
-
-			EnsureScopeActiveForThisViewScene();
-			_binder.Bind();
-			_enabledAfterScope = true;
 			OnEnabled();
 		}
 
@@ -73,12 +113,7 @@ namespace Core.Infrastructure.Views
 		/// </summary>
 		protected virtual void OnDisable()
 		{
-			_binder?.Unbind();
-			if (_enabledAfterScope)
-			{
-				OnDisabled();
-				_enabledAfterScope = false;
-			}
+			OnDisabled();
 		}
 
 		/// <summary>
@@ -95,22 +130,6 @@ namespace Core.Infrastructure.Views
 		{
 			_binder?.Unbind();
 			_enabledAfterScope = false;
-		}
-
-		private void EnsureScopeActiveForThisViewScene()
-		{
-			var scene = gameObject.scene;
-			if (!scene.IsValid() || string.IsNullOrWhiteSpace(scene.name))
-			{
-				return;
-			}
-
-			if (!System.Enum.TryParse(scene.name, ignoreCase: false, out ControllerScopeKey scopeKey))
-			{
-				return;
-			}
-
-			RequestController.ActivateScope(scopeKey);
 		}
 	}
 }

@@ -53,3 +53,7 @@ Output root:
 Note:
 
 - When changing feature-related code patterns or conventions, update the Feature Generator templates accordingly to prevent new features from compiling with outdated code.
+## Third-Party References
+
+- **serverMimiChat**: External dependency reference only. Do not modify or edit this module. It is maintained separately and should be treated as a read-only integration point.
+

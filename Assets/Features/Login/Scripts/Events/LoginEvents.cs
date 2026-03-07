@@ -1,5 +1,3 @@
-using System;
-
 namespace Features.Login.Events
 {
 	/// <summary>
@@ -7,6 +5,7 @@ namespace Features.Login.Events
 	/// </summary>
 	public static class LoginEvents
 	{
-		public const string Echoed = "login.echo.event";
+		public const string LoginSucceeded = "login.success.event";
+		public const string LoginFailed = "login.failed.event";
 	}
 }

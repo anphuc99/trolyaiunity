@@ -1,7 +1,15 @@
+using Core.Infrastructure.Network;
+using Core.Infrastructure.Scenes;
+using Core.Infrastructure.Authentication;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Features.Login.Events;
 using Features.Login.Infrastructure;
 using Features.Login.Infrastructure.Attributes;
+using Features.Login.Model;
 using Features.Login.Requests;
+using Newtonsoft.Json;
+using UnityEngine;
 
 namespace Features.Login.Controller
 {
@@ -28,13 +36,98 @@ namespace Features.Login.Controller
 		}
 
 		/// <summary>
-		/// Sample request handler that echoes payload to a view event.
+		/// Handles login requests from the view.
 		/// </summary>
-		/// <param name="payload">Optional payload.</param>
-		[Request(LoginRequests.Echo)]
-		public static void HandleEcho(object payload)
+		/// <param name="payload">Login payload from the view.</param>
+		[Features.Login.Infrastructure.Attributes.Request(LoginRequests.SubmitLogin)]
+		public static void SubmitLogin(LoginRequestPayload payload)
 		{
-			EventBus.Publish(LoginEvents.Echoed, payload);
+			if (payload == null)
+			{
+				EventBus.Publish(LoginEvents.LoginFailed, "Missing login payload.");
+				return;
+			}
+
+			_ = PerformLoginAsync(payload);
+		}
+
+		/// <summary>
+		/// Performs the login request and publishes the outcome.
+		/// </summary>
+		/// <param name="payload">Login payload.</param>
+		/// <returns>Awaitable task.</returns>
+		public static Task PerformLoginAsync(LoginRequestPayload payload)
+		{
+			if (payload == null)
+			{
+				EventBus.Publish(LoginEvents.LoginFailed, "Missing login payload.");
+				return Task.CompletedTask;
+			}
+
+			return PerformLoginInternalAsync(payload);
+		}
+
+		private static async Task PerformLoginInternalAsync(LoginRequestPayload payload)
+		{
+			var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.Login, payload);
+			if (string.IsNullOrWhiteSpace(responseJson))
+			{
+				AuthTokenModel.AccessToken = null;
+				AuthTokenModel.RefreshToken = null;
+				EventBus.Publish(LoginEvents.LoginFailed, "Empty server response.");
+				return;
+			}
+
+			var response = JsonConvert.DeserializeObject<LoginResponsePayload>(responseJson);
+			if (response != null && !string.IsNullOrWhiteSpace(response.AccessToken))
+			{
+				AuthTokenModel.AccessToken = response.AccessToken;
+				AuthTokenModel.RefreshToken = response.RefreshToken;
+				EventBus.Publish(LoginEvents.LoginSucceeded, response.AccessToken);
+				
+				if (Application.isPlaying)
+				{
+					_ = FetchCharactersAndRedirectAsync();
+				}
+				return;
+			}
+
+			AuthTokenModel.AccessToken = null;
+			AuthTokenModel.RefreshToken = null;
+			var errorMessage = response != null && !string.IsNullOrWhiteSpace(response.Error)
+				? response.Error
+				: response != null && !string.IsNullOrWhiteSpace(response.Message)
+					? response.Message
+				: "Invalid credentials.";
+			EventBus.Publish(LoginEvents.LoginFailed, errorMessage);
+		}
+
+		private static async Task FetchCharactersAndRedirectAsync()
+		{
+			var ResponseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.Characters);
+			if (string.IsNullOrWhiteSpace(ResponseJson))
+			{
+				// If we can't fetch characters, default to creation
+				LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay);
+				return;
+			}
+
+			try
+			{
+				var characters = JsonConvert.DeserializeObject<List<object>>(ResponseJson);
+				if (characters != null && characters.Count > 0)
+				{
+					LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.GamePlayGameplay);
+				}
+				else
+				{
+					LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay);
+				}
+			}
+			catch
+			{
+				LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay);
+			}
 		}
 	}
 }

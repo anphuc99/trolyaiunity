@@ -1,0 +1,18 @@
+{
+    "name": "GamePlay.Chat",
+    "rootNamespace": "",
+    "references": [
+        "Core",
+        "Unity.TextMeshPro",
+        "Share"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

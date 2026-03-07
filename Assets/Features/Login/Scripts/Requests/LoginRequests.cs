@@ -1,5 +1,3 @@
-using System;
-
 namespace Features.Login.Requests
 {
 	/// <summary>
@@ -7,6 +5,6 @@ namespace Features.Login.Requests
 	/// </summary>
 	public static class LoginRequests
 	{
-		public const string Echo = "login.echo.request";
+		public const string SubmitLogin = "login.submit.request";
 	}
 }

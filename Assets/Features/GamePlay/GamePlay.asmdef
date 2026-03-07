@@ -1,0 +1,27 @@
+{
+    "name": "GamePlay",
+    "rootNamespace": "",
+    "references": [
+        "Core",
+        "Share",
+        "GamePlay.Home",
+        "GamePlay.Journal",
+        "GamePlay.Character",
+        "GamePlay.Story",
+        "GamePlay.Practice",
+        "GamePlay.Task",
+        "GamePlay.Chat",
+        "Unity.TextMeshPro",
+        "GamePlay.Setting",
+        "GamePlay.MyLog"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
