@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 namespace Share.Components
 {
-    public class GamePlayMenuItem : MonoBehaviour
+    public class SharedMenuItem : MonoBehaviour
     {
         public TextMeshProUGUI Text;
         public Button button;

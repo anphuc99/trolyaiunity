@@ -4,13 +4,13 @@ using UnityEngine;
 
 namespace Share.Components
 {
-    public class GamePlayMenuButton : MonoBehaviour
+    public class SharedMenuButton : MonoBehaviour
     {
-        public GamePlayMenuItem MenuItemPrefab;
+        public SharedMenuItem MenuItemPrefab;
 
         public GameObject MenuContainer;
 
-        private readonly Dictionary<string, GamePlayMenuItem> _menuItemsById = new Dictionary<string, GamePlayMenuItem>(StringComparer.Ordinal);
+        private readonly Dictionary<string, SharedMenuItem> _menuItemsById = new Dictionary<string, SharedMenuItem>(StringComparer.Ordinal);
 
         private void Awake()
         {

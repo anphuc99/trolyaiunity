@@ -13,7 +13,7 @@ namespace Features.GamePlay.View
 	/// </summary>
 	public sealed class GamePlayView : BaseView
 	{
-		public GamePlayMenuButton MenuButton;
+		public SharedMenuButton MenuButton;
 
 		[OnEvent(GamePlayEvents.MenuItemAddRequested)]
 		private void HandleMenuItemAddRequested(object payload)
