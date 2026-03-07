@@ -124,6 +124,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
+			SetCharacterRespondingState(true);
+
 			_messageContainer.AddNewMessage(new MessageBubbleData
 			{
 				MessageId = Guid.NewGuid().ToString("N"),
@@ -696,8 +698,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			_inputField.onSubmit.RemoveListener(HandleInputSubmitted);
 			_inputField.onSubmit.AddListener(HandleInputSubmitted);
-			_inputField.onEndEdit.RemoveListener(HandleInputEndEdit);
-			_inputField.onEndEdit.AddListener(HandleInputEndEdit);
 		}
 
 		private void UnbindInputFieldEvents()
@@ -708,7 +708,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			_inputField.onSubmit.RemoveListener(HandleInputSubmitted);
-			_inputField.onEndEdit.RemoveListener(HandleInputEndEdit);
 		}
 
 		private void BindRecordButtonEvents()
@@ -734,16 +733,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		private void HandleInputSubmitted(string value)
 		{
-			SendInputMessage();
-		}
-
-		private void HandleInputEndEdit(string value)
-		{
-			if (!Input.GetKeyDown(KeyCode.Return) && !Input.GetKeyDown(KeyCode.KeypadEnter))
-			{
-				return;
-			}
-
 			SendInputMessage();
 		}
 
