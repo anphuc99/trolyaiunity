@@ -3,6 +3,7 @@ using Features.GamePlay.Events;
 using Features.GamePlay.Infrastructure.Attributes;
 using Features.GamePlay.Model;
 using Features.GamePlay.Requests;
+using Share.Components;
 using UnityEngine;
 
 namespace Features.GamePlay.View

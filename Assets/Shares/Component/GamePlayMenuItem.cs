@@ -3,7 +3,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Features.GamePlay.View
+namespace Share.Components
 {
     public class GamePlayMenuItem : MonoBehaviour
     {

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Features.GamePlay.View
+namespace Share.Components
 {
     public class GamePlayMenuButton : MonoBehaviour
     {
