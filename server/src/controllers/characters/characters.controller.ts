@@ -386,7 +386,7 @@ export const createCharactersController = (dataSource: DataSource): CharactersCo
 
       const avatarUrl = buildAbsoluteUrl(request, `/public/avatars/${avatarFilename}`);
 
-      response.json({ avatar: avatarUrl });
+      response.json({ url: avatarUrl });
     } catch (error) {
       console.error("Failed to upload avatar.", error);
       response.status(500).json({
