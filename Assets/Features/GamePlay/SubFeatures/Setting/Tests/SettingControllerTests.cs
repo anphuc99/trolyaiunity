@@ -71,12 +71,6 @@ namespace Features.GamePlay.SubFeatures.Setting.Tests
 			FakeServer.Register("GET", NetworkEndpoints.UserMe,
 				_ => "{\"user\":{\"id\":1,\"username\":\"mimi\",\"name\":\"Test\",\"age\":20,\"description\":\"Desc\",\"levelId\":2,\"currentStoryId\":3,\"voiceName\":\"alloy\",\"pitch\":1.1}}"
 			);
-			FakeServer.Register("GET", NetworkEndpoints.Levels,
-				_ => "{\"levels\":[{\"id\":2,\"level\":\"B1\",\"descript\":\"Level desc\"}]}"
-			);
-			FakeServer.Register("GET", NetworkEndpoints.Stories,
-				_ => "{\"stories\":[{\"id\":3,\"name\":\"Story\"}]}"
-			);
 
 			EventBus.Subscribe(SettingEvents.ProfileLoaded, Handler);
 			try
@@ -90,8 +84,7 @@ namespace Features.GamePlay.SubFeatures.Setting.Tests
 			}
 
 			Assert.IsNotNull(loadedPayload);
-			Assert.AreEqual(2, loadedPayload.LevelId);
-			Assert.AreEqual(1, loadedPayload.Levels.Count);
+			Assert.AreEqual(0, loadedPayload.Levels.Count);
 			Assert.AreEqual(1, loadedPayload.Voices.Count);
 			Assert.AreEqual("Mimi (alloy)", loadedPayload.Voices[0].Label);
 		}

@@ -107,10 +107,8 @@ namespace Features.GamePlay.SubFeatures.Setting.Controller
 			try
 			{
 				var userTask = HttpClient.GetTaskAsync(NetworkEndpoints.UserMe);
-				var levelsTask = HttpClient.GetTaskAsync(NetworkEndpoints.Levels);
-				var storiesTask = HttpClient.GetTaskAsync(NetworkEndpoints.Stories);
 
-				await Task.WhenAll(userTask, levelsTask, storiesTask);
+				await userTask;
 
 				var userResponse = ParseResponse<SettingUserResponsePayload>(await userTask);
 				if (userResponse?.User == null)
@@ -119,12 +117,9 @@ namespace Features.GamePlay.SubFeatures.Setting.Controller
 					return;
 				}
 
-				var levelsResponse = ParseResponse<SettingLevelsResponsePayload>(await levelsTask);
-				var storiesResponse = ParseResponse<SettingStoriesResponsePayload>(await storiesTask);
-
 				SettingState.CurrentProfile = userResponse.User;
-				SettingState.CachedLevels = levelsResponse?.Levels ?? new List<SettingLevelOptionPayload>();
-				SettingState.CachedStories = storiesResponse?.Stories ?? new List<SettingStoryOptionPayload>();
+				SettingState.CachedLevels = new List<SettingLevelOptionPayload>();
+				SettingState.CachedStories = new List<SettingStoryOptionPayload>();
 				SettingState.CachedVoices = BuildVoiceOptions();
 
 				PublishProfileLoaded();
