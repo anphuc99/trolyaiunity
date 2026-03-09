@@ -1,12 +1,19 @@
-using System;
-
 namespace Features.GamePlay.SubFeatures.Subjects.Requests
 {
 	/// <summary>
-	/// Request keys for this subfeature.
+	/// Request keys for the Subjects subfeature.
 	/// </summary>
 	public static class SubjectsRequests
 	{
-		public const string Echo = "game.play.subjects.echo.request";
+		/// <summary>
+		/// Requests loading the subjects list from the server.
+		/// </summary>
+		public const string LoadSubjects = "game.play.subjects.load.request";
+
+		/// <summary>
+		/// Requests opening the Knowledges subfeature for a selected subject.
+		/// Payload: SubjectItemPayload (id, name, description).
+		/// </summary>
+		public const string SelectSubject = "game.play.subjects.select.request";
 	}
 }

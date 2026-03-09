@@ -13,6 +13,9 @@ using Features.GamePlay.SubFeatures.Journal.Controller;
 using Features.GamePlay.SubFeatures.Journal.Model;
 using Features.GamePlay.SubFeatures.Setting.Controller;
 using Features.GamePlay.SubFeatures.Setting.Model;
+using Features.GamePlay.SubFeatures.Subjects.Controller;
+using Features.GamePlay.SubFeatures.Subjects.Model;
+using Features.GamePlay.SubFeatures.Knowledges.Controller;
 using Core.Infrastructure.Network;
 using Core.Infrastructure.State;
 using CoreEvents = Core.Infrastructure.Events;
@@ -189,6 +192,12 @@ namespace Features.GamePlay.Controller
 				case GamePlaySubControllerType.Setting:
 					SettingController.Install();
 					break;
+				case GamePlaySubControllerType.Subjects:
+					SubjectsController.Install();
+					break;
+				case GamePlaySubControllerType.Knowledges:
+					KnowledgesController.Install();
+					break;
 			}
 			GamePlayState.CurrentSubController = subControllerType;
 		}
@@ -228,6 +237,10 @@ namespace Features.GamePlay.Controller
 				GetCharacterNames = GetChatCharacterNames,
 				GetCharacterVoiceName = GetChatCharacterVoiceName,
 				GetCharacterPitch = GetChatCharacterPitch
+			});
+			SubjectsController.SetParentSignals(new SubjectsParentSignals
+			{
+				OnSubjectSelected = OnSubjectSelected,
 			});
 		}
 
@@ -613,6 +626,7 @@ namespace Features.GamePlay.Controller
 			ChatController.SetParentSignals(null);
 			JournalController.SetParentSignals(null);
 			SettingController.SetParentSignals(null);
+			SubjectsController.SetParentSignals(null);
 		}
 
 		/// <summary>
@@ -634,6 +648,12 @@ namespace Features.GamePlay.Controller
 					break;
 				case GamePlaySubControllerType.Setting:
 					SettingController.Uninstall();
+					break;
+				case GamePlaySubControllerType.Subjects:
+					SubjectsController.Uninstall();
+					break;
+				case GamePlaySubControllerType.Knowledges:
+					KnowledgesController.Uninstall();
 					break;
 			}
 		}
@@ -683,6 +703,22 @@ namespace Features.GamePlay.Controller
 		private static void OnSubControllerEchoed(object payload)
 		{
 			EventBus.Publish(GamePlayEvents.Echoed, payload);
+		}
+
+		/// <summary>
+		/// Handles subject selection from the Subjects subcontroller.
+		/// Stores selected subject id in GlobalVariables and opens the Knowledges subfeature.
+		/// </summary>
+		/// <param name="subjectId">Selected subject identifier.</param>
+		private static void OnSubjectSelected(int subjectId)
+		{
+			if (subjectId <= 0)
+			{
+				return;
+			}
+
+			GlobalVariables.Set("global.subjects.selected.id", subjectId);
+			HandleOpenSubController(GamePlaySubControllerType.Knowledges);
 		}
 
 		/// <summary>

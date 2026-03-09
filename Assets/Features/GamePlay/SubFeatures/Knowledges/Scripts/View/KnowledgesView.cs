@@ -7,29 +7,28 @@ using UnityEngine;
 namespace Features.GamePlay.SubFeatures.Knowledges.View
 {
 	/// <summary>
-	/// View for Knowledges.
+	/// View for Knowledges subfeature.
 	/// </summary>
 	public sealed class KnowledgesView : BaseView
 	{
-		[SerializeField]
-		private string _message = "Hello";
-
 		/// <summary>
-		/// Example method to send a request.
+		/// Shows the Knowledges view when installed.
 		/// </summary>
-		public void SendEcho()
+		/// <param name="payload">Unused payload.</param>
+		[OnEvent(KnowledgesEvents.Installed)]
+		private void OnInstalled(object payload)
 		{
-			SendRequest(KnowledgesRequests.Echo, _message);
+			gameObject.SetActive(true);
 		}
 
 		/// <summary>
-		/// Example event handler (auto-bound).
+		/// Hides the Knowledges view when uninstalled.
 		/// </summary>
-		/// <param name="payload">Payload from controller.</param>
-		[OnEvent(KnowledgesEvents.Echoed)]
-		private void OnEchoed(object payload)
+		/// <param name="payload">Unused payload.</param>
+		[OnEvent(KnowledgesEvents.Uninstalled)]
+		private void OnUninstalled(object payload)
 		{
-			Debug.Log("[KnowledgesView] Echoed: " + payload, this);
+			gameObject.SetActive(false);
 		}
 	}
 }

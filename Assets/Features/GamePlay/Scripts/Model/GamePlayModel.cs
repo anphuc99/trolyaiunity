@@ -9,6 +9,8 @@ namespace Features.GamePlay.Model
 		Chat,
 		Journal,
 		Setting,
+		Subjects,
+		Knowledges,
 	}
 
 	/// <summary>

@@ -29,6 +29,22 @@ namespace Features.GamePlay.SubFeatures.Knowledges.Controller
 		}
 
 		/// <summary>
+		/// Installs the Knowledges subfeature.
+		/// </summary>
+		public static void Install()
+		{
+			EventBus.Publish(KnowledgesEvents.Installed, null);
+		}
+
+		/// <summary>
+		/// Uninstalls the Knowledges subfeature.
+		/// </summary>
+		public static void Uninstall()
+		{
+			EventBus.Publish(KnowledgesEvents.Uninstalled, null);
+		}
+
+		/// <summary>
 		/// Binds parent-provided signals for this subfeature.
 		/// </summary>
 		/// <param name="signals">Signals implemented by the parent feature.</param>

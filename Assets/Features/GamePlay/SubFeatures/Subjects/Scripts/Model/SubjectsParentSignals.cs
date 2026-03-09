@@ -8,13 +8,9 @@ namespace Features.GamePlay.SubFeatures.Subjects.Model
 	public sealed class SubjectsParentSignals
 	{
 		/// <summary>
-		/// Optional callback invoked when the child echoes a payload.
+		/// Callback invoked when the user selects a subject to view its knowledges.
+		/// Parameter: selected subject id.
 		/// </summary>
-		public Action<object> OnEchoed { get; set; }
-
-		/// <summary>
-		/// Optional callback for retrieving data from the parent.
-		/// </summary>
-		public Func<string> GetParentStatus { get; set; }
+		public Action<int> OnSubjectSelected { get; set; }
 	}
 }

@@ -26,7 +26,8 @@ namespace Core.Infrastructure.Network
 			{ BuildKey("POST", NetworkEndpoints.CharactersUploadAvatar), _ => "{\"url\":\"/public/avatars/fake-avatar.jpg\"}" },
 			{ BuildKey("GET", NetworkEndpoints.UserMe), _ => "{\"user\":{\"id\":1,\"username\":\"mimi\",\"name\":\"Mimi\",\"age\":18,\"description\":\"Learner\",\"levelId\":null,\"currentStoryId\":null,\"voiceName\":\"alloy\",\"pitch\":1.0}}" },
 			{ BuildKey("PUT", NetworkEndpoints.UserProfile), _ => "{\"user\":{\"id\":1,\"username\":\"mimi\",\"name\":\"Mimi\",\"age\":18,\"description\":\"Learner\",\"levelId\":null,\"currentStoryId\":null,\"voiceName\":\"alloy\",\"pitch\":1.0}}" },
-			{ BuildKey("GET", NetworkEndpoints.Personalities), _ => BuildPersonalitiesResponse() }
+			{ BuildKey("GET", NetworkEndpoints.Personalities), _ => BuildPersonalitiesResponse() },
+			{ BuildKey("GET", NetworkEndpoints.Subjects), _ => "[{\"id\":1,\"name\":\"Toán\",\"description\":\"Môn Toán cơ bản\"},{\"id\":2,\"name\":\"Tiếng Anh\",\"description\":\"Học Tiếng Anh giao tiếp\"}]" },
 		};
 
 		private static readonly Dictionary<string, Func<string, string>> Responses = CloneDefaults();
