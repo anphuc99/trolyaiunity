@@ -14,6 +14,7 @@ export const createAuthRoutes = (dataSource: DataSource) => {
 
   router.post("/register", controller.register);
   router.post("/login", controller.login);
+  router.post("/token/validate", controller.validateToken);
   router.post("/token/refresh", controller.refreshToken);
 
   return router;

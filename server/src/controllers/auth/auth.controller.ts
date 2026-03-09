@@ -4,13 +4,16 @@ import type { DataSource } from "typeorm";
 import UserEntity from "../../models/user.entity.js";
 import {
   signAuthTokenPair,
+  signRefreshToken,
   verifyRefreshToken,
+  isTokenExpiredError,
   type AuthTokenPair
 } from "../../services/auth.service.js";
 
 interface AuthController {
   register: (request: Request, response: Response) => Promise<void>;
   login: (request: Request, response: Response) => Promise<void>;
+  validateToken: (request: Request, response: Response) => void;
   refreshToken: (request: Request, response: Response) => Promise<void>;
 }
 
@@ -127,6 +130,46 @@ export const createAuthController = (dataSource: DataSource): AuthController => 
   };
 
   /**
+   * Validates a refresh token and returns a new one (extends expiry by 7 days).
+   *
+   * Body: { refreshToken: string }
+   * Response: { valid: true, refreshToken: string } or { valid: false, ... }
+   */
+  const validateToken: AuthController["validateToken"] = (request, response) => {
+    const body = request.body as Record<string, unknown>;
+    const refreshToken = typeof body.refreshToken === "string" ? body.refreshToken.trim() : "";
+
+    if (!refreshToken) {
+      response.status(400).json({ valid: false, message: "Refresh token is required" });
+      return;
+    }
+
+    try {
+      const user = verifyRefreshToken(refreshToken);
+      const newRefreshToken = signRefreshToken(user);
+
+      response.json({ valid: true, refreshToken: newRefreshToken });
+    } catch (error) {
+      console.error("Token validation failed.", error);
+
+      if (isTokenExpiredError(error)) {
+        response.status(401).json({
+          valid: false,
+          code: "TOKEN_EXPIRED",
+          message: "Refresh token has expired"
+        });
+        return;
+      }
+
+      response.status(401).json({
+        valid: false,
+        message: "Invalid refresh token",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
+  /**
    * Exchanges a refresh token for a new token pair.
    */
   const refreshToken: AuthController["refreshToken"] = async (request, response) => {
@@ -159,5 +202,5 @@ export const createAuthController = (dataSource: DataSource): AuthController => 
     }
   };
 
-  return { register, login, refreshToken };
+  return { register, login, validateToken, refreshToken };
 };
