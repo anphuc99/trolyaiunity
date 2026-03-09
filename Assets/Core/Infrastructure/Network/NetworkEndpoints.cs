@@ -7,9 +7,9 @@ namespace Core.Infrastructure.Network
 	{
 		public const string Health = "/api/health";
 		public const string Version = "/api/version";
-		public const string Login = "/api/users/login";
+		public const string Login = "/api/auth/login";
 		public const string TokenValidate = "/api/token/validate";
-		public const string TokenRefresh = "/api/token/refresh";
+		public const string TokenRefresh = "/api/auth/token/refresh";
 		public const string Characters = "/api/characters";
 		public const string CharactersUploadAvatar = "/api/characters/upload-avatar";
 		public const string Levels = "/api/levels";
