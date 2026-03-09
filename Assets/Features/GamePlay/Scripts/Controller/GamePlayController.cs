@@ -16,6 +16,8 @@ using Features.GamePlay.SubFeatures.Setting.Model;
 using Features.GamePlay.SubFeatures.Subjects.Controller;
 using Features.GamePlay.SubFeatures.Subjects.Model;
 using Features.GamePlay.SubFeatures.Knowledges.Controller;
+using Features.GamePlay.SubFeatures.CreateSubjects.Controller;
+using Features.GamePlay.SubFeatures.CreateSubjects.Model;
 using Core.Infrastructure.Network;
 using Core.Infrastructure.State;
 using CoreEvents = Core.Infrastructure.Events;
@@ -198,6 +200,9 @@ namespace Features.GamePlay.Controller
 				case GamePlaySubControllerType.Knowledges:
 					KnowledgesController.Install();
 					break;
+				case GamePlaySubControllerType.CreateSubjects:
+					CreateSubjectsController.Install();
+					break;
 			}
 			GamePlayState.CurrentSubController = subControllerType;
 		}
@@ -241,6 +246,12 @@ namespace Features.GamePlay.Controller
 			SubjectsController.SetParentSignals(new SubjectsParentSignals
 			{
 				OnSubjectSelected = OnSubjectSelected,
+				OnOpenCreateSubjects = OnOpenCreateSubjects,
+			});
+			CreateSubjectsController.SetParentSignals(new CreateSubjectsParentSignals
+			{
+				OnSubjectCreated = OnSubjectCreated,
+				OnCancelled = OnCreateSubjectsCancelled,
 			});
 		}
 
@@ -627,6 +638,7 @@ namespace Features.GamePlay.Controller
 			JournalController.SetParentSignals(null);
 			SettingController.SetParentSignals(null);
 			SubjectsController.SetParentSignals(null);
+			CreateSubjectsController.SetParentSignals(null);
 		}
 
 		/// <summary>
@@ -654,6 +666,9 @@ namespace Features.GamePlay.Controller
 					break;
 				case GamePlaySubControllerType.Knowledges:
 					KnowledgesController.Uninstall();
+					break;
+				case GamePlaySubControllerType.CreateSubjects:
+					CreateSubjectsController.Uninstall();
 					break;
 			}
 		}
@@ -719,6 +734,33 @@ namespace Features.GamePlay.Controller
 
 			GlobalVariables.Set("global.subjects.selected.id", subjectId);
 			HandleOpenSubController(GamePlaySubControllerType.Knowledges);
+		}
+
+		/// <summary>
+		/// Handles request to open CreateSubjects from the Subjects subcontroller.
+		/// </summary>
+		private static void OnOpenCreateSubjects()
+		{
+			HandleOpenSubController(GamePlaySubControllerType.CreateSubjects);
+		}
+
+		/// <summary>
+		/// Handles successful subject creation from CreateSubjects.
+		/// Navigates back to the Subjects list.
+		/// </summary>
+		/// <param name="subjectId">Created subject identifier.</param>
+		private static void OnSubjectCreated(int subjectId)
+		{
+			HandleOpenSubController(GamePlaySubControllerType.Subjects);
+		}
+
+		/// <summary>
+		/// Handles cancellation of CreateSubjects.
+		/// Navigates back to the Subjects list.
+		/// </summary>
+		private static void OnCreateSubjectsCancelled()
+		{
+			HandleOpenSubController(GamePlaySubControllerType.Subjects);
 		}
 
 		/// <summary>

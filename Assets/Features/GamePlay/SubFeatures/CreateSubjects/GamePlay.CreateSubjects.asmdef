@@ -1,7 +1,10 @@
 {
     "name": "GamePlay.CreateSubjects",
     "rootNamespace": "",
-    "references": ["Core"],
+    "references": [
+        "Core",
+        "Unity.TextMeshPro"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

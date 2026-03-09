@@ -15,5 +15,10 @@ namespace Features.GamePlay.SubFeatures.Subjects.Requests
 		/// Payload: SubjectItemPayload (id, name, description).
 		/// </summary>
 		public const string SelectSubject = "game.play.subjects.select.request";
+
+		/// <summary>
+		/// Requests opening the CreateSubjects subfeature to create a new subject.
+		/// </summary>
+		public const string OpenCreateSubjects = "game.play.subjects.open.create.request";
 	}
 }

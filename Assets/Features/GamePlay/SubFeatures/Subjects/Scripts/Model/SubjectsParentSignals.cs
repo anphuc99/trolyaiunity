@@ -12,5 +12,10 @@ namespace Features.GamePlay.SubFeatures.Subjects.Model
 		/// Parameter: selected subject id.
 		/// </summary>
 		public Action<int> OnSubjectSelected { get; set; }
+
+		/// <summary>
+		/// Callback invoked when the user wants to create a new subject.
+		/// </summary>
+		public Action OnOpenCreateSubjects { get; set; }
 	}
 }

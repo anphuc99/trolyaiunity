@@ -1,7 +1,10 @@
 {
     "name": "GamePlay.CreateSubjects.Tests",
     "rootNamespace": "",
-    "references": ["GamePlay.CreateSubjects"],
+    "references": [
+        "GamePlay.CreateSubjects",
+        "Core"
+    ],
     "includePlatforms": ["Editor"],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

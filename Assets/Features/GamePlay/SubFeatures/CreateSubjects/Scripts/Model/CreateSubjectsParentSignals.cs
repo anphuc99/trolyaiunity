@@ -8,13 +8,14 @@ namespace Features.GamePlay.SubFeatures.CreateSubjects.Model
 	public sealed class CreateSubjectsParentSignals
 	{
 		/// <summary>
-		/// Optional callback invoked when the child echoes a payload.
+		/// Callback invoked when a subject is successfully created.
+		/// Parameter: the created subject id.
 		/// </summary>
-		public Action<object> OnEchoed { get; set; }
+		public Action<int> OnSubjectCreated { get; set; }
 
 		/// <summary>
-		/// Optional callback for retrieving data from the parent.
+		/// Callback invoked when the user cancels subject creation.
 		/// </summary>
-		public Func<string> GetParentStatus { get; set; }
+		public Action OnCancelled { get; set; }
 	}
 }

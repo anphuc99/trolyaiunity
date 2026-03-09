@@ -11,6 +11,7 @@ namespace Features.GamePlay.Model
 		Setting,
 		Subjects,
 		Knowledges,
+		CreateSubjects,
 	}
 
 	/// <summary>

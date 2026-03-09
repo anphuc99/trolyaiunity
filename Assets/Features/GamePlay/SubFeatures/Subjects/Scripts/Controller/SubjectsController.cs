@@ -87,6 +87,16 @@ namespace Features.GamePlay.SubFeatures.Subjects.Controller
 		}
 
 		/// <summary>
+		/// Handles request to open the CreateSubjects subfeature.
+		/// </summary>
+		/// <param name="payload">Unused.</param>
+		[Request(SubjectsRequests.OpenCreateSubjects)]
+		public static void HandleOpenCreateSubjects(object payload)
+		{
+			SubjectsState.ParentSignals?.OnOpenCreateSubjects?.Invoke();
+		}
+
+		/// <summary>
 		/// Loads subjects from the server asynchronously and publishes results.
 		/// </summary>
 		internal static async Task LoadSubjectsInternalAsync()
