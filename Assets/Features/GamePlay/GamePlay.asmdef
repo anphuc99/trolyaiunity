@@ -4,16 +4,11 @@
     "references": [
         "Core",
         "Share",
-        "GamePlay.Home",
         "GamePlay.Journal",
         "GamePlay.Character",
-        "GamePlay.Story",
-        "GamePlay.Practice",
-        "GamePlay.Task",
         "GamePlay.Chat",
         "Unity.TextMeshPro",
-        "GamePlay.Setting",
-        "GamePlay.MyLog"
+        "GamePlay.Setting"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

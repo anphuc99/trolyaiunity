@@ -5,15 +5,10 @@ namespace Features.GamePlay.Model
 	/// </summary>
 	public enum GamePlaySubControllerType
 	{
-		Home,
 		Character,
 		Chat,
 		Journal,
-		Practice,
-		Story,
-		Task,
 		Setting,
-		MyLog
 	}
 
 	/// <summary>

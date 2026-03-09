@@ -37,11 +37,6 @@ namespace Features.GamePlay.View
 			MenuButton.RemoveMenuItem(removePayload.Id);
 		}
 
-		public void OpenHome() 
-		{
-			SendRequest(GamePlayRequests.OpenSubController, GamePlaySubControllerType.Home);	
-		}
-		
 		public void OpenChat()
 		{
 			SendRequest(GamePlayRequests.OpenChat, null);

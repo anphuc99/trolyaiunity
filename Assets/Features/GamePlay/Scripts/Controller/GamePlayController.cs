@@ -9,18 +9,8 @@ using Features.GamePlay.SubFeatures.Character.Controller;
 using Features.GamePlay.SubFeatures.Character.Model;
 using Features.GamePlay.SubFeatures.Chat.Controller;
 using Features.GamePlay.SubFeatures.Chat.Model;
-using Features.GamePlay.SubFeatures.Home.Controller;
-using Features.GamePlay.SubFeatures.Home.Model;
 using Features.GamePlay.SubFeatures.Journal.Controller;
 using Features.GamePlay.SubFeatures.Journal.Model;
-using Features.GamePlay.SubFeatures.MyLog.Controller;
-using Features.GamePlay.SubFeatures.MyLog.Model;
-using Features.GamePlay.SubFeatures.Practice.Controller;
-using Features.GamePlay.SubFeatures.Practice.Model;
-using Features.GamePlay.SubFeatures.Story.Controller;
-using Features.GamePlay.SubFeatures.Story.Model;
-using Features.GamePlay.SubFeatures.Task.Controller;
-using Features.GamePlay.SubFeatures.Task.Model;
 using Features.GamePlay.SubFeatures.Setting.Controller;
 using Features.GamePlay.SubFeatures.Setting.Model;
 using Core.Infrastructure.Network;
@@ -29,8 +19,6 @@ using CoreEvents = Core.Infrastructure.Events;
 using Newtonsoft.Json;
 using Share.Model;
 using UnityEngine.Networking;
-using Core.Infrastructure.Scenes;
-using UnityEngine.SceneManagement;
 using System;
 
 namespace Features.GamePlay.Controller
@@ -53,7 +41,7 @@ namespace Features.GamePlay.Controller
 			await LoadChatCharactersCacheAsync();
 			SetAllSubControllerSignals();
 			await Task.Yield();
-			InstallSubController(GamePlaySubControllerType.Home);
+			InstallSubController(GamePlaySubControllerType.Character);
 		}
 
 		/// <summary>
@@ -189,9 +177,6 @@ namespace Features.GamePlay.Controller
 		{
 			switch (subControllerType)
 			{
-				case GamePlaySubControllerType.Home:
-					HomeController.Install();
-					break;
 				case GamePlaySubControllerType.Character:
 					CharacterController.Install();
 					break;
@@ -200,18 +185,6 @@ namespace Features.GamePlay.Controller
 					break;
 				case GamePlaySubControllerType.Journal:
 					JournalController.Install();
-					break;
-				case GamePlaySubControllerType.MyLog:
-					MyLogController.Install();
-					break;
-				case GamePlaySubControllerType.Practice:
-					PracticeController.Install();
-					break;
-				case GamePlaySubControllerType.Story:
-					StoryController.Install();
-					break;
-				case GamePlaySubControllerType.Task:
-					TaskController.Install();
 					break;
 				case GamePlaySubControllerType.Setting:
 					SettingController.Install();
@@ -225,16 +198,6 @@ namespace Features.GamePlay.Controller
 		/// </summary>
 		private static void SetAllSubControllerSignals()
 		{
-			HomeController.SetParentSignals(new HomeParentSignals { 
-				OnEchoed = OnSubControllerEchoed,
-				OpenJournal = OpenDefaultJournal,
-				OpenMyLog = () => HandleOpenSubController(GamePlaySubControllerType.MyLog),
-				OpenStory = () => HandleOpenSubController(GamePlaySubControllerType.Story),
-				OpenCreateCharacter = HandleOpenCreateCharacter,
-				OpenCharacter = () => HandleOpenSubController(GamePlaySubControllerType.Character),
-				OpenPractice = () => HandleOpenSubController(GamePlaySubControllerType.Practice),
-				OpenTask = () => HandleOpenSubController(GamePlaySubControllerType.Task),
-			});
 			CharacterController.SetParentSignals(new CharacterParentSignals
 			{
 				OnEchoed = OnSubControllerEchoed,
@@ -254,23 +217,11 @@ namespace Features.GamePlay.Controller
 				GetCharacterVoiceNameByName = GetChatCharacterVoiceName,
 				GetCharacterPitchByName = GetChatCharacterPitch,
 				GetCharacterSpeakingRateByName = GetChatCharacterSpeakingRate,
-				OpenHome = () => HandleOpenSubController(GamePlaySubControllerType.Home),
 			});
 			JournalController.SetParentSignals(new JournalParentSignals { 
 				OnEchoed = OnSubControllerEchoed,
 				GetAvatar = GetChatCharacterAvatar, 
 			});
-			MyLogController.SetParentSignals(new MyLogParentSignals
-			{
-				OnEchoed = OnSubControllerEchoed,
-				AddMenu = AddMenu,
-				RemoveMenu = RemoveMenu,
-				OpenChat = OpenMyLogChat,
-				OpenJournal = OpenMyLogJournal,
-			});
-			PracticeController.SetParentSignals(new PracticeParentSignals { OnEchoed = OnSubControllerEchoed });
-			StoryController.SetParentSignals(new StoryParentSignals { OnEchoed = OnSubControllerEchoed });
-			TaskController.SetParentSignals(new TaskParentSignals { OnEchoed = OnSubControllerEchoed });
 			SettingController.SetParentSignals(new SettingParentSignals
 			{
 				OnEchoed = OnSubControllerEchoed,
@@ -658,14 +609,9 @@ namespace Features.GamePlay.Controller
 		/// </summary>
 		private static void ClearAllSubControllerSignals()
 		{
-			HomeController.SetParentSignals(null);
 			CharacterController.SetParentSignals(null);
 			ChatController.SetParentSignals(null);
 			JournalController.SetParentSignals(null);
-			MyLogController.SetParentSignals(null);
-			PracticeController.SetParentSignals(null);
-			StoryController.SetParentSignals(null);
-			TaskController.SetParentSignals(null);
 			SettingController.SetParentSignals(null);
 		}
 
@@ -677,9 +623,6 @@ namespace Features.GamePlay.Controller
 		{
 			switch (subControllerType)
 			{
-				case GamePlaySubControllerType.Home:
-					HomeController.Uninstall();
-					break;
 				case GamePlaySubControllerType.Character:
 					CharacterController.Uninstall();
 					break;
@@ -688,18 +631,6 @@ namespace Features.GamePlay.Controller
 					break;
 				case GamePlaySubControllerType.Journal:
 					JournalController.Uninstall();
-					break;
-				case GamePlaySubControllerType.MyLog:
-					MyLogController.Uninstall();
-					break;
-				case GamePlaySubControllerType.Practice:
-					PracticeController.Uninstall();
-					break;
-				case GamePlaySubControllerType.Story:
-					StoryController.Uninstall();
-					break;
-				case GamePlaySubControllerType.Task:
-					TaskController.Uninstall();
 					break;
 				case GamePlaySubControllerType.Setting:
 					SettingController.Uninstall();
@@ -752,29 +683,6 @@ namespace Features.GamePlay.Controller
 		private static void OnSubControllerEchoed(object payload)
 		{
 			EventBus.Publish(GamePlayEvents.Echoed, payload);
-		}
-
-		private static void HandleOpenCreateCharacter()
-		{
-			LoadScene.ByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CreateCharaterGameplay, LoadSceneMode.Additive);
-		}
-
-		private static void OpenDefaultJournal()
-		{
-			GlobalVariables.Set(GlobalModes.JournalApiModeKey, GlobalModes.ModeDefault);
-			HandleOpenSubController(GamePlaySubControllerType.Journal);
-		}
-
-		private static void OpenMyLogChat()
-		{
-			GlobalVariables.Set(GlobalModes.ChatApiModeKey, GlobalModes.ModeMyLog);
-			HandleOpenSubController(GamePlaySubControllerType.Chat);
-		}
-
-		private static void OpenMyLogJournal()
-		{
-			GlobalVariables.Set(GlobalModes.JournalApiModeKey, GlobalModes.ModeMyLog);
-			HandleOpenSubController(GamePlaySubControllerType.Journal);
 		}
 
 		/// <summary>

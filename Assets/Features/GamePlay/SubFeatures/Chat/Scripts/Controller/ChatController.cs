@@ -543,7 +543,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				}
 
 				EventBus.Publish(ChatEvents.ConversationEnded, response);
-				ChatState.ParentSignals?.OpenHome?.Invoke();
 			}
 			catch (Exception exception)
 			{

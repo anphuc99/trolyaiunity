@@ -49,29 +49,20 @@ namespace Features.GamePlay.Tests
 		[Test]
 		public void OpenSubController_ShouldInstallTarget()
 		{
-			var opened = GamePlayController.HandleOpenSubController(GamePlaySubControllerType.Home);
+			var opened = GamePlayController.HandleOpenSubController(GamePlaySubControllerType.Character);
 
 			Assert.IsTrue(opened);
-			Assert.AreEqual(GamePlaySubControllerType.Home.ToString(), GamePlayController.HandleGetCurrentSubController());
+			Assert.AreEqual(GamePlaySubControllerType.Character.ToString(), GamePlayController.HandleGetCurrentSubController());
 		}
 
 		[Test]
 		public void OpenSubController_ShouldCloseCurrentBeforeOpeningNewOne()
 		{
-			GamePlayController.HandleOpenSubController(GamePlaySubControllerType.Home);
+			GamePlayController.HandleOpenSubController(GamePlaySubControllerType.Character);
 			var opened = GamePlayController.HandleOpenSubController(GamePlaySubControllerType.Chat);
 
 			Assert.IsTrue(opened);
 			Assert.AreEqual(GamePlaySubControllerType.Chat.ToString(), GamePlayController.HandleGetCurrentSubController());
-		}
-
-		[Test]
-		public void OpenSubController_ShouldOpenMyLog()
-		{
-			var opened = GamePlayController.HandleOpenSubController(GamePlaySubControllerType.MyLog);
-
-			Assert.IsTrue(opened);
-			Assert.AreEqual(GamePlaySubControllerType.MyLog.ToString(), GamePlayController.HandleGetCurrentSubController());
 		}
 
 		[Test]
