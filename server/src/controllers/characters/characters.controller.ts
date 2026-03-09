@@ -7,11 +7,15 @@ import CharacterEntity from "../../models/character.entity.js";
 
 interface CharacterPayload {
   name: string;
+  personality: string;
+  gender: string;
   age?: number | null;
-  description: string;
+  appearance?: string | null;
   avatar?: string | null;
+  voiceModel?: string | null;
   voiceName?: string | null;
   pitch?: number | null;
+  speakingRate?: number | null;
 }
 
 interface AvatarUploadPayload {
@@ -22,11 +26,15 @@ interface AvatarUploadPayload {
 interface CharacterResponse {
   id: number;
   name: string;
+  personality: string;
+  gender: string;
   age: number | null;
-  description: string;
+  appearance: string | null;
   avatar: string | null;
+  voiceModel: string | null;
   voiceName: string | null;
   pitch: number | null;
+  speakingRate: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -82,14 +90,20 @@ const buildAbsoluteUrl = (request: Request, assetPath: string) => {
   return `${request.protocol}://${host}${normalizedPath}`;
 };
 
+const VALID_GENDERS = new Set(["male", "female"]);
+
 const toResponse = (entity: CharacterEntity): CharacterResponse => ({
   id: entity.id,
   name: entity.name,
+  personality: entity.personality,
+  gender: entity.gender,
   age: entity.age ?? null,
-  description: entity.description,
+  appearance: entity.appearance ?? null,
   avatar: entity.avatar ?? null,
+  voiceModel: entity.voiceModel ?? null,
   voiceName: entity.voiceName ?? null,
   pitch: entity.pitch ?? null,
+  speakingRate: entity.speakingRate ?? null,
   createdAt: entity.createdAt.toISOString(),
   updatedAt: entity.updatedAt.toISOString()
 });
@@ -152,15 +166,21 @@ export const createCharactersController = (dataSource: DataSource): CharactersCo
 
     const payload = request.body as CharacterPayload;
     const name = typeof payload?.name === "string" ? payload.name.trim() : "";
-    const description = typeof payload?.description === "string" ? payload.description.trim() : "";
+    const personality = typeof payload?.personality === "string" ? payload.personality.trim() : "";
+    const gender = typeof payload?.gender === "string" ? payload.gender.trim().toLowerCase() : "";
 
     if (!name) {
       response.status(400).json({ message: "Character name is required" });
       return;
     }
 
-    if (!description) {
-      response.status(400).json({ message: "Character description is required" });
+    if (!personality) {
+      response.status(400).json({ message: "Character personality is required" });
+      return;
+    }
+
+    if (!VALID_GENDERS.has(gender)) {
+      response.status(400).json({ message: "Gender must be 'male' or 'female'" });
       return;
     }
 
@@ -170,16 +190,24 @@ export const createCharactersController = (dataSource: DataSource): CharactersCo
       return;
     }
 
+    const appearance = typeof payload?.appearance === "string" ? payload.appearance.trim() || null : null;
+    const voiceModel = typeof payload?.voiceModel === "string" ? payload.voiceModel.trim() || null : null;
     const voiceName = typeof payload?.voiceName === "string" ? payload.voiceName.trim() || null : null;
     const pitch = typeof payload?.pitch === "number" ? payload.pitch : null;
+    const speakingRate = typeof payload?.speakingRate === "number" ? payload.speakingRate : null;
 
     try {
       const character = repository.create({
         name,
+        personality,
+        gender: gender as "male" | "female",
         age: ageResult.value,
-        description,
+        appearance,
+        avatar: typeof payload?.avatar === "string" ? payload.avatar.trim() || null : null,
+        voiceModel,
         voiceName,
         pitch,
+        speakingRate,
         userId: request.user.id
       });
 
@@ -227,13 +255,22 @@ export const createCharactersController = (dataSource: DataSource): CharactersCo
         character.name = name;
       }
 
-      if (typeof body.description === "string") {
-        const description = body.description.trim();
-        if (!description) {
-          response.status(400).json({ message: "Character description cannot be empty" });
+      if (typeof body.personality === "string") {
+        const personality = body.personality.trim();
+        if (!personality) {
+          response.status(400).json({ message: "Character personality cannot be empty" });
           return;
         }
-        character.description = description;
+        character.personality = personality;
+      }
+
+      if (typeof body.gender === "string") {
+        const gender = body.gender.trim().toLowerCase();
+        if (!VALID_GENDERS.has(gender)) {
+          response.status(400).json({ message: "Gender must be 'male' or 'female'" });
+          return;
+        }
+        character.gender = gender as "male" | "female";
       }
 
       if (body.age !== undefined) {
@@ -245,12 +282,24 @@ export const createCharactersController = (dataSource: DataSource): CharactersCo
         character.age = ageResult.value;
       }
 
+      if (body.appearance !== undefined) {
+        character.appearance = typeof body.appearance === "string" ? body.appearance.trim() || null : null;
+      }
+
+      if (body.voiceModel !== undefined) {
+        character.voiceModel = typeof body.voiceModel === "string" ? body.voiceModel.trim() || null : null;
+      }
+
       if (body.voiceName !== undefined) {
         character.voiceName = typeof body.voiceName === "string" ? body.voiceName.trim() || null : null;
       }
 
       if (body.pitch !== undefined) {
         character.pitch = typeof body.pitch === "number" ? body.pitch : null;
+      }
+
+      if (body.speakingRate !== undefined) {
+        character.speakingRate = typeof body.speakingRate === "number" ? body.speakingRate : null;
       }
 
       const saved = await repository.save(character);

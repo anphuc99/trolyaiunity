@@ -41,7 +41,7 @@ CHARACTER INFO
 ====================================
 Name: ${character.name}
 ${character.age ? `Age: ${character.age}` : ""}
-Description: ${character.description}`;
+Personality: ${character.personality}`;
   }
 
   prompt += `
