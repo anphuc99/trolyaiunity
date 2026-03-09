@@ -10,7 +10,8 @@
         "Unity.TextMeshPro",
         "GamePlay.Setting",
         "GamePlay.Subjects",
-        "GamePlay.Knowledges"
+        "GamePlay.Knowledges",
+        "GamePlay.CreateSubjects"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
