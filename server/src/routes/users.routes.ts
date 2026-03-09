@@ -17,6 +17,7 @@ export const createUsersRoutes = (dataSource: DataSource) => {
 
   router.get("/me", controller.getMe);
   router.put("/me", controller.updateMe);
+  router.put("/profile", controller.updateMe);
 
   return router;
 };

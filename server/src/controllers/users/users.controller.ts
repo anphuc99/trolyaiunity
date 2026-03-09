@@ -47,7 +47,7 @@ export const createUsersController = (dataSource: DataSource): UsersController =
         return;
       }
 
-      response.json(toProfile(user));
+      response.json({ user: toProfile(user) });
     } catch (error) {
       console.error("Failed to load user profile.", error);
       response.status(500).json({
@@ -98,7 +98,7 @@ export const createUsersController = (dataSource: DataSource): UsersController =
       }
 
       const saved = await userRepository.save(user);
-      response.json(toProfile(saved));
+      response.json({ user: toProfile(saved) });
     } catch (error) {
       console.error("Failed to update user profile.", error);
       response.status(500).json({
