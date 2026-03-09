@@ -1,7 +1,7 @@
 {
     "name": "CreateCharater",
     "rootNamespace": "",
-    "references": ["Core", "Unity.TextMeshPro"],
+    "references": ["Core", "Unity.TextMeshPro", "Share"],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

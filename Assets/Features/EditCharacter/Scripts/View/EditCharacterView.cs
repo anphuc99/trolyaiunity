@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.IO;
-using System.Reflection;
 using Core.Infrastructure.Views;
 using Features.EditCharacter.Events;
 using Features.EditCharacter.Infrastructure;
@@ -9,6 +8,7 @@ using Features.EditCharacter.Infrastructure.Attributes;
 using Features.EditCharacter.Model;
 using Features.EditCharacter.Requests;
 using Share.Model;
+using Share.Utils;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -199,7 +199,7 @@ namespace Features.EditCharacter.View
 				return;
 			}
 
-			var normalizedGender = NormalizeGender(gender);
+			var normalizedGender = CharacterFormUtils.NormalizeGender(gender);
 			var toggles = _genderToggleGroup.GetComponentsInChildren<Toggle>(true);
 			for (var i = 0; i < toggles.Length; i++)
 			{
@@ -209,11 +209,11 @@ namespace Features.EditCharacter.View
 					continue;
 				}
 
-				var toggleGender = NormalizeGender(toggle.name);
+				var toggleGender = CharacterFormUtils.NormalizeGender(toggle.name);
 				if (string.IsNullOrWhiteSpace(toggleGender))
 				{
 					var label = toggle.GetComponentInChildren<TMP_Text>();
-					toggleGender = NormalizeGender(label != null ? label.text : string.Empty);
+					toggleGender = CharacterFormUtils.NormalizeGender(label != null ? label.text : string.Empty);
 				}
 
 				toggle.isOn = !string.IsNullOrWhiteSpace(normalizedGender)
@@ -235,8 +235,8 @@ namespace Features.EditCharacter.View
 				return;
 			}
 
-			var name = ToNullableString(_nameInput != null ? _nameInput.text : string.Empty);
-			var personality = ToNullableString(_descriptionInput != null ? _descriptionInput.text : string.Empty);
+			var name = CharacterFormUtils.ToNullableString(_nameInput != null ? _nameInput.text : string.Empty);
+			var personality = CharacterFormUtils.ToNullableString(_descriptionInput != null ? _descriptionInput.text : string.Empty);
 			var gender = GetSelectedGender();
 
 			if (_currentCharacterId <= 0 || string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(personality) || string.IsNullOrWhiteSpace(gender))
@@ -246,7 +246,7 @@ namespace Features.EditCharacter.View
 			}
 
 			var voiceName = ResolveVoiceName();
-			var avatar = ToNullableString(_uploadedAvatarUrl);
+			var avatar = CharacterFormUtils.ToNullableString(_uploadedAvatarUrl);
 
 			var payload = new EditCharacterPayload
 			{
@@ -312,7 +312,7 @@ namespace Features.EditCharacter.View
 				yield break;
 			}
 
-			var dataUrl = BuildDataUrl(selectedPath, imageBytes);
+			var dataUrl = DataUrlUtils.BuildImageDataUrl(selectedPath, imageBytes);
 			if (string.IsNullOrWhiteSpace(dataUrl))
 			{
 				ResetUploadingState();
@@ -335,10 +335,10 @@ namespace Features.EditCharacter.View
 		{
 			var selectedPath = string.Empty;
 
-			var fileBrowserType = FindSimpleFileBrowserType();
+			var fileBrowserType = FileBrowserUtils.FindSimpleFileBrowserType();
 			if (fileBrowserType != null)
 			{
-				yield return OpenViaSimpleFileBrowserCoroutine(fileBrowserType, path => selectedPath = path);
+				yield return FileBrowserUtils.OpenViaSimpleFileBrowserCoroutine(fileBrowserType, "Chọn avatar", "Chọn", path => selectedPath = path);
 				onPicked?.Invoke(selectedPath);
 				yield break;
 			}
@@ -351,89 +351,6 @@ namespace Features.EditCharacter.View
 				"Thiết bị chưa có file picker runtime. Vui lòng bật package SimpleFileBrowser cho Android/iOS/PC.");
 			onPicked?.Invoke(string.Empty);
 #endif
-		}
-
-		private IEnumerator OpenViaSimpleFileBrowserCoroutine(Type fileBrowserType, Action<string> onPicked)
-		{
-			var pickModeType = fileBrowserType.GetNestedType("PickMode", BindingFlags.Public);
-			if (pickModeType == null)
-			{
-				onPicked?.Invoke(string.Empty);
-				yield break;
-			}
-
-			var waitMethod = fileBrowserType.GetMethod(
-				"WaitForLoadDialog",
-				BindingFlags.Public | BindingFlags.Static,
-				null,
-				new[] { pickModeType, typeof(bool), typeof(string), typeof(string), typeof(string), typeof(string) },
-				null);
-
-			if (waitMethod == null)
-			{
-				onPicked?.Invoke(string.Empty);
-				yield break;
-			}
-
-			var pickMode = Enum.Parse(pickModeType, "Files");
-			var routine = waitMethod.Invoke(null, new object[] { pickMode, false, null, null, "Chọn avatar", "Chọn" }) as IEnumerator;
-			if (routine != null)
-			{
-				yield return routine;
-			}
-
-			var successProp = fileBrowserType.GetProperty("Success", BindingFlags.Public | BindingFlags.Static);
-			var resultProp = fileBrowserType.GetProperty("Result", BindingFlags.Public | BindingFlags.Static);
-
-			var isSuccess = successProp != null && successProp.GetValue(null) is bool value && value;
-			if (!isSuccess)
-			{
-				onPicked?.Invoke(string.Empty);
-				yield break;
-			}
-
-			var result = resultProp != null ? resultProp.GetValue(null) as string[] : null;
-			onPicked?.Invoke(result != null && result.Length > 0 ? result[0] : string.Empty);
-		}
-
-		private static Type FindSimpleFileBrowserType()
-		{
-			var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-			for (var i = 0; i < assemblies.Length; i += 1)
-			{
-				var assembly = assemblies[i];
-				if (assembly == null)
-				{
-					continue;
-				}
-
-				var type = assembly.GetType("SimpleFileBrowser.FileBrowser", false);
-				if (type != null)
-				{
-					return type;
-				}
-			}
-
-			return null;
-		}
-
-		private static string BuildDataUrl(string filePath, byte[] bytes)
-		{
-			var extension = Path.GetExtension(filePath)?.ToLowerInvariant();
-			var mime = extension == ".png"
-				? "image/png"
-				: extension == ".webp"
-					? "image/webp"
-					: extension == ".jpg" || extension == ".jpeg"
-						? "image/jpeg"
-						: null;
-
-			if (string.IsNullOrWhiteSpace(mime))
-			{
-				return null;
-			}
-
-			return $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
 		}
 
 		private void UpdateAvatarPreview(byte[] bytes)
@@ -475,7 +392,7 @@ namespace Features.EditCharacter.View
 		{
 			ResetUploadingState();
 
-			var avatarUrl = ToNullableString(payload != null ? payload.ToString() : string.Empty);
+			var avatarUrl = CharacterFormUtils.ToNullableString(payload != null ? payload.ToString() : string.Empty);
 			if (!string.IsNullOrWhiteSpace(avatarUrl))
 			{
 				_uploadedAvatarUrl = avatarUrl;
@@ -512,7 +429,7 @@ namespace Features.EditCharacter.View
 					continue;
 				}
 
-				var value = NormalizeGender(toggle.name);
+				var value = CharacterFormUtils.NormalizeGender(toggle.name);
 				if (!string.IsNullOrWhiteSpace(value))
 				{
 					return value;
@@ -521,29 +438,12 @@ namespace Features.EditCharacter.View
 				var label = toggle.GetComponentInChildren<TMP_Text>();
 				if (label != null)
 				{
-					value = NormalizeGender(label.text);
+					value = CharacterFormUtils.NormalizeGender(label.text);
 					if (!string.IsNullOrWhiteSpace(value))
 					{
 						return value;
 					}
 				}
-			}
-
-			return null;
-		}
-
-		private static string NormalizeGender(string raw)
-		{
-			var normalized = (raw ?? string.Empty).Trim().ToLowerInvariant();
-
-			if (normalized.Contains("female") || normalized.Contains("nữ") || normalized == "nu")
-			{
-				return "female";
-			}
-
-			if (normalized.Contains("male") || normalized.Contains("nam"))
-			{
-				return "male";
 			}
 
 			return null;
@@ -585,12 +485,6 @@ namespace Features.EditCharacter.View
 			}
 
 			return text;
-		}
-
-		private static string ToNullableString(string value)
-		{
-			var trimmed = (value ?? string.Empty).Trim();
-			return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
 		}
 
 		public void UpdatePitchNumberText()

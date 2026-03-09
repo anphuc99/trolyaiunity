@@ -3,6 +3,7 @@ using Features.GamePlay.SubFeatures.Practice.Events;
 using Features.GamePlay.SubFeatures.Practice.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.Practice.Model;
 using Features.GamePlay.SubFeatures.Practice.Requests;
+using Share.Utils;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -128,17 +129,17 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 		{
 			if (_koreanText == null)
 			{
-				_koreanText = FindChildByName(transform, "textkr")?.GetComponentInChildren<TMP_Text>();
+				_koreanText = TransformUtils.FindChildByName(transform, "textkr")?.GetComponentInChildren<TMP_Text>();
 			}
 
 			if (_contextBeforeContainer == null)
 			{
-				_contextBeforeContainer = FindChildByName(transform, "5 câu trước")?.gameObject;
+				_contextBeforeContainer = TransformUtils.FindChildByName(transform, "5 câu trước")?.gameObject;
 			}
 
 			if (_contextAfterContainer == null)
 			{
-				_contextAfterContainer = FindChildByName(transform, "5 câu sau")?.gameObject;
+				_contextAfterContainer = TransformUtils.FindChildByName(transform, "5 câu sau")?.gameObject;
 			}
 
 			if (_contextBeforeText == null && _contextBeforeContainer != null)
@@ -153,7 +154,7 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 
 			if (_revealButton == null)
 			{
-				_revealButton = FindChildByName(transform, "btn hiện chữ")?.GetComponent<Button>();
+				_revealButton = TransformUtils.FindChildByName(transform, "btn hiện chữ")?.GetComponent<Button>();
 			}
 
 			if (_revealButtonText == null && _revealButton != null)
@@ -163,64 +164,64 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 
 			if (_tabTitleText == null)
 			{
-				var titleRoot = FindChildByName(transform, "Icon");
+				var titleRoot = TransformUtils.FindChildByName(transform, "Icon");
 				_tabTitleText = titleRoot != null ? titleRoot.GetComponentInChildren<TMP_Text>() : null;
 			}
 
 			if (_journalSummaryText == null)
 			{
-				var summaryRoot = FindChildByName(transform, "Sumary");
+				var summaryRoot = TransformUtils.FindChildByName(transform, "Sumary");
 				_journalSummaryText = summaryRoot != null ? summaryRoot.GetComponentInChildren<TMP_Text>() : null;
 			}
 
 			if (_ratingContainer == null)
 			{
-				_ratingContainer = FindChildByName(transform, "btn đánh giá")?.gameObject;
+				_ratingContainer = TransformUtils.FindChildByName(transform, "btn đánh giá")?.gameObject;
 			}
 
 			if (_rateAgainButton == null)
 			{
-				_rateAgainButton = FindChildByName(transform, "Lại")?.GetComponent<Button>();
+				_rateAgainButton = TransformUtils.FindChildByName(transform, "Lại")?.GetComponent<Button>();
 			}
 
 			if (_rateHardButton == null)
 			{
-				_rateHardButton = FindChildByName(transform, "Khó")?.GetComponent<Button>();
+				_rateHardButton = TransformUtils.FindChildByName(transform, "Khó")?.GetComponent<Button>();
 			}
 
 			if (_rateGoodButton == null)
 			{
-				_rateGoodButton = FindChildByName(transform, "Trung bình")?.GetComponent<Button>();
+				_rateGoodButton = TransformUtils.FindChildByName(transform, "Trung bình")?.GetComponent<Button>();
 			}
 
 			if (_rateEasyButton == null)
 			{
-				_rateEasyButton = FindChildByName(transform, "Dễ")?.GetComponent<Button>();
+				_rateEasyButton = TransformUtils.FindChildByName(transform, "Dễ")?.GetComponent<Button>();
 			}
 
 			if (_tabReviewButton == null)
 			{
-				_tabReviewButton = FindChildByName(transform, "Ôn tập")?.GetComponent<Button>();
+				_tabReviewButton = TransformUtils.FindChildByName(transform, "Ôn tập")?.GetComponent<Button>();
 			}
 
 			if (_tabDifficultButton == null)
 			{
-				_tabDifficultButton = FindChildByName(transform, "Từ khó")?.GetComponent<Button>();
+				_tabDifficultButton = TransformUtils.FindChildByName(transform, "Từ khó")?.GetComponent<Button>();
 			}
 
 			if (_tabStarredButton == null)
 			{
-				_tabStarredButton = FindChildByName(transform, "Từ sao")?.GetComponent<Button>();
+				_tabStarredButton = TransformUtils.FindChildByName(transform, "Từ sao")?.GetComponent<Button>();
 			}
 
 			if (_tabLearnButton == null)
 			{
-				_tabLearnButton = FindChildByName(transform, "Học")?.GetComponent<Button>();
+				_tabLearnButton = TransformUtils.FindChildByName(transform, "Học")?.GetComponent<Button>();
 			}
 
 			if (_speakerButton == null)
 			{
-				_speakerButton = FindChildByName(transform, "Loa")?.GetComponent<Button>();
+				_speakerButton = TransformUtils.FindChildByName(transform, "Loa")?.GetComponent<Button>();
 			}
 
 			if (_audioSource == null)
@@ -666,36 +667,6 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 				PracticeTabType.Learn => "Học",
 				_ => "Luyện tập"
 			};
-		}
-
-		private static Transform FindChildByName(Transform root, string targetName)
-		{
-			if (root == null || string.IsNullOrWhiteSpace(targetName))
-			{
-				return null;
-			}
-
-			for (var i = 0; i < root.childCount; i += 1)
-			{
-				var child = root.GetChild(i);
-				if (child == null)
-				{
-					continue;
-				}
-
-				if (string.Equals(child.name, targetName, StringComparison.Ordinal))
-				{
-					return child;
-				}
-
-				var nested = FindChildByName(child, targetName);
-				if (nested != null)
-				{
-					return nested;
-				}
-			}
-
-			return null;
 		}
 
 		/// <summary>

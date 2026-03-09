@@ -1,6 +1,7 @@
 using Core.Infrastructure.Views;
 using Core.Infrastructure.Network;
 using Features.GamePlay.SubFeatures.Journal.Events;
+using Share.Utils;
 using Features.GamePlay.SubFeatures.Journal.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.Journal.Model;
 using Features.GamePlay.SubFeatures.Journal.Requests;
@@ -68,6 +69,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
 		private const float AutoPlayNextMessageDelaySeconds = 1f;
 		private NetworkSettings _networkSettings;
+		private string _normalizedServerBaseUrl;
 		private List<MessageBubbleData> _currentChatMessages = new List<MessageBubbleData>();
 		private bool _isChatAutoPlaying;
 		private int _currentAutoPlayListIndex = -1;
@@ -445,7 +447,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 
 		private IEnumerator PlayJournalAudioAsync(JournalPlayMessageAudioPayload payload)
 		{
-			var resolvedUrl = ResolveAudioUrl(payload.AudioUrl);
+			var resolvedUrl = AudioUrlUtils.ResolveAudioUrl(payload.AudioUrl, GetNormalizedServerBaseUrl());
 			if (string.IsNullOrWhiteSpace(resolvedUrl))
 			{
 				ClearReloadingState(payload.MessageIndex);
@@ -453,7 +455,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				yield break;
 			}
 
-			using var audioRequest = UnityWebRequestMultimedia.GetAudioClip(resolvedUrl, ResolveAudioType(resolvedUrl));
+			using var audioRequest = UnityWebRequestMultimedia.GetAudioClip(resolvedUrl, AudioUrlUtils.ResolveAudioType(resolvedUrl));
 			yield return audioRequest.SendWebRequest();
 
 			if (audioRequest.result != UnityWebRequest.Result.Success)
@@ -529,76 +531,23 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			_voiceAudioSource.ignoreListenerPause = true;
 		}
 
-		private string ResolveAudioUrl(string audioUrl)
+		/// <summary>
+		/// Returns the cached normalized server base URL (without trailing /api).
+		/// </summary>
+		private string GetNormalizedServerBaseUrl()
 		{
-			if (string.IsNullOrWhiteSpace(audioUrl))
+			if (_normalizedServerBaseUrl == null)
 			{
-				return null;
+				if (_networkSettings == null)
+				{
+					_networkSettings = Resources.Load<NetworkSettings>("NetworkSettings");
+				}
+
+				_normalizedServerBaseUrl = AudioUrlUtils.NormalizeServerBaseUrl(
+					_networkSettings != null ? _networkSettings.BaseUrl : null) ?? string.Empty;
 			}
 
-			if (Uri.TryCreate(audioUrl, UriKind.Absolute, out var absoluteUri))
-			{
-				return absoluteUri.ToString();
-			}
-
-			var baseUrl = NormalizeServerBaseUrl(GetServerBaseUrl());
-			if (string.IsNullOrWhiteSpace(baseUrl))
-			{
-				return null;
-			}
-
-			if (!audioUrl.StartsWith("/", StringComparison.Ordinal))
-			{
-				audioUrl = "/" + audioUrl;
-			}
-
-			return baseUrl + audioUrl;
-		}
-
-		private static AudioType ResolveAudioType(string audioUrl)
-		{
-			if (string.IsNullOrWhiteSpace(audioUrl))
-			{
-				return AudioType.MPEG;
-			}
-
-			if (audioUrl.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
-			{
-				return AudioType.WAV;
-			}
-
-			if (audioUrl.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase))
-			{
-				return AudioType.OGGVORBIS;
-			}
-
-			return AudioType.MPEG;
-		}
-
-		private string GetServerBaseUrl()
-		{
-			if (_networkSettings == null)
-			{
-				_networkSettings = Resources.Load<NetworkSettings>("NetworkSettings");
-			}
-
-			return _networkSettings != null ? _networkSettings.BaseUrl : null;
-		}
-
-		private static string NormalizeServerBaseUrl(string baseUrl)
-		{
-			if (string.IsNullOrWhiteSpace(baseUrl))
-			{
-				return null;
-			}
-
-			var normalized = baseUrl.Trim().TrimEnd('/');
-			if (normalized.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
-			{
-				normalized = normalized.Substring(0, normalized.Length - 4);
-			}
-
-			return normalized;
+			return string.IsNullOrWhiteSpace(_normalizedServerBaseUrl) ? null : _normalizedServerBaseUrl;
 		}
 
 		/// <summary>

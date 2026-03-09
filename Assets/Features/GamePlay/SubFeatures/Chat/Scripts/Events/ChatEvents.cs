@@ -17,5 +17,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Events
 		public const string ContextInputRequested = "game.play.chat.context.input.requested.event";
 		public const string ConversationEnded = "game.play.chat.conversation.ended.event";
 		public const string RequestFailed = "game.play.chat.request.failed.event";
+		public const string TranscriptionCompleted = "game.play.chat.transcription.completed.event";
 	}
 }

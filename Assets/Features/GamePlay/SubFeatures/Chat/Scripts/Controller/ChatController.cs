@@ -6,6 +6,7 @@ using Features.GamePlay.SubFeatures.Chat.Requests;
 using Core.Infrastructure.Network;
 using Core.Infrastructure.State;
 using Newtonsoft.Json;
+using Share.Utils;
 using CoreGlobalModes = Core.Infrastructure.State.GlobalModes;
 using System;
 using System.Collections.Generic;
@@ -204,32 +205,26 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				return;
 			}
 
-			var characterName = string.IsNullOrWhiteSpace(payload.CharacterName)
-				? string.Empty
-				: payload.CharacterName.Trim();
+			_ = PlayMessageAudioInternalAsync(payload);
+		}
 
-			var voiceName = string.IsNullOrWhiteSpace(characterName)
-				? null
-				: ChatState.ParentSignals?.GetCharacterVoiceNameByName?.Invoke(characterName);
-
-			var pitch = string.IsNullOrWhiteSpace(characterName)
-				? null
-				: ChatState.ParentSignals?.GetCharacterPitchByName?.Invoke(characterName);
-
-			var speakingRate = string.IsNullOrWhiteSpace(characterName)
-				? null
-				: ChatState.ParentSignals?.GetCharacterSpeakingRateByName?.Invoke(characterName);
-
-			EventBus.Publish(ChatEvents.MessageAudioPlayRequested, new ChatPlayMessageAudioPayload
+		/// <summary>
+		/// Handles speech-to-text transcription requests from the view.
+		/// </summary>
+		/// <param name="payload">Transcription request payload.</param>
+		[Request(ChatRequests.TranscribeAudio)]
+		public static void HandleTranscribeAudio(ChatTranscribeAudioRequestPayload payload)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.AudioBase64))
 			{
-				MessageId = payload.MessageId,
-				CharacterName = characterName,
-				Text = payload.Text,
-				Tone = payload.Tone,
-				VoiceName = voiceName,
-				Pitch = pitch,
-				SpeakingRate = speakingRate,
-			});
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Missing audio data for transcription."
+				});
+				return;
+			}
+
+			_ = TranscribeAudioInternalAsync(payload);
 		}
 
 		/// <summary>
@@ -575,6 +570,25 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				}
 
 				var response = JsonConvert.DeserializeObject<ChatHistoryResponsePayload>(responseJson) ?? new ChatHistoryResponsePayload();
+
+				// Pre-parse assistant turns so the View does not need to duplicate parsing logic.
+				if (response.Messages != null)
+				{
+					for (var i = 0; i < response.Messages.Count; i++)
+					{
+						var message = response.Messages[i];
+						if (message == null)
+						{
+							continue;
+						}
+
+						if (string.Equals(message.Role, "assistant", System.StringComparison.OrdinalIgnoreCase))
+						{
+							message.Turns = ParseAssistantTurns(message.Content);
+						}
+					}
+				}
+
 				EventBus.Publish(ChatEvents.HistoryLoaded, response);
 			}
 			catch (Exception exception)
@@ -615,12 +629,15 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					return;
 				}
 
+				var turns = ParseAssistantTurns(response.Reply);
+				await PreResolveTtsAudioUrlsAsync(turns);
+
 				EventBus.Publish(ChatEvents.MessageReceived, new ChatAssistantMessagePayload
 				{
 					Reply = response.Reply,
 					Model = response.Model,
 					SessionId = payload.SessionId,
-					Turns = ParseAssistantTurns(response.Reply),
+					Turns = turns,
 				});
 			}
 			catch (Exception exception)
@@ -661,12 +678,15 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					return;
 				}
 
+				var turns = ParseAssistantTurns(response.Reply);
+				await PreResolveTtsAudioUrlsAsync(turns);
+
 				EventBus.Publish(ChatEvents.MessageReceived, new ChatAssistantMessagePayload
 				{
 					Reply = response.Reply,
 					Model = response.Model,
 					SessionId = payload?.SessionId,
-					Turns = ParseAssistantTurns(response.Reply),
+					Turns = turns,
 				});
 			}
 			catch (Exception exception)
@@ -770,6 +790,160 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 
 			return new List<ChatAssistantTurnPayload>();
+		}
+
+		/// <summary>
+		/// Pre-resolves TTS audio URLs for each turn so the View only needs to download audio clips.
+		/// </summary>
+		/// <param name="turns">Parsed turn list to enrich with AudioUrl.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task PreResolveTtsAudioUrlsAsync(List<ChatAssistantTurnPayload> turns)
+		{
+			if (turns == null || turns.Count == 0)
+			{
+				return;
+			}
+
+			for (var i = 0; i < turns.Count; i++)
+			{
+				var turn = turns[i];
+				if (turn == null || string.IsNullOrWhiteSpace(turn.Text))
+				{
+					continue;
+				}
+
+				var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
+				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? "neutral" : turn.Tone.Trim();
+				turn.AudioUrl = await ResolveTtsAudioUrlAsync(turn.Text, tone, characterName);
+			}
+		}
+
+		/// <summary>
+		/// Performs TTS API call and publishes playback event with resolved audio URL.
+		/// </summary>
+		/// <param name="payload">Replay request payload.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task PlayMessageAudioInternalAsync(ChatPlayMessageAudioRequestPayload payload)
+		{
+			try
+			{
+				var characterName = string.IsNullOrWhiteSpace(payload.CharacterName)
+					? string.Empty
+					: payload.CharacterName.Trim();
+
+				var voiceName = string.IsNullOrWhiteSpace(characterName)
+					? null
+					: ChatState.ParentSignals?.GetCharacterVoiceNameByName?.Invoke(characterName);
+
+				var pitch = string.IsNullOrWhiteSpace(characterName)
+					? null
+					: ChatState.ParentSignals?.GetCharacterPitchByName?.Invoke(characterName);
+
+				var speakingRate = string.IsNullOrWhiteSpace(characterName)
+					? null
+					: ChatState.ParentSignals?.GetCharacterSpeakingRateByName?.Invoke(characterName);
+
+				var audioUrl = await ResolveTtsAudioUrlAsync(payload.Text, payload.Tone, characterName, payload.ForceReload);
+
+				EventBus.Publish(ChatEvents.MessageAudioPlayRequested, new ChatPlayMessageAudioPayload
+				{
+					MessageId = payload.MessageId,
+					CharacterName = characterName,
+					Text = payload.Text,
+					Tone = payload.Tone,
+					VoiceName = voiceName,
+					Pitch = pitch,
+					SpeakingRate = speakingRate,
+					AudioUrl = audioUrl,
+					ForceReload = payload.ForceReload,
+					MessageIndex = payload.MessageIndex,
+				});
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to resolve TTS audio: " + exception.Message
+				});
+			}
+		}
+
+		/// <summary>
+		/// Performs speech-to-text API call and publishes transcription result.
+		/// </summary>
+		/// <param name="payload">Transcription request payload.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task TranscribeAudioInternalAsync(ChatTranscribeAudioRequestPayload payload)
+		{
+			try
+			{
+				var requestPayload = new ChatSpeechToTextRequestPayload
+				{
+					Audio = payload.AudioBase64,
+					Language = payload.Language,
+				};
+
+				var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatTranscribe, requestPayload);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = "Empty speech-to-text response from server."
+					});
+					EventBus.Publish(ChatEvents.TranscriptionCompleted, null);
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<ChatSpeechToTextResponsePayload>(responseJson);
+				var transcript = response?.Transcript?.Trim();
+				EventBus.Publish(ChatEvents.TranscriptionCompleted, transcript);
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to transcribe audio: " + exception.Message
+				});
+				EventBus.Publish(ChatEvents.TranscriptionCompleted, null);
+			}
+		}
+
+		/// <summary>
+		/// Calls the TTS endpoint and returns the resolved absolute audio URL.
+		/// </summary>
+		/// <param name="text">Text to synthesize.</param>
+		/// <param name="tone">Tone hint.</param>
+		/// <param name="characterName">Character name.</param>
+		/// <param name="forceReload">Whether to force regeneration.</param>
+		/// <returns>Absolute audio URL, or null on failure.</returns>
+		private static async Task<string> ResolveTtsAudioUrlAsync(string text, string tone, string characterName, bool forceReload = false)
+		{
+			try
+			{
+				var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload);
+				var endpoint = NetworkEndpoints.TextToSpeech + query;
+				var responseJson = await HttpClient.GetTaskAsync(endpoint);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					return null;
+				}
+
+				var ttsResponse = JsonConvert.DeserializeObject<ChatTextToSpeechResponsePayload>(responseJson);
+				var rawUrl = ttsResponse?.Url;
+				if (string.IsNullOrWhiteSpace(rawUrl))
+				{
+					return null;
+				}
+
+				var settings = UnityEngine.Resources.Load<NetworkSettings>("NetworkSettings");
+				var baseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settings != null ? settings.BaseUrl : null);
+				return AudioUrlUtils.ResolveAudioUrl(rawUrl, baseUrl);
+			}
+			catch (Exception exception)
+			{
+				Debug.LogWarning("[ChatController] TTS resolution failed: " + exception.Message);
+				return null;
+			}
 		}
 	}
 }

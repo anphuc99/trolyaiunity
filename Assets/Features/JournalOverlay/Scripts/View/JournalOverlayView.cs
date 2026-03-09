@@ -6,6 +6,7 @@ using Features.JournalOverlay.Infrastructure;
 using Features.JournalOverlay.Infrastructure.Attributes;
 using Features.JournalOverlay.Model;
 using Features.JournalOverlay.Requests;
+using Share.Utils;
 using System;
 using System.Collections;
 using TMPro;
@@ -53,6 +54,7 @@ namespace Features.JournalOverlay.View
 		private Coroutine _autoPlayCoroutine;
 		private bool _isAutoPlaying;
 		private NetworkSettings _networkSettings;
+		private string _normalizedServerBaseUrl;
 
 		// ================================================================
 		// BaseView lifecycle
@@ -249,7 +251,7 @@ namespace Features.JournalOverlay.View
 				yield break;
 			}
 
-			var resolvedUrl = ResolveAudioUrl(messagePayload.AudioUrl);
+			var resolvedUrl = AudioUrlUtils.ResolveAudioUrl(messagePayload.AudioUrl, GetNormalizedServerBaseUrl());
 			if (string.IsNullOrWhiteSpace(resolvedUrl))
 			{
 				_isAutoPlaying = false;
@@ -257,7 +259,7 @@ namespace Features.JournalOverlay.View
 				yield break;
 			}
 
-			using var audioRequest = UnityWebRequestMultimedia.GetAudioClip(resolvedUrl, ResolveAudioType(resolvedUrl));
+			using var audioRequest = UnityWebRequestMultimedia.GetAudioClip(resolvedUrl, AudioUrlUtils.ResolveAudioType(resolvedUrl));
 			yield return audioRequest.SendWebRequest();
 
 			if (audioRequest.result != UnityWebRequest.Result.Success)
@@ -433,94 +435,22 @@ namespace Features.JournalOverlay.View
 		// ================================================================
 
 		/// <summary>
-		/// Resolves an audio URL — prepends server base URL if relative.
+		/// Returns the cached normalized server base URL (without trailing /api).
 		/// </summary>
-		/// <param name="audioUrl">Raw audio URL from server.</param>
-		/// <returns>Fully resolved URL, or null.</returns>
-		private string ResolveAudioUrl(string audioUrl)
+		private string GetNormalizedServerBaseUrl()
 		{
-			if (string.IsNullOrWhiteSpace(audioUrl))
+			if (_normalizedServerBaseUrl == null)
 			{
-				return null;
+				if (_networkSettings == null)
+				{
+					_networkSettings = Resources.Load<NetworkSettings>("NetworkSettings");
+				}
+
+				_normalizedServerBaseUrl = AudioUrlUtils.NormalizeServerBaseUrl(
+					_networkSettings != null ? _networkSettings.BaseUrl : null) ?? string.Empty;
 			}
 
-			if (Uri.TryCreate(audioUrl, UriKind.Absolute, out var absoluteUri))
-			{
-				return absoluteUri.ToString();
-			}
-
-			var baseUrl = NormalizeServerBaseUrl(GetServerBaseUrl());
-			if (string.IsNullOrWhiteSpace(baseUrl))
-			{
-				return null;
-			}
-
-			if (!audioUrl.StartsWith("/", StringComparison.Ordinal))
-			{
-				audioUrl = "/" + audioUrl;
-			}
-
-			return baseUrl + audioUrl;
-		}
-
-		/// <summary>
-		/// Determines the <see cref="AudioType"/> from a URL extension.
-		/// </summary>
-		/// <param name="audioUrl">Audio URL.</param>
-		/// <returns>Matching AudioType.</returns>
-		private static AudioType ResolveAudioType(string audioUrl)
-		{
-			if (string.IsNullOrWhiteSpace(audioUrl))
-			{
-				return AudioType.MPEG;
-			}
-
-			if (audioUrl.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
-			{
-				return AudioType.WAV;
-			}
-
-			if (audioUrl.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase))
-			{
-				return AudioType.OGGVORBIS;
-			}
-
-			return AudioType.MPEG;
-		}
-
-		/// <summary>
-		/// Loads the server base URL from NetworkSettings resource.
-		/// </summary>
-		/// <returns>Server base URL.</returns>
-		private string GetServerBaseUrl()
-		{
-			if (_networkSettings == null)
-			{
-				_networkSettings = Resources.Load<NetworkSettings>("NetworkSettings");
-			}
-
-			return _networkSettings != null ? _networkSettings.BaseUrl : null;
-		}
-
-		/// <summary>
-		/// Normalizes the server base URL by trimming trailing slashes and /api suffix.
-		/// </summary>
-		/// <param name="baseUrl">Raw base URL.</param>
-		/// <returns>Normalized base URL without trailing /api.</returns>
-		private static string NormalizeServerBaseUrl(string baseUrl)
-		{
-			if (string.IsNullOrWhiteSpace(baseUrl))
-			{
-				return null;
-			}
-
-			var normalized = baseUrl.Trim().TrimEnd('/');
-			if (normalized.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
-			{
-				normalized = normalized.Substring(0, normalized.Length - 4);
-			}
-
-			return normalized;
+			return string.IsNullOrWhiteSpace(_normalizedServerBaseUrl) ? null : _normalizedServerBaseUrl;
 		}
 
 		/// <summary>

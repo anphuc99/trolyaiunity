@@ -69,6 +69,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// Optional tone hint.
 		/// </summary>
 		public string Tone { get; set; }
+
+		/// <summary>
+		/// Whether to force TTS regeneration.
+		/// </summary>
+		public bool ForceReload { get; set; }
+
+		/// <summary>
+		/// View-local message index for reloading UI state tracking.
+		/// </summary>
+		public int MessageIndex { get; set; } = -1;
 	}
 
 	/// <summary>
@@ -110,6 +120,21 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// Character speaking rate value from cache.
 		/// </summary>
 		public float? SpeakingRate { get; set; }
+
+		/// <summary>
+		/// Pre-resolved absolute TTS audio URL.
+		/// </summary>
+		public string AudioUrl { get; set; }
+
+		/// <summary>
+		/// Whether this playback was a forced re-generation.
+		/// </summary>
+		public bool ForceReload { get; set; }
+
+		/// <summary>
+		/// View-local message index for reloading UI state tracking.
+		/// </summary>
+		public int MessageIndex { get; set; } = -1;
 	}
 
 	/// <summary>
@@ -128,6 +153,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		[JsonProperty("content")]
 		public string Content { get; set; }
+
+		/// <summary>
+		/// Pre-parsed assistant turns (populated by Controller, not deserialized from server).
+		/// </summary>
+		[JsonIgnore]
+		public System.Collections.Generic.List<ChatAssistantTurnPayload> Turns { get; set; }
 	}
 
 	/// <summary>
@@ -254,6 +285,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		[JsonProperty("Translation")]
 		public string Translation { get; set; }
+
+		/// <summary>
+		/// Pre-resolved TTS audio URL (populated by controller before publishing to view).
+		/// </summary>
+		[JsonIgnore]
+		public string AudioUrl { get; set; }
 	}
 
 	/// <summary>
@@ -400,6 +437,22 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 
 		[JsonProperty("appearance")]
 		public string Appearance { get; set; }
+	}
+
+	/// <summary>
+	/// Request payload from view to controller for speech-to-text transcription.
+	/// </summary>
+	public sealed class ChatTranscribeAudioRequestPayload
+	{
+		/// <summary>
+		/// Base64-encoded audio data URL (e.g. data:audio/wav;base64,...).
+		/// </summary>
+		public string AudioBase64 { get; set; }
+
+		/// <summary>
+		/// Language hint (e.g. ko, vi, en).
+		/// </summary>
+		public string Language { get; set; }
 	}
 
 	/// <summary>

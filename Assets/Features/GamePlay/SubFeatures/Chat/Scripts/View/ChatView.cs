@@ -1,15 +1,12 @@
 using Core.Infrastructure.Views;
-using Core.Infrastructure.Network;
-using Core.Infrastructure.Authentication;
 using Features.GamePlay.SubFeatures.Chat.Events;
 using Features.GamePlay.SubFeatures.Chat.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.Chat.Model;
 using Features.GamePlay.SubFeatures.Chat.Requests;
-using Newtonsoft.Json;
+using Share.Utils;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -75,7 +72,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private AudioClip _recordingAudioClip;
 		private Image _recordButtonImage;
 		private Color _recordButtonIdleColor = Color.white;
-		private NetworkSettings _networkSettings;
 
 		/// <summary>
 		/// Sends current input field text to chat server.
@@ -312,7 +308,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					continue;
 				}
 
-				var turns = ParseAssistantTurns(item.Content);
+				var turns = item.Turns != null && item.Turns.Count > 0 ? item.Turns : new List<ChatAssistantTurnPayload>();
 				if (turns.Count == 0)
 				{
 					mapped.Add(new MessageBubbleData
@@ -374,7 +370,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			var turns = response.Turns != null && response.Turns.Count > 0 ? response.Turns : ParseAssistantTurns(response.Reply);
+			var turns = response.Turns != null && response.Turns.Count > 0 ? response.Turns : new List<ChatAssistantTurnPayload>();
 			if (turns.Count == 0)
 			{
 				_messageContainer.AddNewMessage(new MessageBubbleData
@@ -438,10 +434,13 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? DefaultTtsTone : turn.Tone.Trim();
 
 				AudioClip clip = null;
-				yield return StartCoroutine(RequestCharacterTtsClip(messageText, tone, characterName, loadedClip =>
+				if (!string.IsNullOrWhiteSpace(turn.AudioUrl))
 				{
-					clip = loadedClip;
-				}));
+					yield return StartCoroutine(DownloadAudioClipFromUrl(turn.AudioUrl, loadedClip =>
+					{
+						clip = loadedClip;
+					}));
+				}
 
 				_messageContainer.AddNewMessage(new MessageBubbleData
 				{
@@ -464,74 +463,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			_isProcessingCharacterTurns = false;
 			SetCharacterRespondingState(false);
-		}
-
-		private IEnumerator RequestCharacterTtsClip(string text, string tone, string characterName, Action<AudioClip> onCompleted)
-		{
-			yield return RequestCharacterTtsClip(text, tone, characterName, false, onCompleted);
-		}
-
-		private IEnumerator RequestCharacterTtsClip(string text, string tone, string characterName, bool forceReload, Action<AudioClip> onCompleted)
-		{
-			if (string.IsNullOrWhiteSpace(text))
-			{
-				onCompleted?.Invoke(null);
-				yield break;
-			}
-
-			var requestUrl = BuildTextToSpeechRequestUrl(text, tone, characterName, forceReload);
-			if (string.IsNullOrWhiteSpace(requestUrl))
-			{
-				onCompleted?.Invoke(null);
-				yield break;
-			}
-
-			using var request = UnityWebRequest.Get(requestUrl);
-			var accessToken = AuthTokenModel.AccessToken;
-			if (!string.IsNullOrWhiteSpace(accessToken))
-			{
-				request.SetRequestHeader("Authorization", "Bearer " + accessToken);
-			}
-			yield return request.SendWebRequest();
-
-			if (request.result != UnityWebRequest.Result.Success)
-			{
-				Debug.LogWarning("[ChatView] TTS request failed: " + request.error, this);
-				onCompleted?.Invoke(null);
-				yield break;
-			}
-
-			ChatTextToSpeechResponsePayload ttsResponse;
-			try
-			{
-				ttsResponse = JsonConvert.DeserializeObject<ChatTextToSpeechResponsePayload>(request.downloadHandler.text);
-			}
-			catch (Exception exception)
-			{
-				Debug.LogWarning("[ChatView] Failed to parse TTS response: " + exception.Message, this);
-				onCompleted?.Invoke(null);
-				yield break;
-			}
-
-			var audioUrl = ResolveAudioUrl(ttsResponse?.Url);
-			if (string.IsNullOrWhiteSpace(audioUrl))
-			{
-				onCompleted?.Invoke(null);
-				yield break;
-			}
-
-			using var audioRequest = UnityWebRequestMultimedia.GetAudioClip(audioUrl, ResolveAudioType(audioUrl));
-			yield return audioRequest.SendWebRequest();
-
-			if (audioRequest.result != UnityWebRequest.Result.Success)
-			{
-				Debug.LogWarning("[ChatView] Failed to download TTS audio: " + audioRequest.error, this);
-				onCompleted?.Invoke(null);
-				yield break;
-			}
-
-			var clip = DownloadHandlerAudioClip.GetContent(audioRequest);
-			onCompleted?.Invoke(clip);
 		}
 
 		private IEnumerator PlayCharacterVoiceAsync(AudioClip clip)
@@ -559,11 +490,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		private void EnsureDependencies()
 		{
-			if (_networkSettings == null)
-			{
-				_networkSettings = Resources.Load<NetworkSettings>("NetworkSettings");
-			}
-
 			if (_characterVoiceAudioSource == null)
 			{
 				_characterVoiceAudioSource = GetComponent<AudioSource>();
@@ -575,7 +501,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			if (_selectCharacterPopupView == null)
 			{
-				var popupTransform = FindChildByName(transform, "PopupSelectCharacter");
+				var popupTransform = TransformUtils.FindChildByName(transform, "PopupSelectCharacter");
 				if (popupTransform != null)
 				{
 					_selectCharacterPopupView = popupTransform.GetComponent<ChatSelectCharacterPopupView>();
@@ -588,7 +514,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			if (_contextPopupView == null)
 			{
-				var contextPopupTransform = FindChildByName(transform, "PopupContext");
+				var contextPopupTransform = TransformUtils.FindChildByName(transform, "PopupContext");
 				if (contextPopupTransform != null)
 				{
 					_contextPopupView = contextPopupTransform.GetComponent<ChatContextPopupView>();
@@ -798,13 +724,27 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			var trimmedClip = TrimAudioClip(recordedClip, sampleCount);
+			var trimmedClip = AudioConvertUtils.TrimAudioClip(recordedClip, sampleCount);
 			if (trimmedClip == null)
 			{
 				return;
 			}
 
-			StartCoroutine(TranscribeRecordedAudio(trimmedClip));
+			var wavBytes = AudioConvertUtils.ConvertClipToWav(trimmedClip);
+			if (wavBytes == null || wavBytes.Length == 0)
+			{
+				return;
+			}
+
+			_isTranscribingVoice = true;
+			SetChatInputInteractable(!_isCharacterResponding);
+			UpdateRecordButtonVisualState();
+
+			SendRequest(ChatRequests.TranscribeAudio, new ChatTranscribeAudioRequestPayload
+			{
+				AudioBase64 = "data:audio/wav;base64," + Convert.ToBase64String(wavBytes),
+				Language = DefaultSpeechLanguage,
+			});
 		}
 
 		private void StopRecordingIfNeeded()
@@ -825,77 +765,21 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			UpdateRecordButtonVisualState();
 		}
 
-		private IEnumerator TranscribeRecordedAudio(AudioClip clip)
+		/// <summary>
+		/// Handles transcription completion from the Controller.
+		/// </summary>
+		/// <param name="payload">Transcript string, or null on failure.</param>
+		[OnEvent(ChatEvents.TranscriptionCompleted)]
+		private void OnTranscriptionCompleted(object payload)
 		{
-			if (clip == null)
-			{
-				yield break;
-			}
-
-			var endpoint = BuildSpeechToTextRequestUrl();
-			if (string.IsNullOrWhiteSpace(endpoint))
-			{
-				yield break;
-			}
-
-			var wavBytes = ConvertClipToWav(clip);
-			if (wavBytes == null || wavBytes.Length == 0)
-			{
-				yield break;
-			}
-
-			var requestPayload = new ChatSpeechToTextRequestPayload
-			{
-				Audio = "data:audio/wav;base64," + Convert.ToBase64String(wavBytes),
-				Language = DefaultSpeechLanguage,
-			};
-
-			var requestJson = JsonConvert.SerializeObject(requestPayload);
-			var requestBytes = Encoding.UTF8.GetBytes(requestJson);
-			using var request = new UnityWebRequest(endpoint, UnityWebRequest.kHttpVerbPOST)
-			{
-				uploadHandler = new UploadHandlerRaw(requestBytes),
-				downloadHandler = new DownloadHandlerBuffer(),
-			};
-			request.SetRequestHeader("Content-Type", "application/json");
-
-			var accessToken = AuthTokenModel.AccessToken;
-			if (!string.IsNullOrWhiteSpace(accessToken))
-			{
-				request.SetRequestHeader("Authorization", "Bearer " + accessToken);
-			}
-
-			_isTranscribingVoice = true;
-			SetChatInputInteractable(!_isCharacterResponding);
-			UpdateRecordButtonVisualState();
-
-			yield return request.SendWebRequest();
-
 			_isTranscribingVoice = false;
 			SetChatInputInteractable(!_isCharacterResponding);
 			UpdateRecordButtonVisualState();
 
-			if (request.result != UnityWebRequest.Result.Success)
-			{
-				Debug.LogWarning("[ChatView] Speech-to-text request failed: " + request.error, this);
-				yield break;
-			}
-
-			ChatSpeechToTextResponsePayload response;
-			try
-			{
-				response = JsonConvert.DeserializeObject<ChatSpeechToTextResponsePayload>(request.downloadHandler.text);
-			}
-			catch (Exception exception)
-			{
-				Debug.LogWarning("[ChatView] Failed to parse speech-to-text response: " + exception.Message, this);
-				yield break;
-			}
-
-			var transcript = response?.Transcript?.Trim();
+			var transcript = payload as string;
 			if (string.IsNullOrWhiteSpace(transcript))
 			{
-				yield break;
+				return;
 			}
 
 			if (_inputField != null)
@@ -919,80 +803,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			_recordButtonImage.color = _isRecordingVoice ? Color.red : _recordButtonIdleColor;
-		}
-
-		private string BuildSpeechToTextRequestUrl()
-		{
-			var baseUrl = NormalizeServerBaseUrl(GetServerBaseUrl());
-			if (string.IsNullOrWhiteSpace(baseUrl))
-			{
-				return null;
-			}
-
-			return baseUrl + NetworkEndpoints.ChatTranscribe;
-		}
-
-		private static AudioClip TrimAudioClip(AudioClip sourceClip, int sampleCount)
-		{
-			if (sourceClip == null || sampleCount <= 0)
-			{
-				return null;
-			}
-
-			sampleCount = Mathf.Clamp(sampleCount, 1, sourceClip.samples);
-			var channelCount = sourceClip.channels;
-			var sourceData = new float[sourceClip.samples * channelCount];
-			sourceClip.GetData(sourceData, 0);
-
-			var trimmedData = new float[sampleCount * channelCount];
-			Array.Copy(sourceData, trimmedData, trimmedData.Length);
-
-			var trimmedClip = AudioClip.Create("chat-recorded", sampleCount, channelCount, sourceClip.frequency, false);
-			trimmedClip.SetData(trimmedData, 0);
-			return trimmedClip;
-		}
-
-		private static byte[] ConvertClipToWav(AudioClip clip)
-		{
-			if (clip == null)
-			{
-				return null;
-			}
-
-			var sampleCount = clip.samples;
-			var channelCount = clip.channels;
-			var frequency = clip.frequency;
-			var samples = new float[sampleCount * channelCount];
-			clip.GetData(samples, 0);
-
-			var pcmBytes = new byte[samples.Length * 2];
-			for (var index = 0; index < samples.Length; index++)
-			{
-				var value = Mathf.Clamp(samples[index], -1f, 1f);
-				short pcmValue = (short)Mathf.RoundToInt(value * short.MaxValue);
-				pcmBytes[index * 2] = (byte)(pcmValue & 0xff);
-				pcmBytes[index * 2 + 1] = (byte)((pcmValue >> 8) & 0xff);
-			}
-
-			var headerSize = 44;
-			var wavBytes = new byte[headerSize + pcmBytes.Length];
-
-			Encoding.ASCII.GetBytes("RIFF").CopyTo(wavBytes, 0);
-			BitConverter.GetBytes(wavBytes.Length - 8).CopyTo(wavBytes, 4);
-			Encoding.ASCII.GetBytes("WAVE").CopyTo(wavBytes, 8);
-			Encoding.ASCII.GetBytes("fmt ").CopyTo(wavBytes, 12);
-			BitConverter.GetBytes(16).CopyTo(wavBytes, 16);
-			BitConverter.GetBytes((short)1).CopyTo(wavBytes, 20);
-			BitConverter.GetBytes((short)channelCount).CopyTo(wavBytes, 22);
-			BitConverter.GetBytes(frequency).CopyTo(wavBytes, 24);
-			BitConverter.GetBytes(frequency * channelCount * 2).CopyTo(wavBytes, 28);
-			BitConverter.GetBytes((short)(channelCount * 2)).CopyTo(wavBytes, 32);
-			BitConverter.GetBytes((short)16).CopyTo(wavBytes, 34);
-			Encoding.ASCII.GetBytes("data").CopyTo(wavBytes, 36);
-			BitConverter.GetBytes(pcmBytes.Length).CopyTo(wavBytes, 40);
-			pcmBytes.CopyTo(wavBytes, headerSize);
-
-			return wavBytes;
 		}
 
 		private void HandleMessageSpeakerClicked(MessageBubbleData messageData)
@@ -1033,46 +843,29 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			StartCoroutine(ForceReloadMessageTts(messageData));
-		}
-
-		private IEnumerator ForceReloadMessageTts(MessageBubbleData messageData)
-		{
-			if (_messageContainer == null || messageData == null || messageData.MessageIndex < 0)
-			{
-				yield break;
-			}
-
-			var messageIndex = messageData.MessageIndex;
-			_reloadingTtsMessageIndices.Add(messageIndex);
-			_messageContainer.SetMessageTtsReloading(messageIndex, true);
-
 			var baseText = string.IsNullOrWhiteSpace(messageData.OriginalMessage) ? messageData.Message : messageData.OriginalMessage;
 			if (string.IsNullOrWhiteSpace(baseText))
 			{
-				_messageContainer.SetMessageTtsReloading(messageIndex, false);
-				_reloadingTtsMessageIndices.Remove(messageIndex);
-				yield break;
+				return;
 			}
+
+			_reloadingTtsMessageIndices.Add(messageData.MessageIndex);
+			_messageContainer.SetMessageTtsReloading(messageData.MessageIndex, true);
 
 			var tone = string.IsNullOrWhiteSpace(messageData.Tone) ? DefaultTtsTone : messageData.Tone.Trim();
 			var characterName = messageData.Type == MessageBubbleType.User
 				? "User"
 				: (string.IsNullOrWhiteSpace(messageData.SenderName) ? DefaultCharacterDisplayName : messageData.SenderName.Trim());
 
-			AudioClip clip = null;
-			yield return StartCoroutine(RequestCharacterTtsClip(baseText, tone, characterName, true, loadedClip =>
+			SendRequest(ChatRequests.PlayMessageAudio, new ChatPlayMessageAudioRequestPayload
 			{
-				clip = loadedClip;
-			}));
-
-			if (clip != null)
-			{
-				yield return StartCoroutine(PlayCharacterVoiceAsync(clip));
-			}
-
-			_messageContainer.SetMessageTtsReloading(messageIndex, false);
-			_reloadingTtsMessageIndices.Remove(messageIndex);
+				MessageId = messageData.MessageId,
+				CharacterName = characterName,
+				Text = baseText,
+				Tone = tone,
+				ForceReload = true,
+				MessageIndex = messageData.MessageIndex,
+			});
 		}
 
 		private void HandleMessageTranslateClicked(MessageBubbleData messageData)
@@ -1168,15 +961,23 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		private IEnumerator PlaySingleMessageAudio(ChatPlayMessageAudioPayload playback)
 		{
-			var tone = string.IsNullOrWhiteSpace(playback.Tone) ? DefaultTtsTone : playback.Tone.Trim();
 			AudioClip clip = null;
-			yield return StartCoroutine(RequestCharacterTtsClip(playback.Text, tone, playback.CharacterName, loadedClip =>
+			if (!string.IsNullOrWhiteSpace(playback.AudioUrl))
 			{
-				clip = loadedClip;
-			}));
+				yield return StartCoroutine(DownloadAudioClipFromUrl(playback.AudioUrl, loadedClip =>
+				{
+					clip = loadedClip;
+				}));
+			}
 
 			if (clip == null)
 			{
+				// Clear reload state if this was a force-reload request that failed.
+				if (playback.ForceReload && playback.MessageIndex >= 0 && _messageContainer != null)
+				{
+					_messageContainer.SetMessageTtsReloading(playback.MessageIndex, false);
+					_reloadingTtsMessageIndices.Remove(playback.MessageIndex);
+				}
 				yield break;
 			}
 
@@ -1193,160 +994,42 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				_messageContainer.SetMessageTtsPlaying(playback.MessageId, false);
 			}
+
+			// Clear reload state after playback
+			if (playback.ForceReload && playback.MessageIndex >= 0 && _messageContainer != null)
+			{
+				_messageContainer.SetMessageTtsReloading(playback.MessageIndex, false);
+				_reloadingTtsMessageIndices.Remove(playback.MessageIndex);
+			}
 		}
 
-		private string BuildTextToSpeechRequestUrl(string text, string tone, string characterName, bool forceReload = false)
-		{
-			var baseUrl = NormalizeServerBaseUrl(GetServerBaseUrl());
-			if (string.IsNullOrWhiteSpace(baseUrl))
-			{
-				return null;
-			}
-
-			var endpoint = baseUrl + NetworkEndpoints.TextToSpeech;
-			var queryParts = new List<string>
-			{
-				"text=" + UnityWebRequest.EscapeURL(text),
-				"tone=" + UnityWebRequest.EscapeURL(string.IsNullOrWhiteSpace(tone) ? DefaultTtsTone : tone),
-				"characterName=" + UnityWebRequest.EscapeURL(string.IsNullOrWhiteSpace(characterName) ? DefaultCharacterDisplayName : characterName),
-			};
-
-			if (forceReload)
-			{
-				queryParts.Add("force=true");
-			}
-
-			return endpoint + "?" + string.Join("&", queryParts);
-		}
-
-		private string ResolveAudioUrl(string audioUrl)
+		/// <summary>
+		/// Downloads an audio clip from a pre-resolved absolute URL.
+		/// </summary>
+		/// <param name="audioUrl">Absolute audio URL.</param>
+		/// <param name="onCompleted">Callback with the loaded clip (or null on failure).</param>
+		/// <returns>Coroutine enumerator.</returns>
+		private IEnumerator DownloadAudioClipFromUrl(string audioUrl, Action<AudioClip> onCompleted)
 		{
 			if (string.IsNullOrWhiteSpace(audioUrl))
 			{
-				return null;
+				onCompleted?.Invoke(null);
+				yield break;
 			}
 
-			if (Uri.TryCreate(audioUrl, UriKind.Absolute, out var absoluteUri))
+			var audioType = AudioUrlUtils.ResolveAudioType(audioUrl);
+			using var audioRequest = UnityWebRequestMultimedia.GetAudioClip(audioUrl, audioType);
+			yield return audioRequest.SendWebRequest();
+
+			if (audioRequest.result != UnityWebRequest.Result.Success)
 			{
-				return absoluteUri.ToString();
+				Debug.LogWarning("[ChatView] Failed to download audio: " + audioRequest.error, this);
+				onCompleted?.Invoke(null);
+				yield break;
 			}
 
-			var baseUrl = NormalizeServerBaseUrl(GetServerBaseUrl());
-			if (string.IsNullOrWhiteSpace(baseUrl))
-			{
-				return null;
-			}
-
-			if (!audioUrl.StartsWith("/", StringComparison.Ordinal))
-			{
-				audioUrl = "/" + audioUrl;
-			}
-
-			return baseUrl + audioUrl;
-		}
-
-		private static AudioType ResolveAudioType(string audioUrl)
-		{
-			if (string.IsNullOrWhiteSpace(audioUrl))
-			{
-				return AudioType.MPEG;
-			}
-
-			if (audioUrl.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
-			{
-				return AudioType.WAV;
-			}
-
-			if (audioUrl.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase))
-			{
-				return AudioType.OGGVORBIS;
-			}
-
-			return AudioType.MPEG;
-		}
-
-		private string GetServerBaseUrl()
-		{
-			if (_networkSettings == null)
-			{
-				_networkSettings = Resources.Load<NetworkSettings>("NetworkSettings");
-			}
-
-			return _networkSettings != null ? _networkSettings.BaseUrl : null;
-		}
-
-		private static string NormalizeServerBaseUrl(string baseUrl)
-		{
-			if (string.IsNullOrWhiteSpace(baseUrl))
-			{
-				return null;
-			}
-
-			var normalized = baseUrl.Trim().TrimEnd('/');
-			if (normalized.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
-			{
-				normalized = normalized.Substring(0, normalized.Length - 4);
-			}
-
-			return normalized;
-		}
-
-		private static List<ChatAssistantTurnPayload> ParseAssistantTurns(string content)
-		{
-			if (string.IsNullOrWhiteSpace(content))
-			{
-				return new List<ChatAssistantTurnPayload>();
-			}
-
-			try
-			{
-				var list = JsonConvert.DeserializeObject<List<ChatAssistantTurnPayload>>(content);
-				if (list != null && list.Count > 0)
-				{
-					return list;
-				}
-
-				var single = JsonConvert.DeserializeObject<ChatAssistantTurnPayload>(content);
-				if (single != null)
-				{
-					return new List<ChatAssistantTurnPayload> { single };
-				}
-			}
-			catch
-			{
-			}
-
-			return new List<ChatAssistantTurnPayload>();
-		}
-
-		private static Transform FindChildByName(Transform root, string targetName)
-		{
-			if (root == null || string.IsNullOrWhiteSpace(targetName))
-			{
-				return null;
-			}
-
-			for (var i = 0; i < root.childCount; i++)
-			{
-				var child = root.GetChild(i);
-				if (child == null)
-				{
-					continue;
-				}
-
-				if (string.Equals(child.name, targetName, StringComparison.Ordinal))
-				{
-					return child;
-				}
-
-				var nested = FindChildByName(child, targetName);
-				if (nested != null)
-				{
-					return nested;
-				}
-			}
-
-			return null;
+			var clip = DownloadHandlerAudioClip.GetContent(audioRequest);
+			onCompleted?.Invoke(clip);
 		}
 
 		private void ClearConversationState()
