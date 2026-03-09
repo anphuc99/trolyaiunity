@@ -10,6 +10,7 @@
     "build:tsc": "tsc -p tsconfig.json",
     "db:sync": "tsx src/scripts/db-sync.ts",
     "db:reset": "tsx src/scripts/db-reset.ts",
+    "user:register": "tsx src/scripts/register-user.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
