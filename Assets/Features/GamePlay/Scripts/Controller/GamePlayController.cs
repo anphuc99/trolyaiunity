@@ -46,7 +46,7 @@ namespace Features.GamePlay.Controller
 			await LoadChatCharactersCacheAsync();
 			SetAllSubControllerSignals();
 			await Task.Yield();
-			InstallSubController(GamePlaySubControllerType.Character);
+			InstallSubController(GamePlaySubControllerType.Subjects);
 		}
 
 		/// <summary>
@@ -231,6 +231,7 @@ namespace Features.GamePlay.Controller
 				GetCharacterVoiceNameByName = GetChatCharacterVoiceName,
 				GetCharacterPitchByName = GetChatCharacterPitch,
 				GetCharacterSpeakingRateByName = GetChatCharacterSpeakingRate,
+				OpenHome = OnOpenHome,
 			});
 			JournalController.SetParentSignals(new JournalParentSignals { 
 				OnEchoed = OnSubControllerEchoed,
@@ -247,6 +248,8 @@ namespace Features.GamePlay.Controller
 			{
 				OnSubjectSelected = OnSubjectSelected,
 				OnOpenCreateSubjects = OnOpenCreateSubjects,
+				AddMenu = AddMenu,
+				RemoveMenu = RemoveMenu,
 			});
 			CreateSubjectsController.SetParentSignals(new CreateSubjectsParentSignals
 			{
@@ -759,6 +762,15 @@ namespace Features.GamePlay.Controller
 		/// Navigates back to the Subjects list.
 		/// </summary>
 		private static void OnCreateSubjectsCancelled()
+		{
+			HandleOpenSubController(GamePlaySubControllerType.Subjects);
+		}
+
+		/// <summary>
+		/// Handles Home action from child subfeatures.
+		/// Navigates to Subjects as the gameplay home screen.
+		/// </summary>
+		private static void OnOpenHome()
 		{
 			HandleOpenSubController(GamePlaySubControllerType.Subjects);
 		}

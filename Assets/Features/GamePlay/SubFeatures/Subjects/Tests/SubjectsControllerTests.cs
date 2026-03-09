@@ -226,5 +226,45 @@ namespace Features.GamePlay.SubFeatures.Subjects.Tests
 			Assert.IsNotNull(SubjectsState.CachedSubjects);
 			Assert.AreEqual(0, SubjectsState.CachedSubjects.Count);
 		}
+
+		[Test]
+		public void Install_RegistersCreateSubjectMenu_WhenAddMenuAvailable()
+		{
+			string receivedText = null;
+			System.Action receivedAction = null;
+
+			SubjectsController.SetParentSignals(new SubjectsParentSignals
+			{
+				AddMenu = (text, onClick) =>
+				{
+					receivedText = text;
+					receivedAction = onClick;
+					return "subjects-create-menu";
+				},
+			});
+
+			SubjectsController.Install();
+
+			Assert.AreEqual("Tạo môn học", receivedText);
+			Assert.IsNotNull(receivedAction);
+			Assert.AreEqual("subjects-create-menu", SubjectsState.CreateSubjectMenuId);
+		}
+
+		[Test]
+		public void Uninstall_RemovesCreateSubjectMenu_WhenMenuIdExists()
+		{
+			string removedMenuId = null;
+			SubjectsController.SetParentSignals(new SubjectsParentSignals
+			{
+				AddMenu = (text, onClick) => "subjects-create-menu",
+				RemoveMenu = id => removedMenuId = id,
+			});
+
+			SubjectsController.Install();
+			SubjectsController.Uninstall();
+
+			Assert.AreEqual("subjects-create-menu", removedMenuId);
+			Assert.IsNull(SubjectsState.CreateSubjectMenuId);
+		}
 	}
 }

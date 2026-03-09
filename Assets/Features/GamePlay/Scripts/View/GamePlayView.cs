@@ -46,5 +46,13 @@ namespace Features.GamePlay.View
 		{
 			SendRequest(GamePlayRequests.OpenSubController, GamePlaySubControllerType.Setting);
 		}
+
+		/// <summary>
+		/// Opens the gameplay home screen (Subjects).
+		/// </summary>
+		public void OpenHome()
+		{
+			SendRequest(GamePlayRequests.OpenSubController, GamePlaySubControllerType.Subjects);
+		}
 	}
 }

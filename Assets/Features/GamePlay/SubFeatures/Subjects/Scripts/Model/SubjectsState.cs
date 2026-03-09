@@ -18,11 +18,17 @@ namespace Features.GamePlay.SubFeatures.Subjects.Model
 		public static List<SubjectItemPayload> CachedSubjects { get; set; } = new List<SubjectItemPayload>();
 
 		/// <summary>
+		/// Parent menu item id for "create subject" action.
+		/// </summary>
+		public static string CreateSubjectMenuId { get; set; }
+
+		/// <summary>
 		/// Resets all cached state to defaults.
 		/// </summary>
 		public static void Reset()
 		{
 			CachedSubjects = new List<SubjectItemPayload>();
+			CreateSubjectMenuId = null;
 		}
 	}
 }

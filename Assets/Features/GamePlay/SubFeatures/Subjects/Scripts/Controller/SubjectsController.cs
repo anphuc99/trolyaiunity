@@ -32,6 +32,7 @@ namespace Features.GamePlay.SubFeatures.Subjects.Controller
 		[Core.Infrastructure.Attributes.ControllerShutdown]
 		public static void OnExitScope()
 		{
+			UnregisterCreateSubjectMenu();
 			SubjectsState.Reset();
 		}
 
@@ -40,6 +41,7 @@ namespace Features.GamePlay.SubFeatures.Subjects.Controller
 		/// </summary>
 		public static void Install()
 		{
+			RegisterCreateSubjectMenu();
 			EventBus.Publish(SubjectsEvents.Installed, null);
 			HandleLoadSubjects();
 		}
@@ -49,6 +51,7 @@ namespace Features.GamePlay.SubFeatures.Subjects.Controller
 		/// </summary>
 		public static void Uninstall()
 		{
+			UnregisterCreateSubjectMenu();
 			SubjectsState.Reset();
 			EventBus.Publish(SubjectsEvents.Uninstalled, null);
 		}
@@ -92,6 +95,36 @@ namespace Features.GamePlay.SubFeatures.Subjects.Controller
 		/// <param name="payload">Unused.</param>
 		[Request(SubjectsRequests.OpenCreateSubjects)]
 		public static void HandleOpenCreateSubjects(object payload)
+		{
+			SubjectsState.ParentSignals?.OnOpenCreateSubjects?.Invoke();
+		}
+
+		private static void RegisterCreateSubjectMenu()
+		{
+			UnregisterCreateSubjectMenu();
+
+			var menuId = SubjectsState.ParentSignals?.AddMenu?.Invoke("Tạo môn học", HandleCreateSubjectMenuClicked);
+			if (string.IsNullOrWhiteSpace(menuId))
+			{
+				return;
+			}
+
+			SubjectsState.CreateSubjectMenuId = menuId;
+		}
+
+		private static void UnregisterCreateSubjectMenu()
+		{
+			if (string.IsNullOrWhiteSpace(SubjectsState.CreateSubjectMenuId))
+			{
+				SubjectsState.CreateSubjectMenuId = null;
+				return;
+			}
+
+			SubjectsState.ParentSignals?.RemoveMenu?.Invoke(SubjectsState.CreateSubjectMenuId);
+			SubjectsState.CreateSubjectMenuId = null;
+		}
+
+		private static void HandleCreateSubjectMenuClicked()
 		{
 			SubjectsState.ParentSignals?.OnOpenCreateSubjects?.Invoke();
 		}
