@@ -103,4 +103,5 @@ server/Library/
 server/Temp/
 server/dist/
 server/.env
+server/public/avatars/
 servertoken.txt

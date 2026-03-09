@@ -1,0 +1,15 @@
+{
+    "name": "GamePlay.Subjects.Tests",
+    "rootNamespace": "",
+    "references": ["GamePlay.Subjects"],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": ["TestAssemblies"]
+}

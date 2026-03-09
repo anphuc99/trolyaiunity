@@ -65,5 +65,9 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		public Func<string, float?> GetCharacterSpeakingRateByName { get; set; }
 
+		/// <summary>
+		/// Optional callback for returning to the Home subcontroller.
+		/// </summary>
+		public Action OpenHome { get; set; }
 	}
 }

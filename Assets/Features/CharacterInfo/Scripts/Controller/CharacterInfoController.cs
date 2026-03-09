@@ -87,6 +87,8 @@ namespace Features.CharacterInfo.Controller
 				return;
 			}
 
+			Debug.Log("" + responseJson.ToString());
+
 			SetDeletedCharacterNotice(selectedCharacter);
 
 			LoadScene.UnloadByScope(Core.Infrastructure.Attributes.ControllerScopeKey.CharacterInfoGameplay);

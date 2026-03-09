@@ -8,7 +8,9 @@
         "GamePlay.Character",
         "GamePlay.Chat",
         "Unity.TextMeshPro",
-        "GamePlay.Setting"
+        "GamePlay.Setting",
+        "GamePlay.Subjects",
+        "GamePlay.Knowledges"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

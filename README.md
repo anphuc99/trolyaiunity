@@ -57,3 +57,34 @@ Note:
 
 - **serverMimiChat**: External dependency reference only. Do not modify or edit this module. It is maintained separately and should be treated as a read-only integration point.
 
+### Subfeature Lifecycle Rules (Mandatory)
+
+When adding a new GamePlay subfeature (or any parent-scoped subfeature), follow these rules:
+
+1. **Controller must expose lifecycle methods**
+	- `public static void Install()`
+	- `public static void Uninstall()`
+
+2. **Controller must publish visibility events**
+	- In `Install()`, publish: `EventBus.Publish(<Subfeature>Events.Installed, null)`
+	- In `Uninstall()`, publish: `EventBus.Publish(<Subfeature>Events.Uninstalled, null)`
+
+3. **Event keys are required in `<Subfeature>Events`**
+	- `public const string Installed = "...installed.event";`
+	- `public const string Uninstalled = "...uninstalled.event";`
+
+4. **View must react to install/uninstall events**
+	- Add `[OnEvent(<Subfeature>Events.Installed)]` handler and call `gameObject.SetActive(true)`
+	- Add `[OnEvent(<Subfeature>Events.Uninstalled)]` handler and call `gameObject.SetActive(false)`
+
+5. **Parent controller owns signal wiring**
+	- Parent scope controller sets/clears child `SetParentSignals(...)` in its `OnEnterScope()` / `OnExitScope()`.
+	- Parent controller switches active subfeatures by calling child `Install()` / `Uninstall()`.
+
+6. **Do not bypass this lifecycle**
+	- Do not toggle child view GameObjects directly from parent view scripts.
+	- Do not skip Installed/Uninstalled events.
+
+Note:
+
+- When changing feature-related code patterns or conventions, update the Feature Generator templates accordingly to prevent new features from compiling with outdated code.
