@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, type Content, type Part } from "@google/generative-ai";
+import { GoogleAIFileManager } from "@google/generative-ai/server";
 
 /**
  * Supported Gemini model identifiers.
@@ -207,6 +208,7 @@ Example:
  */
 export const createGeminiChatService = (config: GeminiChatServiceConfig): GeminiChatService => {
   const genAI = new GoogleGenerativeAI(config.apiKey);
+  const fileManager = new GoogleAIFileManager(config.apiKey);
   const defaultModel = config.model;
 
   const createReply: GeminiChatService["createReply"] = async (message, history = [], modelOverride, audioParts) => {
@@ -240,15 +242,21 @@ export const createGeminiChatService = (config: GeminiChatServiceConfig): Gemini
       throw new Error("No message or history provided for Gemini");
     }
 
-    // Build message parts: text + optional audio inline data
+    // Upload audio files via Google AI File API and build message parts
     const messageParts: Part[] = [];
 
     if (audioParts && audioParts.length > 0) {
       for (const audio of audioParts) {
+        const buffer = Buffer.from(audio.data, "base64");
+        const uploadResult = await fileManager.uploadFile(buffer, {
+          mimeType: audio.mimeType,
+          displayName: `user-audio-${Date.now()}`
+        });
+
         messageParts.push({
-          inlineData: {
-            data: audio.data,
-            mimeType: audio.mimeType
+          fileData: {
+            fileUri: uploadResult.file.uri,
+            mimeType: uploadResult.file.mimeType
           }
         });
       }
