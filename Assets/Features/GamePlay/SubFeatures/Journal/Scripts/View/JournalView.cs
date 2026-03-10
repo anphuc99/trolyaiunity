@@ -62,8 +62,12 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		private Button _goodButton;
 		[SerializeField]
 		private Button _easyButton;
+
+		[Header("Buttons")]
 		[SerializeField]
 		private Button _autoPlayButton;
+		[SerializeField]
+		private Button _downloadAudioButton;
 
 		private readonly List<JournalItemView> _spawnedListItems = new List<JournalItemView>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();

@@ -653,14 +653,14 @@ export const createMyLogController = (
    * @param history - Chat history messages.
    * @param userId - User ID.
    * @param journalId - Journal ID to link messages to.
-   * @param voiceByCharacter - Map of character name → voice name for audio ID gen.
+   * @param voiceByCharacter - Map of character name → voice settings for audio ID gen.
    * @returns Array of message entity data objects.
    */
   const buildMessageEntities = (
     history: ChatHistoryMessage[],
     userId: number,
     journalId: number,
-    voiceByCharacter: Map<string, string>
+    voiceByCharacter: Map<string, { voiceName: string; pitch: number | null; speakingRate: number | null }>
   ) => {
     const result: Array<{
       content: string;
@@ -719,8 +719,8 @@ export const createMyLogController = (
         const translation = typeof turn.Translation === "string" ? turn.Translation.trim() : "";
         const tone = typeof turn.Tone === "string" ? turn.Tone.trim() : "";
         const voiceKey = normalizeName(characterName || "Mimi");
-        const voiceName = voiceByCharacter.get(voiceKey) ?? "";
-        const audio = !isPsychologist && tone ? buildAudioId(content, tone, voiceName || undefined) : null;
+        const voiceSettings = voiceByCharacter.get(voiceKey);
+        const audio = !isPsychologist && tone ? buildAudioId(content, tone, voiceSettings?.voiceName || undefined, voiceSettings?.pitch ?? undefined, voiceSettings?.speakingRate ?? undefined) : null;
 
         result.push({
           content,
@@ -1316,7 +1316,11 @@ Return ONLY the JSON object. No markdown. No extra text.
       const voiceByCharacter = new Map(
         characters
           .filter((c) => c.voiceName)
-          .map((c) => [normalizeName(c.name), c.voiceName as string])
+          .map((c) => [normalizeName(c.name), {
+            voiceName: c.voiceName as string,
+            pitch: c.pitch ?? null,
+            speakingRate: c.speakingRate ?? null
+          }])
       );
 
       const messageEntities = buildMessageEntities(history, request.user.id, savedJournal.id, voiceByCharacter);
