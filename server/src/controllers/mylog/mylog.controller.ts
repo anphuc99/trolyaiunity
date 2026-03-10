@@ -260,14 +260,15 @@ export const createMyLogController = (
     message: string | undefined,
     history: Array<{ role: "system" | "developer" | "user" | "assistant"; content: string }>,
     modelOverride?: string,
-    retryLimit = 2
+    retryLimit = 2,
+    sessionKey?: string
   ): Promise<JsonReplyResult> => {
     let attempt = 0;
     let prompt = typeof message === "string" && message.trim() ? message.trim() : undefined;
     const retryPromptSeed = prompt || "Continue the diary conversation naturally based on the current chat history.";
 
     while (attempt <= retryLimit) {
-      const result = await service.createReply(prompt, history, modelOverride || undefined);
+      const result = await service.createReply(prompt, history, modelOverride || undefined, undefined, sessionKey);
 
       const turns = parseAssistantReply(result.reply);
       if (isValidMyLogTurnSchema(turns)) {
@@ -1115,7 +1116,9 @@ export const createMyLogController = (
         selectedService,
         message,
         history,
-        mylogModel
+        mylogModel,
+        2,
+        `mylog:${request.user.id}`
       );
 
       // Normalize message IDs to prevent duplicates
@@ -1638,13 +1641,19 @@ Return ONLY the JSON object. No markdown. No extra text.
       ];
 
       await historyStore.clear(request.user.id);
+      // Invalidate cached Gemini chat session since history was rewritten
+      if (geminiService) {
+        geminiService.clearSession(`mylog:${request.user.id}`);
+      }
       await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
 
       const result = await requestJsonReplyWithRetry(
         selectedService,
         editedContent,
         historyForAI,
-        mylogModel
+        mylogModel,
+        2,
+        `mylog:${request.user.id}`
       );
 
       const normalizedReply = useGemini

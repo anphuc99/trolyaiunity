@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, type Content, type Part } from "@google/generative-ai";
+import { GoogleGenerativeAI, type ChatSession, type Content, type Part } from "@google/generative-ai";
 import { GoogleAIFileManager } from "@google/generative-ai/server";
 
 /**
@@ -43,8 +43,12 @@ export interface GeminiChatService {
     message?: string,
     history?: Array<{ role: "system" | "developer" | "user" | "assistant"; content: string }>,
     modelOverride?: string,
-    audioParts?: GeminiAudioPart[]
+    audioParts?: GeminiAudioPart[],
+    sessionKey?: string
   ) => Promise<{ reply: string; model: string }>;
+
+  /** Removes the cached chat session for the given key so the next call rebuilds from history. */
+  clearSession: (sessionKey: string) => void;
 }
 
 /**
@@ -211,7 +215,14 @@ export const createGeminiChatService = (config: GeminiChatServiceConfig): Gemini
   const fileManager = new GoogleAIFileManager(config.apiKey);
   const defaultModel = config.model;
 
-  const createReply: GeminiChatService["createReply"] = async (message, history = [], modelOverride, audioParts) => {
+  /** In-memory cache of active Gemini ChatSession instances keyed by sessionKey. */
+  const sessionCache = new Map<string, ChatSession>();
+
+  const clearSession: GeminiChatService["clearSession"] = (sessionKey) => {
+    sessionCache.delete(sessionKey);
+  };
+
+  const createReply: GeminiChatService["createReply"] = async (message, history = [], modelOverride, audioParts, sessionKey) => {
     const resolvedModel = modelOverride?.trim() || defaultModel;
     
     // Find system message from history
@@ -230,10 +241,16 @@ export const createGeminiChatService = (config: GeminiChatServiceConfig): Gemini
       systemInstruction: systemInstruction
     });
 
-    // Start a chat session with the converted history
-    const chat = model.startChat({
-      history: geminiHistory
-    });
+    // Reuse cached ChatSession when available; otherwise create from history
+    let chat: ChatSession;
+    if (sessionKey && sessionCache.has(sessionKey)) {
+      chat = sessionCache.get(sessionKey)!;
+    } else {
+      chat = model.startChat({ history: geminiHistory });
+      if (sessionKey) {
+        sessionCache.set(sessionKey, chat);
+      }
+    }
 
     // Send the user message if provided
     const userMessage = message?.trim() ?? "";
@@ -283,5 +300,5 @@ export const createGeminiChatService = (config: GeminiChatServiceConfig): Gemini
     };
   };
 
-  return { createReply };
+  return { createReply, clearSession };
 };

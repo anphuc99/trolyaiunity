@@ -400,7 +400,8 @@ export const createChatController = (
     history: Array<{ role: "system" | "developer" | "user" | "assistant"; content: string }>,
     modelOverride?: string,
     retryLimit = 2,
-    audioParts?: GeminiAudioPart[]
+    audioParts?: GeminiAudioPart[],
+    sessionKey?: string
   ): Promise<JsonReplyResult> => {
     let attempt = 0;
     let prompt = typeof message === "string" && message.trim() ? message.trim() : undefined;
@@ -410,7 +411,7 @@ export const createChatController = (
     while (attempt <= retryLimit) {
       // Only send audio on the first attempt; retries use text-only corrective prompts
       const audioForAttempt = attempt === 0 ? audioParts : undefined;
-      const result = await service.createReply(prompt, history, modelOverride || undefined, audioForAttempt);
+      const result = await service.createReply(prompt, history, modelOverride || undefined, audioForAttempt, sessionKey);
       lastResult = result;
 
       const turns = parseAssistantReply(result.reply);
@@ -706,7 +707,8 @@ export const createChatController = (
         history,
         modelOverride || undefined,
         2,
-        geminiAudioParts
+        geminiAudioParts,
+        String(request.user.id)
       );
 
       const normalizedReply = useGemini
@@ -776,7 +778,10 @@ export const createChatController = (
         selectedService,
         undefined,
         history,
-        modelOverride || undefined
+        modelOverride || undefined,
+        2,
+        undefined,
+        String(request.user.id)
       );
 
       const normalizedReply = useGemini
@@ -955,13 +960,20 @@ export const createChatController = (
       ];
 
       await historyStore.clear(request.user.id);
+      // Invalidate cached Gemini chat session since history was rewritten
+      if (geminiService) {
+        geminiService.clearSession(String(request.user.id));
+      }
       await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
 
       const result = await requestJsonReplyWithRetry(
         selectedService,
         editedContent,
         historyForAI,
-        modelOverride || undefined
+        modelOverride || undefined,
+        2,
+        undefined,
+        String(request.user.id)
       );
 
       const normalizedReply = useGemini
