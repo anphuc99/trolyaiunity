@@ -74,6 +74,23 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private Color _recordButtonIdleColor = Color.white;
 
 		/// <summary>
+		/// Rich text marker shown in the input field when a voice recording is pending.
+		/// </summary>
+		private const string AudioRecordingRichText = "<i>Bản ghi âm</i>";
+
+		/// <summary>
+		/// Base64-encoded audio data URL of the pending voice recording.
+		/// Set when the user finishes recording; cleared when sent or cancelled.
+		/// </summary>
+		private string _pendingAudioBase64;
+
+		/// <summary>
+		/// The message id assigned to the user bubble for a pending audio message.
+		/// Used to update the bubble text once transcription arrives from server.
+		/// </summary>
+		private string _pendingAudioMessageId;
+
+		/// <summary>
 		/// Sends current input field text to chat server.
 		/// </summary>
 		public void SendInputMessage()
@@ -96,10 +113,13 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			StopRecordingIfNeeded();
 			UnbindInputFieldEvents();
 			UnbindRecordButtonEvents();
+			UnbindAudioInputGuard();
 		}
 
 		/// <summary>
 		/// Sends one user message to server and appends it locally.
+		/// When a pending voice recording exists, the audio data is sent alongside
+		/// the message so Gemini can process the audio directly.
 		/// </summary>
 		/// <param name="message">User message content.</param>
 		public void SendChatMessage(string message)
@@ -115,30 +135,47 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			var trimmed = message?.Trim();
-			if (string.IsNullOrWhiteSpace(trimmed))
+			var hasAudio = !string.IsNullOrEmpty(_pendingAudioBase64);
+
+			if (string.IsNullOrWhiteSpace(trimmed) && !hasAudio)
 			{
 				return;
 			}
 
 			SetCharacterRespondingState(true);
 
+			var messageId = Guid.NewGuid().ToString("N");
+			var displayText = hasAudio ? AudioRecordingRichText : trimmed;
+
 			_messageContainer.AddNewMessage(new MessageBubbleData
 			{
-				MessageId = Guid.NewGuid().ToString("N"),
+				MessageId = messageId,
 				Type = MessageBubbleType.User,
 				SenderName = DefaultUserDisplayName,
-				Message = trimmed,
+				Message = displayText,
 				Avatar = null,
 			});
 			ScrollMessagesToBottom();
 
-			SendRequest(ChatRequests.SendMessage, new ChatSendRequestPayload
+			var payload = new ChatSendRequestPayload
 			{
-				Message = trimmed,
+				Message = hasAudio ? null : trimmed,
 				SessionId = string.IsNullOrWhiteSpace(_sessionId) ? null : _sessionId,
 				Model = string.IsNullOrWhiteSpace(_modelOverride) ? null : _modelOverride,
 				StoryId = _storyId > 0 ? _storyId : null,
-			});
+			};
+
+			if (hasAudio)
+			{
+				payload.Audio = _pendingAudioBase64;
+				payload.AudioMessageId = messageId;
+				_pendingAudioMessageId = messageId;
+			}
+
+			_pendingAudioBase64 = null;
+			UnbindAudioInputGuard();
+
+			SendRequest(ChatRequests.SendMessage, payload);
 
 			if (_inputField != null)
 			{
@@ -189,6 +226,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			StopAllCoroutines();
 			StopRecordingIfNeeded();
+			UnbindAudioInputGuard();
+			_pendingAudioBase64 = null;
+			_pendingAudioMessageId = null;
 			_pendingCharacterTurns.Clear();
 			_isProcessingCharacterTurns = false;
 			_isTranscribingVoice = false;
@@ -698,6 +738,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			UpdateRecordButtonVisualState();
 		}
 
+		/// <summary>
+		/// Stops voice recording, encodes the audio as base64, and places the
+		/// rich text recording marker into the input field. The audio data is stored
+		/// in _pendingAudioBase64 and will be sent alongside the next chat message.
+		/// </summary>
 		private void StopAndTranscribeRecording()
 		{
 			if (!_isRecordingVoice)
@@ -736,15 +781,16 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			_isTranscribingVoice = true;
-			SetChatInputInteractable(!_isCharacterResponding);
-			UpdateRecordButtonVisualState();
+			// Store audio data and show recording marker in input field
+			_pendingAudioBase64 = "data:audio/wav;base64," + Convert.ToBase64String(wavBytes);
 
-			SendRequest(ChatRequests.TranscribeAudio, new ChatTranscribeAudioRequestPayload
+			if (_inputField != null)
 			{
-				AudioBase64 = "data:audio/wav;base64," + Convert.ToBase64String(wavBytes),
-				Language = DefaultSpeechLanguage,
-			});
+				_inputField.richText = true;
+				_inputField.text = AudioRecordingRichText;
+			}
+
+			BindAudioInputGuard();
 		}
 
 		private void StopRecordingIfNeeded()
@@ -762,11 +808,95 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_isRecordingVoice = false;
 			_recordingDeviceName = null;
 			_recordingAudioClip = null;
+			_pendingAudioBase64 = null;
 			UpdateRecordButtonVisualState();
 		}
 
 		/// <summary>
-		/// Handles transcription completion from the Controller.
+		/// Binds the input field value-changed listener that enforces the audio
+		/// recording rich text rules: any deletion clears the field entirely,
+		/// and any addition resets the field back to the recording marker.
+		/// </summary>
+		private void BindAudioInputGuard()
+		{
+			if (_inputField == null)
+			{
+				return;
+			}
+
+			_inputField.onValueChanged.RemoveListener(HandleAudioInputGuard);
+			_inputField.onValueChanged.AddListener(HandleAudioInputGuard);
+		}
+
+		/// <summary>
+		/// Unbinds the audio input guard listener.
+		/// </summary>
+		private void UnbindAudioInputGuard()
+		{
+			if (_inputField == null)
+			{
+				return;
+			}
+
+			_inputField.onValueChanged.RemoveListener(HandleAudioInputGuard);
+		}
+
+		/// <summary>
+		/// Enforces the recording marker in the input field.
+		/// If the marker lost any character (deletion), clears the entire input and discards the recording.
+		/// If new characters were added, resets back to the marker only.
+		/// </summary>
+		/// <param name="newValue">Current input field text value.</param>
+		private void HandleAudioInputGuard(string newValue)
+		{
+			if (string.IsNullOrEmpty(_pendingAudioBase64))
+			{
+				UnbindAudioInputGuard();
+				return;
+			}
+
+			if (string.IsNullOrEmpty(newValue))
+			{
+				// User deleted everything
+				ClearPendingAudioRecording();
+				return;
+			}
+
+			// Check if the recording marker is still intact
+			if (newValue.Contains(AudioRecordingRichText))
+			{
+				// Marker intact but extra characters were added — reset to marker only
+				if (!string.Equals(newValue, AudioRecordingRichText, StringComparison.Ordinal))
+				{
+					_inputField.onValueChanged.RemoveListener(HandleAudioInputGuard);
+					_inputField.text = AudioRecordingRichText;
+					_inputField.onValueChanged.AddListener(HandleAudioInputGuard);
+				}
+				return;
+			}
+
+			// Marker is broken (characters were deleted) — clear everything
+			ClearPendingAudioRecording();
+		}
+
+		/// <summary>
+		/// Discards the pending audio recording and clears the input field.
+		/// </summary>
+		private void ClearPendingAudioRecording()
+		{
+			_pendingAudioBase64 = null;
+			_pendingAudioMessageId = null;
+			UnbindAudioInputGuard();
+
+			if (_inputField != null)
+			{
+				_inputField.onValueChanged.RemoveListener(HandleAudioInputGuard);
+				_inputField.text = string.Empty;
+			}
+		}
+
+		/// <summary>
+		/// Handles transcription completion from the Controller (legacy OpenAI STT path).
 		/// </summary>
 		/// <param name="payload">Transcript string, or null on failure.</param>
 		[OnEvent(ChatEvents.TranscriptionCompleted)]
@@ -792,6 +922,31 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				_intputChat.text = transcript;
 				_intputChat.ActivateInputField();
+			}
+		}
+
+		/// <summary>
+		/// Handles audio transcription from Gemini after a voice message was sent.
+		/// Updates the user bubble text with the actual transcribed content.
+		/// </summary>
+		/// <param name="payload">ChatAudioTranscribedPayload with transcription and message id.</param>
+		[OnEvent(ChatEvents.AudioRecordingTranscribed)]
+		private void OnAudioRecordingTranscribed(object payload)
+		{
+			var transcribed = payload as ChatAudioTranscribedPayload;
+			if (transcribed == null || string.IsNullOrWhiteSpace(transcribed.Transcribe))
+			{
+				return;
+			}
+
+			if (_messageContainer == null)
+			{
+				return;
+			}
+
+			if (!string.IsNullOrWhiteSpace(transcribed.UserMessageId))
+			{
+				_messageContainer.UpdateMessageText(transcribed.UserMessageId, transcribed.Transcribe);
 			}
 		}
 
@@ -1036,6 +1191,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			StopAllCoroutines();
 			StopRecordingIfNeeded();
+			UnbindAudioInputGuard();
+			_pendingAudioBase64 = null;
+			_pendingAudioMessageId = null;
 			_pendingCharacterTurns.Clear();
 			_isProcessingCharacterTurns = false;
 			SetCharacterRespondingState(false);

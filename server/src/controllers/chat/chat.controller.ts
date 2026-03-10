@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import type { DataSource } from "typeorm";
 import { toFile, type Uploadable } from "openai/uploads";
 import { createOpenAIChatService, createOpenAIClient, type OpenAIChatService } from "../../services/openai.service.js";
-import { createGeminiChatService, isGeminiModel, type GeminiChatService } from "../../services/gemini.service.js";
+import { createGeminiChatService, isGeminiModel, type GeminiChatService, type GeminiAudioPart } from "../../services/gemini.service.js";
 import { buildChatSystemPrompt } from "../../services/chat-prompt.service.js";
 import StoryEntity from "../../models/story.entity.js";
 import UserEntity from "../../models/user.entity.js";
@@ -37,6 +37,7 @@ interface AssistantTurn {
   Text?: string;
   Tone?: string;
   Translation?: string;
+  Transcribe?: string;
 }
 
 type ChatReplyService = OpenAIChatService | GeminiChatService;
@@ -398,7 +399,8 @@ export const createChatController = (
     message: string | undefined,
     history: Array<{ role: "system" | "developer" | "user" | "assistant"; content: string }>,
     modelOverride?: string,
-    retryLimit = 2
+    retryLimit = 2,
+    audioParts?: GeminiAudioPart[]
   ): Promise<JsonReplyResult> => {
     let attempt = 0;
     let prompt = typeof message === "string" && message.trim() ? message.trim() : undefined;
@@ -406,7 +408,9 @@ export const createChatController = (
     let lastResult: JsonReplyResult | null = null;
 
     while (attempt <= retryLimit) {
-      const result = await service.createReply(prompt, history, modelOverride || undefined);
+      // Only send audio on the first attempt; retries use text-only corrective prompts
+      const audioForAttempt = attempt === 0 ? audioParts : undefined;
+      const result = await service.createReply(prompt, history, modelOverride || undefined, audioForAttempt);
       lastResult = result;
 
       const turns = parseAssistantReply(result.reply);
@@ -645,10 +649,12 @@ export const createChatController = (
     const message = typeof request.body?.message === "string" ? request.body.message.trim() : "";
     const sessionId = getSessionId(request.body?.sessionId);
     const modelOverride = "gemini-3-flash-preview";
+    const audioBase64 = typeof request.body?.audio === "string" ? request.body.audio.trim() : "";
+    const hasAudio = Boolean(audioBase64);
 
-    if (!message) {
+    if (!message && !hasAudio) {
       response.status(400).json({
-        message: "Message is required"
+        message: "Message or audio is required"
       });
       return;
     }
@@ -666,28 +672,73 @@ export const createChatController = (
     }
 
     try {
+      // Parse audio data URL into inline data for Gemini if present
+      let geminiAudioParts: GeminiAudioPart[] | undefined;
+      if (hasAudio && useGemini) {
+        const parsed = parseAudioDataUrl(audioBase64);
+        if (!parsed) {
+          response.status(400).json({ message: "Invalid audio data URL" });
+          return;
+        }
+        if (parsed.buffer.byteLength > MAX_AUDIO_BYTES) {
+          response.status(413).json({ message: "Audio payload is too large" });
+          return;
+        }
+        geminiAudioParts = [{
+          data: parsed.buffer.toString("base64"),
+          mimeType: parsed.mime
+        }];
+      }
+
+      // When audio is present, instruct Gemini to also transcribe the audio
+      const audioTranscribeInstruction = hasAudio
+        ? "\n\nIMPORTANT: The user has sent an audio recording. Listen to the audio carefully and include an extra field \"Transcribe\" in EVERY item of your JSON response array. \"Transcribe\" must contain the exact transcription of what the user said in the audio. If the audio is unclear, transcribe as best you can. Respond to the audio content naturally as if the user typed it."
+        : "";
+
+      const effectiveMessage = (message || "The user sent an audio message. Please listen and respond.") + audioTranscribeInstruction;
+
       const systemPrompt = await buildSystemPrompt(request.user.id, request.body);
       await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
       const history = await historyStore.load(request.user.id);
       const result = await requestJsonReplyWithRetry(
         selectedService,
-        message,
+        effectiveMessage,
         history,
-        modelOverride || undefined
+        modelOverride || undefined,
+        2,
+        geminiAudioParts
       );
 
       const normalizedReply = useGemini
         ? normalizeAssistantReplyMessageIds(result.reply, collectAssistantMessageIds(history))
         : result.reply;
 
+      // Extract transcription from the first turn if present
+      let transcribe: string | undefined;
+      if (hasAudio) {
+        const turns = parseAssistantReply(normalizedReply);
+        for (const turn of turns) {
+          const t = typeof (turn as Record<string, unknown>).Transcribe === "string"
+            ? ((turn as Record<string, unknown>).Transcribe as string).trim()
+            : "";
+          if (t) {
+            transcribe = t;
+            break;
+          }
+        }
+      }
+
+      // Store the transcribed text as the user message in history (not the raw instruction)
+      const userHistoryContent = hasAudio && transcribe ? transcribe : message;
       await historyStore.append(request.user.id, [
-        { role: "user", content: message },
+        { role: "user", content: userHistoryContent },
         { role: "assistant", content: normalizedReply }
       ]);
 
       response.json({
         reply: normalizedReply,
-        model: result.model
+        model: result.model,
+        ...(transcribe ? { transcribe } : {})
       });
     } catch (error) {
       console.error("Error in sendMessage:", error);

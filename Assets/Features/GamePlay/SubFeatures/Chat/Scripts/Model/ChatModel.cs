@@ -43,6 +43,22 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		[JsonProperty("storyId")]
 		public int? StoryId { get; set; }
+
+		/// <summary>
+		/// Optional base64-encoded audio data URL for voice messages.
+		/// When present, the server sends the audio to Gemini directly
+		/// and returns a transcription in the response.
+		/// </summary>
+		[JsonProperty("audio")]
+		public string Audio { get; set; }
+
+		/// <summary>
+		/// Client-side only: message id of the user bubble so the view can
+		/// update it with the transcribed text after the server responds.
+		/// Not serialized to the server.
+		/// </summary>
+		[JsonIgnore]
+		public string AudioMessageId { get; set; }
 	}
 
 	/// <summary>
@@ -195,6 +211,13 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		[JsonProperty("message")]
 		public string Message { get; set; }
+
+		/// <summary>
+		/// Transcription of user audio when an audio recording was sent.
+		/// Populated by Gemini's analysis of the audio content.
+		/// </summary>
+		[JsonProperty("transcribe")]
+		public string Transcribe { get; set; }
 	}
 
 	/// <summary>
@@ -291,6 +314,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		[JsonIgnore]
 		public string AudioUrl { get; set; }
+
+		/// <summary>
+		/// Transcription of user audio when an audio recording was sent.
+		/// </summary>
+		[JsonProperty("Transcribe")]
+		public string Transcribe { get; set; }
 	}
 
 	/// <summary>
@@ -317,6 +346,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// Parsed assistant turns when reply is JSON array/object.
 		/// </summary>
 		public System.Collections.Generic.List<ChatAssistantTurnPayload> Turns { get; set; } = new System.Collections.Generic.List<ChatAssistantTurnPayload>();
+
+		/// <summary>
+		/// Transcription of user audio when the message contained a voice recording.
+		/// </summary>
+		public string Transcribe { get; set; }
 	}
 
 	/// <summary>
@@ -483,5 +517,22 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		[JsonProperty("transcript")]
 		public string Transcript { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload when Gemini transcribes an audio recording sent by the user.
+	/// Published so the view can update the user message bubble with the transcribed text.
+	/// </summary>
+	public sealed class ChatAudioTranscribedPayload
+	{
+		/// <summary>
+		/// Transcribed text from the audio recording.
+		/// </summary>
+		public string Transcribe { get; set; }
+
+		/// <summary>
+		/// The message id assigned to the user bubble in the view.
+		/// </summary>
+		public string UserMessageId { get; set; }
 	}
 }

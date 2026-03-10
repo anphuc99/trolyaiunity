@@ -27,11 +27,22 @@ export interface GeminiChatServiceConfig {
   model: string;
 }
 
+/**
+ * Inline audio attachment to include in a Gemini message.
+ */
+export interface GeminiAudioPart {
+  /** Base64-encoded audio data (without data URL prefix). */
+  data: string;
+  /** MIME type of the audio (e.g. "audio/wav", "audio/webm"). */
+  mimeType: string;
+}
+
 export interface GeminiChatService {
   createReply: (
     message?: string,
     history?: Array<{ role: "system" | "developer" | "user" | "assistant"; content: string }>,
-    modelOverride?: string
+    modelOverride?: string,
+    audioParts?: GeminiAudioPart[]
   ) => Promise<{ reply: string; model: string }>;
 }
 
@@ -198,7 +209,7 @@ export const createGeminiChatService = (config: GeminiChatServiceConfig): Gemini
   const genAI = new GoogleGenerativeAI(config.apiKey);
   const defaultModel = config.model;
 
-  const createReply: GeminiChatService["createReply"] = async (message, history = [], modelOverride) => {
+  const createReply: GeminiChatService["createReply"] = async (message, history = [], modelOverride, audioParts) => {
     const resolvedModel = modelOverride?.trim() || defaultModel;
     
     // Find system message from history
@@ -225,11 +236,27 @@ export const createGeminiChatService = (config: GeminiChatServiceConfig): Gemini
     // Send the user message if provided
     const userMessage = message?.trim() ?? "";
     
-    if (!userMessage && geminiHistory.length === 0) {
+    if (!userMessage && geminiHistory.length === 0 && (!audioParts || audioParts.length === 0)) {
       throw new Error("No message or history provided for Gemini");
     }
 
-    const result = await chat.sendMessage(userMessage || "Continue the conversation.");
+    // Build message parts: text + optional audio inline data
+    const messageParts: Part[] = [];
+
+    if (audioParts && audioParts.length > 0) {
+      for (const audio of audioParts) {
+        messageParts.push({
+          inlineData: {
+            data: audio.data,
+            mimeType: audio.mimeType
+          }
+        });
+      }
+    }
+
+    messageParts.push({ text: userMessage || "Continue the conversation." });
+
+    const result = await chat.sendMessage(messageParts);
     const response = result.response;
     const reply = response.text().trim();
 

@@ -103,11 +103,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				return;
 			}
 
-			if (string.IsNullOrWhiteSpace(payload.Message))
+			if (string.IsNullOrWhiteSpace(payload.Message) && string.IsNullOrWhiteSpace(payload.Audio))
 			{
 				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
 				{
-					Message = "Message is required."
+					Message = "Message or audio is required."
 				});
 				return;
 			}
@@ -629,6 +629,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					return;
 				}
 
+				// If server returned a transcription for the audio, notify the view
+				if (!string.IsNullOrWhiteSpace(response.Transcribe))
+				{
+					EventBus.Publish(ChatEvents.AudioRecordingTranscribed, new ChatAudioTranscribedPayload
+					{
+						Transcribe = response.Transcribe,
+						UserMessageId = payload.AudioMessageId,
+					});
+				}
+
 				var turns = ParseAssistantTurns(response.Reply);
 				await PreResolveTtsAudioUrlsAsync(turns);
 
@@ -638,6 +648,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					Model = response.Model,
 					SessionId = payload.SessionId,
 					Turns = turns,
+					Transcribe = response.Transcribe,
 				});
 			}
 			catch (Exception exception)

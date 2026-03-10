@@ -359,6 +359,45 @@ namespace Share.Components
 		}
 
 		/// <summary>
+		/// Updates the text of a message identified by its message id.
+		/// </summary>
+		/// <param name="messageId">Message identifier.</param>
+		/// <param name="newText">New text to display.</param>
+		public void UpdateMessageText(string messageId, string newText)
+		{
+			if (string.IsNullOrWhiteSpace(messageId))
+			{
+				return;
+			}
+
+			var updated = false;
+			for (var i = 0; i < _messages.Count; i++)
+			{
+				var message = _messages[i];
+				if (message == null)
+				{
+					continue;
+				}
+
+				if (message.MessageId != messageId)
+				{
+					continue;
+				}
+
+				message.Message = newText ?? string.Empty;
+				message.OriginalMessage = newText ?? string.Empty;
+				updated = true;
+				break;
+			}
+
+			if (updated)
+			{
+				RebuildMetrics();
+				RefreshVisible();
+			}
+		}
+
+		/// <summary>
 		/// Inserts one message at the beginning (older message).
 		/// </summary>
 		/// <param name="message">Message text.</param>
