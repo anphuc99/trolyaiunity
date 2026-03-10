@@ -81,21 +81,6 @@ namespace Features.GamePlay.SubFeatures.Knowledges.Controller
 		}
 
 		/// <summary>
-		/// Handles knowledge selection and starts learning.
-		/// </summary>
-		/// <param name="payload">KnowledgeItemPayload of the selected knowledge.</param>
-		[Request(KnowledgesRequests.SelectKnowledge)]
-		public static void HandleSelectKnowledge(object payload)
-		{
-			if (payload is not KnowledgeItemPayload knowledge || knowledge.Id <= 0)
-			{
-				return;
-			}
-
-			KnowledgesState.ParentSignals?.OnStartLearning?.Invoke(knowledge.Id);
-		}
-
-		/// <summary>
 		/// Handles navigation back to subjects.
 		/// </summary>
 		/// <param name="payload">Unused.</param>
@@ -106,23 +91,13 @@ namespace Features.GamePlay.SubFeatures.Knowledges.Controller
 		}
 
 		/// <summary>
-		/// Handles starting learning mode.
+		/// Handles starting learning mode with the current subject.
 		/// </summary>
 		/// <param name="payload">Unused.</param>
 		[Request(KnowledgesRequests.StartLearning)]
 		public static void HandleStartLearning(object payload)
 		{
-			// Use the first cached knowledge if no specific one is selected
-			var knowledgeId = 0;
-			if (KnowledgesState.CachedKnowledges != null && KnowledgesState.CachedKnowledges.Count > 0)
-			{
-				knowledgeId = KnowledgesState.CachedKnowledges[0].Id;
-			}
-
-			if (knowledgeId > 0)
-			{
-				KnowledgesState.ParentSignals?.OnStartLearning?.Invoke(knowledgeId);
-			}
+			KnowledgesState.ParentSignals?.OnStartLearning?.Invoke();
 		}
 
 		/// <summary>

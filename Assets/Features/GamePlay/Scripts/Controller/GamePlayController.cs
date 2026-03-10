@@ -766,18 +766,12 @@ namespace Features.GamePlay.Controller
 
 		/// <summary>
 		/// Handles start learning action from Knowledges.
-		/// Sets learn mode and knowledge ID in GlobalVariables, then opens Chat.
+		/// Sets learn mode in GlobalVariables, then opens Chat.
+		/// Subject ID is already stored in GlobalVariables from subject selection.
 		/// </summary>
-		/// <param name="knowledgeId">The knowledge item identifier to learn.</param>
-		private static void OnStartLearning(int knowledgeId)
+		private static void OnStartLearning()
 		{
-			if (knowledgeId <= 0)
-			{
-				return;
-			}
-
 			GlobalVariables.Set(GlobalModes.ChatApiModeKey, GlobalModes.ModeLearn);
-			GlobalVariables.Set(GlobalModes.KnowledgeIdKey, knowledgeId);
 			HandleOpenSubController(GamePlaySubControllerType.Chat);
 		}
 

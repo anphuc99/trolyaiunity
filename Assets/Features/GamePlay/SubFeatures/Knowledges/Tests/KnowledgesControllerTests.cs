@@ -76,59 +76,6 @@ namespace Features.GamePlay.SubFeatures.Knowledges.Tests
 		}
 
 		[Test]
-		public void HandleSelectKnowledge_InvokesParentSignal_WhenValidKnowledge()
-		{
-			var selectedId = 0;
-			KnowledgesController.SetParentSignals(new KnowledgesParentSignals
-			{
-				OnStartLearning = id => selectedId = id,
-			});
-
-			KnowledgesController.HandleSelectKnowledge(new KnowledgeItemPayload { Id = 5, Name = "Kiến thức" });
-
-			Assert.AreEqual(5, selectedId);
-		}
-
-		[Test]
-		public void HandleSelectKnowledge_DoesNothing_WhenKnowledgeIdIsZero()
-		{
-			var selectedId = -1;
-			KnowledgesController.SetParentSignals(new KnowledgesParentSignals
-			{
-				OnStartLearning = id => selectedId = id,
-			});
-
-			KnowledgesController.HandleSelectKnowledge(new KnowledgeItemPayload { Id = 0, Name = "Invalid" });
-
-			Assert.AreEqual(-1, selectedId);
-		}
-
-		[Test]
-		public void HandleSelectKnowledge_DoesNothing_WhenPayloadIsNull()
-		{
-			var selectedId = -1;
-			KnowledgesController.SetParentSignals(new KnowledgesParentSignals
-			{
-				OnStartLearning = id => selectedId = id,
-			});
-
-			KnowledgesController.HandleSelectKnowledge(null);
-
-			Assert.AreEqual(-1, selectedId);
-		}
-
-		[Test]
-		public void HandleSelectKnowledge_DoesNotThrow_WhenNoParentSignals()
-		{
-			KnowledgesController.SetParentSignals(null);
-
-			Assert.DoesNotThrow(() =>
-			{
-				KnowledgesController.HandleSelectKnowledge(new KnowledgeItemPayload { Id = 1, Name = "Test" });
-			});
-		}
-
-		[Test]
 		public void HandleBackToSubjects_InvokesParentSignal()
 		{
 			var invoked = false;
@@ -154,51 +101,28 @@ namespace Features.GamePlay.SubFeatures.Knowledges.Tests
 		}
 
 		[Test]
-		public void HandleStartLearning_InvokesParentSignal_WhenCachedKnowledgesExist()
+		public void HandleStartLearning_InvokesParentSignal()
 		{
-			var selectedId = 0;
-			KnowledgesState.CachedKnowledges = new List<KnowledgeItemPayload>
-			{
-				new KnowledgeItemPayload { Id = 10, Name = "First Knowledge" }
-			};
+			var invoked = false;
 			KnowledgesController.SetParentSignals(new KnowledgesParentSignals
 			{
-				OnStartLearning = id => selectedId = id,
+				OnStartLearning = () => invoked = true,
 			});
 
 			KnowledgesController.HandleStartLearning(null);
 
-			Assert.AreEqual(10, selectedId);
+			Assert.IsTrue(invoked);
 		}
 
 		[Test]
-		public void HandleStartLearning_DoesNotInvoke_WhenNoCachedKnowledges()
+		public void HandleStartLearning_DoesNotThrow_WhenNoParentSignals()
 		{
-			var selectedId = -1;
-			KnowledgesState.CachedKnowledges = null;
-			KnowledgesController.SetParentSignals(new KnowledgesParentSignals
+			KnowledgesController.SetParentSignals(null);
+
+			Assert.DoesNotThrow(() =>
 			{
-				OnStartLearning = id => selectedId = id,
+				KnowledgesController.HandleStartLearning(null);
 			});
-
-			KnowledgesController.HandleStartLearning(null);
-
-			Assert.AreEqual(-1, selectedId);
-		}
-
-		[Test]
-		public void HandleStartLearning_DoesNotInvoke_WhenCachedKnowledgesEmpty()
-		{
-			var selectedId = -1;
-			KnowledgesState.CachedKnowledges = new List<KnowledgeItemPayload>();
-			KnowledgesController.SetParentSignals(new KnowledgesParentSignals
-			{
-				OnStartLearning = id => selectedId = id,
-			});
-
-			KnowledgesController.HandleStartLearning(null);
-
-			Assert.AreEqual(-1, selectedId);
 		}
 
 		[Test]
@@ -268,7 +192,7 @@ namespace Features.GamePlay.SubFeatures.Knowledges.Tests
 		{
 			var signals = new KnowledgesParentSignals
 			{
-				OnStartLearning = _ => { },
+				OnStartLearning = () => { },
 			};
 
 			KnowledgesController.SetParentSignals(signals);

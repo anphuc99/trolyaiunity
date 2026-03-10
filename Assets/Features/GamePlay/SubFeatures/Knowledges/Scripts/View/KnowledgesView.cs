@@ -119,23 +119,9 @@ namespace Features.GamePlay.SubFeatures.Knowledges.View
 
 				var item = Instantiate(_itemPrefab, _contentParent);
 				item.gameObject.SetActive(true);
-				item.Initialize(knowledgeData, OnKnowledgeItemClicked);
+				item.Initialize(knowledgeData);
 				_spawnedItems.Add(item);
 			}
-		}
-
-		/// <summary>
-		/// Handles a knowledge item click by sending a select request to the controller.
-		/// </summary>
-		/// <param name="knowledge">The selected knowledge data.</param>
-		private void OnKnowledgeItemClicked(KnowledgeItemPayload knowledge)
-		{
-			if (knowledge == null || knowledge.Id <= 0)
-			{
-				return;
-			}
-
-			SendRequest(KnowledgesRequests.SelectKnowledge, knowledge);
 		}
 
 		/// <summary>

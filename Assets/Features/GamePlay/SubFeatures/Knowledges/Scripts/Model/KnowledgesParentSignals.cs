@@ -13,10 +13,10 @@ namespace Features.GamePlay.SubFeatures.Knowledges.Model
 		public Action OnBackToSubjects { get; set; }
 
 		/// <summary>
-		/// Callback invoked when user wants to start learning with a knowledge item.
-		/// Parameter is the knowledge ID.
+		/// Callback invoked when user wants to start learning with the current subject.
+		/// Subject ID is read from GlobalVariables.
 		/// </summary>
-		public Action<int> OnStartLearning { get; set; }
+		public Action OnStartLearning { get; set; }
 
 		/// <summary>
 		/// Adds a menu item and returns its identifier.

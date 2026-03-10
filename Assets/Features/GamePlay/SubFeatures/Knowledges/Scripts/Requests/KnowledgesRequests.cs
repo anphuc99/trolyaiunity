@@ -11,18 +11,12 @@ namespace Features.GamePlay.SubFeatures.Knowledges.Requests
 		public const string LoadKnowledges = "game.play.knowledges.load.request";
 
 		/// <summary>
-		/// Selects a knowledge item to start learning.
-		/// Payload: KnowledgeItemPayload.
-		/// </summary>
-		public const string SelectKnowledge = "game.play.knowledges.select.request";
-
-		/// <summary>
 		/// Navigates back to subjects list.
 		/// </summary>
 		public const string BackToSubjects = "game.play.knowledges.back.request";
 
 		/// <summary>
-		/// Starts learning mode with the selected knowledge.
+		/// Starts learning mode with the current subject's knowledges.
 		/// </summary>
 		public const string StartLearning = "game.play.knowledges.learn.request";
 	}
