@@ -16,6 +16,7 @@ using Features.GamePlay.SubFeatures.Setting.Model;
 using Features.GamePlay.SubFeatures.Subjects.Controller;
 using Features.GamePlay.SubFeatures.Subjects.Model;
 using Features.GamePlay.SubFeatures.Knowledges.Controller;
+using Features.GamePlay.SubFeatures.Knowledges.Model;
 using Features.GamePlay.SubFeatures.CreateSubjects.Controller;
 using Features.GamePlay.SubFeatures.CreateSubjects.Model;
 using Core.Infrastructure.Network;
@@ -248,6 +249,13 @@ namespace Features.GamePlay.Controller
 			{
 				OnSubjectSelected = OnSubjectSelected,
 				OnOpenCreateSubjects = OnOpenCreateSubjects,
+				AddMenu = AddMenu,
+				RemoveMenu = RemoveMenu,
+			});
+			KnowledgesController.SetParentSignals(new KnowledgesParentSignals
+			{
+				OnBackToSubjects = OnBackToSubjects,
+				OnStartLearning = OnStartLearning,
 				AddMenu = AddMenu,
 				RemoveMenu = RemoveMenu,
 			});
@@ -641,6 +649,7 @@ namespace Features.GamePlay.Controller
 			JournalController.SetParentSignals(null);
 			SettingController.SetParentSignals(null);
 			SubjectsController.SetParentSignals(null);
+			KnowledgesController.SetParentSignals(null);
 			CreateSubjectsController.SetParentSignals(null);
 		}
 
@@ -745,6 +754,31 @@ namespace Features.GamePlay.Controller
 		private static void OnOpenCreateSubjects()
 		{
 			HandleOpenSubController(GamePlaySubControllerType.CreateSubjects);
+		}
+
+		/// <summary>
+		/// Handles navigation back to Subjects from Knowledges.
+		/// </summary>
+		private static void OnBackToSubjects()
+		{
+			HandleOpenSubController(GamePlaySubControllerType.Subjects);
+		}
+
+		/// <summary>
+		/// Handles start learning action from Knowledges.
+		/// Sets learn mode and knowledge ID in GlobalVariables, then opens Chat.
+		/// </summary>
+		/// <param name="knowledgeId">The knowledge item identifier to learn.</param>
+		private static void OnStartLearning(int knowledgeId)
+		{
+			if (knowledgeId <= 0)
+			{
+				return;
+			}
+
+			GlobalVariables.Set(GlobalModes.ChatApiModeKey, GlobalModes.ModeLearn);
+			GlobalVariables.Set(GlobalModes.KnowledgeIdKey, knowledgeId);
+			HandleOpenSubController(GamePlaySubControllerType.Chat);
 		}
 
 		/// <summary>

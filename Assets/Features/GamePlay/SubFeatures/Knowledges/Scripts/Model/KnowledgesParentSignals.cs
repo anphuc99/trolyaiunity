@@ -8,13 +8,24 @@ namespace Features.GamePlay.SubFeatures.Knowledges.Model
 	public sealed class KnowledgesParentSignals
 	{
 		/// <summary>
-		/// Optional callback invoked when the child echoes a payload.
+		/// Callback invoked when user wants to navigate back to Subjects.
 		/// </summary>
-		public Action<object> OnEchoed { get; set; }
+		public Action OnBackToSubjects { get; set; }
 
 		/// <summary>
-		/// Optional callback for retrieving data from the parent.
+		/// Callback invoked when user wants to start learning with a knowledge item.
+		/// Parameter is the knowledge ID.
 		/// </summary>
-		public Func<string> GetParentStatus { get; set; }
+		public Action<int> OnStartLearning { get; set; }
+
+		/// <summary>
+		/// Adds a menu item and returns its identifier.
+		/// </summary>
+		public Func<string, Action, string> AddMenu { get; set; }
+
+		/// <summary>
+		/// Removes a menu item by identifier.
+		/// </summary>
+		public Action<string> RemoveMenu { get; set; }
 	}
 }

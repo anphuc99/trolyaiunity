@@ -16,7 +16,12 @@ namespace Core.Infrastructure.State
 		public const string JournalApiModeKey = "global.gameplay.journal.api.mode";
 
 		/// <summary>
-		/// Default API mode value.
+		/// Key for storing the selected knowledge ID for learning.
+		/// </summary>
+		public const string KnowledgeIdKey = "global.gameplay.knowledge.id";
+
+		/// <summary>
+		/// Default API mode value (practice mode from gameplay).
 		/// </summary>
 		public const string ModeDefault = "default";
 
@@ -24,5 +29,10 @@ namespace Core.Infrastructure.State
 		/// MyLog API mode value.
 		/// </summary>
 		public const string ModeMyLog = "mylog";
+
+		/// <summary>
+		/// Learn mode value (from knowledges).
+		/// </summary>
+		public const string ModeLearn = "learn";
 	}
 }

@@ -5,8 +5,6 @@ namespace Features.GamePlay.SubFeatures.Knowledges.Events
 	/// </summary>
 	public static class KnowledgesEvents
 	{
-		public const string Echoed = "game.play.knowledges.echo.event";
-
 		/// <summary>
 		/// Published when the Knowledges subfeature is installed and visible.
 		/// </summary>
@@ -16,5 +14,17 @@ namespace Features.GamePlay.SubFeatures.Knowledges.Events
 		/// Published when the Knowledges subfeature is uninstalled and hidden.
 		/// </summary>
 		public const string Uninstalled = "game.play.knowledges.uninstalled.event";
+
+		/// <summary>
+		/// Published when knowledges are successfully loaded.
+		/// Payload: List of KnowledgeItemPayload.
+		/// </summary>
+		public const string KnowledgesLoaded = "game.play.knowledges.loaded.event";
+
+		/// <summary>
+		/// Published when loading knowledges fails.
+		/// Payload: KnowledgesErrorPayload.
+		/// </summary>
+		public const string KnowledgesLoadFailed = "game.play.knowledges.load.failed.event";
 	}
 }
