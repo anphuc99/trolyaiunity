@@ -253,7 +253,25 @@ export const createGeminiChatService = (config: GeminiChatServiceConfig): Gemini
     }
 
     // Send the user message if provided
-    const userMessage = message?.trim() ?? "";
+    let userMessage = message?.trim() ?? "";
+
+    // When reusing a cached session, any developer messages appended after the
+    // last user/assistant turn haven't been sent to the session yet.  Merge them
+    // into the current user message so the AI receives the context inline.
+    if (sessionKey && sessionCache.has(sessionKey)) {
+      const trailingDevMessages: string[] = [];
+      for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].role === "developer") {
+          trailingDevMessages.unshift(history[i].content);
+        } else {
+          break;
+        }
+      }
+
+      if (trailingDevMessages.length > 0) {
+        userMessage = formatMergedDeveloperUserMessage(trailingDevMessages, userMessage);
+      }
+    }
     
     if (!userMessage && geminiHistory.length === 0 && (!audioParts || audioParts.length === 0)) {
       throw new Error("No message or history provided for Gemini");
