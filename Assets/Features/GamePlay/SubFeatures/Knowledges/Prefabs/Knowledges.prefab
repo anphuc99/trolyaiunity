@@ -264,8 +264,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _visible: 1
-  _itemPrefab: {fileID: 0}
-  _contentParent: {fileID: 0}
+  _itemPrefab: {fileID: -367070226542809138, guid: 24fb4e9413ab98b48ba8ac8a693ae653, type: 3}
+  _contentParent: {fileID: 8471846276304171645}
+  _learnButton: {fileID: 7981347349395861559}
 --- !u!1 &2901268279702041871
 GameObject:
   m_ObjectHideFlags: 0
