@@ -42,6 +42,7 @@ export const createMyLogRoutes = (dataSource: DataSource) => {
 
   // Diary chat journals
   router.get("/journals", requireAuth, controller.listJournals);
+  router.get("/journals/:id/audio", requireAuth, controller.downloadJournalAudio);
   router.get("/journals/:id", requireAuth, controller.getJournal);
 
   // Diary chat session

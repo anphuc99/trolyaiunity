@@ -388,5 +388,87 @@ namespace Features.GamePlay.SubFeatures.Journal.Tests
 			Assert.IsNotNull(reviewPayload.Review);
 			Assert.AreEqual(1, reviewPayload.Review.JournalId);
 		}
+
+		// ==================================================================
+		// Download Audio tests
+		// ==================================================================
+
+		[Test]
+		public void HandleDownloadAudio_InvalidPayload_PublishesError()
+		{
+			JournalErrorPayload errorPayload = null;
+			void Handler(object payload)
+			{
+				errorPayload = payload as JournalErrorPayload;
+			}
+
+			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.RequestFailed, Handler);
+			try
+			{
+				JournalController.HandleDownloadAudio("invalid-id");
+			}
+			finally
+			{
+				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.RequestFailed, Handler);
+			}
+
+			Assert.IsNotNull(errorPayload);
+			Assert.IsFalse(string.IsNullOrWhiteSpace(errorPayload.Message));
+		}
+
+		[Test]
+		public void HandleDownloadAudio_ValidId_PublishesAudioDownloadCompleted()
+		{
+			JournalAudioDownloadPayload downloadPayload = null;
+			void Handler(object payload)
+			{
+				downloadPayload = payload as JournalAudioDownloadPayload;
+			}
+
+			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.AudioDownloadCompleted, Handler);
+			try
+			{
+				JournalController.HandleDownloadAudio(new JournalDetailRequestPayload
+				{
+					JournalId = 42
+				});
+			}
+			finally
+			{
+				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.AudioDownloadCompleted, Handler);
+			}
+
+			Assert.IsNotNull(downloadPayload);
+			Assert.AreEqual(42, downloadPayload.JournalId);
+			Assert.IsFalse(string.IsNullOrWhiteSpace(downloadPayload.DownloadUrl));
+			StringAssert.Contains("/42/audio", downloadPayload.DownloadUrl);
+		}
+
+		[Test]
+		public void HandleDownloadAudio_MyLogMode_UsesMyLogEndpoint()
+		{
+			GlobalVariablesMutationProxyController.Set(GlobalModes.JournalApiModeKey, GlobalModes.ModeMyLog);
+
+			JournalAudioDownloadPayload downloadPayload = null;
+			void Handler(object payload)
+			{
+				downloadPayload = payload as JournalAudioDownloadPayload;
+			}
+
+			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.AudioDownloadCompleted, Handler);
+			try
+			{
+				JournalController.HandleDownloadAudio(10);
+			}
+			finally
+			{
+				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.AudioDownloadCompleted, Handler);
+			}
+
+			Assert.IsNotNull(downloadPayload);
+			Assert.AreEqual(10, downloadPayload.JournalId);
+			StringAssert.Contains("mylog", downloadPayload.DownloadUrl.ToLower());
+			StringAssert.Contains("/10/audio", downloadPayload.DownloadUrl);
+		}
 	}
 }

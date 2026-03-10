@@ -22,5 +22,8 @@ namespace Features.GamePlay.SubFeatures.Journal.Events
 
 		/// <summary>A journal FSRS review was submitted successfully.</summary>
 		public const string ReviewSubmitted = "game.play.journal.review.submitted.event";
+
+		/// <summary>Journal audio download completed or failed.</summary>
+		public const string AudioDownloadCompleted = "game.play.journal.audio.download.completed.event";
 	}
 }

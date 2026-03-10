@@ -28,5 +28,10 @@ namespace Features.GamePlay.SubFeatures.Journal.Requests
 		/// Submits an FSRS review rating for a journal.
 		/// </summary>
 		public const string SubmitJournalReview = "game.play.journal.submit.review.request";
+
+		/// <summary>
+		/// Downloads all audio for a journal as a single combined MP3.
+		/// </summary>
+		public const string DownloadAudio = "game.play.journal.download.audio.request";
 	}
 }

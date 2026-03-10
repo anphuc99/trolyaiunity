@@ -349,6 +349,21 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		}
 
 		/// <summary>
+		/// Builds journal audio download endpoint.
+		/// </summary>
+		/// <param name="journalId">Journal id.</param>
+		/// <returns>Relative endpoint path for audio download.</returns>
+		private static string BuildJournalAudioEndpoint(int journalId)
+		{
+			if (IsMyLogJournalMode())
+			{
+				return NetworkEndpoints.MyLogJournals + "/" + journalId + "/audio";
+			}
+
+			return NetworkEndpoints.Journals + "/" + journalId + "/audio";
+		}
+
+		/// <summary>
 		/// Builds text-to-speech endpoint with query parameters.
 		/// </summary>
 		/// <param name="text">Message text.</param>
@@ -456,6 +471,34 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 			}
 
 			_ = SubmitJournalReviewInternalAsync(payload);
+		}
+
+		// ==================================================================
+		// Download Audio handler
+		// ==================================================================
+
+		/// <summary>
+		/// Handles request to download all audio for a journal as a single MP3.
+		/// Publishes AudioDownloadCompleted with the resolved download URL for the view.
+		/// </summary>
+		/// <param name="payload">Payload containing journal id.</param>
+		[Request(JournalRequests.DownloadAudio)]
+		public static void HandleDownloadAudio(object payload)
+		{
+			if (!TryResolveJournalId(payload, out var journalId))
+			{
+				PublishError("Missing or invalid journal id for audio download.");
+				return;
+			}
+
+			var endpoint = BuildJournalAudioEndpoint(journalId);
+			var resolvedUrl = HttpClient.ResolveUrl(endpoint);
+
+			EventBus.Publish(JournalEvents.AudioDownloadCompleted, new JournalAudioDownloadPayload
+			{
+				JournalId = journalId,
+				DownloadUrl = resolvedUrl
+			});
 		}
 
 		/// <summary>

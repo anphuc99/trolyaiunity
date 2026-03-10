@@ -1,6 +1,9 @@
 import type { Request, Response } from "express";
+import { execFile } from "child_process";
 import { randomUUID } from "crypto";
+import fs from "fs/promises";
 import path from "path";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import type { DataSource } from "typeorm";
 import { LessThanOrEqual, Between } from "typeorm";
 import { createOpenAIChatService, type OpenAIChatService } from "../../services/openai.service.js";
@@ -13,7 +16,9 @@ import MyLogMessageEntity from "../../models/my-log-message.entity.js";
 import CharacterEntity from "../../models/character.entity.js";
 import UserEntity from "../../models/user.entity.js";
 import { createChatHistoryStore, type ChatHistoryMessage, type ChatHistoryStore } from "../../services/chat-history.service.js";
-import { buildAudioId } from "../../services/tts.service.js";
+import { buildAudioId, getAudioPath, createTtsAudio } from "../../services/tts.service.js";
+
+const MYLOG_TEMP_DIR = path.join(process.cwd(), "data", "temp");
 
 /**
  * The special character name used for hidden psychologist evaluation messages.
@@ -37,6 +42,7 @@ interface MyLogController {
   appendDeveloperMessage: (request: Request, response: Response) => Promise<void>;
   editMessage: (request: Request, response: Response) => Promise<void>;
   getDeveloperState: (request: Request, response: Response) => Promise<void>;
+  downloadJournalAudio: (request: Request, response: Response) => Promise<void>;
 }
 
 interface MyLogControllerDeps {
@@ -1721,6 +1727,148 @@ Return ONLY the JSON object. No markdown. No extra text.
     }
   };
 
+  // ────────────────────────────────────────────────────────────────────────
+  // Download combined journal audio
+  // ────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Downloads all audio for a mylog journal as a single concatenated MP3 file.
+   * Messages are sorted by createdAt. Hidden psychologist entries are skipped.
+   *
+   * GET /api/mylog/journals/:id/audio
+   */
+  const downloadJournalAudio: MyLogController["downloadJournalAudio"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const journalId = Number(request.params?.id);
+    if (!Number.isInteger(journalId) || journalId <= 0) {
+      response.status(400).json({ message: "Invalid journal id" });
+      return;
+    }
+
+    try {
+      const userId = request.user.id;
+
+      const journal = await myLogJournalRepository.findOne({
+        where: { id: journalId, userId }
+      });
+
+      if (!journal) {
+        response.status(404).json({ message: "Journal not found" });
+        return;
+      }
+
+      const messages = await myLogMessageRepository.find({
+        where: { journalId: journal.id, userId },
+        order: { createdAt: "ASC" }
+      });
+
+      if (!messages.length) {
+        response.status(404).json({ message: "No messages found for this journal" });
+        return;
+      }
+
+      const characters = await characterRepository.find({ where: { userId } });
+      const characterByName = new Map(
+        characters.map((c) => [normalizeName(c.name), c])
+      );
+
+      const audioPaths: string[] = [];
+
+      for (const message of messages) {
+        if (!message.tone || message.characterName === "User" || message.isHidden) {
+          continue;
+        }
+
+        const character = characterByName.get(normalizeName(message.characterName));
+        const voiceName = character?.voiceName?.trim() || undefined;
+        const pitch = character?.pitch ?? undefined;
+        const speakingRate = character?.speakingRate ?? undefined;
+
+        const audioId = buildAudioId(
+          message.content,
+          message.tone,
+          voiceName,
+          pitch,
+          speakingRate
+        );
+
+        const audioPath = getAudioPath(audioId);
+
+        try {
+          await fs.access(audioPath);
+        } catch {
+          await createTtsAudio(
+            message.content,
+            message.tone,
+            audioId,
+            voiceName,
+            pitch,
+            speakingRate
+          );
+        }
+
+        audioPaths.push(audioPath);
+      }
+
+      if (!audioPaths.length) {
+        response.status(404).json({ message: "No audio available for this journal" });
+        return;
+      }
+
+      await fs.mkdir(MYLOG_TEMP_DIR, { recursive: true });
+      const tempId = randomUUID();
+      const concatListPath = path.join(MYLOG_TEMP_DIR, `concat_${tempId}.txt`);
+      const outputPath = path.join(MYLOG_TEMP_DIR, `journal_${tempId}.mp3`);
+
+      const concatContent = audioPaths
+        .map((p) => `file '${p.replace(/\\/g, "/").replace(/'/g, "'\\''")}'`)
+        .join("\n");
+      await fs.writeFile(concatListPath, concatContent, "utf-8");
+
+      await new Promise<void>((resolve, reject) => {
+        execFile(
+          ffmpegInstaller.path,
+          [
+            "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", concatListPath,
+            "-codec:a", "libmp3lame",
+            "-q:a", "2",
+            outputPath
+          ],
+          (error) => {
+            if (error) {
+              reject(new Error(`ffmpeg concat failed: ${error.message}`));
+              return;
+            }
+            resolve();
+          }
+        );
+      });
+
+      const fileName = `mylog_journal_${journalId}.mp3`;
+      response.setHeader("Content-Type", "audio/mpeg");
+      response.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+
+      const fileBuffer = await fs.readFile(outputPath);
+      response.send(fileBuffer);
+
+      await fs.unlink(concatListPath).catch(() => {});
+      await fs.unlink(outputPath).catch(() => {});
+    } catch (error) {
+      console.error("Error in downloadJournalAudio (mylog):", error);
+      response.status(500).json({
+        message: "Failed to download journal audio",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
   return {
     createLog,
     listLogs,
@@ -1735,6 +1883,7 @@ Return ONLY the JSON object. No markdown. No extra text.
     getJournal,
     appendDeveloperMessage,
     editMessage,
-    getDeveloperState
+    getDeveloperState,
+    downloadJournalAudio
   };
 };

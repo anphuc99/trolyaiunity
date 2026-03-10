@@ -17,6 +17,7 @@ export const createJournalRoutes = (dataSource: DataSource) => {
   router.get("/search", requireAuth, controller.searchMessages);
   router.get("/review/due", requireAuth, controller.getDueJournals);
   router.post("/review", requireAuth, controller.submitJournalReview);
+  router.get("/:id/audio", requireAuth, controller.downloadJournalAudio);
   router.get("/:id", requireAuth, controller.getJournal);
   router.post("/end", requireAuth, controller.endConversation);
 

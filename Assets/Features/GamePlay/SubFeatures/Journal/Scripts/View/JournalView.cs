@@ -1,5 +1,6 @@
 using Core.Infrastructure.Views;
 using Core.Infrastructure.Network;
+using Core.Infrastructure.Authentication;
 using Features.GamePlay.SubFeatures.Journal.Events;
 using Share.Utils;
 using Features.GamePlay.SubFeatures.Journal.Infrastructure.Attributes;
@@ -9,6 +10,7 @@ using Share.Components;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Networking;
@@ -96,6 +98,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		/// Index of the current due-journal being reviewed.
 		/// </summary>
 		private int _currentDueIndex;
+
+		/// <summary>
+		/// True while an audio download is in progress.
+		/// </summary>
+		private bool _isDownloadingAudio;
 
 		/// <summary>
 		/// Requests journal list from API.
@@ -237,6 +244,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			EnsurePlayAllBinding();
 			EnsureAutoPlayBinding();
 			EnsureFsrsBindings();
+			EnsureDownloadAudioBinding();
 			_isFsrsMode = false;
 			SetMode(false);
 			SetFsrsContainerVisible(false);
@@ -260,6 +268,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			StopAllCoroutines();
 			_reloadingTtsMessageIndices.Clear();
 			_isFsrsMode = false;
+			_isDownloadingAudio = false;
 			_currentChatMessages.Clear();
 			_dueJournals.Clear();
 			_currentDueIndex = 0;
@@ -359,6 +368,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			if (_autoPlayButton != null)
 			{
 				_autoPlayButton.gameObject.SetActive(showDetail);
+			}
+
+			if (_downloadAudioButton != null)
+			{
+				_downloadAudioButton.gameObject.SetActive(showDetail);
 			}
 
 			// Show FSRS rating buttons only in FSRS detail mode
@@ -1244,6 +1258,141 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			}
 
 			return prefix + " " + summary;
+		}
+
+		// ==================================================================
+		// Download Audio
+		// ==================================================================
+
+		/// <summary>
+		/// Wires the download audio button to send the DownloadAudio request.
+		/// </summary>
+		private void EnsureDownloadAudioBinding()
+		{
+			if (_downloadAudioButton == null)
+			{
+				return;
+			}
+
+			_downloadAudioButton.onClick.RemoveAllListeners();
+			_downloadAudioButton.onClick.AddListener(HandleDownloadAudioClicked);
+		}
+
+		/// <summary>
+		/// Handles the download audio button press.
+		/// </summary>
+		private void HandleDownloadAudioClicked()
+		{
+			if (_isDownloadingAudio)
+			{
+				return;
+			}
+
+			var journalId = JournalState.SelectedJournalId;
+			if (!journalId.HasValue || journalId.Value <= 0)
+			{
+				Debug.LogWarning("[JournalView] No journal selected for audio download.", this);
+				return;
+			}
+
+			SendRequest(JournalRequests.DownloadAudio, new JournalDetailRequestPayload
+			{
+				JournalId = journalId.Value
+			});
+		}
+
+		/// <summary>
+		/// Receives resolved download URL from controller and starts the download coroutine.
+		/// </summary>
+		/// <param name="payload">Audio download payload with URL.</param>
+		[OnEvent(JournalEvents.AudioDownloadCompleted)]
+		private void OnAudioDownloadCompleted(object payload)
+		{
+			if (payload is not JournalAudioDownloadPayload downloadPayload)
+			{
+				return;
+			}
+
+			if (string.IsNullOrWhiteSpace(downloadPayload.DownloadUrl))
+			{
+				Debug.LogError("[JournalView] Download URL is empty.", this);
+				return;
+			}
+
+			StartCoroutine(DownloadAndSaveAudioAsync(downloadPayload));
+		}
+
+		/// <summary>
+		/// Downloads the combined journal MP3 from the server and saves to persistent storage.
+		/// </summary>
+		/// <param name="payload">Download payload with URL and journal id.</param>
+		/// <returns>Coroutine enumerator.</returns>
+		private IEnumerator DownloadAndSaveAudioAsync(JournalAudioDownloadPayload payload)
+		{
+			_isDownloadingAudio = true;
+			UpdateDownloadButtonText(true);
+
+			using var request = UnityWebRequest.Get(payload.DownloadUrl);
+			var token = AuthTokenModel.AccessToken;
+			if (!string.IsNullOrWhiteSpace(token))
+			{
+				request.SetRequestHeader("Authorization", "Bearer " + token);
+			}
+
+			yield return request.SendWebRequest();
+
+			if (request.result != UnityWebRequest.Result.Success)
+			{
+				Debug.LogError("[JournalView] Audio download failed: " + request.error, this);
+				_isDownloadingAudio = false;
+				UpdateDownloadButtonText(false);
+				yield break;
+			}
+
+			var audioData = request.downloadHandler.data;
+			if (audioData == null || audioData.Length == 0)
+			{
+				Debug.LogError("[JournalView] Downloaded audio is empty.", this);
+				_isDownloadingAudio = false;
+				UpdateDownloadButtonText(false);
+				yield break;
+			}
+
+			var fileName = "journal_" + payload.JournalId + "_audio.mp3";
+			var savePath = Path.Combine(Application.persistentDataPath, fileName);
+
+			try
+			{
+				File.WriteAllBytes(savePath, audioData);
+				Debug.Log("[JournalView] Audio saved to: " + savePath, this);
+			}
+			catch (Exception ex)
+			{
+				Debug.LogError("[JournalView] Failed to save audio: " + ex.Message, this);
+			}
+
+			_isDownloadingAudio = false;
+			UpdateDownloadButtonText(false);
+		}
+
+		/// <summary>
+		/// Updates the download button label during and after download.
+		/// </summary>
+		/// <param name="isDownloading">True while download is in progress.</param>
+		private void UpdateDownloadButtonText(bool isDownloading)
+		{
+			if (_downloadAudioButton == null)
+			{
+				return;
+			}
+
+			var label = _downloadAudioButton.GetComponentInChildren<TMP_Text>();
+			if (label != null)
+			{
+				label.text = isDownloading ? "Đang tải..." : "Tải audio";
+			}
+
+			_downloadAudioButton.interactable = !isDownloading;
 		}
 	}
 }

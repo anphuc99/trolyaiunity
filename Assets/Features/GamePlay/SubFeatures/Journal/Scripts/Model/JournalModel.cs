@@ -347,4 +347,25 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 		public JournalReviewPayload Review { get; set; }
 	}
 
+	// ================================================================
+	// Download Audio payloads
+	// ================================================================
+
+	/// <summary>
+	/// Event payload for audio download result published by controller.
+	/// Contains the fully resolved URL for the view to download the MP3 binary.
+	/// </summary>
+	public sealed class JournalAudioDownloadPayload
+	{
+		/// <summary>
+		/// Journal id whose audio is being downloaded.
+		/// </summary>
+		public int JournalId { get; set; }
+
+		/// <summary>
+		/// Fully resolved URL to download the combined MP3 from the server.
+		/// </summary>
+		public string DownloadUrl { get; set; }
+	}
+
 }
