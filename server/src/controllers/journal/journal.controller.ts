@@ -913,11 +913,41 @@ Please summarize the above conversation in Vietnamese, update the story descript
       const tempId = crypto.randomUUID();
       const concatListPath = path.join(TEMP_DIR, `concat_${tempId}.txt`);
       const outputPath = path.join(TEMP_DIR, `journal_${tempId}.mp3`);
+      const silencePath = path.join(TEMP_DIR, `silence_${tempId}.mp3`);
 
-      // Build the concat list file — each line: file '/path/to/audio.mp3'
-      const concatContent = audioPaths
-        .map((p) => `file '${p.replace(/\\/g, "/").replace(/'/g, "'\\''")}'`)
-        .join("\n");
+      // Generate a 1-second silent MP3 to insert between messages
+      await new Promise<void>((resolve, reject) => {
+        execFile(
+          ffmpegInstaller.path,
+          [
+            "-y",
+            "-f", "lavfi",
+            "-i", "anullsrc=r=44100:cl=mono",
+            "-t", "1",
+            "-codec:a", "libmp3lame",
+            "-q:a", "2",
+            silencePath
+          ],
+          (error) => {
+            if (error) {
+              reject(new Error(`ffmpeg silence generation failed: ${error.message}`));
+              return;
+            }
+            resolve();
+          }
+        );
+      });
+
+      // Build the concat list file with 1s silence between each message
+      const silenceLine = `file '${silencePath.replace(/\\/g, "/").replace(/'/g, "'\\''")}'`;
+      const concatLines: string[] = [];
+      for (let i = 0; i < audioPaths.length; i++) {
+        if (i > 0) {
+          concatLines.push(silenceLine);
+        }
+        concatLines.push(`file '${audioPaths[i].replace(/\\/g, "/").replace(/'/g, "'\\''")}' `);
+      }
+      const concatContent = concatLines.join("\n");
       await fs.writeFile(concatListPath, concatContent, "utf-8");
 
       await new Promise<void>((resolve, reject) => {
@@ -953,6 +983,7 @@ Please summarize the above conversation in Vietnamese, update the story descript
       // Cleanup temp files
       await fs.unlink(concatListPath).catch(() => {});
       await fs.unlink(outputPath).catch(() => {});
+      await fs.unlink(silencePath).catch(() => {});
     } catch (error) {
       console.error("Error in downloadJournalAudio:", error);
       response.status(500).json({
