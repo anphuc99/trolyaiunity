@@ -231,6 +231,7 @@ export const createGeminiChatService = (config: GeminiChatServiceConfig): Gemini
     
     // Build enhanced system instruction with developer role explanation
     const systemInstruction = buildGeminiSystemInstruction(systemPrompt);
+    console.log("Gemini system instruction:", systemInstruction);
     
     // Convert history to Gemini format (excluding system messages)
     const geminiHistory = convertHistoryToGeminiFormat(history);
@@ -250,6 +251,7 @@ export const createGeminiChatService = (config: GeminiChatServiceConfig): Gemini
       if (sessionKey) {
         sessionCache.set(sessionKey, chat);
       }
+      console.log("Started new Gemini chat session with history. Session key:", sessionKey);
     }
 
     // Send the user message if provided
