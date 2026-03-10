@@ -1118,7 +1118,7 @@ export const createMyLogController = (
         history,
         mylogModel,
         2,
-        `mylog:${request.user.id}`
+        `mylog_${request.user.id}`
       );
 
       // Normalize message IDs to prevent duplicates
@@ -1365,7 +1365,7 @@ Return ONLY the JSON object. No markdown. No extra text.
       // Clear chat history and invalidate in-memory Gemini chat session cache.
       await historyStore.clear(request.user.id);
       if (geminiService) {
-        geminiService.clearSession(`mylog:${request.user.id}`);
+        geminiService.clearSession(`mylog_${request.user.id}`);
       }
 
       response.json({
@@ -1646,7 +1646,7 @@ Return ONLY the JSON object. No markdown. No extra text.
       await historyStore.clear(request.user.id);
       // Invalidate cached Gemini chat session since history was rewritten
       if (geminiService) {
-        geminiService.clearSession(`mylog:${request.user.id}`);
+        geminiService.clearSession(`mylog_${request.user.id}`);
       }
       await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
 
@@ -1656,7 +1656,7 @@ Return ONLY the JSON object. No markdown. No extra text.
         historyForAI,
         mylogModel,
         2,
-        `mylog:${request.user.id}`
+        `mylog_${request.user.id}`
       );
 
       const normalizedReply = useGemini

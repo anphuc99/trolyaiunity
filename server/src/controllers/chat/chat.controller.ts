@@ -708,7 +708,7 @@ export const createChatController = (
         modelOverride || undefined,
         2,
         geminiAudioParts,
-        String(request.user.id)
+        `chat_${request.user.id}`
       );
 
       const normalizedReply = useGemini
@@ -781,7 +781,7 @@ export const createChatController = (
         modelOverride || undefined,
         2,
         undefined,
-        String(request.user.id)
+        `chat_${request.user.id}`
       );
 
       const normalizedReply = useGemini
@@ -962,7 +962,7 @@ export const createChatController = (
       await historyStore.clear(request.user.id);
       // Invalidate cached Gemini chat session since history was rewritten
       if (geminiService) {
-        geminiService.clearSession(String(request.user.id));
+        geminiService.clearSession(`chat_${request.user.id}`);
       }
       await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
 
@@ -973,7 +973,7 @@ export const createChatController = (
         modelOverride || undefined,
         2,
         undefined,
-        String(request.user.id)
+        `chat_${request.user.id}`
       );
 
       const normalizedReply = useGemini
