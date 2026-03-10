@@ -1362,8 +1362,11 @@ Return ONLY the JSON object. No markdown. No extra text.
         await myLogRepository.save(dueLogs);
       }
 
-      // Clear chat history
+      // Clear chat history and invalidate in-memory Gemini chat session cache.
       await historyStore.clear(request.user.id);
+      if (geminiService) {
+        geminiService.clearSession(`mylog:${request.user.id}`);
+      }
 
       response.json({
         journalId: savedJournal.id,
