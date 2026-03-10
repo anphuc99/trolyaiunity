@@ -31,6 +31,40 @@ namespace Features.GamePlay.SubFeatures.CreateSubjects.View
 		private TextMeshProUGUI _errorText;
 
 		/// <summary>
+		/// Wires button click listeners when the view is enabled.
+		/// </summary>
+		protected override void OnEnabled()
+		{
+			if (_submitButton != null)
+			{
+				_submitButton.onClick.RemoveListener(OnSubmitClicked);
+				_submitButton.onClick.AddListener(OnSubmitClicked);
+			}
+
+			if (_cancelButton != null)
+			{
+				_cancelButton.onClick.RemoveListener(OnCancelClicked);
+				_cancelButton.onClick.AddListener(OnCancelClicked);
+			}
+		}
+
+		/// <summary>
+		/// Removes button click listeners when the view is disabled.
+		/// </summary>
+		protected override void OnDisabled()
+		{
+			if (_submitButton != null)
+			{
+				_submitButton.onClick.RemoveListener(OnSubmitClicked);
+			}
+
+			if (_cancelButton != null)
+			{
+				_cancelButton.onClick.RemoveListener(OnCancelClicked);
+			}
+		}
+
+		/// <summary>
 		/// Shows the CreateSubjects view and resets the form.
 		/// </summary>
 		/// <param name="payload">Unused payload.</param>
