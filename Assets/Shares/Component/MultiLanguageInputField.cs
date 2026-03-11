@@ -92,10 +92,27 @@ namespace Share.Components
             }
 
             var label = GetLanguageLabel(_currentLanguage);
+            if (!TryResolveNotification())
+            {
+                Debug.LogWarning("[MultiLanguageInputField] Notification reference is missing.", this);
+                return;
+            }
+
+            _notification.ShowNotification(label, 1f);
+        }
+
+        /// <summary>
+        /// Resolves the Notification reference, including inactive scene objects.
+        /// </summary>
+        private bool TryResolveNotification()
+        {
             if (_notification != null)
             {
-                _notification.ShowNotification(label, 1f);
+                return true;
             }
+
+            _notification = Object.FindFirstObjectByType<Notification>(FindObjectsInactive.Include);
+            return _notification != null;
         }
 
         /// <summary>Returns the short label for a given language.</summary>
@@ -104,8 +121,8 @@ namespace Share.Components
             switch (lang)
             {
                 case InputLanguage.Vietnamese: return "VI";
-                case InputLanguage.Korean:     return "KO";
-                default:                       return "ENG";
+                case InputLanguage.Korean: return "KO";
+                default: return "ENG";
             }
         }
 
@@ -673,14 +690,14 @@ namespace Share.Components
             //      22=ㅈ→12, 23=ㅊ→14, 24=ㅋ→15, 25=ㅌ→16, 26=ㅍ→17, 27=ㅎ→18
             switch (jongIdx)
             {
-                case  1: return  0;
-                case  2: return  1;
-                case  4: return  2;
-                case  7: return  3;
-                case  8: return  5;
-                case 16: return  6;
-                case 17: return  7;
-                case 19: return  9;
+                case 1: return 0;
+                case 2: return 1;
+                case 4: return 2;
+                case 7: return 3;
+                case 8: return 5;
+                case 16: return 6;
+                case 17: return 7;
+                case 19: return 9;
                 case 20: return 10;
                 case 21: return 11;
                 case 22: return 12;
@@ -689,7 +706,7 @@ namespace Share.Components
                 case 25: return 16;
                 case 26: return 17;
                 case 27: return 18;
-                default: return  0;
+                default: return 0;
             }
         }
 
@@ -715,9 +732,9 @@ namespace Share.Components
             // ㅜ(13) + p(ㅔ,5) = ㅞ(15)
             // ㅜ(13) + l(ㅣ,20) = ㅟ(16)
             // ㅡ(18) + l(ㅣ,20) = ㅢ(19)
-            if (currentJung == 8 && key == "k")  return 9;
-            if (currentJung == 8 && key == "o")  return 10;
-            if (currentJung == 8 && key == "l")  return 11;
+            if (currentJung == 8 && key == "k") return 9;
+            if (currentJung == 8 && key == "o") return 10;
+            if (currentJung == 8 && key == "l") return 11;
             if (currentJung == 13 && key == "j") return 14;
             if (currentJung == 13 && key == "p") return 15;
             if (currentJung == 13 && key == "l") return 16;
@@ -738,16 +755,16 @@ namespace Share.Components
             // ㄹ(8) + t(ㅅ) = ㄽ(12), ㄹ(8) + x(ㅌ) = ㄾ(13), ㄹ(8) + v(ㅍ) = ㄿ(14)
             // ㄹ(8) + g(ㅎ) = ㅀ(15)
             // ㅂ(17) + t(ㅅ) = ㅄ(18)
-            if (currentJong == 1 && key == "t")  return 3;
-            if (currentJong == 4 && key == "w")  return 5;
-            if (currentJong == 4 && key == "g")  return 6;
-            if (currentJong == 8 && key == "r")  return 9;
-            if (currentJong == 8 && key == "a")  return 10;
-            if (currentJong == 8 && key == "q")  return 11;
-            if (currentJong == 8 && key == "t")  return 12;
-            if (currentJong == 8 && key == "x")  return 13;
-            if (currentJong == 8 && key == "v")  return 14;
-            if (currentJong == 8 && key == "g")  return 15;
+            if (currentJong == 1 && key == "t") return 3;
+            if (currentJong == 4 && key == "w") return 5;
+            if (currentJong == 4 && key == "g") return 6;
+            if (currentJong == 8 && key == "r") return 9;
+            if (currentJong == 8 && key == "a") return 10;
+            if (currentJong == 8 && key == "q") return 11;
+            if (currentJong == 8 && key == "t") return 12;
+            if (currentJong == 8 && key == "x") return 13;
+            if (currentJong == 8 && key == "v") return 14;
+            if (currentJong == 8 && key == "g") return 15;
             if (currentJong == 17 && key == "t") return 18;
             return -1;
         }
