@@ -240,7 +240,7 @@ namespace Share.Components
                 }
             }
 
-            // 3) w-key transformation (aw→ă, ow→ơ, uw→ư)
+            // 3) w-key transformation (aw→ă, ow→ơ, uw→ư, uow→ươ)
             if (lower == 'w' && caret > 0)
             {
                 var prev = currentText[caret - 1];
@@ -252,6 +252,22 @@ namespace Share.Components
                     replacement = TransferTone(prevLower, replacement);
                     if (char.IsUpper(prev)) replacement = char.ToUpperInvariant(replacement);
                     currentText = currentText.Remove(caret - 1, 1).Insert(caret - 1, replacement.ToString());
+
+                    // Vowel cluster: "uo" + w → "ươ" (also transform preceding 'u' → 'ư')
+                    if (prevBase == 'o' && caret >= 2)
+                    {
+                        var prev2 = currentText[caret - 2];
+                        var prev2Lower = char.ToLowerInvariant(prev2);
+                        var prev2Base = GetVowelBase(prev2Lower);
+                        if (prev2Base == 'u')
+                        {
+                            var rep2 = TelexWMap['u'];
+                            rep2 = TransferTone(prev2Lower, rep2);
+                            if (char.IsUpper(prev2)) rep2 = char.ToUpperInvariant(rep2);
+                            currentText = currentText.Remove(caret - 2, 1).Insert(caret - 2, rep2.ToString());
+                        }
+                    }
+
                     SetTextAndCaret(currentText, caret);
                     return;
                 }
@@ -322,28 +338,59 @@ namespace Share.Components
             // Reverse so they're in left-to-right order
             vowelPositions.Reverse();
 
-            // Vietnamese rule: if there are multiple vowels, tone goes on the
-            // second vowel in a vowel cluster (simplified).
-            // Special: if the word ends with a consonant after vowels, tone the first vowel.
-            // Simplified: prefer the second vowel when there are 2+, else first.
-            if (vowelPositions.Count >= 2)
+            // Priority 1: if there is a special/modified vowel (â, ă, ê, ô, ơ, ư),
+            // the tone mark goes on that vowel.
+            var specialPositions = new List<int>();
+            foreach (var pos in vowelPositions)
             {
-                // Check if there's a consonant after the last vowel (before caret)
-                var lastVowelIdx = vowelPositions[vowelPositions.Count - 1];
-                var hasTrailingConsonant = false;
-                for (var i = lastVowelIdx + 1; i < caret; i++)
+                var baseV = GetVowelBase(char.ToLowerInvariant(text[pos]));
+                if (IsSpecialVowel(baseV))
                 {
-                    var c = char.ToLowerInvariant(text[i]);
-                    if (!IsVietnameseVowel(c) && char.IsLetter(c))
-                    {
-                        hasTrailingConsonant = true;
-                        break;
-                    }
+                    specialPositions.Add(pos);
                 }
-                // If trailing consonant, tone the first vowel; else tone the second
-                return hasTrailingConsonant ? vowelPositions[0] : vowelPositions[1];
             }
 
+            if (specialPositions.Count == 1)
+            {
+                return specialPositions[0];
+            }
+
+            if (specialPositions.Count > 1)
+            {
+                // Multiple special vowels (e.g. ươ): prefer the non-ư one (ơ gets tone)
+                foreach (var pos in specialPositions)
+                {
+                    var baseV = GetVowelBase(char.ToLowerInvariant(text[pos]));
+                    if (baseV != '\u01b0') // not ư
+                        return pos;
+                }
+                return specialPositions[specialPositions.Count - 1];
+            }
+
+            // Priority 2: positional rules for plain vowels
+            var lastVowelIdx = vowelPositions[vowelPositions.Count - 1];
+            var hasTrailingConsonant = false;
+            for (var i = lastVowelIdx + 1; i < caret; i++)
+            {
+                var c = char.ToLowerInvariant(text[i]);
+                if (!IsVietnameseVowel(c) && char.IsLetter(c))
+                {
+                    hasTrailingConsonant = true;
+                    break;
+                }
+            }
+
+            // 3+ vowels → middle vowel
+            if (vowelPositions.Count >= 3)
+            {
+                return vowelPositions[1];
+            }
+
+            // 2 vowels: trailing consonant → last vowel; otherwise → first vowel
+            if (hasTrailingConsonant)
+            {
+                return vowelPositions[vowelPositions.Count - 1];
+            }
             return vowelPositions[0];
         }
 
@@ -384,6 +431,17 @@ namespace Share.Components
                 if (kvp.Value.IndexOf(c) >= 0) return true;
             }
             return false;
+        }
+
+        /// <summary>Checks if a base vowel is a special/modified vowel (â, ă, ê, ô, ơ, ư).</summary>
+        private static bool IsSpecialVowel(char baseVowel)
+        {
+            return baseVowel == '\u00e2' || // â
+                   baseVowel == '\u0103' || // ă
+                   baseVowel == '\u00ea' || // ê
+                   baseVowel == '\u00f4' || // ô
+                   baseVowel == '\u01a1' || // ơ
+                   baseVowel == '\u01b0';   // ư
         }
 
         #endregion
