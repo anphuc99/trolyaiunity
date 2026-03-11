@@ -43,6 +43,7 @@ namespace Share.Components
         private int _cho = -1;   // choseong index
         private int _jung = -1;  // jungseong index
         private int _jong = -1;  // jongseong index
+        private bool _isInternalTextChange;
 
         // ──────────────────────── Lifecycle ────────────────────────
 
@@ -50,12 +51,28 @@ namespace Share.Components
         {
             base.Awake();
             onValidateInput += ValidateMultiLangInput;
+            onValueChanged.AddListener(HandleInputValueChanged);
         }
 
         protected override void OnDestroy()
         {
+            onValueChanged.RemoveListener(HandleInputValueChanged);
             onValidateInput -= ValidateMultiLangInput;
             base.OnDestroy();
+        }
+
+        /// <summary>
+        /// Resets Korean composing state when the text is changed externally
+        /// (e.g., Backspace/Delete/paste), avoiding stale composition carry-over.
+        /// </summary>
+        private void HandleInputValueChanged(string _)
+        {
+            if (_currentLanguage != InputLanguage.Korean || _isInternalTextChange)
+            {
+                return;
+            }
+
+            FinalizeHangul();
         }
 
         private void Update()
@@ -1041,7 +1058,9 @@ namespace Share.Components
                 _isComposing = true;
             }
 
+            _isInternalTextChange = true;
             text = newText;
+            _isInternalTextChange = false;
 
             // Defer caret update to next frame to avoid TMP layout race
             caretPosition = Mathf.Clamp(newCaret, 0, newText.Length);
