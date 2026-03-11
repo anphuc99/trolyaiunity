@@ -908,7 +908,6 @@ Please summarize the above conversation in Vietnamese, update the story descript
           audioId = message.audio.trim();
         }
         else {
-          const character = characterByName.get(normalizeName(message.characterName));
           const { voiceName, pitch, speakingRate } = await resolveCharacterVoiceSettings(message.characterName);
 
           audioId = buildAudioId(
