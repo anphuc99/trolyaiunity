@@ -279,6 +279,18 @@ namespace Share.Components
 
             if (!VowelToneTable.TryGetValue(baseVowel, out var toneRow)) return false;
 
+            // If the vowel already carries this exact tone, undo it and
+            // return false so the tone key is inserted as a literal character.
+            // Example: "té" + 's' → revert to "te", then 's' inserted → "tes"
+            var currentToneIdx = toneRow.IndexOf(lowerCh);
+            if (currentToneIdx == toneIndex)
+            {
+                var baseChar = toneRow[0];
+                if (wasUpper) baseChar = char.ToUpperInvariant(baseChar);
+                text = text.Remove(vowelPos, 1).Insert(vowelPos, baseChar.ToString());
+                return false;
+            }
+
             var toned = toneRow[toneIndex];
             if (wasUpper) toned = char.ToUpperInvariant(toned);
 
