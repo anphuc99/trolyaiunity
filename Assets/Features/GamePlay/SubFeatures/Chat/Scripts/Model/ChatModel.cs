@@ -39,12 +39,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		public string Model { get; set; }
 
 		/// <summary>
-		/// Optional story id for prompt enrichment.
-		/// </summary>
-		[JsonProperty("storyId")]
-		public int? StoryId { get; set; }
-
-		/// <summary>
 		/// Optional base64-encoded audio data URL for voice messages.
 		/// When present, the server sends the audio to Gemini directly
 		/// and returns a transcription in the response.

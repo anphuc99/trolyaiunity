@@ -39,9 +39,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private string _modelOverride;
 
 		[SerializeField]
-		private int _storyId;
-
-		[SerializeField]
 		private AudioSource _characterVoiceAudioSource;
 
 		[SerializeField]
@@ -161,7 +158,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				Message = hasAudio ? null : trimmed,
 				SessionId = string.IsNullOrWhiteSpace(_sessionId) ? null : _sessionId,
 				Model = string.IsNullOrWhiteSpace(_modelOverride) ? null : _modelOverride,
-				StoryId = _storyId > 0 ? _storyId : null,
 			};
 
 			if (hasAudio)
@@ -1063,7 +1059,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				{
 					SessionId = string.IsNullOrWhiteSpace(_sessionId) ? null : _sessionId,
 					Model = string.IsNullOrWhiteSpace(_modelOverride) ? null : _modelOverride,
-					StoryId = _storyId > 0 ? _storyId : null,
 				});
 				return;
 			}
