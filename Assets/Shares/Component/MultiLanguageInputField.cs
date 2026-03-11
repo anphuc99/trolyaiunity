@@ -269,7 +269,13 @@ namespace Share.Components
                         text = text.Remove(i, 1).Insert(i, replacement.ToString());
                         return true;
                     }
-                    if (cLower == '\u0111') break; // already đ
+                    // Already đ → undo: revert to 'd', return false so literal 'd' inserts → "dd"
+                    if (cLower == '\u0111')
+                    {
+                        var reverted = char.IsUpper(c) ? 'D' : 'd';
+                        text = text.Remove(i, 1).Insert(i, reverted.ToString());
+                        return false;
+                    }
                 }
                 else
                 {
@@ -282,7 +288,15 @@ namespace Share.Components
                         text = text.Remove(i, 1).Insert(i, replacement.ToString());
                         return true;
                     }
-                    if (cBase == target) break; // already transformed (â/ê/ô)
+                    // Already transformed (â/ê/ô) → undo: revert to base, return false → "aa"/"ee"/"oo"
+                    if (cBase == target)
+                    {
+                        var reverted = lower;
+                        reverted = TransferTone(cLower, reverted);
+                        if (char.IsUpper(c)) reverted = char.ToUpperInvariant(reverted);
+                        text = text.Remove(i, 1).Insert(i, reverted.ToString());
+                        return false;
+                    }
                 }
             }
             return false;
@@ -303,7 +317,38 @@ namespace Share.Components
 
                 var cBase = GetVowelBase(cLower);
                 if (!TelexWMap.ContainsKey(cBase)) continue;
-                if (IsSpecialVowel(cBase)) continue; // already ă/ơ/ư
+
+                // Already transformed (ă/ơ/ư) → undo: revert to base, return false → "aw"/"ow"/"uw"
+                if (IsSpecialVowel(cBase))
+                {
+                    // Find the original plain vowel for this special vowel
+                    char plain;
+                    if (cBase == '\u0103') plain = 'a';      // ă → a
+                    else if (cBase == '\u01a1') plain = 'o';  // ơ → o
+                    else if (cBase == '\u01b0') plain = 'u';  // ư → u
+                    else continue; // â/ê/ô are not w-targets
+
+                    var reverted = plain;
+                    reverted = TransferTone(cLower, reverted);
+                    if (char.IsUpper(c)) reverted = char.ToUpperInvariant(reverted);
+                    text = text.Remove(i, 1).Insert(i, reverted.ToString());
+
+                    // Also undo ươ cluster: if we're reverting ơ→o, check prev for ư→u
+                    if (cBase == '\u01a1' && i > 0)
+                    {
+                        var prev = text[i - 1];
+                        var prevBase = GetVowelBase(char.ToLowerInvariant(prev));
+                        if (prevBase == '\u01b0') // ư
+                        {
+                            var rep2 = 'u';
+                            rep2 = TransferTone(char.ToLowerInvariant(prev), rep2);
+                            if (char.IsUpper(prev)) rep2 = char.ToUpperInvariant(rep2);
+                            text = text.Remove(i - 1, 1).Insert(i - 1, rep2.ToString());
+                        }
+                    }
+
+                    return false;
+                }
 
                 var replacement = TelexWMap[cBase];
                 replacement = TransferTone(cLower, replacement);
