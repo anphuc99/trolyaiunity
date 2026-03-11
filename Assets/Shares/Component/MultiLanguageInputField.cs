@@ -678,11 +678,8 @@ namespace Share.Components
                 case HangulState.Empty:
                     if (jungIdx >= 0)
                     {
-                        // Standalone vowel (no choseong)
-                        _cho = 11; // ㅇ (silent ieung) as placeholder? No — in Korean, standalone vowels use jamo
-                        _jung = jungIdx;
-                        _hangulState = HangulState.Jungseong;
-                        UpdateComposing();
+                        // Standalone vowel: insert vowel jamo directly, do not auto-prefix ㅇ.
+                        InsertStandaloneJungseong(jungIdx);
                     }
                     else if (choIdx >= 0)
                     {
@@ -740,12 +737,9 @@ namespace Share.Components
                     }
                     else if (jungIdx >= 0)
                     {
-                        // New vowel — finalize and start fresh
+                        // New standalone vowel after finishing previous syllable.
                         FinalizeHangul();
-                        _cho = 11; // ㅇ placeholder for standalone vowel
-                        _jung = jungIdx;
-                        _hangulState = HangulState.Jungseong;
-                        UpdateComposing();
+                        InsertStandaloneJungseong(jungIdx);
                     }
                     else if (choIdx >= 0)
                     {
@@ -828,6 +822,18 @@ namespace Share.Components
             return (char)code;
         }
 
+        /// <summary>
+        /// Inserts a standalone Jungseong compatibility jamo without creating
+        /// an auto-prefixed syllable with ㅇ.
+        /// </summary>
+        private void InsertStandaloneJungseong(int jungIdx)
+        {
+            var jamo = GetJungseongJamo(jungIdx);
+            var currentText = text.Insert(caretPosition, jamo.ToString());
+            SetTextAndCaret(currentText, caretPosition + 1);
+            FinalizeHangul();
+        }
+
         /// <summary>Updates the composing (in-progress) character at the caret.</summary>
         private void UpdateComposing()
         {
@@ -894,9 +900,25 @@ namespace Share.Components
             '\u314B', '\u314C', '\u314D', '\u314E'            // ㅋ ㅌ ㅍ ㅎ
         };
 
+        // Compatibility Jamo for jungseong display
+        private static readonly char[] JungseongJamo =
+        {
+            '\u314F', '\u3150', '\u3151', '\u3152', '\u3153', // ㅏ ㅐ ㅑ ㅒ ㅓ
+            '\u3154', '\u3155', '\u3156', '\u3157', '\u3158', // ㅔ ㅕ ㅖ ㅗ ㅘ
+            '\u3159', '\u315A', '\u315B', '\u315C', '\u315D', // ㅙ ㅚ ㅛ ㅜ ㅝ
+            '\u315E', '\u315F', '\u3160', '\u3161', '\u3162', // ㅞ ㅟ ㅠ ㅡ ㅢ
+            '\u3163'                                              // ㅣ
+        };
+
         private static char GetChoseongJamo(int index)
         {
             if (index >= 0 && index < ChoseongJamo.Length) return ChoseongJamo[index];
+            return '?';
+        }
+
+        private static char GetJungseongJamo(int index)
+        {
+            if (index >= 0 && index < JungseongJamo.Length) return JungseongJamo[index];
             return '?';
         }
 
