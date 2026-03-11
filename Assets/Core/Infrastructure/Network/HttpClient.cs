@@ -357,6 +357,11 @@ namespace Core.Infrastructure.Network
 
 			var resolvedUrl = ResolveUrl(url);
 			using var request = UnityWebRequestMultimedia.GetAudioClip(resolvedUrl, audioType);
+			request.disposeDownloadHandlerOnDispose = false;
+			if (request.downloadHandler is DownloadHandlerAudioClip downloadHandler)
+			{
+				downloadHandler.streamAudio = false;
+			}
 			ApplyHeaders(request, headers);
 			ApplyTimeout(request, timeoutSeconds);
 
@@ -372,7 +377,20 @@ namespace Core.Infrastructure.Network
 				return null;
 			}
 
-			return DownloadHandlerAudioClip.GetContent(request);
+			if (request.downloadHandler is not DownloadHandlerAudioClip resolvedHandler)
+			{
+				Debug.LogError($"{LogPrefix} DownloadAudioClip failed for '{request.url}': invalid download handler.");
+				return null;
+			}
+
+			var clip = resolvedHandler.audioClip;
+			if (clip == null)
+			{
+				Debug.LogError($"{LogPrefix} DownloadAudioClip failed for '{request.url}': audio clip is null.");
+				return null;
+			}
+
+			return clip;
 		}
 
 		/// <summary>
