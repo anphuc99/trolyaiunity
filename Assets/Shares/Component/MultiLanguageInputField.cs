@@ -228,7 +228,7 @@ namespace Share.Components
             var currentText = text;
             var caret = caretPosition;
 
-            // 0) z-key removes Vietnamese marks (tone + vowel marks, and đ -> d)
+            // 0) z-key removes only tone marks (s/f/r/x/j)
             if (lower == 'z')
             {
                 if (TryRemoveVietnameseMark(ref currentText, caret))
@@ -446,8 +446,8 @@ namespace Share.Components
         }
 
         /// <summary>
-        /// Removes Vietnamese marks in the current word by scanning backward from the caret.
-        /// Priority is nearest marked character: tone/vowel mark on vowels, or đ -> d.
+        /// Removes Vietnamese tone marks in the current word by scanning backward from the caret.
+        /// Only tone is removed; base vowel forms (â, ă, ê, ô, ơ, ư) and đ are preserved.
         /// </summary>
         private static bool TryRemoveVietnameseMark(ref string text, int caret)
         {
@@ -457,20 +457,17 @@ namespace Share.Components
                 var cLower = char.ToLowerInvariant(c);
                 if (cLower == ' ' || cLower == '\n' || cLower == '\r') break;
 
-                // Remove đ mark
-                if (cLower == '\u0111')
-                {
-                    var replacement = char.IsUpper(c) ? 'D' : 'd';
-                    text = text.Remove(i, 1).Insert(i, replacement.ToString());
-                    return true;
-                }
-
-                // Remove tone/vowel marks on Vietnamese vowels
+                // Remove tone marks on Vietnamese vowels only
                 if (!IsVietnameseVowel(cLower)) continue;
 
                 var baseVowel = GetVowelBase(cLower);
-                var plainVowel = GetPlainVowel(baseVowel);
-                var replacementVowel = char.IsUpper(c) ? char.ToUpperInvariant(plainVowel) : plainVowel;
+                if (!VowelToneTable.TryGetValue(baseVowel, out var toneRow)) continue;
+
+                var currentToneIdx = toneRow.IndexOf(cLower);
+                if (currentToneIdx <= 0) continue; // no tone to remove
+
+                var replacementVowel = toneRow[0]; // keep base vowel form (e.g. ấ -> â)
+                if (char.IsUpper(c)) replacementVowel = char.ToUpperInvariant(replacementVowel);
 
                 if (replacementVowel != c)
                 {
@@ -586,26 +583,6 @@ namespace Share.Components
                 if (kvp.Value.IndexOf(c) >= 0) return kvp.Key;
             }
             return c;
-        }
-
-        /// <summary>Maps marked Vietnamese base vowels back to plain Latin vowels.</summary>
-        private static char GetPlainVowel(char baseVowel)
-        {
-            switch (baseVowel)
-            {
-                case '\u00e2': // â
-                case '\u0103': // ă
-                    return 'a';
-                case '\u00ea': // ê
-                    return 'e';
-                case '\u00f4': // ô
-                case '\u01a1': // ơ
-                    return 'o';
-                case '\u01b0': // ư
-                    return 'u';
-                default:
-                    return baseVowel;
-            }
         }
 
         /// <summary>
