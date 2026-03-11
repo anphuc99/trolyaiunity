@@ -731,26 +731,26 @@ Please summarize the above conversation in Vietnamese, update the story descript
 
       const currentState: ReviewState = reviewEntity
         ? {
-            stability: reviewEntity.stability,
-            difficulty: reviewEntity.difficulty,
-            lapses: reviewEntity.lapses,
-            currentIntervalDays: reviewEntity.currentIntervalDays,
-            nextReviewDate: reviewEntity.nextReviewDate instanceof Date
-              ? reviewEntity.nextReviewDate.toISOString()
-              : String(reviewEntity.nextReviewDate),
-            lastReviewDate: reviewEntity.lastReviewDate
-              ? reviewEntity.lastReviewDate instanceof Date
-                ? reviewEntity.lastReviewDate.toISOString()
-                : String(reviewEntity.lastReviewDate)
-              : null,
-            reviewHistory: (() => {
-              try {
-                return JSON.parse(reviewEntity.reviewHistoryJson || "[]") as ReviewHistoryEntry[];
-              } catch {
-                return [];
-              }
-            })()
-          }
+          stability: reviewEntity.stability,
+          difficulty: reviewEntity.difficulty,
+          lapses: reviewEntity.lapses,
+          currentIntervalDays: reviewEntity.currentIntervalDays,
+          nextReviewDate: reviewEntity.nextReviewDate instanceof Date
+            ? reviewEntity.nextReviewDate.toISOString()
+            : String(reviewEntity.nextReviewDate),
+          lastReviewDate: reviewEntity.lastReviewDate
+            ? reviewEntity.lastReviewDate instanceof Date
+              ? reviewEntity.lastReviewDate.toISOString()
+              : String(reviewEntity.lastReviewDate)
+            : null,
+          reviewHistory: (() => {
+            try {
+              return JSON.parse(reviewEntity.reviewHistoryJson || "[]") as ReviewHistoryEntry[];
+            } catch {
+              return [];
+            }
+          })()
+        }
         : createInitialReviewState();
 
       const updated = updateReviewAfterRating(currentState, rating as FSRSRating);
@@ -866,40 +866,74 @@ Please summarize the above conversation in Vietnamese, update the story descript
 
       const audioPaths: string[] = [];
 
-      for (const message of messages) {
-        if (!message.tone || message.characterName === "User") {
-          continue;
+      const resolveCharacterVoiceSettings = async (characterName: string) => {
+        if (!characterName) {
+          return {
+            voiceName: undefined,
+            pitch: undefined,
+            speakingRate: undefined
+          };
         }
 
-        const character = characterByName.get(normalizeName(message.characterName));
-        const voiceName = character?.voiceName?.trim() || undefined;
-        const pitch = character?.pitch ?? undefined;
-        const speakingRate = character?.speakingRate ?? undefined;
+        if (characterName.toLowerCase() === "user") {
+          const user = await userRepository
+            .createQueryBuilder("user")
+            .where("user.id = :userId", { userId })
+            .getOne();
 
-        const audioId = buildAudioId(
-          message.content,
-          message.tone,
-          voiceName,
-          pitch,
-          speakingRate
-        );
+          return {
+            voiceName: user?.voiceName?.trim() || undefined,
+            pitch: user?.pitch ?? undefined,
+            speakingRate: undefined
+          };
+        }
 
-        const audioPath = getAudioPath(audioId);
+        const character = await characterRepository
+          .createQueryBuilder("character")
+          .where("character.userId = :userId", { userId })
+          .andWhere("LOWER(character.name) = LOWER(:name)", { name: characterName })
+          .getOne();
 
-        // Generate audio if it doesn't exist
-        try {
-          await fs.access(audioPath);
-        } catch {
-          await createTtsAudio(
+        return {
+          voiceName: character?.voiceName?.trim() || undefined,
+          pitch: character?.pitch ?? undefined,
+          speakingRate: character?.speakingRate ?? undefined
+        };
+      };
+
+      for (const message of messages) {
+        let audioId: string | null = null;
+
+        if (message.audio) {
+          audioId = message.audio.trim();
+        }
+        else {
+          const character = characterByName.get(normalizeName(message.characterName));
+          const { voiceName, pitch, speakingRate } = await resolveCharacterVoiceSettings(message.characterName);
+
+          audioId = buildAudioId(
             message.content,
-            message.tone,
-            audioId,
+            message.tone ?? "neutral",
             voiceName,
             pitch,
             speakingRate
           );
+          try {
+            await fs.access(getAudioPath(audioId));
+          } catch {
+            await createTtsAudio(
+              message.content,
+              message.tone ?? "neutral",
+              audioId,
+              voiceName,
+              pitch,
+              speakingRate
+            );
+          }
         }
+        const audioPath = getAudioPath(audioId);
 
+        // Generate audio if it doesn't exist
         audioPaths.push(audioPath);
       }
 
@@ -981,9 +1015,9 @@ Please summarize the above conversation in Vietnamese, update the story descript
       response.send(fileBuffer);
 
       // Cleanup temp files
-      await fs.unlink(concatListPath).catch(() => {});
-      await fs.unlink(outputPath).catch(() => {});
-      await fs.unlink(silencePath).catch(() => {});
+      await fs.unlink(concatListPath).catch(() => { });
+      await fs.unlink(outputPath).catch(() => { });
+      await fs.unlink(silencePath).catch(() => { });
     } catch (error) {
       console.error("Error in downloadJournalAudio:", error);
       response.status(500).json({
