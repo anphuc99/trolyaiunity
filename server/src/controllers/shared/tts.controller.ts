@@ -2,6 +2,8 @@ import type { Request, Response } from "express";
 import fs from "fs/promises";
 import type { DataSource } from "typeorm";
 import CharacterEntity from "../../models/character.entity.js";
+import MessageEntity from "../../models/message.entity.js";
+import MyLogMessageEntity from "../../models/my-log-message.entity.js";
 import UserEntity from "../../models/user.entity.js";
 import { buildAudioId, createTtsAudio, getAudioPath } from "../../services/tts.service.js";
 
@@ -17,6 +19,8 @@ interface TtsController {
  */
 export const createTtsController = (dataSource: DataSource): TtsController => {
   const characterRepository = dataSource.getRepository(CharacterEntity);
+  const messageRepository = dataSource.getRepository(MessageEntity);
+  const myLogMessageRepository = dataSource.getRepository(MyLogMessageEntity);
   const userRepository = dataSource.getRepository(UserEntity);
 
   const resolveCharacterVoiceSettings = async (userId: number, characterName: string) => {
@@ -64,6 +68,7 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
     const tone = typeof request.query.tone === "string" ? request.query.tone.trim() : "neutral, medium pitch";
     const characterName =
       typeof request.query.characterName === "string" ? request.query.characterName.trim() : "";
+    const messageId = typeof request.query.messageId === "string" ? request.query.messageId.trim() : "";
     const force = request.query.force === "true";
 
     if (!text) {
@@ -88,6 +93,38 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
     );
     const audioPath = getAudioPath(audioId);
 
+    const attachAudioToMessageIfMissing = async () => {
+      if (!messageId) {
+        return;
+      }
+
+      const message = await messageRepository.findOne({
+        where: { id: messageId, userId }
+      });
+
+      if (message) {
+        if (!message.audio || !message.audio.trim()) {
+          message.audio = audioId;
+          await messageRepository.save(message);
+        }
+
+        return;
+      }
+
+      const myLogMessage = await myLogMessageRepository.findOne({
+        where: { id: messageId, userId }
+      });
+
+      if (!myLogMessage) {
+        return;
+      }
+
+      if (!myLogMessage.audio || !myLogMessage.audio.trim()) {
+        myLogMessage.audio = audioId;
+        await myLogMessageRepository.save(myLogMessage);
+      }
+    };
+
     try {
       if (force) {
         await fs.unlink(audioPath).catch((error) => {
@@ -99,7 +136,8 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
 
       try {
         await fs.access(audioPath);
-				response.json({ success: true, output: audioId, url: `/audio/${audioId}.mp3` });
+        await attachAudioToMessageIfMissing();
+        response.json({ success: true, output: audioId, url: `/audio/${audioId}.mp3` });
         return;
       } catch (error) {
         if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
@@ -116,6 +154,7 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
         resolvedSettings.pitch,
         resolvedSettings.speakingRate
       );
+      await attachAudioToMessageIfMissing();
       response.json({ success: true, output: audioId, url: `/audio/${audioId}.mp3` });
     } catch (error) {
       console.error("Failed to generate TTS.", error);

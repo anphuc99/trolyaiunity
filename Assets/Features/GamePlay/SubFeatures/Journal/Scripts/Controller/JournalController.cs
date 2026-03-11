@@ -284,7 +284,7 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		{
 			try
 			{
-				var endpoint = BuildTextToSpeechEndpoint(payload.Text, payload.Tone, payload.CharacterName, payload.ForceReload);
+				var endpoint = BuildTextToSpeechEndpoint(payload.Text, payload.Tone, payload.CharacterName, payload.ForceReload, payload.MessageId);
 				var responseJson = await HttpClient.GetTaskAsync(endpoint);
 				if (string.IsNullOrWhiteSpace(responseJson))
 				{
@@ -385,16 +385,23 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		/// <param name="tone">Optional tone hint.</param>
 		/// <param name="characterName">Character display name.</param>
 		/// <param name="forceReload">True to force regeneration on server.</param>
+		/// <param name="messageId">Optional message id for persisting missing audio mapping.</param>
 		/// <returns>Resolved endpoint path.</returns>
-		private static string BuildTextToSpeechEndpoint(string text, string tone, string characterName, bool forceReload)
+		private static string BuildTextToSpeechEndpoint(string text, string tone, string characterName, bool forceReload, string messageId = null)
 		{
 			var safeText = string.IsNullOrWhiteSpace(text) ? string.Empty : text;
 			var safeTone = string.IsNullOrWhiteSpace(tone) ? "neutral" : tone.Trim();
 			var safeName = string.IsNullOrWhiteSpace(characterName) ? string.Empty : characterName.Trim();
+			var safeMessageId = string.IsNullOrWhiteSpace(messageId) ? string.Empty : messageId.Trim();
 			var endpoint = NetworkEndpoints.TextToSpeech;
 			var query = "text=" + Uri.EscapeDataString(safeText)
 				+ "&tone=" + Uri.EscapeDataString(safeTone)
 				+ "&characterName=" + Uri.EscapeDataString(safeName);
+
+			if (!string.IsNullOrWhiteSpace(safeMessageId))
+			{
+				query += "&messageId=" + Uri.EscapeDataString(safeMessageId);
+			}
 
 			if (forceReload)
 			{
