@@ -441,6 +441,22 @@ namespace Share.Components
             // Reverse so they're in left-to-right order
             vowelPositions.Reverse();
 
+            // Special rule: "qu" is treated as a consonant cluster in Vietnamese.
+            // The 'u' immediately after 'q' is NOT a vowel for tone placement.
+            // e.g. "qua" → tone on 'a' (quả), not on 'u' (qủa).
+            if (vowelPositions.Count > 0)
+            {
+                var firstVPos = vowelPositions[0];
+                var firstVLower = char.ToLowerInvariant(text[firstVPos]);
+                if (firstVLower == 'u' && firstVPos > 0 &&
+                    char.ToLowerInvariant(text[firstVPos - 1]) == 'q')
+                {
+                    vowelPositions.RemoveAt(0);
+                    if (vowelPositions.Count == 0) return firstVPos; // only 'u' after 'q', fallback
+                    if (vowelPositions.Count == 1) return vowelPositions[0];
+                }
+            }
+
             // Priority 1: if there is a special/modified vowel (â, ă, ê, ô, ơ, ư),
             // the tone mark goes on that vowel.
             var specialPositions = new List<int>();
