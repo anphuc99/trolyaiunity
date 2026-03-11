@@ -918,6 +918,8 @@ Please summarize the above conversation in Vietnamese, update the story descript
             pitch,
             speakingRate
           );
+          message.audio = audioId;
+          await messageRepository.save(message);
           try {
             await fs.access(getAudioPath(audioId));
           } catch {
