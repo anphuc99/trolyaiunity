@@ -35,6 +35,11 @@ namespace Share.Components
                 return;
             }
 
+            if (!gameObject.activeSelf)
+            {
+                gameObject.SetActive(true);
+            }
+
             StopAllCoroutines();
             KillFadeTween();
             StartCoroutine(StartShowNotification(message, duration));
