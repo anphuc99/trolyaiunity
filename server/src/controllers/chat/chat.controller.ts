@@ -151,36 +151,16 @@ export const createChatController = (
   };
 
   /**
-   * Parses a numeric story id from user input.
-   *
-   * @param value - Input value from the request body.
-   * @returns Story id or null when invalid.
-   */
-  const parseStoryId = (value: unknown) => {
-    const parsed = typeof value === "number" ? value : Number.parseInt(String(value ?? ""), 10);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      return null;
-    }
-    return parsed;
-  };
-
-  /**
    * Loads the story used for prompt enrichment.
-   * Falls back to user's currentStoryId when not provided in payload.
+   * Always uses the authenticated user's currentStoryId.
    *
    * @param userId - Authenticated user id.
-   * @param payload - Request payload for the chat call.
    * @returns The matching story or null when not found.
    */
-  const loadStoryForPrompt = async (userId: number, payload: Record<string, unknown>) => {
-    let storyId = parseStoryId(payload.storyId);
-    
-    // Fallback to user's currentStoryId if not provided
-    if (!storyId) {
-      const user = await userRepository.findOne({ where: { id: userId } });
-      storyId = user?.currentStoryId ?? null;
-    }
-    
+  const loadStoryForPrompt = async (userId: number) => {
+    const user = await userRepository.findOne({ where: { id: userId } });
+    const storyId = user?.currentStoryId ?? null;
+
     if (!storyId) {
       return null;
     }
@@ -620,8 +600,8 @@ export const createChatController = (
       relations: { level: true }
     });
 
-    const story = await loadStoryForPrompt(userId, payload);
-
+    const story = await loadStoryForPrompt(userId);
+    console.log("Loaded story for prompt:", story);
     return buildChatSystemPrompt({
       level: user?.level?.level ?? null,
       levelMaxWords: user?.level?.maxWords ?? null,
