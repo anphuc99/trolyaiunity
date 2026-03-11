@@ -416,8 +416,8 @@ namespace Features.GamePlay.SubFeatures.Journal.Tests
 			Assert.IsFalse(string.IsNullOrWhiteSpace(errorPayload.Message));
 		}
 
-		[Test]
-		public void HandleDownloadAudio_ValidId_PublishesAudioDownloadCompleted()
+		[UnityTest]
+		public System.Collections.IEnumerator HandleDownloadAudio_ValidId_PublishesAudioDownloadCompleted()
 		{
 			JournalAudioDownloadPayload downloadPayload = null;
 			void Handler(object payload)
@@ -425,27 +425,25 @@ namespace Features.GamePlay.SubFeatures.Journal.Tests
 				downloadPayload = payload as JournalAudioDownloadPayload;
 			}
 
+			FakeServer.Register("GET", NetworkEndpoints.Journals + "/42/audio", _ => "fake-audio-bytes");
 			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.AudioDownloadCompleted, Handler);
-			try
+
+			JournalController.HandleDownloadAudio(new JournalDetailRequestPayload
 			{
-				JournalController.HandleDownloadAudio(new JournalDetailRequestPayload
-				{
-					JournalId = 42
-				});
-			}
-			finally
-			{
-				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.AudioDownloadCompleted, Handler);
-			}
+				JournalId = 42
+			});
+			yield return AwaitTask(Task.Delay(200));
+
+			Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.AudioDownloadCompleted, Handler);
 
 			Assert.IsNotNull(downloadPayload);
 			Assert.AreEqual(42, downloadPayload.JournalId);
-			Assert.IsFalse(string.IsNullOrWhiteSpace(downloadPayload.DownloadUrl));
-			StringAssert.Contains("/42/audio", downloadPayload.DownloadUrl);
+			Assert.IsTrue(downloadPayload.Success);
+			Assert.IsFalse(string.IsNullOrWhiteSpace(downloadPayload.SavePath));
 		}
 
-		[Test]
-		public void HandleDownloadAudio_MyLogMode_UsesMyLogEndpoint()
+		[UnityTest]
+		public System.Collections.IEnumerator HandleDownloadAudio_MyLogMode_UsesMyLogEndpoint()
 		{
 			GlobalVariablesMutationProxyController.Set(GlobalModes.JournalApiModeKey, GlobalModes.ModeMyLog);
 
@@ -455,20 +453,18 @@ namespace Features.GamePlay.SubFeatures.Journal.Tests
 				downloadPayload = payload as JournalAudioDownloadPayload;
 			}
 
+			FakeServer.Register("GET", NetworkEndpoints.MyLogJournals + "/10/audio", _ => "fake-audio-bytes");
 			Core.Infrastructure.Events.EventBus.Subscribe(JournalEvents.AudioDownloadCompleted, Handler);
-			try
-			{
-				JournalController.HandleDownloadAudio(10);
-			}
-			finally
-			{
-				Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.AudioDownloadCompleted, Handler);
-			}
+
+			JournalController.HandleDownloadAudio(10);
+			yield return AwaitTask(Task.Delay(200));
+
+			Core.Infrastructure.Events.EventBus.Unsubscribe(JournalEvents.AudioDownloadCompleted, Handler);
 
 			Assert.IsNotNull(downloadPayload);
 			Assert.AreEqual(10, downloadPayload.JournalId);
-			StringAssert.Contains("mylog", downloadPayload.DownloadUrl.ToLower());
-			StringAssert.Contains("/10/audio", downloadPayload.DownloadUrl);
+			Assert.IsTrue(downloadPayload.Success);
+			Assert.IsFalse(string.IsNullOrWhiteSpace(downloadPayload.SavePath));
 		}
 	}
 }

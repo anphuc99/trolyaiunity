@@ -5,11 +5,9 @@ using Features.GamePlay.SubFeatures.Practice.Model;
 using Features.GamePlay.SubFeatures.Practice.Requests;
 using Share.Utils;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
-using UnityEngine.Networking;
 using UnityEngine.UI;
 
 namespace Features.GamePlay.SubFeatures.Practice.View
@@ -369,12 +367,23 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 		private void OnAudioUrlResolved(object payload)
 		{
 			if (payload is not PracticeAudioUrlPayload audioPayload
-				|| string.IsNullOrWhiteSpace(audioPayload.Url))
+				|| audioPayload.Clip == null)
 			{
 				return;
 			}
 
-			StartCoroutine(PlayAudioFromUrlAsync(audioPayload.Url));
+			if (_audioSource == null)
+			{
+				return;
+			}
+
+			if (_audioSource.isPlaying)
+			{
+				_audioSource.Stop();
+			}
+
+			_audioSource.clip = audioPayload.Clip;
+			_audioSource.Play();
 		}
 
 		private void HandleRevealClicked()
@@ -669,46 +678,5 @@ namespace Features.GamePlay.SubFeatures.Practice.View
 			};
 		}
 
-		/// <summary>
-		/// Downloads and plays an audio clip from the given URL.
-		/// </summary>
-		/// <param name="url">Full audio URL.</param>
-		/// <returns>Coroutine enumerator.</returns>
-		private IEnumerator PlayAudioFromUrlAsync(string url)
-		{
-			if (string.IsNullOrWhiteSpace(url))
-			{
-				yield break;
-			}
-
-			if (_audioSource == null)
-			{
-				yield break;
-			}
-
-			// Stop any currently playing audio before starting new playback
-			if (_audioSource.isPlaying)
-			{
-				_audioSource.Stop();
-			}
-
-			using var audioRequest = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.MPEG);
-			yield return audioRequest.SendWebRequest();
-
-			if (audioRequest.result != UnityWebRequest.Result.Success)
-			{
-				Debug.LogWarning("[PracticeView] Failed to download audio: " + audioRequest.error, this);
-				yield break;
-			}
-			Debug.Log(url);
-			var clip = DownloadHandlerAudioClip.GetContent(audioRequest);
-			if (clip == null)
-			{
-				yield break;
-			}
-
-			_audioSource.clip = clip;
-			_audioSource.Play();
-		}
 	}
 }

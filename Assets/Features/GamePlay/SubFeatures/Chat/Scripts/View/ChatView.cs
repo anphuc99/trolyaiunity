@@ -9,7 +9,6 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
-using UnityEngine.Networking;
 using Share.Components;
 using UnityEngine.UI;
 
@@ -473,15 +472,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? DefaultTtsTone : turn.Tone.Trim();
 
-				AudioClip clip = null;
-				if (!string.IsNullOrWhiteSpace(turn.AudioUrl))
-				{
-					yield return StartCoroutine(DownloadAudioClipFromUrl(turn.AudioUrl, loadedClip =>
-					{
-						clip = loadedClip;
-					}));
-				}
-
 				_messageContainer.AddNewMessage(new MessageBubbleData
 				{
 					MessageId = string.IsNullOrWhiteSpace(turn.MessageId) ? Guid.NewGuid().ToString("N") : turn.MessageId,
@@ -495,9 +485,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				});
 				ScrollMessagesToBottom();
 
-				if (clip != null)
+				if (turn.AudioClip != null)
 				{
-					yield return StartCoroutine(PlayCharacterVoiceAsync(clip));
+					yield return StartCoroutine(PlayCharacterVoiceAsync(turn.AudioClip));
 				}
 			}
 
@@ -1116,16 +1106,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		private IEnumerator PlaySingleMessageAudio(ChatPlayMessageAudioPayload playback)
 		{
-			AudioClip clip = null;
-			if (!string.IsNullOrWhiteSpace(playback.AudioUrl))
-			{
-				yield return StartCoroutine(DownloadAudioClipFromUrl(playback.AudioUrl, loadedClip =>
-				{
-					clip = loadedClip;
-				}));
-			}
-
-			if (clip == null)
+			if (playback.AudioClip == null)
 			{
 				// Clear reload state if this was a force-reload request that failed.
 				if (playback.ForceReload && playback.MessageIndex >= 0 && _messageContainer != null)
@@ -1142,7 +1123,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_messageContainer.SetMessageTtsPlaying(playback.MessageId, true);
 			}
 
-			yield return StartCoroutine(PlayCharacterVoiceAsync(clip));
+			yield return StartCoroutine(PlayCharacterVoiceAsync(playback.AudioClip));
 
 			// Show speaker button again after playback finishes
 			if (_messageContainer != null && !string.IsNullOrWhiteSpace(playback.MessageId))
@@ -1156,35 +1137,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_messageContainer.SetMessageTtsReloading(playback.MessageIndex, false);
 				_reloadingTtsMessageIndices.Remove(playback.MessageIndex);
 			}
-		}
-
-		/// <summary>
-		/// Downloads an audio clip from a pre-resolved absolute URL.
-		/// </summary>
-		/// <param name="audioUrl">Absolute audio URL.</param>
-		/// <param name="onCompleted">Callback with the loaded clip (or null on failure).</param>
-		/// <returns>Coroutine enumerator.</returns>
-		private IEnumerator DownloadAudioClipFromUrl(string audioUrl, Action<AudioClip> onCompleted)
-		{
-			if (string.IsNullOrWhiteSpace(audioUrl))
-			{
-				onCompleted?.Invoke(null);
-				yield break;
-			}
-
-			var audioType = AudioUrlUtils.ResolveAudioType(audioUrl);
-			using var audioRequest = UnityWebRequestMultimedia.GetAudioClip(audioUrl, audioType);
-			yield return audioRequest.SendWebRequest();
-
-			if (audioRequest.result != UnityWebRequest.Result.Success)
-			{
-				Debug.LogWarning("[ChatView] Failed to download audio: " + audioRequest.error, this);
-				onCompleted?.Invoke(null);
-				yield break;
-			}
-
-			var clip = DownloadHandlerAudioClip.GetContent(audioRequest);
-			onCompleted?.Invoke(clip);
 		}
 
 		private void ClearConversationState()

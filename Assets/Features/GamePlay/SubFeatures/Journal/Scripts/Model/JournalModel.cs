@@ -229,6 +229,12 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 		/// Resolved audio URL returned by server.
 		/// </summary>
 		public string AudioUrl { get; set; }
+
+		/// <summary>
+		/// Downloaded audio clip ready for playback (populated by controller).
+		/// </summary>
+		[JsonIgnore]
+		public UnityEngine.AudioClip Clip { get; set; }
 	}
 
 	// ================================================================
@@ -358,14 +364,19 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 	public sealed class JournalAudioDownloadPayload
 	{
 		/// <summary>
-		/// Journal id whose audio is being downloaded.
+		/// Journal id whose audio was downloaded.
 		/// </summary>
 		public int JournalId { get; set; }
 
 		/// <summary>
-		/// Fully resolved URL to download the combined MP3 from the server.
+		/// File path where the downloaded audio was saved.
 		/// </summary>
-		public string DownloadUrl { get; set; }
+		public string SavePath { get; set; }
+
+		/// <summary>
+		/// Whether the download and save completed successfully.
+		/// </summary>
+		public bool Success { get; set; }
 	}
 
 }

@@ -7,7 +7,9 @@ using Core.Infrastructure.Network;
 using Core.Infrastructure.Scenes;
 using Core.Infrastructure.State;
 using Newtonsoft.Json;
+using Share.Utils;
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
 using System.Collections.Generic;
@@ -297,6 +299,18 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 					return;
 				}
 
+				var settings = Resources.Load<NetworkSettings>("NetworkSettings");
+				var baseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settings != null ? settings.BaseUrl : null);
+				var resolvedUrl = AudioUrlUtils.ResolveAudioUrl(response.Url, baseUrl);
+				if (string.IsNullOrWhiteSpace(resolvedUrl))
+				{
+					PublishError("Failed to resolve audio URL.");
+					return;
+				}
+
+				var audioType = AudioUrlUtils.ResolveAudioType(resolvedUrl);
+				var clip = await HttpClient.DownloadAudioClipTaskAsync(resolvedUrl, audioType);
+
 				EventBus.Publish(JournalEvents.MessageAudioPlayRequested, new JournalPlayMessageAudioPayload
 				{
 					MessageId = payload.MessageId,
@@ -304,7 +318,8 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 					CharacterName = payload.CharacterName,
 					Text = payload.Text,
 					Tone = payload.Tone,
-					AudioUrl = response.Url
+					AudioUrl = response.Url,
+					Clip = clip
 				});
 			}
 			catch (Exception exception)
@@ -491,14 +506,53 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 				return;
 			}
 
-			var endpoint = BuildJournalAudioEndpoint(journalId);
-			var resolvedUrl = HttpClient.ResolveUrl(endpoint);
+			_ = DownloadAndSaveAudioInternalAsync(journalId);
+		}
 
-			EventBus.Publish(JournalEvents.AudioDownloadCompleted, new JournalAudioDownloadPayload
+		/// <summary>
+		/// Downloads the combined journal MP3 binary and saves it to persistent storage.
+		/// Publishes AudioDownloadCompleted event when finished.
+		/// </summary>
+		/// <param name="journalId">Journal id to download audio for.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task DownloadAndSaveAudioInternalAsync(int journalId)
+		{
+			try
 			{
-				JournalId = journalId,
-				DownloadUrl = resolvedUrl
-			});
+				var endpoint = BuildJournalAudioEndpoint(journalId);
+				var audioData = await HttpClient.GetBytesTaskAsync(endpoint);
+				if (audioData == null || audioData.Length == 0)
+				{
+					PublishError("Downloaded audio is empty.");
+					EventBus.Publish(JournalEvents.AudioDownloadCompleted, new JournalAudioDownloadPayload
+					{
+						JournalId = journalId,
+						Success = false
+					});
+					return;
+				}
+
+				var fileName = "journal_" + journalId + "_audio.mp3";
+				var savePath = Path.Combine(Application.persistentDataPath, fileName);
+				File.WriteAllBytes(savePath, audioData);
+				Debug.Log("[JournalController] Audio saved to: " + savePath);
+
+				EventBus.Publish(JournalEvents.AudioDownloadCompleted, new JournalAudioDownloadPayload
+				{
+					JournalId = journalId,
+					SavePath = savePath,
+					Success = true
+				});
+			}
+			catch (Exception exception)
+			{
+				PublishError("Failed to download audio: " + exception.Message);
+				EventBus.Publish(JournalEvents.AudioDownloadCompleted, new JournalAudioDownloadPayload
+				{
+					JournalId = journalId,
+					Success = false
+				});
+			}
 		}
 
 		/// <summary>

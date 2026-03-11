@@ -1,8 +1,5 @@
 using Core.Infrastructure.Views;
-using Core.Infrastructure.Network;
-using Core.Infrastructure.Authentication;
 using Features.GamePlay.SubFeatures.Journal.Events;
-using Share.Utils;
 using Features.GamePlay.SubFeatures.Journal.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.Journal.Model;
 using Features.GamePlay.SubFeatures.Journal.Requests;
@@ -10,10 +7,8 @@ using Share.Components;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.Networking;
 using TMPro;
 
 namespace Features.GamePlay.SubFeatures.Journal.View
@@ -74,8 +69,6 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		private readonly List<JournalItemView> _spawnedListItems = new List<JournalItemView>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
 		private const float AutoPlayNextMessageDelaySeconds = 1f;
-		private NetworkSettings _networkSettings;
-		private string _normalizedServerBaseUrl;
 		private List<MessageBubbleData> _currentChatMessages = new List<MessageBubbleData>();
 		private bool _isChatAutoPlaying;
 		private int _currentAutoPlayListIndex = -1;
@@ -220,17 +213,17 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				return;
 			}
 
-			if (string.IsNullOrWhiteSpace(audioPayload.AudioUrl))
+			if (audioPayload.Clip == null)
 			{
 				ClearReloadingState(audioPayload.MessageIndex);
 				TryRestoreForegroundPlaybackMode();
-				Debug.LogWarning("[JournalView] Missing audio URL for playback.", this);
+				Debug.LogWarning("[JournalView] Missing audio clip for playback.", this);
 				return;
 			}
 
 			EnsureAudioSource();
 			EnableBackgroundPlaybackMode();
-			StartCoroutine(PlayJournalAudioAsync(audioPayload));
+			StartCoroutine(PlayJournalAudioClipAsync(audioPayload));
 		}
 
 		/// <summary>
@@ -463,38 +456,17 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			RequestMessageAudio(messageData, true);
 		}
 
-		private IEnumerator PlayJournalAudioAsync(JournalPlayMessageAudioPayload payload)
+		/// <summary>
+		/// Plays the audio clip from the controller-provided payload.
+		/// After playback, clears reloading state and optionally continues auto-play.
+		/// </summary>
+		/// <param name="payload">Audio playback payload with pre-downloaded clip.</param>
+		/// <returns>Coroutine enumerator.</returns>
+		private IEnumerator PlayJournalAudioClipAsync(JournalPlayMessageAudioPayload payload)
 		{
-			var resolvedUrl = AudioUrlUtils.ResolveAudioUrl(payload.AudioUrl, GetNormalizedServerBaseUrl());
-			if (string.IsNullOrWhiteSpace(resolvedUrl))
-			{
-				ClearReloadingState(payload.MessageIndex);
-				TryRestoreForegroundPlaybackMode();
-				yield break;
-			}
-
-			using var audioRequest = UnityWebRequestMultimedia.GetAudioClip(resolvedUrl, AudioUrlUtils.ResolveAudioType(resolvedUrl));
-			yield return audioRequest.SendWebRequest();
-
-			if (audioRequest.result != UnityWebRequest.Result.Success)
-			{
-				ClearReloadingState(payload.MessageIndex);
-				TryRestoreForegroundPlaybackMode();
-				Debug.LogWarning("[JournalView] Failed to download audio: " + audioRequest.error, this);
-				yield break;
-			}
-
-			var clip = DownloadHandlerAudioClip.GetContent(audioRequest);
-			if (clip == null)
-			{
-				ClearReloadingState(payload.MessageIndex);
-				TryRestoreForegroundPlaybackMode();
-				yield break;
-			}
-
 			EnsureAudioSource();
 			_voiceAudioSource.Stop();
-			_voiceAudioSource.clip = clip;
+			_voiceAudioSource.clip = payload.Clip;
 			_voiceAudioSource.Play();
 			while (_voiceAudioSource.isPlaying)
 			{
@@ -547,25 +519,6 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			}
 
 			_voiceAudioSource.ignoreListenerPause = true;
-		}
-
-		/// <summary>
-		/// Returns the cached normalized server base URL (without trailing /api).
-		/// </summary>
-		private string GetNormalizedServerBaseUrl()
-		{
-			if (_normalizedServerBaseUrl == null)
-			{
-				if (_networkSettings == null)
-				{
-					_networkSettings = Resources.Load<NetworkSettings>("NetworkSettings");
-				}
-
-				_normalizedServerBaseUrl = AudioUrlUtils.NormalizeServerBaseUrl(
-					_networkSettings != null ? _networkSettings.BaseUrl : null) ?? string.Empty;
-			}
-
-			return string.IsNullOrWhiteSpace(_normalizedServerBaseUrl) ? null : _normalizedServerBaseUrl;
 		}
 
 		/// <summary>
@@ -1295,6 +1248,9 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				return;
 			}
 
+			_isDownloadingAudio = true;
+			UpdateDownloadButtonText(true);
+
 			SendRequest(JournalRequests.DownloadAudio, new JournalDetailRequestPayload
 			{
 				JournalId = journalId.Value
@@ -1308,71 +1264,21 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		[OnEvent(JournalEvents.AudioDownloadCompleted)]
 		private void OnAudioDownloadCompleted(object payload)
 		{
+			_isDownloadingAudio = false;
+			UpdateDownloadButtonText(false);
+
 			if (payload is not JournalAudioDownloadPayload downloadPayload)
 			{
 				return;
 			}
 
-			if (string.IsNullOrWhiteSpace(downloadPayload.DownloadUrl))
+			if (!downloadPayload.Success)
 			{
-				Debug.LogError("[JournalView] Download URL is empty.", this);
+				Debug.LogError("[JournalView] Audio download failed.", this);
 				return;
 			}
 
-			StartCoroutine(DownloadAndSaveAudioAsync(downloadPayload));
-		}
-
-		/// <summary>
-		/// Downloads the combined journal MP3 from the server and saves to persistent storage.
-		/// </summary>
-		/// <param name="payload">Download payload with URL and journal id.</param>
-		/// <returns>Coroutine enumerator.</returns>
-		private IEnumerator DownloadAndSaveAudioAsync(JournalAudioDownloadPayload payload)
-		{
-			_isDownloadingAudio = true;
-			UpdateDownloadButtonText(true);
-
-			using var request = UnityWebRequest.Get(payload.DownloadUrl);
-			var token = AuthTokenModel.AccessToken;
-			if (!string.IsNullOrWhiteSpace(token))
-			{
-				request.SetRequestHeader("Authorization", "Bearer " + token);
-			}
-
-			yield return request.SendWebRequest();
-
-			if (request.result != UnityWebRequest.Result.Success)
-			{
-				Debug.LogError("[JournalView] Audio download failed: " + request.error, this);
-				_isDownloadingAudio = false;
-				UpdateDownloadButtonText(false);
-				yield break;
-			}
-
-			var audioData = request.downloadHandler.data;
-			if (audioData == null || audioData.Length == 0)
-			{
-				Debug.LogError("[JournalView] Downloaded audio is empty.", this);
-				_isDownloadingAudio = false;
-				UpdateDownloadButtonText(false);
-				yield break;
-			}
-
-			var fileName = "journal_" + payload.JournalId + "_audio.mp3";
-			var savePath = Path.Combine(Application.persistentDataPath, fileName);
-
-			try
-			{
-				File.WriteAllBytes(savePath, audioData);
-				Debug.Log("[JournalView] Audio saved to: " + savePath, this);
-			}
-			catch (Exception ex)
-			{
-				Debug.LogError("[JournalView] Failed to save audio: " + ex.Message, this);
-			}
-
-			_isDownloadingAudio = false;
-			UpdateDownloadButtonText(false);
+			Debug.Log("[JournalView] Audio saved to: " + downloadPayload.SavePath, this);
 		}
 
 		/// <summary>

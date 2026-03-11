@@ -265,6 +265,135 @@ namespace Core.Infrastructure.Network
 			return DeleteAsync(url, headers, timeoutSeconds, cancellationToken).AsTask();
 		}
 
+		/// <summary>
+		/// Downloads raw bytes from a URL.
+		/// </summary>
+		/// <param name="url">Request URL or relative path.</param>
+		/// <param name="headers">Optional headers.</param>
+		/// <param name="timeoutSeconds">Optional timeout in seconds (0 means default).</param>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <returns>Response bytes or null on failure.</returns>
+		public static async UniTask<byte[]> GetBytesAsync(
+			string url,
+			Dictionary<string, string> headers = null,
+			int timeoutSeconds = 0,
+			CancellationToken cancellationToken = default)
+		{
+			if (string.IsNullOrWhiteSpace(url))
+			{
+				Debug.LogError($"{LogPrefix} GetBytes failed: url is null/empty.");
+				return null;
+			}
+
+			if (UseFakeResponses())
+			{
+				var fakeText = await FakeGetAsync(url, cancellationToken);
+				return fakeText != null ? System.Text.Encoding.UTF8.GetBytes(fakeText) : null;
+			}
+
+			var resolvedUrl = ResolveUrl(url);
+			using var request = UnityWebRequest.Get(resolvedUrl);
+			ApplyHeaders(request, headers);
+			ApplyTimeout(request, timeoutSeconds);
+
+			try
+			{
+				await request.SendWebRequest().ToUniTask(cancellationToken: cancellationToken);
+			}
+			catch (System.Exception ex) when (!(ex is System.OperationCanceledException)) { }
+
+			if (request.result != UnityWebRequest.Result.Success)
+			{
+				Debug.LogError($"{LogPrefix} GetBytes to '{request.url}' failed ({request.responseCode}): {request.error}");
+				return null;
+			}
+
+			return request.downloadHandler?.data;
+		}
+
+		/// <summary>
+		/// Downloads raw bytes from a URL as a Task.
+		/// </summary>
+		/// <param name="url">Request URL or relative path.</param>
+		/// <param name="headers">Optional headers.</param>
+		/// <param name="timeoutSeconds">Optional timeout in seconds (0 means default).</param>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <returns>Response bytes or null on failure.</returns>
+		public static Task<byte[]> GetBytesTaskAsync(
+			string url,
+			Dictionary<string, string> headers = null,
+			int timeoutSeconds = 0,
+			CancellationToken cancellationToken = default)
+		{
+			return GetBytesAsync(url, headers, timeoutSeconds, cancellationToken).AsTask();
+		}
+
+		/// <summary>
+		/// Downloads an AudioClip from a URL.
+		/// </summary>
+		/// <param name="url">Request URL or relative path.</param>
+		/// <param name="audioType">Audio encoding type.</param>
+		/// <param name="headers">Optional headers.</param>
+		/// <param name="timeoutSeconds">Optional timeout in seconds (0 means default).</param>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <returns>Loaded AudioClip or null on failure.</returns>
+		public static async UniTask<AudioClip> DownloadAudioClipAsync(
+			string url,
+			AudioType audioType = AudioType.MPEG,
+			Dictionary<string, string> headers = null,
+			int timeoutSeconds = 0,
+			CancellationToken cancellationToken = default)
+		{
+			if (string.IsNullOrWhiteSpace(url))
+			{
+				Debug.LogError($"{LogPrefix} DownloadAudioClip failed: url is null/empty.");
+				return null;
+			}
+
+			if (UseFakeResponses())
+			{
+				return null;
+			}
+
+			var resolvedUrl = ResolveUrl(url);
+			using var request = UnityWebRequestMultimedia.GetAudioClip(resolvedUrl, audioType);
+			ApplyHeaders(request, headers);
+			ApplyTimeout(request, timeoutSeconds);
+
+			try
+			{
+				await request.SendWebRequest().ToUniTask(cancellationToken: cancellationToken);
+			}
+			catch (System.Exception ex) when (!(ex is System.OperationCanceledException)) { }
+
+			if (request.result != UnityWebRequest.Result.Success)
+			{
+				Debug.LogError($"{LogPrefix} DownloadAudioClip failed for '{request.url}': {request.error}");
+				return null;
+			}
+
+			return DownloadHandlerAudioClip.GetContent(request);
+		}
+
+		/// <summary>
+		/// Downloads an AudioClip from a URL as a Task.
+		/// </summary>
+		/// <param name="url">Request URL or relative path.</param>
+		/// <param name="audioType">Audio encoding type.</param>
+		/// <param name="headers">Optional headers.</param>
+		/// <param name="timeoutSeconds">Optional timeout in seconds (0 means default).</param>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <returns>Loaded AudioClip or null on failure.</returns>
+		public static Task<AudioClip> DownloadAudioClipTaskAsync(
+			string url,
+			AudioType audioType = AudioType.MPEG,
+			Dictionary<string, string> headers = null,
+			int timeoutSeconds = 0,
+			CancellationToken cancellationToken = default)
+		{
+			return DownloadAudioClipAsync(url, audioType, headers, timeoutSeconds, cancellationToken).AsTask();
+		}
+
 		private static void ApplyHeaders(UnityWebRequest request, Dictionary<string, string> headers)
 		{
 			if (request == null)

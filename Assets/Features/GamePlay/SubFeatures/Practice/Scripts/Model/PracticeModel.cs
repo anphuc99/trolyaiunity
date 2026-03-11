@@ -282,8 +282,14 @@ namespace Features.GamePlay.SubFeatures.Practice.Model
 	public sealed class PracticeAudioUrlPayload
 	{
 		/// <summary>
-		/// Full audio URL ready for playback.
+		/// Full audio URL used for downloading.
 		/// </summary>
 		public string Url { get; set; }
+
+		/// <summary>
+		/// Downloaded audio clip ready for playback (populated by controller).
+		/// </summary>
+		[Newtonsoft.Json.JsonIgnore]
+		public UnityEngine.AudioClip Clip { get; set; }
 	}
 }

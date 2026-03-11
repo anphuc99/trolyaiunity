@@ -143,6 +143,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		public string AudioUrl { get; set; }
 
 		/// <summary>
+		/// Pre-downloaded audio clip for playback (populated by controller).
+		/// </summary>
+		[JsonIgnore]
+		public UnityEngine.AudioClip AudioClip { get; set; }
+
+		/// <summary>
 		/// Whether this playback was a forced re-generation.
 		/// </summary>
 		public bool ForceReload { get; set; }
@@ -314,6 +320,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		[JsonIgnore]
 		public string AudioUrl { get; set; }
+
+		/// <summary>
+		/// Pre-downloaded audio clip (populated by controller before publishing to view).
+		/// </summary>
+		[JsonIgnore]
+		public UnityEngine.AudioClip AudioClip { get; set; }
 
 		/// <summary>
 		/// Transcription of user audio when an audio recording was sent.

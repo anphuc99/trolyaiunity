@@ -213,9 +213,12 @@ namespace Features.GamePlay.SubFeatures.Practice.Controller
 					return;
 				}
 
+				var clip = await HttpClient.DownloadAudioClipTaskAsync(resolvedUrl, AudioType.MPEG);
+
 				EventBus.Publish(PracticeEvents.AudioUrlResolved, new PracticeAudioUrlPayload
 				{
-					Url = resolvedUrl
+					Url = resolvedUrl,
+					Clip = clip
 				});
 			}
 			catch (Exception exception)

@@ -826,6 +826,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
 				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? "neutral" : turn.Tone.Trim();
 				turn.AudioUrl = await ResolveTtsAudioUrlAsync(turn.Text, tone, characterName);
+
+				if (!string.IsNullOrWhiteSpace(turn.AudioUrl))
+				{
+					var audioType = AudioUrlUtils.ResolveAudioType(turn.AudioUrl);
+					turn.AudioClip = await HttpClient.DownloadAudioClipTaskAsync(turn.AudioUrl, audioType);
+				}
 			}
 		}
 
@@ -856,6 +862,13 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 				var audioUrl = await ResolveTtsAudioUrlAsync(payload.Text, payload.Tone, characterName, payload.ForceReload);
 
+				AudioClip audioClip = null;
+				if (!string.IsNullOrWhiteSpace(audioUrl))
+				{
+					var audioType = AudioUrlUtils.ResolveAudioType(audioUrl);
+					audioClip = await HttpClient.DownloadAudioClipTaskAsync(audioUrl, audioType);
+				}
+
 				EventBus.Publish(ChatEvents.MessageAudioPlayRequested, new ChatPlayMessageAudioPayload
 				{
 					MessageId = payload.MessageId,
@@ -866,6 +879,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					Pitch = pitch,
 					SpeakingRate = speakingRate,
 					AudioUrl = audioUrl,
+					AudioClip = audioClip,
 					ForceReload = payload.ForceReload,
 					MessageIndex = payload.MessageIndex,
 				});
