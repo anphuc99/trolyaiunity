@@ -336,6 +336,13 @@ namespace Share.Components
         /// </summary>
         private static bool TryApplyTone(ref string text, int caret, int toneIndex)
         {
+            // Vietnamese orthography: words ending in stop consonants (t, c, ch, p)
+            // only allow sắc (1) and nặng (5). Reject huyền (2), hỏi (3), ngã (4).
+            if (toneIndex >= 2 && toneIndex <= 4 && HasStopConsonantEnding(text, caret))
+            {
+                return false;
+            }
+
             // Search backwards for the tone-target vowel in the current word
             var vowelPos = FindToneTargetVowel(text, caret);
             if (vowelPos < 0) return false;
@@ -494,6 +501,36 @@ namespace Share.Components
                    baseVowel == '\u00f4' || // ô
                    baseVowel == '\u01a1' || // ơ
                    baseVowel == '\u01b0';   // ư
+        }
+
+        /// <summary>
+        /// Checks whether the current word (up to <paramref name="caret"/>) ends with
+        /// a Vietnamese stop consonant (t, c, ch, p). Words with these endings
+        /// can only carry sắc or nặng tones.
+        /// </summary>
+        private static bool HasStopConsonantEnding(string text, int caret)
+        {
+            // Collect trailing consonant cluster of the current word
+            var end = caret - 1;
+            while (end >= 0)
+            {
+                var c = char.ToLowerInvariant(text[end]);
+                if (c == ' ' || c == '\n' || c == '\r') return false;
+                // Stop at first vowel — everything after it is the consonant ending
+                if (IsVietnameseVowel(c)) break;
+                if (!char.IsLetter(c)) return false;
+                end--;
+            }
+
+            // Build the trailing consonant string after the last vowel
+            var lastVowelIdx = end;
+            if (lastVowelIdx < 0) return false; // no vowel found = no valid word
+
+            var consonantLen = (caret - 1) - lastVowelIdx;
+            if (consonantLen <= 0) return false; // word ends in vowel, no restriction
+
+            var trailing = text.Substring(lastVowelIdx + 1, consonantLen).ToLowerInvariant();
+            return trailing == "t" || trailing == "c" || trailing == "ch" || trailing == "p";
         }
 
         #endregion
