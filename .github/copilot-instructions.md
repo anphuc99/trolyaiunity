@@ -64,6 +64,7 @@ This project uses an MVC-inspired, event-driven architecture.
    - **Must NOT call Controllers directly**
    - Can only interact with Controllers via `SendRequest(...)` from `BaseView`
    - Receives data from Controllers by subscribing to events (attribute binding via `[OnEvent("key")]`)
+   - **DO NOT USING HTTP REQUESTS IN VIEWS**
 
 - **Tests**
    - Unit tests must focus on Controller logic
