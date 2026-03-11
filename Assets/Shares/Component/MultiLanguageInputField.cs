@@ -222,52 +222,21 @@ namespace Share.Components
                 // If tone cannot be applied, insert literally
             }
 
-            // 2) Double-key transformation (aa→â, ee→ê, oo→ô, dd→đ)
-            if (TelexDoubleMap.ContainsKey(lower) && caret > 0)
+            // 2) Double-key (aa→â, ee→ê, oo→ô, dd→đ) — scan backward in word
+            if (TelexDoubleMap.ContainsKey(lower))
             {
-                var prev = currentText[caret - 1];
-                var prevLower = char.ToLowerInvariant(prev);
-                // Also check if prev is already a toned variant of the same base
-                var prevBase = GetVowelBase(prevLower);
-                if (prevBase == lower || prevLower == lower)
+                if (TryApplyDoubleKey(ref currentText, caret, lower, isUpper))
                 {
-                    var replacement = TelexDoubleMap[lower];
-                    replacement = TransferTone(prevLower, replacement);
-                    if (isUpper || char.IsUpper(prev)) replacement = char.ToUpperInvariant(replacement);
-                    currentText = currentText.Remove(caret - 1, 1).Insert(caret - 1, replacement.ToString());
                     SetTextAndCaret(currentText, caret);
                     return;
                 }
             }
 
-            // 3) w-key transformation (aw→ă, ow→ơ, uw→ư, uow→ươ)
-            if (lower == 'w' && caret > 0)
+            // 3) w-key (aw→ă, ow→ơ, uw→ư, uo→ươ) — scan backward in word
+            if (lower == 'w')
             {
-                var prev = currentText[caret - 1];
-                var prevLower = char.ToLowerInvariant(prev);
-                var prevBase = GetVowelBase(prevLower);
-                if (TelexWMap.ContainsKey(prevBase))
+                if (TryApplyWKey(ref currentText, caret))
                 {
-                    var replacement = TelexWMap[prevBase];
-                    replacement = TransferTone(prevLower, replacement);
-                    if (char.IsUpper(prev)) replacement = char.ToUpperInvariant(replacement);
-                    currentText = currentText.Remove(caret - 1, 1).Insert(caret - 1, replacement.ToString());
-
-                    // Vowel cluster: "uo" + w → "ươ" (also transform preceding 'u' → 'ư')
-                    if (prevBase == 'o' && caret >= 2)
-                    {
-                        var prev2 = currentText[caret - 2];
-                        var prev2Lower = char.ToLowerInvariant(prev2);
-                        var prev2Base = GetVowelBase(prev2Lower);
-                        if (prev2Base == 'u')
-                        {
-                            var rep2 = TelexWMap['u'];
-                            rep2 = TransferTone(prev2Lower, rep2);
-                            if (char.IsUpper(prev2)) rep2 = char.ToUpperInvariant(rep2);
-                            currentText = currentText.Remove(caret - 2, 1).Insert(caret - 2, rep2.ToString());
-                        }
-                    }
-
                     SetTextAndCaret(currentText, caret);
                     return;
                 }
@@ -276,6 +245,89 @@ namespace Share.Components
             // 4) Default: insert the character as-is
             currentText = currentText.Insert(caret, ch.ToString());
             SetTextAndCaret(currentText, caret + 1);
+        }
+
+        /// <summary>
+        /// Scans backward through the current word for a character matching
+        /// the double-key target (a→â, e→ê, o→ô, d→đ) and transforms it.
+        /// </summary>
+        private static bool TryApplyDoubleKey(ref string text, int caret, char lower, bool isUpper)
+        {
+            var target = TelexDoubleMap[lower];
+            for (var i = caret - 1; i >= 0; i--)
+            {
+                var c = text[i];
+                var cLower = char.ToLowerInvariant(c);
+                if (cLower == ' ' || cLower == '\n' || cLower == '\r') break;
+
+                if (lower == 'd')
+                {
+                    if (cLower == 'd')
+                    {
+                        var replacement = target;
+                        if (isUpper || char.IsUpper(c)) replacement = char.ToUpperInvariant(replacement);
+                        text = text.Remove(i, 1).Insert(i, replacement.ToString());
+                        return true;
+                    }
+                    if (cLower == '\u0111') break; // already đ
+                }
+                else
+                {
+                    var cBase = GetVowelBase(cLower);
+                    if (cBase == lower)
+                    {
+                        var replacement = target;
+                        replacement = TransferTone(cLower, replacement);
+                        if (isUpper || char.IsUpper(c)) replacement = char.ToUpperInvariant(replacement);
+                        text = text.Remove(i, 1).Insert(i, replacement.ToString());
+                        return true;
+                    }
+                    if (cBase == target) break; // already transformed (â/ê/ô)
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Scans backward through the current word for a vowel that can be
+        /// w-transformed (a→ă, o→ơ, u→ư) and applies the transformation.
+        /// Also handles the uo→ươ cluster automatically.
+        /// </summary>
+        private static bool TryApplyWKey(ref string text, int caret)
+        {
+            for (var i = caret - 1; i >= 0; i--)
+            {
+                var c = text[i];
+                var cLower = char.ToLowerInvariant(c);
+                if (cLower == ' ' || cLower == '\n' || cLower == '\r') break;
+
+                var cBase = GetVowelBase(cLower);
+                if (!TelexWMap.ContainsKey(cBase)) continue;
+                if (IsSpecialVowel(cBase)) continue; // already ă/ơ/ư
+
+                var replacement = TelexWMap[cBase];
+                replacement = TransferTone(cLower, replacement);
+                if (char.IsUpper(c)) replacement = char.ToUpperInvariant(replacement);
+                text = text.Remove(i, 1).Insert(i, replacement.ToString());
+
+                // Handle uo→ươ cluster: also transform preceding 'u'
+                if (cBase == 'o' && i > 0)
+                {
+                    var prev = text[i - 1];
+                    var prevLower = char.ToLowerInvariant(prev);
+                    var prevBase = GetVowelBase(prevLower);
+                    if (prevBase == 'u' && !IsSpecialVowel(prevBase))
+                    {
+                        var rep2 = TelexWMap['u'];
+                        rep2 = TransferTone(prevLower, rep2);
+                        if (char.IsUpper(prev)) rep2 = char.ToUpperInvariant(rep2);
+                        text = text.Remove(i - 1, 1).Insert(i - 1, rep2.ToString());
+                    }
+                }
+
+                return true;
+            }
+            return false;
         }
 
         /// <summary>
