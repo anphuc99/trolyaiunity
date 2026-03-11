@@ -2,6 +2,7 @@ using System.Collections;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Share.Components
 {
@@ -12,6 +13,8 @@ namespace Share.Components
     {
         [SerializeField]
         private TextMeshProUGUI _notificationText;
+        [SerializeField]
+        private Image _backgroundImage;
 
         [SerializeField]
         private float _fadeDuration = 0.4f;
@@ -41,9 +44,18 @@ namespace Share.Components
         {
             _notificationText.text = message ?? string.Empty;
 
-            var color = _notificationText.color;
-            color.a = 1f;
-            _notificationText.color = color;
+            var textColor = _notificationText.color;
+            textColor.a = 1f;
+            _notificationText.color = textColor;
+
+            Color? backgroundColor = null;
+            if (_backgroundImage != null)
+            {
+                var color = _backgroundImage.color;
+                color.a = 1f;
+                _backgroundImage.color = color;
+                backgroundColor = color;
+            }
 
             gameObject.SetActive(true);
 
@@ -52,13 +64,27 @@ namespace Share.Components
                 yield return new WaitForSeconds(duration);
             }
 
-            _fadeTween = DOTween
-                .To(
+            var fadeDuration = Mathf.Max(0.01f, _fadeDuration);
+            var fadeSequence = DOTween.Sequence();
+            fadeSequence.Join(
+                DOTween.To(
                     () => _notificationText.color,
                     value => _notificationText.color = value,
-                    new Color(color.r, color.g, color.b, 0f),
-                    Mathf.Max(0.01f, _fadeDuration))
-                .SetUpdate(true);
+                    new Color(textColor.r, textColor.g, textColor.b, 0f),
+                    fadeDuration));
+
+            if (backgroundColor.HasValue && _backgroundImage != null)
+            {
+                var bg = backgroundColor.Value;
+                fadeSequence.Join(
+                    DOTween.To(
+                        () => _backgroundImage.color,
+                        value => _backgroundImage.color = value,
+                        new Color(bg.r, bg.g, bg.b, 0f),
+                        fadeDuration));
+            }
+
+            _fadeTween = fadeSequence.SetUpdate(true);
 
             yield return _fadeTween.WaitForCompletion();
 
