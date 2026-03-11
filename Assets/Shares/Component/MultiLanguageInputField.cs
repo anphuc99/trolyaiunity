@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace Share.Components
 {
@@ -82,6 +83,20 @@ namespace Share.Components
             {
                 CycleLanguage();
             }
+        }
+
+        public override void OnUpdateSelected(BaseEventData eventData)
+        {
+            // While Korean syllable is still composing, Backspace should decompose
+            // one step at a time instead of deleting the whole composed character.
+            if (_currentLanguage == InputLanguage.Korean &&
+                Input.GetKeyDown(KeyCode.Backspace) &&
+                HandleKoreanBackspace())
+            {
+                return;
+            }
+
+            base.OnUpdateSelected(eventData);
         }
 
         // ──────────────────────── Language cycling ────────────────────────
@@ -872,6 +887,124 @@ namespace Share.Components
                         SetTextAndCaret(t, caretPosition + 1);
                     }
                     break;
+            }
+        }
+
+        /// <summary>
+        /// Handles Backspace while a Hangul syllable is being composed.
+        /// Decomposes in reverse order: jongseong -> jungseong -> choseong.
+        /// </summary>
+        private bool HandleKoreanBackspace()
+        {
+            if (_hangulState == HangulState.Empty || caretPosition <= 0)
+            {
+                return false;
+            }
+
+            switch (_hangulState)
+            {
+                case HangulState.Jongseong:
+                    {
+                        var simplifiedJong = RemoveCompoundJongseongTail(_jong);
+                        if (simplifiedJong != _jong)
+                        {
+                            _jong = simplifiedJong;
+                            UpdateComposing();
+                            return true;
+                        }
+
+                        _jong = 0;
+                        _hangulState = HangulState.Jungseong;
+                        UpdateComposing();
+                        return true;
+                    }
+
+                case HangulState.Jungseong:
+                    {
+                        var simplifiedJung = RemoveCompoundJungseongTail(_jung);
+                        if (simplifiedJung != _jung)
+                        {
+                            _jung = simplifiedJung;
+                            UpdateComposing();
+                            return true;
+                        }
+
+                        _jung = -1;
+                        _jong = -1;
+                        _hangulState = HangulState.Choseong;
+                        UpdateComposing();
+                        return true;
+                    }
+
+                case HangulState.Choseong:
+                    {
+                        var t = text;
+                        var caret = caretPosition;
+                        if (caret > 0)
+                        {
+                            t = t.Remove(caret - 1, 1);
+                            FinalizeHangul();
+                            SetTextAndCaret(t, caret - 1);
+                            return true;
+                        }
+
+                        FinalizeHangul();
+                        return false;
+                    }
+
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// Removes the tail from a compound jungseong (e.g. ㅘ -> ㅗ).
+        /// Returns the original value if it is not compound.
+        /// </summary>
+        private static int RemoveCompoundJungseongTail(int jung)
+        {
+            switch (jung)
+            {
+                case 9:  // ㅘ -> ㅗ
+                case 10: // ㅙ -> ㅗ
+                case 11: // ㅚ -> ㅗ
+                    return 8;
+                case 14: // ㅝ -> ㅜ
+                case 15: // ㅞ -> ㅜ
+                case 16: // ㅟ -> ㅜ
+                    return 13;
+                case 19: // ㅢ -> ㅡ
+                    return 18;
+                default:
+                    return jung;
+            }
+        }
+
+        /// <summary>
+        /// Removes the tail from a compound jongseong (e.g. ㄳ -> ㄱ).
+        /// Returns the original value if it is not compound.
+        /// </summary>
+        private static int RemoveCompoundJongseongTail(int jong)
+        {
+            switch (jong)
+            {
+                case 3:  // ㄳ -> ㄱ
+                    return 1;
+                case 5:  // ㄵ -> ㄴ
+                case 6:  // ㄶ -> ㄴ
+                    return 4;
+                case 9:  // ㄺ -> ㄹ
+                case 10: // ㄻ -> ㄹ
+                case 11: // ㄼ -> ㄹ
+                case 12: // ㄽ -> ㄹ
+                case 13: // ㄾ -> ㄹ
+                case 14: // ㄿ -> ㄹ
+                case 15: // ㅀ -> ㄹ
+                    return 8;
+                case 18: // ㅄ -> ㅂ
+                    return 17;
+                default:
+                    return jong;
             }
         }
 
