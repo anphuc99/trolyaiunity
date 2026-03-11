@@ -316,17 +316,14 @@ namespace Share.Components
                 if (cLower == ' ' || cLower == '\n' || cLower == '\r') break;
 
                 var cBase = GetVowelBase(cLower);
-                if (!TelexWMap.ContainsKey(cBase)) continue;
 
                 // Already transformed (ă/ơ/ư) → undo: revert to base, return false → "aw"/"ow"/"uw"
-                if (IsSpecialVowel(cBase))
+                if (cBase == '\u0103' || cBase == '\u01a1' || cBase == '\u01b0')
                 {
-                    // Find the original plain vowel for this special vowel
                     char plain;
                     if (cBase == '\u0103') plain = 'a';      // ă → a
                     else if (cBase == '\u01a1') plain = 'o';  // ơ → o
-                    else if (cBase == '\u01b0') plain = 'u';  // ư → u
-                    else continue; // â/ê/ô are not w-targets
+                    else plain = 'u';                         // ư → u
 
                     var reverted = plain;
                     reverted = TransferTone(cLower, reverted);
@@ -349,6 +346,8 @@ namespace Share.Components
 
                     return false;
                 }
+
+                if (!TelexWMap.ContainsKey(cBase)) continue;
 
                 var replacement = TelexWMap[cBase];
                 replacement = TransferTone(cLower, replacement);
