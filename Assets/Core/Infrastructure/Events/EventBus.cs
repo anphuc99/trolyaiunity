@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 
 namespace Core.Infrastructure.Events
 {
@@ -14,6 +15,7 @@ namespace Core.Infrastructure.Events
 
 		private static readonly object Sync = new object();
 		private static readonly Dictionary<string, List<Action<object>>> HandlersByKey = new Dictionary<string, List<Action<object>>>(StringComparer.Ordinal);
+		private static readonly SynchronizationContext MainThreadContext = SynchronizationContext.Current;
 
 		/// <summary>
 		/// Optional error logger. If unset, errors are written to <see cref="Trace"/>.
@@ -42,6 +44,22 @@ namespace Core.Infrastructure.Events
 				}
 
 				snapshot = handlers.ToArray();
+			}
+
+			if (MainThreadContext != null && SynchronizationContext.Current != MainThreadContext)
+			{
+				MainThreadContext.Post(_ => InvokeHandlers(key, payload, snapshot), null);
+				return;
+			}
+
+			InvokeHandlers(key, payload, snapshot);
+		}
+
+		private static void InvokeHandlers(string key, object payload, Action<object>[] snapshot)
+		{
+			if (snapshot == null || snapshot.Length == 0)
+			{
+				return;
 			}
 
 			for (var i = 0; i < snapshot.Length; i++)
