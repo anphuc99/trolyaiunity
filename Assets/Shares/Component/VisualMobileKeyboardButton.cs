@@ -30,29 +30,48 @@ namespace Share.Components
     /// The serialized Button component is disabled at runtime to remove
     /// it from the Selectable pool.
     /// </summary>
-    public class VisualMobileKeyboardButton : MonoBehaviour, IPointerClickHandler
+    public class VisualMobileKeyboardButton : MonoBehaviour,
+        IPointerClickHandler,
+        IPointerDownHandler,
+        IPointerUpHandler,
+        IPointerEnterHandler,
+        IPointerExitHandler
     {
         public VisualMobileKeyType type;
         public string DisplayText;
         public string InputText;
         [SerializeField] private TextMeshProUGUI textMeshProUGUI;
-        [SerializeField] private Button _button;
+        [SerializeField] private Image _imageTarget;
+        [Header("Color Transition")]
+        [SerializeField] private Color _normalColor = Color.white;
+        [SerializeField] private Color _highlightedColor = new Color(0.9607843f, 0.9607843f, 0.9607843f, 1f);
+        [SerializeField] private Color _pressedColor = new Color(0.78431374f, 0.78431374f, 0.78431374f, 1f);
+        [SerializeField] private Color _disabledColor = new Color(0.78431374f, 0.78431374f, 0.78431374f, 0.5019608f);
+        [SerializeField] private float _fadeDuration = 0.1f;
+        [SerializeField] private bool _interactable = true;
 
         private Action<VisualMobileKeyboardButton> _onClick;
+        private bool _isPointerDown;
+        private bool _isPointerInside;
 
         void Awake()
         {
-            // Disable the Button component so it is no longer a Selectable.
-            // This prevents the EventSystem from selecting the button on click,
-            // which would deselect the input field and hide the keyboard.
-            if (_button == null)
+            if (_imageTarget == null)
             {
-                _button = GetComponent<Button>();
+                _imageTarget = GetComponent<Image>();
             }
-            if (_button != null)
-            {
-                _button.enabled = false;
-            }
+            ApplyStateColor(_interactable ? _normalColor : _disabledColor, true);
+        }
+
+        private void OnEnable()
+        {
+            ApplyStateColor(_interactable ? _normalColor : _disabledColor, true);
+        }
+
+        private void OnDisable()
+        {
+            _isPointerDown = false;
+            _isPointerInside = false;
         }
 
         /// <summary>
@@ -60,7 +79,62 @@ namespace Share.Components
         /// </summary>
         public void OnPointerClick(PointerEventData eventData)
         {
+            if (!_interactable || eventData.button != PointerEventData.InputButton.Left)
+            {
+                return;
+            }
+
             _onClick?.Invoke(this);
+        }
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            if (!_interactable || eventData.button != PointerEventData.InputButton.Left)
+            {
+                return;
+            }
+
+            _isPointerDown = true;
+            ApplyStateColor(_pressedColor);
+        }
+
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            if (!_interactable || eventData.button != PointerEventData.InputButton.Left)
+            {
+                return;
+            }
+
+            _isPointerDown = false;
+            ApplyStateColor(_isPointerInside ? _highlightedColor : _normalColor);
+        }
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            if (!_interactable)
+            {
+                return;
+            }
+
+            _isPointerInside = true;
+            if (!_isPointerDown)
+            {
+                ApplyStateColor(_highlightedColor);
+            }
+        }
+
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            if (!_interactable)
+            {
+                return;
+            }
+
+            _isPointerInside = false;
+            if (!_isPointerDown)
+            {
+                ApplyStateColor(_normalColor);
+            }
         }
 
         public void Install(string displayText, string inputText, Action<VisualMobileKeyboardButton> onClick)
@@ -75,6 +149,32 @@ namespace Share.Components
         {
             DisplayText = displayText;
             textMeshProUGUI.text = displayText;
+        }
+
+        /// <summary>
+        /// Sets interactable state and updates the visual color accordingly.
+        /// </summary>
+        public void SetInteractable(bool interactable)
+        {
+            _interactable = interactable;
+            _isPointerDown = false;
+            ApplyStateColor(_interactable ? _normalColor : _disabledColor);
+        }
+
+        private void ApplyStateColor(Color targetColor, bool instant = false)
+        {
+            if (_imageTarget == null)
+            {
+                return;
+            }
+
+            if (instant || !isActiveAndEnabled || _fadeDuration <= 0f)
+            {
+                _imageTarget.color = targetColor;
+                return;
+            }
+
+            _imageTarget.CrossFadeColor(targetColor, _fadeDuration, true, true);
         }
     }
 }
