@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -46,6 +47,14 @@ namespace Share.Components
         private int _jong = -1;  // jongseong index
         private bool _isInternalTextChange;
 
+        // ──────────────────────── Mobile keyboard state ────────────────────────
+        private VisualMobileKeyboard _visualKeyboard;
+        private RectTransform _uiPanelToShift;
+        private float _uiPanelOriginalY;
+        private bool _uiPanelShifted;
+        private Tween _uiShiftTween;
+        private static readonly float UIShiftDuration = 0.25f;
+
         // ──────────────────────── Lifecycle ────────────────────────
 
         protected override void Awake()
@@ -59,6 +68,7 @@ namespace Share.Components
         {
             onValueChanged.RemoveListener(HandleInputValueChanged);
             onValidateInput -= ValidateMultiLangInput;
+            DisconnectVisualKeyboard();
             base.OnDestroy();
         }
 
@@ -97,6 +107,90 @@ namespace Share.Components
             }
 
             base.OnUpdateSelected(eventData);
+        }
+
+        /// <summary>
+        /// When the input field is selected on mobile, show the visual keyboard.
+        /// </summary>
+        public override void OnSelect(BaseEventData eventData)
+        {
+            base.OnSelect(eventData);
+            if (IsMobilePlatform())
+            {
+                ShowVisualKeyboard();
+            }
+        }
+
+        /// <summary>
+        /// When the input field loses focus, hide the visual keyboard.
+        /// </summary>
+        public override void OnDeselect(BaseEventData eventData)
+        {
+            base.OnDeselect(eventData);
+            HideVisualKeyboard();
+        }
+
+        // ──────────────────────── Public API for visual keyboard ────────────────────────
+
+        /// <summary>
+        /// Sets the input language externally (e.g. from the visual keyboard).
+        /// </summary>
+        public void SetLanguage(InputLanguage language)
+        {
+            if (_currentLanguage == language) return;
+            FinalizeHangul();
+            _currentLanguage = language;
+        }
+
+        /// <summary>
+        /// Inserts a character or action from the visual keyboard.
+        /// Supports backspace (\b), newline (\n), and regular characters.
+        /// </summary>
+        public void InsertFromKeyboard(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return;
+
+            if (input == "\b")
+            {
+                // Handle backspace
+                if (_currentLanguage == InputLanguage.Korean && HandleKoreanBackspace())
+                {
+                    return;
+                }
+                if (caretPosition > 0)
+                {
+                    var t = text.Remove(caretPosition - 1, 1);
+                    SetTextAndCaret(t, caretPosition - 1);
+                }
+                return;
+            }
+
+            if (input == "\n")
+            {
+                // Simulate Enter by finalizing composition and inserting newline
+                FinalizeHangul();
+                var t = text.Insert(caretPosition, "\n");
+                SetTextAndCaret(t, caretPosition + 1);
+                return;
+            }
+
+            // Insert each character through the validation pipeline
+            foreach (var ch in input)
+            {
+                switch (_currentLanguage)
+                {
+                    case InputLanguage.Vietnamese:
+                        HandleVietnameseChar(ch);
+                        break;
+                    case InputLanguage.Korean:
+                        HandleKoreanChar(ch);
+                        break;
+                    default:
+                        var newText = text.Insert(caretPosition, ch.ToString());
+                        SetTextAndCaret(newText, caretPosition + 1);
+                        break;
+                }
+            }
         }
 
         // ──────────────────────── Language cycling ────────────────────────
@@ -1244,6 +1338,147 @@ namespace Share.Components
             caretPosition = Mathf.Clamp(newCaret, 0, newText.Length);
             selectionAnchorPosition = caretPosition;
             selectionFocusPosition = caretPosition;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        //  MOBILE VISUAL KEYBOARD INTEGRATION
+        // ══════════════════════════════════════════════════════════════════
+
+        /// <summary>Detects if the current platform is mobile.</summary>
+        private static bool IsMobilePlatform()
+        {
+#if UNITY_EDITOR
+            return false;
+#else
+            return Application.isMobilePlatform;
+#endif
+        }
+
+        /// <summary>Finds and shows the visual keyboard, wiring input events.</summary>
+        private void ShowVisualKeyboard()
+        {
+            if (_visualKeyboard == null)
+            {
+                _visualKeyboard = FindFirstObjectByType<VisualMobileKeyboard>(FindObjectsInactive.Include);
+            }
+
+            if (_visualKeyboard == null) return;
+
+            _visualKeyboard._inputAction = InsertFromKeyboard;
+            _visualKeyboard.Show(this);
+
+            // Push UI panel up if the keyboard covers this input field
+            PushUIPanelIfNeeded();
+        }
+
+        /// <summary>Hides the visual keyboard and restores UI panel position.</summary>
+        private void HideVisualKeyboard()
+        {
+            if (_visualKeyboard != null && _visualKeyboard.IsShown)
+            {
+                _visualKeyboard.Hide();
+            }
+
+            DisconnectVisualKeyboard();
+            RestoreUIPanel();
+        }
+
+        /// <summary>Disconnects input/language callbacks from the visual keyboard.</summary>
+        private void DisconnectVisualKeyboard()
+        {
+            if (_visualKeyboard != null)
+            {
+                _visualKeyboard._inputAction = null;
+            }
+        }
+
+        /// <summary>
+        /// If the input field is below the keyboard, shifts the parent UI panel up
+        /// so the input remains visible.
+        /// </summary>
+        private void PushUIPanelIfNeeded()
+        {
+            if (_visualKeyboard == null || !_visualKeyboard.IsShown) return;
+
+            var inputRect = GetComponent<RectTransform>();
+            var canvas = GetComponentInParent<Canvas>();
+            if (canvas == null) return;
+
+            // Find the top-level UI panel (direct child of Canvas) to shift
+            var panelTransform = FindShiftableParent(inputRect, canvas);
+            if (panelTransform == null) return;
+
+            _uiPanelToShift = panelTransform;
+            if (!_uiPanelShifted)
+            {
+                _uiPanelOriginalY = _uiPanelToShift.anchoredPosition.y;
+            }
+
+            // Calculate overlap between input field bottom and keyboard top
+            var inputWorldCorners = new Vector3[4];
+            inputRect.GetWorldCorners(inputWorldCorners);
+            var inputBottomWorld = inputWorldCorners[0].y; // bottom-left Y
+
+            var kbWorldCorners = new Vector3[4];
+            _visualKeyboard.KeyboardRect.GetWorldCorners(kbWorldCorners);
+            var kbTopWorld = kbWorldCorners[1].y; // top-left Y
+
+            var overlap = kbTopWorld - inputBottomWorld;
+            if (overlap <= 0) return; // Input is above keyboard, no shift needed
+
+            // Add small margin above the keyboard
+            var shiftAmount = overlap + 20f;
+
+            // Convert world-space shift to local anchored position offset
+            var canvasRect = canvas.GetComponent<RectTransform>();
+            var scaleFactor = canvasRect.lossyScale.y;
+            if (scaleFactor > 0)
+            {
+                shiftAmount /= scaleFactor;
+            }
+
+            _uiShiftTween?.Kill();
+            _uiShiftTween = _uiPanelToShift.DOAnchorPosY(
+                _uiPanelOriginalY + shiftAmount, UIShiftDuration)
+                .SetEase(Ease.OutCubic)
+                .SetUpdate(true);
+            _uiPanelShifted = true;
+        }
+
+        /// <summary>Restores the shifted UI panel to its original position.</summary>
+        private void RestoreUIPanel()
+        {
+            if (!_uiPanelShifted || _uiPanelToShift == null) return;
+
+            _uiShiftTween?.Kill();
+            _uiShiftTween = _uiPanelToShift.DOAnchorPosY(
+                _uiPanelOriginalY, UIShiftDuration)
+                .SetEase(Ease.OutCubic)
+                .SetUpdate(true)
+                .OnComplete(() => _uiPanelShifted = false);
+        }
+
+        /// <summary>
+        /// Finds the appropriate parent RectTransform to shift.
+        /// Returns the direct child of the Canvas root.
+        /// </summary>
+        private static RectTransform FindShiftableParent(RectTransform child, Canvas canvas)
+        {
+            var canvasTransform = canvas.transform;
+            var current = child;
+            RectTransform lastBeforeCanvas = null;
+
+            while (current != null)
+            {
+                if (current.parent == canvasTransform)
+                {
+                    return current;
+                }
+                lastBeforeCanvas = current;
+                current = current.parent as RectTransform;
+            }
+
+            return lastBeforeCanvas;
         }
     }
 }
