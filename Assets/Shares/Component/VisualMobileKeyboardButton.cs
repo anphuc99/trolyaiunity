@@ -52,7 +52,6 @@ namespace Share.Components
 
         private Action<VisualMobileKeyboardButton> _onClick;
         private bool _isPointerDown;
-        private bool _isPointerInside;
         private Color _baseImageColor = Color.white;
 
         void Awake()
@@ -78,7 +77,6 @@ namespace Share.Components
         private void OnDisable()
         {
             _isPointerDown = false;
-            _isPointerInside = false;
         }
 
         /// <summary>
@@ -92,6 +90,7 @@ namespace Share.Components
             }
 
             _onClick?.Invoke(this);
+            ApplyStateColor(_normalColor);
         }
 
         public void OnPointerDown(PointerEventData eventData)
@@ -113,7 +112,8 @@ namespace Share.Components
             }
 
             _isPointerDown = false;
-            ApplyStateColor(_isPointerInside ? _highlightedColor : _normalColor);
+            // Keyboard keys should return to the base visual state after release.
+            ApplyStateColor(_normalColor);
         }
 
         public void OnPointerEnter(PointerEventData eventData)
@@ -123,7 +123,6 @@ namespace Share.Components
                 return;
             }
 
-            _isPointerInside = true;
             if (!_isPointerDown)
             {
                 ApplyStateColor(_highlightedColor);
@@ -137,7 +136,6 @@ namespace Share.Components
                 return;
             }
 
-            _isPointerInside = false;
             if (!_isPointerDown)
             {
                 ApplyStateColor(_normalColor);
