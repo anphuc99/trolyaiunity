@@ -54,7 +54,6 @@ namespace Share.Components
         private bool _isPointerDown;
         private Color _originalImageColor = Color.white;
         private bool _hasOriginalImageColor;
-        private static VisualMobileKeyboardButton _currentHoveredButton;
 
         void Awake()
         {
@@ -73,26 +72,7 @@ namespace Share.Components
 
         private void OnDisable()
         {
-            if (_currentHoveredButton == this)
-            {
-                _currentHoveredButton = null;
-            }
             _isPointerDown = false;
-        }
-
-        private void Update()
-        {
-            if (!_isPointerDown)
-            {
-                return;
-            }
-
-            // Safety net: if pointer up is missed by this key, recover state.
-            if (!Input.GetMouseButton(0) && Input.touchCount == 0)
-            {
-                _isPointerDown = false;
-                ApplyStateColor(_normalColor);
-            }
         }
 
         /// <summary>
@@ -139,12 +119,6 @@ namespace Share.Components
                 return;
             }
 
-            if (_currentHoveredButton != null && _currentHoveredButton != this)
-            {
-                _currentHoveredButton.ApplyStateColor(_currentHoveredButton._normalColor);
-            }
-            _currentHoveredButton = this;
-
             if (!_isPointerDown)
             {
                 ApplyStateColor(_highlightedColor);
@@ -156,11 +130,6 @@ namespace Share.Components
             if (!_interactable)
             {
                 return;
-            }
-
-            if (_currentHoveredButton == this)
-            {
-                _currentHoveredButton = null;
             }
 
             if (!_isPointerDown)
@@ -197,7 +166,7 @@ namespace Share.Components
             ApplyStateColor(_interactable ? _normalColor : _disabledColor);
         }
 
-        private void ApplyStateColor(Color targetColor, bool instant = false)
+        private void ApplyStateColor(Color stateMultiplier, bool instant = false)
         {
             if (_imageTarget == null)
             {
@@ -206,18 +175,19 @@ namespace Share.Components
 
             CacheOriginalColorIfNeeded();
 
-            // Normal state must restore the exact original image color.
-            var tintedColor = targetColor == _normalColor
-                ? _originalImageColor
-                : MultiplyColor(_originalImageColor, targetColor);
+            // Always: finalColor = originalImageColor × stateMultiplier.
+            // Image.color is locked to white (set in CacheOriginalColorFromCurrent)
+            // so CanvasRenderer.color is the only active multiplier.
+            var finalColor = MultiplyColor(_originalImageColor, stateMultiplier);
 
             if (instant || !isActiveAndEnabled || _fadeDuration <= 0f)
             {
-                _imageTarget.color = tintedColor;
+                // Use CanvasRenderer directly to stay consistent with CrossFadeColor path.
+                _imageTarget.canvasRenderer.SetColor(finalColor);
                 return;
             }
 
-            _imageTarget.CrossFadeColor(tintedColor, _fadeDuration, true, true);
+            _imageTarget.CrossFadeColor(finalColor, _fadeDuration, true, true);
         }
 
         private static Color MultiplyColor(Color baseColor, Color tint)
@@ -253,7 +223,15 @@ namespace Share.Components
                 return;
             }
 
+            // Capture the sprite's intended color from Image.color.
             _originalImageColor = _imageTarget.color;
+
+            // Lock Image.color to white so that CanvasRenderer.color becomes the
+            // sole color multiplier. Without this, CrossFadeColor applies ON TOP
+            // of Image.color causing double-multiplication and black artifacts:
+            //   displayed = Image.color × CanvasRenderer.color
+            // With Image.color = white: displayed = CanvasRenderer.color only.
+            _imageTarget.color = Color.white;
             _hasOriginalImageColor = true;
         }
 
