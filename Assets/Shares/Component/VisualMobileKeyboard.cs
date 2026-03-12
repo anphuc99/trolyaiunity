@@ -1,7 +1,6 @@
 using System;
 using DG.Tweening;
 using UnityEngine;
-using UnityEngine.EventSystems;
 
 namespace Share.Components
 {
@@ -308,16 +307,6 @@ namespace Share.Components
                     break;
             }
 
-            // Re-focus the input field so the keyboard stays open
-            RefocusInput();
-        }
-
-        /// <summary>Re-selects the focused input field to prevent keyboard from closing.</summary>
-        private void RefocusInput()
-        {
-            if (_focusedInput == null) return;
-            EventSystem.current.SetSelectedGameObject(_focusedInput.gameObject);
-            _focusedInput.ActivateInputField();
         }
 
         // ──────────────────────── Language Cycling ────────────────────────

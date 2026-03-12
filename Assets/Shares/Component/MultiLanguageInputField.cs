@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
@@ -55,7 +54,6 @@ namespace Share.Components
         private bool _uiPanelShifted;
         private Tween _uiShiftTween;
         private static readonly float UIShiftDuration = 0.25f;
-        private Coroutine _deselectCoroutine;
 
         // ──────────────────────── Lifecycle ────────────────────────
 
@@ -125,40 +123,12 @@ namespace Share.Components
 
         /// <summary>
         /// When the input field loses focus, hide the visual keyboard.
-        /// Delays by one frame when keyboard is shown, so button clicks
-        /// can re-focus the input field before we decide to hide.
+        /// Keyboard buttons use IPointerClickHandler (not Selectable), so
+        /// clicking them does NOT trigger OnDeselect.
         /// </summary>
         public override void OnDeselect(BaseEventData eventData)
         {
             base.OnDeselect(eventData);
-
-            if (_visualKeyboard != null && _visualKeyboard.IsShown)
-            {
-                // Delay: let the keyboard button's OnClick + RefocusInput run first
-                if (_deselectCoroutine != null) StopCoroutine(_deselectCoroutine);
-                _deselectCoroutine = StartCoroutine(DelayedDeselect());
-                return;
-            }
-
-            HideVisualKeyboard();
-        }
-
-        /// <summary>
-        /// Waits one frame, then hides the keyboard only if the input field
-        /// was NOT re-selected by the keyboard's RefocusInput.
-        /// </summary>
-        private IEnumerator DelayedDeselect()
-        {
-            yield return null;
-            _deselectCoroutine = null;
-
-            // If the keyboard re-focused us, stay open
-            if (EventSystem.current != null &&
-                EventSystem.current.currentSelectedGameObject == gameObject)
-            {
-                yield break;
-            }
-
             HideVisualKeyboard();
         }
 
