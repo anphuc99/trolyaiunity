@@ -136,13 +136,13 @@ namespace Share.Components
         {
             if (_rectTransform != null) return;
 
-            _rectTransform = _UIPanel.GetComponent<RectTransform>();
+            _rectTransform = GetComponent<RectTransform>();
             _shownY = _rectTransform.anchoredPosition.y;
             _hiddenY = _shownY - _rectTransform.rect.height;
 
             InstallAllPanels();
             HideAllPanels();
-            _UIPanel.SetActive(false);
+            gameObject.SetActive(false);
             _isShown = false;
         }
 
@@ -160,7 +160,7 @@ namespace Share.Components
             UpdateLanguageButtonDisplay();
             ShowActivePanel();
 
-            _UIPanel.SetActive(true);
+            gameObject.SetActive(true);
             AnimateIn();
             _isShown = true;
         }
@@ -175,7 +175,7 @@ namespace Share.Components
             _focusedInput = null;
             AnimateOut(() =>
             {
-                _UIPanel.SetActive(false);
+                gameObject.SetActive(false);
                 HideAllPanels();
             });
         }
