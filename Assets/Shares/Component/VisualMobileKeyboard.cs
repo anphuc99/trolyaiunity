@@ -259,7 +259,12 @@ namespace Share.Components
                     break;
 
                 case VisualMobileKeyType.Uppercase:
-                    _isUppercase = !_isUppercase;
+                    _isUppercase = true;
+                    ShowActivePanel();
+                    break;
+
+                case VisualMobileKeyType.Lowercase:
+                    _isUppercase = false;
                     ShowActivePanel();
                     break;
 
