@@ -52,7 +52,8 @@ namespace Share.Components
 
         private Action<VisualMobileKeyboardButton> _onClick;
         private bool _isPointerDown;
-        private Color _baseImageColor = Color.white;
+        private Color _originalImageColor = Color.white;
+        private bool _hasOriginalImageColor;
 
         void Awake()
         {
@@ -61,16 +62,14 @@ namespace Share.Components
                 _imageTarget = GetComponent<Image>();
             }
 
-            if (_imageTarget != null)
-            {
-                _baseImageColor = _imageTarget.color;
-            }
+            CacheOriginalColorIfNeeded();
 
             ApplyStateColor(_interactable ? _normalColor : _disabledColor, true);
         }
 
         private void OnEnable()
         {
+            CacheOriginalColorIfNeeded();
             ApplyStateColor(_interactable ? _normalColor : _disabledColor, true);
         }
 
@@ -173,7 +172,12 @@ namespace Share.Components
                 return;
             }
 
-            var tintedColor = MultiplyColor(_baseImageColor, targetColor);
+            CacheOriginalColorIfNeeded();
+
+            // Normal state must restore the exact original image color.
+            var tintedColor = targetColor == _normalColor
+                ? _originalImageColor
+                : MultiplyColor(_originalImageColor, targetColor);
 
             if (instant || !isActiveAndEnabled || _fadeDuration <= 0f)
             {
@@ -191,6 +195,17 @@ namespace Share.Components
                 baseColor.g * tint.g,
                 baseColor.b * tint.b,
                 baseColor.a * tint.a);
+        }
+
+        private void CacheOriginalColorIfNeeded()
+        {
+            if (_hasOriginalImageColor || _imageTarget == null)
+            {
+                return;
+            }
+
+            _originalImageColor = _imageTarget.color;
+            _hasOriginalImageColor = true;
         }
     }
 }
