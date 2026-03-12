@@ -54,6 +54,7 @@ namespace Share.Components
         private bool _isPointerDown;
         private Color _originalImageColor = Color.white;
         private bool _hasOriginalImageColor;
+        private static VisualMobileKeyboardButton _currentHoveredButton;
 
         void Awake()
         {
@@ -72,7 +73,26 @@ namespace Share.Components
 
         private void OnDisable()
         {
+            if (_currentHoveredButton == this)
+            {
+                _currentHoveredButton = null;
+            }
             _isPointerDown = false;
+        }
+
+        private void Update()
+        {
+            if (!_isPointerDown)
+            {
+                return;
+            }
+
+            // Safety net: if pointer up is missed by this key, recover state.
+            if (!Input.GetMouseButton(0) && Input.touchCount == 0)
+            {
+                _isPointerDown = false;
+                ApplyStateColor(_normalColor);
+            }
         }
 
         /// <summary>
@@ -119,6 +139,12 @@ namespace Share.Components
                 return;
             }
 
+            if (_currentHoveredButton != null && _currentHoveredButton != this)
+            {
+                _currentHoveredButton.ApplyStateColor(_currentHoveredButton._normalColor);
+            }
+            _currentHoveredButton = this;
+
             if (!_isPointerDown)
             {
                 ApplyStateColor(_highlightedColor);
@@ -130,6 +156,11 @@ namespace Share.Components
             if (!_interactable)
             {
                 return;
+            }
+
+            if (_currentHoveredButton == this)
+            {
+                _currentHoveredButton = null;
             }
 
             if (!_isPointerDown)
