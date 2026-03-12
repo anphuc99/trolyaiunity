@@ -247,7 +247,13 @@ MonoBehaviour:
   DisplayText: 
   InputText: 
   textMeshProUGUI: {fileID: 4078654319453664822}
-  _button: {fileID: 0}
+  _imageTarget: {fileID: 8501129843443203242}
+  _normalColor: {r: 1, g: 1, b: 1, a: 1}
+  _highlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+  _pressedColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+  _disabledColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 0.5019608}
+  _fadeDuration: 0.1
+  _interactable: 1
 --- !u!1 &4078654319453664820
 GameObject:
   m_ObjectHideFlags: 0
