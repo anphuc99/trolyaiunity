@@ -128,6 +128,14 @@ namespace Share.Components
 
         private void Awake()
         {
+            EnsureInitialized();
+        }
+
+        /// <summary>Lazily initializes RectTransform and panels (safe to call multiple times).</summary>
+        private void EnsureInitialized()
+        {
+            if (_rectTransform != null) return;
+
             _rectTransform = _UIPanel.GetComponent<RectTransform>();
             _shownY = _rectTransform.anchoredPosition.y;
             _hiddenY = _shownY - _rectTransform.rect.height;
@@ -145,6 +153,7 @@ namespace Share.Components
         /// </summary>
         public void Show(MultiLanguageInputField inputField)
         {
+            EnsureInitialized();
             _focusedInput = inputField;
             _currentLanguage = inputField.CurrentLanguage;
             _isUppercase = false;
