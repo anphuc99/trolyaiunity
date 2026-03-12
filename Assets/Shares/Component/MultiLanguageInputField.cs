@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
@@ -54,6 +55,7 @@ namespace Share.Components
         private bool _uiPanelShifted;
         private Tween _uiShiftTween;
         private static readonly float UIShiftDuration = 0.25f;
+        private Coroutine _reselectCoroutine;
 
         // ──────────────────────── Lifecycle ────────────────────────
 
@@ -123,13 +125,57 @@ namespace Share.Components
 
         /// <summary>
         /// When the input field loses focus, hide the visual keyboard.
-        /// Keyboard buttons use IPointerClickHandler (not Selectable), so
-        /// clicking them does NOT trigger OnDeselect.
+        /// If the pointer is over the keyboard, we skip base.OnDeselect()
+        /// (keeping the field activated) and re-select ourselves next frame.
         /// </summary>
         public override void OnDeselect(BaseEventData eventData)
         {
+            if (_visualKeyboard != null && _visualKeyboard.IsShown && IsPointerOverKeyboard())
+            {
+                // Pointer is on the keyboard — keep the field active,
+                // re-select on next frame (can't re-select inside OnDeselect).
+                if (_reselectCoroutine != null) StopCoroutine(_reselectCoroutine);
+                _reselectCoroutine = StartCoroutine(ReselectNextFrame());
+                return;
+            }
+
             base.OnDeselect(eventData);
             HideVisualKeyboard();
+        }
+
+        /// <summary>
+        /// Checks whether the current pointer/touch position is inside the keyboard rect.
+        /// </summary>
+        private bool IsPointerOverKeyboard()
+        {
+            if (_visualKeyboard == null || _visualKeyboard.KeyboardRect == null) return false;
+
+            Vector2 screenPoint;
+            if (Input.touchCount > 0)
+                screenPoint = Input.GetTouch(0).position;
+            else
+                screenPoint = (Vector2)Input.mousePosition;
+
+            var canvas = _visualKeyboard.GetComponentInParent<Canvas>();
+            if (canvas == null) return false;
+
+            Camera cam = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            return RectTransformUtility.RectangleContainsScreenPoint(
+                _visualKeyboard.KeyboardRect, screenPoint, cam);
+        }
+
+        /// <summary>
+        /// Waits one frame then re-selects this input field, keeping the keyboard open.
+        /// </summary>
+        private IEnumerator ReselectNextFrame()
+        {
+            yield return null;
+            _reselectCoroutine = null;
+            if (EventSystem.current != null)
+            {
+                EventSystem.current.SetSelectedGameObject(gameObject);
+            }
+            ActivateInputField();
         }
 
         // ──────────────────────── Public API for visual keyboard ────────────────────────
