@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
@@ -54,6 +55,7 @@ namespace Share.Components
         private bool _uiPanelShifted;
         private Tween _uiShiftTween;
         private static readonly float UIShiftDuration = 0.25f;
+        private Coroutine _deselectCoroutine;
 
         // ──────────────────────── Lifecycle ────────────────────────
 
@@ -123,21 +125,38 @@ namespace Share.Components
 
         /// <summary>
         /// When the input field loses focus, hide the visual keyboard.
-        /// Skip if the new selection is part of the keyboard (button press).
+        /// Delays by one frame when keyboard is shown, so button clicks
+        /// can re-focus the input field before we decide to hide.
         /// </summary>
         public override void OnDeselect(BaseEventData eventData)
         {
             base.OnDeselect(eventData);
 
-            // If the visual keyboard is shown, check if the new selection is a keyboard button.
-            // If so, don't hide — the keyboard will re-focus this input field.
             if (_visualKeyboard != null && _visualKeyboard.IsShown)
             {
-                var selected = EventSystem.current.currentSelectedGameObject;
-                if (selected != null && selected.GetComponentInParent<VisualMobileKeyboard>() != null)
-                {
-                    return;
-                }
+                // Delay: let the keyboard button's OnClick + RefocusInput run first
+                if (_deselectCoroutine != null) StopCoroutine(_deselectCoroutine);
+                _deselectCoroutine = StartCoroutine(DelayedDeselect());
+                return;
+            }
+
+            HideVisualKeyboard();
+        }
+
+        /// <summary>
+        /// Waits one frame, then hides the keyboard only if the input field
+        /// was NOT re-selected by the keyboard's RefocusInput.
+        /// </summary>
+        private IEnumerator DelayedDeselect()
+        {
+            yield return null;
+            _deselectCoroutine = null;
+
+            // If the keyboard re-focused us, stay open
+            if (EventSystem.current != null &&
+                EventSystem.current.currentSelectedGameObject == gameObject)
+            {
+                yield break;
             }
 
             HideVisualKeyboard();
