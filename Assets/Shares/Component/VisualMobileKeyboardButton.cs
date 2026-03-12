@@ -53,6 +53,7 @@ namespace Share.Components
         private Action<VisualMobileKeyboardButton> _onClick;
         private bool _isPointerDown;
         private bool _isPointerInside;
+        private Color _baseImageColor = Color.white;
 
         void Awake()
         {
@@ -60,6 +61,12 @@ namespace Share.Components
             {
                 _imageTarget = GetComponent<Image>();
             }
+
+            if (_imageTarget != null)
+            {
+                _baseImageColor = _imageTarget.color;
+            }
+
             ApplyStateColor(_interactable ? _normalColor : _disabledColor, true);
         }
 
@@ -168,13 +175,24 @@ namespace Share.Components
                 return;
             }
 
+            var tintedColor = MultiplyColor(_baseImageColor, targetColor);
+
             if (instant || !isActiveAndEnabled || _fadeDuration <= 0f)
             {
-                _imageTarget.color = targetColor;
+                _imageTarget.color = tintedColor;
                 return;
             }
 
-            _imageTarget.CrossFadeColor(targetColor, _fadeDuration, true, true);
+            _imageTarget.CrossFadeColor(tintedColor, _fadeDuration, true, true);
+        }
+
+        private static Color MultiplyColor(Color baseColor, Color tint)
+        {
+            return new Color(
+                baseColor.r * tint.r,
+                baseColor.g * tint.g,
+                baseColor.b * tint.b,
+                baseColor.a * tint.a);
         }
     }
 }
