@@ -57,10 +57,7 @@ namespace Share.Components
 
         void Awake()
         {
-            if (_imageTarget == null)
-            {
-                _imageTarget = GetComponent<Image>();
-            }
+            ResolveImageTarget();
 
             CacheOriginalColorIfNeeded();
 
@@ -147,6 +144,10 @@ namespace Share.Components
             InputText = inputText;
             _onClick = onClick;
             textMeshProUGUI.text = displayText;
+
+            // Ensure we capture the final runtime key color as the true base color.
+            CacheOriginalColorFromCurrent(force: true);
+            ApplyStateColor(_interactable ? _normalColor : _disabledColor, true);
         }
 
         public void SetDisplayText(string displayText)
@@ -199,13 +200,58 @@ namespace Share.Components
 
         private void CacheOriginalColorIfNeeded()
         {
-            if (_hasOriginalImageColor || _imageTarget == null)
+            if (_hasOriginalImageColor)
+            {
+                return;
+            }
+
+            CacheOriginalColorFromCurrent(force: false);
+        }
+
+        private void CacheOriginalColorFromCurrent(bool force)
+        {
+            ResolveImageTarget();
+
+            if (_imageTarget == null)
+            {
+                return;
+            }
+
+            if (!force && _hasOriginalImageColor)
             {
                 return;
             }
 
             _originalImageColor = _imageTarget.color;
             _hasOriginalImageColor = true;
+        }
+
+        private void ResolveImageTarget()
+        {
+            if (_imageTarget != null)
+            {
+                return;
+            }
+
+            // Prefer a visible child image (e.g. "Fill") over the root image,
+            // since the root may be transparent or stylistic-only.
+            var childImages = GetComponentsInChildren<Image>(true);
+            for (int i = 0; i < childImages.Length; i++)
+            {
+                var img = childImages[i];
+                if (img == null || img.gameObject == gameObject)
+                {
+                    continue;
+                }
+
+                if (img.color.a > 0.01f)
+                {
+                    _imageTarget = img;
+                    return;
+                }
+            }
+
+            _imageTarget = GetComponent<Image>();
         }
     }
 }
