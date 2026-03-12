@@ -367,7 +367,11 @@ namespace Share.Components
         {
             _slideTween?.Kill();
             _rectTransform.anchoredPosition = new Vector2(_rectTransform.anchoredPosition.x, _hiddenY);
-            _slideTween = _rectTransform.DOAnchorPosY(_shownY, _animDuration)
+            _slideTween = DOTween.To(
+                    () => _rectTransform.anchoredPosition,
+                    v => _rectTransform.anchoredPosition = v,
+                    new Vector2(_rectTransform.anchoredPosition.x, _shownY),
+                    _animDuration)
                 .SetEase(Ease.OutCubic)
                 .SetUpdate(true);
         }
@@ -376,7 +380,11 @@ namespace Share.Components
         private void AnimateOut(Action onComplete)
         {
             _slideTween?.Kill();
-            _slideTween = _rectTransform.DOAnchorPosY(_hiddenY, _animDuration)
+            _slideTween = DOTween.To(
+                    () => _rectTransform.anchoredPosition,
+                    v => _rectTransform.anchoredPosition = v,
+                    new Vector2(_rectTransform.anchoredPosition.x, _hiddenY),
+                    _animDuration)
                 .SetEase(Ease.InCubic)
                 .SetUpdate(true)
                 .OnComplete(() => onComplete?.Invoke());

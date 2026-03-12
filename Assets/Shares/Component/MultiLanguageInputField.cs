@@ -1438,8 +1438,11 @@ namespace Share.Components
             }
 
             _uiShiftTween?.Kill();
-            _uiShiftTween = _uiPanelToShift.DOAnchorPosY(
-                _uiPanelOriginalY + shiftAmount, UIShiftDuration)
+            var targetPos = new Vector2(_uiPanelToShift.anchoredPosition.x, _uiPanelOriginalY + shiftAmount);
+            _uiShiftTween = DOTween.To(
+                    () => _uiPanelToShift.anchoredPosition,
+                    v => _uiPanelToShift.anchoredPosition = v,
+                    targetPos, UIShiftDuration)
                 .SetEase(Ease.OutCubic)
                 .SetUpdate(true);
             _uiPanelShifted = true;
@@ -1451,8 +1454,11 @@ namespace Share.Components
             if (!_uiPanelShifted || _uiPanelToShift == null) return;
 
             _uiShiftTween?.Kill();
-            _uiShiftTween = _uiPanelToShift.DOAnchorPosY(
-                _uiPanelOriginalY, UIShiftDuration)
+            var restorePos = new Vector2(_uiPanelToShift.anchoredPosition.x, _uiPanelOriginalY);
+            _uiShiftTween = DOTween.To(
+                    () => _uiPanelToShift.anchoredPosition,
+                    v => _uiPanelToShift.anchoredPosition = v,
+                    restorePos, UIShiftDuration)
                 .SetEase(Ease.OutCubic)
                 .SetUpdate(true)
                 .OnComplete(() => _uiPanelShifted = false);
