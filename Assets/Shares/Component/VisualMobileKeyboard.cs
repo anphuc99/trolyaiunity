@@ -189,6 +189,9 @@ namespace Share.Components
         /// <summary>The RectTransform of the keyboard UI panel.</summary>
         public RectTransform KeyboardRect => _rectTransform;
 
+        /// <summary>The anchoredPosition.y when fully shown (for world-space calculation).</summary>
+        public float ShownY => _shownY;
+
         // ──────────────────────── Panel Installation ────────────────────────
 
         /// <summary>Installs display/input text on all panels.</summary>

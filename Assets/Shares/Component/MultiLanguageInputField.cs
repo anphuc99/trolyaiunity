@@ -1348,7 +1348,7 @@ namespace Share.Components
         private static bool IsMobilePlatform()
         {
 #if UNITY_EDITOR
-            return false;
+            return true;
 #else
             return Application.isMobilePlatform;
 #endif
@@ -1414,20 +1414,30 @@ namespace Share.Components
                 _uiPanelOriginalY = _uiPanelToShift.anchoredPosition.y;
             }
 
-            // Calculate overlap between input field bottom and keyboard top
+            // Calculate overlap between input field bottom and keyboard top (at final shown position).
+            // We temporarily set keyboard to its final position for correct world-space measurement,
+            // then restore to let animation continue.
+            var kbRect = _visualKeyboard.KeyboardRect;
+            var currentKbPos = kbRect.anchoredPosition;
+            kbRect.anchoredPosition = new Vector2(currentKbPos.x, _visualKeyboard.ShownY);
+
             var inputWorldCorners = new Vector3[4];
             inputRect.GetWorldCorners(inputWorldCorners);
             var inputBottomWorld = inputWorldCorners[0].y; // bottom-left Y
 
             var kbWorldCorners = new Vector3[4];
-            _visualKeyboard.KeyboardRect.GetWorldCorners(kbWorldCorners);
+            kbRect.GetWorldCorners(kbWorldCorners);
             var kbTopWorld = kbWorldCorners[1].y; // top-left Y
+
+            // Restore keyboard position for animation
+            kbRect.anchoredPosition = currentKbPos;
 
             var overlap = kbTopWorld - inputBottomWorld;
             if (overlap <= 0) return; // Input is above keyboard, no shift needed
 
-            // Add small margin above the keyboard
-            var shiftAmount = overlap + 20f;
+            // Shift just enough so the input bottom sits at keyboard top + small margin
+            var margin = 10f;
+            var shiftAmount = overlap + margin;
 
             // Convert world-space shift to local anchored position offset
             var canvasRect = canvas.GetComponent<RectTransform>();
