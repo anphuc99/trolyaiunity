@@ -1412,6 +1412,9 @@ namespace Share.Components
 
             if (_visualKeyboard == null) return;
 
+            // Already shown for this input — don't re-trigger animation
+            if (_visualKeyboard.IsShown) return;
+
             _visualKeyboard._inputAction = InsertFromKeyboard;
             _visualKeyboard.Show(this);
 
