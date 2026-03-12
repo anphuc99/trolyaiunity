@@ -123,10 +123,23 @@ namespace Share.Components
 
         /// <summary>
         /// When the input field loses focus, hide the visual keyboard.
+        /// Skip if the new selection is part of the keyboard (button press).
         /// </summary>
         public override void OnDeselect(BaseEventData eventData)
         {
             base.OnDeselect(eventData);
+
+            // If the visual keyboard is shown, check if the new selection is a keyboard button.
+            // If so, don't hide — the keyboard will re-focus this input field.
+            if (_visualKeyboard != null && _visualKeyboard.IsShown)
+            {
+                var selected = EventSystem.current.currentSelectedGameObject;
+                if (selected != null && selected.GetComponentInParent<VisualMobileKeyboard>() != null)
+                {
+                    return;
+                }
+            }
+
             HideVisualKeyboard();
         }
 
