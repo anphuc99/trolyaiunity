@@ -1279,6 +1279,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			}
 
 			Debug.Log("[JournalView] Audio saved to: " + downloadPayload.SavePath, this);
+
+			if (IsPCPlatform() && !string.IsNullOrEmpty(downloadPayload.SavePath))
+			{
+				OpenContainingFolder(downloadPayload.SavePath);
+			}
 		}
 
 		/// <summary>
@@ -1299,6 +1304,47 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			}
 
 			_downloadAudioButton.interactable = !isDownloading;
+		}
+
+		/// <summary>
+		/// Returns true when running on a desktop PC platform (Windows, macOS, Linux).
+		/// </summary>
+		private static bool IsPCPlatform()
+		{
+			var p = Application.platform;
+			return p == RuntimePlatform.WindowsPlayer || p == RuntimePlatform.WindowsEditor ||
+				   p == RuntimePlatform.OSXPlayer    || p == RuntimePlatform.OSXEditor    ||
+				   p == RuntimePlatform.LinuxPlayer  || p == RuntimePlatform.LinuxEditor;
+		}
+
+		/// <summary>
+		/// Opens the OS file explorer at the folder containing <paramref name="filePath"/>.
+		/// On Windows, the file is selected in Explorer.
+		/// On macOS, Finder reveals the file.
+		/// On Linux, the containing directory is opened via xdg-open.
+		/// </summary>
+		/// <param name="filePath">Absolute path of the saved audio file.</param>
+		private static void OpenContainingFolder(string filePath)
+		{
+			var p = Application.platform;
+			if (p == RuntimePlatform.WindowsPlayer || p == RuntimePlatform.WindowsEditor)
+			{
+				// /select highlights the file in Windows Explorer
+				System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + filePath + "\"");
+			}
+			else if (p == RuntimePlatform.OSXPlayer || p == RuntimePlatform.OSXEditor)
+			{
+				System.Diagnostics.Process.Start("open", "-R \"" + filePath + "\"");
+			}
+			else
+			{
+				// Linux: open the containing directory
+				var folder = System.IO.Path.GetDirectoryName(filePath);
+				if (!string.IsNullOrEmpty(folder))
+				{
+					System.Diagnostics.Process.Start("xdg-open", "\"" + folder + "\"");
+				}
+			}
 		}
 	}
 }
