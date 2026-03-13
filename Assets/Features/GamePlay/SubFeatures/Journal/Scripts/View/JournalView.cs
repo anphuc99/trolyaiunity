@@ -1330,7 +1330,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			if (p == RuntimePlatform.WindowsPlayer || p == RuntimePlatform.WindowsEditor)
 			{
 				// /select highlights the file in Windows Explorer
-				System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + filePath + "\"");
+				System.Diagnostics.Process.Start(Application.persistentDataPath);
 			}
 			else if (p == RuntimePlatform.OSXPlayer || p == RuntimePlatform.OSXEditor)
 			{
