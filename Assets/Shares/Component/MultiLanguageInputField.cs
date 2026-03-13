@@ -534,6 +534,21 @@ namespace Share.Components
 
                 if (!TelexWMap.ContainsKey(cBase)) continue;
 
+                // "ua" cluster: skip 'a' so the scan finds 'u' and transforms it to 'ư',
+                // producing "ưa" (common Vietnamese cluster) instead of "uă".
+                // Also skip when preceding char is already 'ư' so the undo path can reach it.
+                // Exception: "qua" — "qu" is a consonant cluster, so 'w' should apply to 'a' → "quă".
+                if (cBase == 'a' && i > 0)
+                {
+                    var prevLower = char.ToLowerInvariant(text[i - 1]);
+                    var prevBase = GetVowelBase(prevLower);
+                    if ((prevBase == 'u' || prevBase == '\u01b0') &&
+                        (i < 2 || char.ToLowerInvariant(text[i - 2]) != 'q'))
+                    {
+                        continue;
+                    }
+                }
+
                 var replacement = TelexWMap[cBase];
                 replacement = TransferTone(cLower, replacement);
                 if (char.IsUpper(c)) replacement = char.ToUpperInvariant(replacement);
