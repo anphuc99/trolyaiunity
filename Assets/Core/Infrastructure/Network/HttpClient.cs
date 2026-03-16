@@ -358,9 +358,11 @@ namespace Core.Infrastructure.Network
 			var resolvedUrl = ResolveUrl(url);
 			using var request = UnityWebRequestMultimedia.GetAudioClip(resolvedUrl, audioType);
 			request.disposeDownloadHandlerOnDispose = false;
+			// streamAudio must be true on Android — setting it to false causes FMOD to attempt
+			// synchronous decompression which fails with "Unsupported file or audio format" on Android.
 			if (request.downloadHandler is DownloadHandlerAudioClip downloadHandler)
 			{
-				downloadHandler.streamAudio = false;
+				downloadHandler.streamAudio = true;
 			}
 			ApplyHeaders(request, headers);
 			ApplyTimeout(request, timeoutSeconds);
