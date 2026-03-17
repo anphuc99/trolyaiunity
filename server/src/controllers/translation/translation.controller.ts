@@ -183,7 +183,7 @@ export const createTranslationController = (
       const response = await openAIClient.audio.transcriptions.create({
         file,
         model: "gpt-4o-transcribe",
-        language: "ko"
+        language: "zh"
       });
 
       const transcript = response.text?.trim() ?? "";

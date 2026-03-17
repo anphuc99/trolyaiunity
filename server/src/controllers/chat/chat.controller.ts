@@ -48,7 +48,7 @@ interface JsonReplyResult {
 }
 
 const MAX_AUDIO_BYTES = 12 * 1024 * 1024;
-const DEFAULT_TRANSCRIBE_LANGUAGE = "ko";
+const DEFAULT_TRANSCRIBE_LANGUAGE = "zh";
 
 /**
  * Parses a base64 audio data URL and extracts mime type + binary buffer.
