@@ -1411,7 +1411,7 @@ namespace Share.Components
         private static bool IsMobilePlatform()
         {
 #if UNITY_EDITOR
-            return true;
+            return false; // Always use visual keyboard in editor for testing
 #else
             return Application.isMobilePlatform;
 #endif
