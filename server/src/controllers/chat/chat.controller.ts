@@ -35,6 +35,7 @@ interface AssistantTurn {
   MessageId?: string;
   CharacterName?: string;
   Text?: string;
+  Pinyin?: string;
   Tone?: string;
   Translation?: string;
   Transcribe?: string;
@@ -334,10 +335,11 @@ export const createChatController = (
       const messageId = typeof turn.MessageId === "string" ? turn.MessageId.trim() : "";
       const characterName = typeof turn.CharacterName === "string" ? turn.CharacterName.trim() : "";
       const text = typeof turn.Text === "string" ? turn.Text.trim() : "";
+      const pinyin = typeof turn.Pinyin === "string" ? turn.Pinyin.trim() : "";
       const tone = typeof turn.Tone === "string" ? turn.Tone.trim() : "";
       const translation = typeof turn.Translation === "string" ? turn.Translation.trim() : "";
 
-      if (!messageId || !characterName || !text || !tone || !translation) {
+      if (!messageId || !characterName || !text || !pinyin || !tone || !translation) {
         return false;
       }
     }
@@ -359,7 +361,7 @@ export const createChatController = (
       "Retry now and return ONLY valid JSON array.",
       "Requirements:",
       "- Must be a JSON array (1-10 items).",
-      "- Every item must include non-empty string fields: MessageId, CharacterName, Text, Tone, Translation.",
+      "- Every item must include non-empty string fields: MessageId, CharacterName, Text, Pinyin, Tone, Translation.",
       "- No markdown, no explanations, no comments."
     ].join("\n");
   };
