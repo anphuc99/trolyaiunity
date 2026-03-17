@@ -24,7 +24,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private const string DefaultTtsTone = "neutral";
 		private const int RecordingFrequencyHz = 16000;
 		private const int MaxRecordingSeconds = 60;
-		private const string DefaultSpeechLanguage = "ko";
+		private const string DefaultSpeechLanguage = "zh";
 
 		[SerializeField]
 		private TMP_InputField _inputField;

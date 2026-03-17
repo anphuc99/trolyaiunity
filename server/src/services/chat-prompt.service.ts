@@ -71,28 +71,27 @@ export interface ChatPromptParams {
 const LEVEL_CONFIG: Record<string, ChatPromptLevelConfig> = {
   A0: {
     maxWords: 3,
-    guideline: "Use only simple present tense. Avoid any complex grammar."
+    guideline: "Use only simple phrases and greetings. Avoid any complex grammar (Equivalent to early HSK 1)."
   },
   A1: {
     maxWords: 5,
-    guideline: "Use simple sentences. Present tense and basic past. Allowed patterns: -고 싶다, -아/어요."
+    guideline: "Use simple sentences. Allowed patterns: 是...的, 有, 在, and basic measure words. Avoid complex particles (Equivalent to HSK 1-2)."
   },
   A2: {
     maxWords: 7,
-    guideline: "Basic A2 compound structures are allowed: -고, -지만, -아서/-어서, -(으)면, -(으)려고. Avoid intermediate-level grammar."
+    guideline: "Basic compound structures are allowed: 因为...所以, 虽然...但是, 的/得/地, and basic 了/过/着 usage. Avoid intermediate-level grammar (Equivalent to HSK 3)."
   },
   B1: {
     maxWords: 10,
-    guideline:
-      "Use lower-intermediate (B1) grammar. Keep sentences not too long. Allowed patterns: -(으)ㄹ 수 있다, -아/어서, -(으)니까, -기 때문에, -(으)면, -는데, -(으)려고 하다, -(으)면서, -(으)ㄴ/는 것 같다, -아/어도 되다, -아/어야 하다. Avoid B2+ grammar."
+    guideline: "Use lower-intermediate grammar. Allowed patterns: 把/被 sentences, complements of state/result, 越来越, 只要...就. Keep sentences relatively short. Avoid advanced grammar (Equivalent to HSK 4)."
   },
   B2: {
     maxWords: 12,
-    guideline: "Use advanced grammar. Express opinions and more abstract ideas, but keep replies concise."
+    guideline: "Use advanced grammar. Express opinions and more abstract ideas, but keep replies concise (Equivalent to HSK 5)."
   },
   C1: {
     maxWords: 15,
-    guideline: "Use advanced grammar, idiomatic expressions, and nuanced language while staying concise."
+    guideline: "Use advanced grammar, idiomatic expressions (成语), and nuanced language while staying concise (Equivalent to HSK 6)."
   },
   C2: {
     maxWords: 20,
@@ -111,7 +110,7 @@ const normalizeLevel = (value: string | null | undefined) => {
  * Important: this project expects JSON array assistant replies (legacy Gemini-style).
  * So we keep the same *rules + context structure*, but we enforce the JSON schema in the prompt.
  *
- * Any optional field that is missing/empty is skipped ("cái nào chưa có bỏ qua").
+ * Any optional field that is missing/empty is skipped.
  */
 export const buildChatSystemPrompt = (params: ChatPromptParams): string => {
   const level = normalizeLevel(params.level);
@@ -120,7 +119,7 @@ export const buildChatSystemPrompt = (params: ChatPromptParams): string => {
   const maxWords = Number.isFinite(dbMaxWords) && (dbMaxWords as number) > 0 ? (dbMaxWords as number) : levelCfg.maxWords;
   const dbGuideline = (params.levelGuideline ?? "").trim();
   const guideline = dbGuideline || levelCfg.guideline;
-  const context = params.context?.trim() ? params.context.trim() : "A casual Korean practice chat between the user and the assistant.";
+  const context = params.context?.trim() ? params.context.trim() : "A casual Chinese practice chat between the user and the assistant.";
 
   const maybe = (label: string, value: string | null | undefined) => {
     const trimmed = (value ?? "").trim();
@@ -154,15 +153,15 @@ export const buildChatSystemPrompt = (params: ChatPromptParams): string => {
 
   const characterRules = "";
 
-  const p = `YOU ARE A CONVERSATION PARTNER FOR KOREAN LEARNERS.
+  const p = `YOU ARE A CONVERSATION PARTNER FOR CHINESE LEARNERS.
 
 ====================================
 ABSOLUTE RULES (SYSTEM CRITICAL)
 ====================================
-1. Reply in Korean (Text field only).
+1. Reply in Chinese (Text field only. Use Simplified Chinese).
 2. Keep replies short and friendly.
-3. Max ${maxWords} Korean words per sentence when possible.
-4. Avoid numerals; write numbers in Korean words.
+3. Max ${maxWords} Chinese words/characters per sentence when possible.
+4. Avoid numerals; write numbers in Chinese characters.
 5. Translation must be Vietnamese only.
 
 ====================================
@@ -181,7 +180,7 @@ DIALOGUE RULES
 ====================================
 - Prefer 1-10 short sentences per reply.
 - Keep character traits consistent with any profile provided in developer/context messages (name, gender, age, personality, appearance).
-- If the user mixes Vietnamese/Korean, still respond in Korean.
+- If the user mixes Vietnamese/Chinese, still respond in Chinese.
 - If the user asks for translation/explanation, keep it short and at the same level.
 - If the character is thinking, please put it in parentheses.
 
@@ -189,38 +188,40 @@ DIALOGUE RULES
 RESPONSE FORMAT (JSON ARRAY)
 ====================================
 - Return a JSON array of 1-10 objects.
-- Each object must include: MessageId, CharacterName, Text, Tone, Translation.
+- Each object must include: MessageId, CharacterName, Text, Pinyin, Tone, Translation.
 - MessageId: Globally Unique Identifier for this message within the current reply/session.
 - CharacterName: speaker name. Use "Mimi" if no character is specified.
-- Text: Korean only.
+- Text: Chinese characters only (Simplified).
+- Pinyin: Pinyin reading of the Text (include tone marks, e.g., "Nǐ hǎo!").
 - Tone: short English description for TTS (e.g. "neutral, medium pitch").
 - Translation: Vietnamese translation of Text.
 - Return ONLY valid JSON. No markdown, no extra commentary.
 
 ====================================
-TTS TEXT FORMATTING PlEASE FOLLOW THESE TONE INDICATORS FOR KOREAN TTS:
+TTS TEXT FORMATTING PLEASE FOLLOW THESE TONE INDICATORS FOR CHINESE TTS:
 ====================================
 Angry: !!!
 Shouting: !!!!!
-Disgusted: 응... ...  
+Disgusted: 呃... ...  
 Sad: ... ...  
-Scared: 아... ...  
-Surprised: 흥?! ?!  
+Scared: 啊... ...  
+Surprised: 咦?! ?!  
 Shy: ...  
-Affectionate: 흥...  
+Affectionate: 嗯...  
 Happy: !  
-Excited: 와! !!!  
+Excited: 哇! !!!  
 Serious: .  
 Neutral: unchanged
 
 Example:
 [
   {
-    "MessageId": "30dd879c-ee2f-11db-8314-0800200c9a66", -- Use a UUID v1/v4 generator
+    "MessageId": "30dd879c-ee2f-11db-8314-0800200c9a66",
     "CharacterName": "Mimi",
-    "Text": "안녕하세요!",
+    "Text": "你好！",
+    "Pinyin": "Nǐ hǎo!",
     "Tone": "Happy, medium pitch",
-    "Translation": "Xin chao."
+    "Translation": "Xin chào."
   }
 ]
 
@@ -230,8 +231,8 @@ SUMMARY
 
 If a summary is requested by the developer, summarize the entire conversation and update the STORY DESCRIPTION to return JSON as follows:
 {
-  "Summary": "The summary of the conversation is here.", -- Only Vietnamese summary text.
-  "UpdatedStoryDescription": "The story description has been updated here." -- Only Vietnamese updated story description text.
+  "Summary": "The summary of the conversation is here.", 
+  "UpdatedStoryDescription": "The story description has been updated here." 
 }
 
 ====================================
@@ -241,4 +242,3 @@ Silently verify all ABSOLUTE RULES before responding.`;
 
   return p;
 };
-
