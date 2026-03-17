@@ -5,45 +5,43 @@ const DEFAULT_LEVELS: Array<Pick<LevelEntity, "level" | "maxWords" | "descript" 
   {
     level: "A0",
     maxWords: 3,
-    descript: "Starting out: recognition of basic words and sounds.",
-    guideline: "Use only simple present tense. Avoid any complex grammar."
+    descript: "Starting out: recognition of basic Pinyin, simple characters, and sounds.",
+    guideline: "Use only simple phrases and greetings. Avoid any complex grammar (Equivalent to early HSK 1)."
   },
   {
     level: "A1",
     maxWords: 5,
-    descript: "Basic phrases for familiar topics.",
-    guideline: "Use simple sentences. Present tense and basic past. Allowed patterns: -고 싶다, -아/어요."
+    descript: "Basic Chinese phrases for familiar topics.",
+    guideline: "Use simple sentences. Allowed patterns: 是...的, 有, 在, and basic measure words. Avoid complex particles (Equivalent to HSK 1-2)."
   },
   {
     level: "A2",
     maxWords: 7,
-    descript: "Simple conversation and routine tasks.",
-    guideline:
-      "Basic A2 compound structures are allowed: -고, -지만, -아서/-어서, -(으)면, -(으)려고. Avoid intermediate-level grammar."
+    descript: "Simple Chinese conversation and routine tasks.",
+    guideline: "Basic compound structures are allowed: 因为...所以, 虽然...但是, 的/得/地, and basic 了/过/着 usage. Avoid intermediate-level grammar (Equivalent to HSK 3)."
   },
   {
     level: "B1",
     maxWords: 10,
-    descript: "Handle everyday situations and short texts.",
-    guideline:
-      "Use lower-intermediate (B1) grammar. Keep sentences not too long. Allowed patterns: -(으)ㄹ 수 있다, -아/어서, -(으)니까, -기 때문에, -(으)면, -는데, -(으)려고 하다, -(으)면서, -(으)ㄴ/는 것 같다, -아/어도 되다, -아/어야 하다. Avoid B2+ grammar."
+    descript: "Handle everyday situations and short Chinese texts.",
+    guideline: "Use lower-intermediate grammar. Allowed patterns: 把/被 sentences, complements of state/result, 越来越, 只要...就. Keep sentences relatively short. Avoid advanced grammar (Equivalent to HSK 4)."
   },
   {
     level: "B2",
     maxWords: 12,
-    descript: "Discuss abstract topics with some fluency.",
-    guideline: "Use advanced grammar. Express opinions and more abstract ideas, but keep replies concise."
+    descript: "Discuss abstract topics with some fluency in Chinese.",
+    guideline: "Use advanced grammar. Express opinions and more abstract ideas, but keep replies concise (Equivalent to HSK 5)."
   },
   {
     level: "C1",
     maxWords: 15,
-    descript: "Understand complex texts and express ideas.",
-    guideline: "Use advanced grammar, idiomatic expressions, and nuanced language while staying concise."
+    descript: "Understand complex texts and express ideas using rich vocabulary.",
+    guideline: "Use advanced grammar, idiomatic expressions (成语), and nuanced language while staying concise (Equivalent to HSK 6)."
   },
   {
     level: "C2",
     maxWords: 20,
-    descript: "Near-native understanding and expression.",
+    descript: "Near-native understanding and expression in Chinese.",
     guideline: "Use natural, native-like language. Keep replies concise and helpful for learning."
   }
 ];
