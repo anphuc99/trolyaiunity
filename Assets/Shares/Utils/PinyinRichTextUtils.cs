@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 
 namespace Share.Utils
@@ -16,7 +18,7 @@ namespace Share.Utils
 		/// Example: nǐ hǎo + 你好 -> &lt;voffset=1em&gt;&lt;size=50%&gt;nǐ&lt;/size&gt;&lt;/voffset&gt;你 ...
 		/// </summary>
 		/// <param name="hanText">Base Han text.</param>
-		/// <param name="pinyin">Whitespace-separated pinyin syllables.</param>
+		/// <param name="pinyin">Pinyin text; punctuation/separators are tolerated.</param>
 		/// <returns>Formatted TMP rich text. Falls back to hanText when pinyin is missing.</returns>
 		public static string BuildInlineRuby(string hanText, string pinyin)
 		{
@@ -30,8 +32,7 @@ namespace Share.Utils
 				return hanText;
 			}
 
-			var syllables = pinyin
-				.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+			var syllables = ExtractPinyinSyllables(pinyin);
 			if (syllables.Length == 0)
 			{
 				return hanText;
@@ -57,6 +58,74 @@ namespace Share.Utils
 			}
 
 			return builder.ToString();
+		}
+
+		private static string[] ExtractPinyinSyllables(string pinyin)
+		{
+			var result = new List<string>();
+			var current = new StringBuilder();
+
+			for (var i = 0; i < pinyin.Length; i++)
+			{
+				var ch = pinyin[i];
+				if (IsPinyinSyllableChar(ch))
+				{
+					current.Append(ch);
+					continue;
+				}
+
+				if (current.Length > 0)
+				{
+					result.Add(current.ToString());
+					current.Clear();
+				}
+
+				if (IsPinyinSeparator(ch))
+				{
+					continue;
+				}
+			}
+
+			if (current.Length > 0)
+			{
+				result.Add(current.ToString());
+			}
+
+			return result.ToArray();
+		}
+
+		private static bool IsPinyinSyllableChar(char ch)
+		{
+			if (char.IsDigit(ch))
+			{
+				return true;
+			}
+
+			if (IsLatinLetter(ch))
+			{
+				return true;
+			}
+
+			var category = CharUnicodeInfo.GetUnicodeCategory(ch);
+			return category == UnicodeCategory.NonSpacingMark
+				|| category == UnicodeCategory.SpacingCombiningMark
+				|| category == UnicodeCategory.EnclosingMark;
+		}
+
+		private static bool IsLatinLetter(char ch)
+		{
+			if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'))
+			{
+				return true;
+			}
+
+			return (ch >= 0x00C0 && ch <= 0x024F)
+				|| (ch >= 0x1E00 && ch <= 0x1EFF);
+		}
+
+		private static bool IsPinyinSeparator(char ch)
+		{
+			return ch == '\'' || ch == '’' || ch == '-' || ch == '·';
 		}
 
 		private static bool IsCjkIdeograph(char ch)
