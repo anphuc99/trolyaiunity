@@ -369,12 +369,13 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 					var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? DefaultCharacterDisplayName : turn.CharacterName.Trim();
 					var text = string.IsNullOrWhiteSpace(turn.Text) ? string.Empty : turn.Text;
+					var displayText = PinyinRichTextUtils.BuildInlineRuby(text, turn.Pinyin);
 					mapped.Add(new MessageBubbleData
 					{
 						MessageId = string.IsNullOrWhiteSpace(turn.MessageId) ? Guid.NewGuid().ToString("N") : turn.MessageId,
 						Type = MessageBubbleType.Character,
 						SenderName = characterName,
-						Message = text,
+						Message = displayText,
 						OriginalMessage = text,
 						Translation = turn.Translation,
 						Pinyin = turn.Pinyin,
@@ -468,13 +469,14 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				}
 
 				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? DefaultTtsTone : turn.Tone.Trim();
+				var displayText = PinyinRichTextUtils.BuildInlineRuby(messageText, turn.Pinyin);
 
 				_messageContainer.AddNewMessage(new MessageBubbleData
 				{
 					MessageId = string.IsNullOrWhiteSpace(turn.MessageId) ? Guid.NewGuid().ToString("N") : turn.MessageId,
 					Type = MessageBubbleType.Character,
 					SenderName = characterName,
-					Message = messageText,
+					Message = displayText,
 					OriginalMessage = messageText,
 					Translation = turn.Translation,
 					Pinyin = turn.Pinyin,
