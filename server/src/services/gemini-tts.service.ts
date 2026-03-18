@@ -1,13 +1,14 @@
 /**
  * Gemini TTS service with round-robin API key rotation.
  *
- * Uses the Gemini REST API (`gemini-2.5-flash-preview-tts`) to synthesise speech.
+ * Uses the @google/generative-ai SDK (`gemini-2.5-flash-preview-tts`) to synthesise speech.
  * Four API keys (GEMINI_API_KEY_VOICE1 … GEMINI_API_KEY_VOICE4) are rotated in
  * sequence so that per-key rate limits are distributed evenly.
  */
 
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 const GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts";
-const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 // ---------------------------------------------------------------------------
 // Round-robin key management
@@ -91,7 +92,7 @@ const wrapPcmInWav = (pcm: Buffer, sampleRate: number): Buffer => {
 // ---------------------------------------------------------------------------
 
 /**
- * Calls the Gemini TTS API and returns a WAV buffer.
+ * Calls the Gemini TTS API via the @google/generative-ai SDK and returns a WAV buffer.
  *
  * The API key is selected using round-robin rotation so rate limits across
  * the four configured keys are distributed evenly.
@@ -102,44 +103,25 @@ const wrapPcmInWav = (pcm: Buffer, sampleRate: number): Buffer => {
  */
 export const synthesizeGeminiTts = async (text: string, voiceName: string): Promise<Buffer> => {
   const apiKey = getNextGeminiVoiceKey();
+  const genAI = new GoogleGenerativeAI(apiKey);
 
-  const url = `${GEMINI_API_BASE}/${GEMINI_TTS_MODEL}:generateContent`;
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey
-    },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text }] }],
-      generationConfig: {
-        responseModalities: ["AUDIO"],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName }
-          }
+  const model = genAI.getGenerativeModel({
+    model: GEMINI_TTS_MODEL,
+    generationConfig: {
+      // @ts-expect-error — SDK types lag behind API; responseModalities+speechConfig are valid at runtime.
+      responseModalities: ["AUDIO"],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName }
         }
       }
-    })
+    }
   });
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Gemini TTS API error (${response.status}): ${body}`);
-  }
-
-  const result = (await response.json()) as {
-    candidates?: Array<{
-      content?: {
-        parts?: Array<{
-          inlineData?: { mimeType?: string; data?: string };
-        }>;
-      };
-    }>;
-  };
-
-  const inlineData = result.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+  const result = await model.generateContent(text);
+  const response = result.response;
+  const part = response.candidates?.[0]?.content?.parts?.[0];
+  const inlineData = part?.inlineData;
 
   if (!inlineData?.data) {
     throw new Error("Gemini TTS returned no audio data");
