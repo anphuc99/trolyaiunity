@@ -52,7 +52,7 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
       .getOne();
 
     return {
-      voiceName: character?.voiceName?.trim() || undefined,
+      voiceName: character?.voiceModel === "openai" ? character?.voiceName?.trim() || undefined : undefined,
       pitch: character?.pitch ?? undefined,
       speakingRate: character?.speakingRate ?? undefined
     };
