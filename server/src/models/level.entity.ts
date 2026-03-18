@@ -17,6 +17,9 @@ class LevelEntity {
   @Column({ type: "text", default: "" })
   guideline!: string;
 
+  @Column({ type: "text", default: "" })
+  vocabulary!: string;
+
   @Column({ type: "text" })
   descript!: string;
 
