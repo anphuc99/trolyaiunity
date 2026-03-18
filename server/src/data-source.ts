@@ -18,6 +18,7 @@ import VocabularyReviewEntity from "./models/vocabulary-review.entity.js";
 import MyLogEntity from "./models/my-log.entity.js";
 import MyLogJournalEntity from "./models/my-log-journal.entity.js";
 import MyLogMessageEntity from "./models/my-log-message.entity.js";
+import VoiceEntity from "./models/voice.entity.js";
 import { repoRoot } from "./env.js";
 
 type SupportedDbType = "mysql" | "sqlite";
@@ -92,6 +93,7 @@ export const AppDataSource = new DataSource({
     TranslationCardEntity,
     TranslationReviewEntity,
     UserEntity,
+    VoiceEntity,
     VocabularyEntity,
     VocabularyMemoryEntity,
     VocabularyReviewEntity

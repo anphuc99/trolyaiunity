@@ -50,6 +50,7 @@ namespace Features.CreateCharater.View
 		{
 			TryAutoBindOptionalControls();
 			UpdateBackButtonVisibility();
+			SendRequest(CreateCharaterRequests.FetchVoices);
 
 			if (_submitButton != null)
 			{
@@ -155,26 +156,45 @@ namespace Features.CreateCharater.View
 			return age;
 		}
 
-		private string ResolveVoiceName()
+		private bool TryResolveSelectedVoice(out string voiceModel, out string voiceName)
 		{
+			voiceModel = null;
+			voiceName = null;
+
 			if (_voiceDropdown == null || _voiceDropdown.options == null || _voiceDropdown.options.Count == 0)
 			{
-				return null;
+				return false;
 			}
 
 			var index = Mathf.Clamp(_voiceDropdown.value, 0, _voiceDropdown.options.Count - 1);
 			var text = (_voiceDropdown.options[index]?.text ?? string.Empty).Trim();
 			if (string.IsNullOrWhiteSpace(text))
 			{
-				return null;
+				return false;
 			}
 
 			if (text.StartsWith("option", StringComparison.OrdinalIgnoreCase))
 			{
-				return null;
+				return false;
 			}
 
-			return text;
+			var separatorIndex = text.IndexOf(" - ", StringComparison.Ordinal);
+			if (separatorIndex <= 0 || separatorIndex >= text.Length - 3)
+			{
+				return false;
+			}
+
+			voiceModel = text.Substring(0, separatorIndex).Trim().ToLowerInvariant();
+			voiceName = text.Substring(separatorIndex + 3).Trim();
+
+			if (string.IsNullOrWhiteSpace(voiceModel) || string.IsNullOrWhiteSpace(voiceName))
+			{
+				voiceModel = null;
+				voiceName = null;
+				return false;
+			}
+
+			return true;
 		}
 
 		private static string ToNullableString(string value)
@@ -263,7 +283,7 @@ namespace Features.CreateCharater.View
 				return;
 			}
 
-			var voiceName = ResolveVoiceName();
+			TryResolveSelectedVoice(out var voiceModel, out var voiceName);
 			var avatar = ToNullableString(_uploadedAvatarUrl);
 
 			var payload = new CreateCharacterPayload
@@ -274,13 +294,47 @@ namespace Features.CreateCharater.View
 				personality = personality,
 				appearance = null,
 				avatar = avatar,
-				voiceModel = string.IsNullOrWhiteSpace(voiceName) ? null : "openai",
+				voiceModel = voiceModel,
 				voiceName = voiceName,
 				pitch = _pitchSlider != null ? _pitchSlider.value : null,
 				speakingRate = _speakingRateSlider != null ? _speakingRateSlider.value : null
 			};
 
 			SendRequest(CreateCharaterRequests.SubmitCharacter, payload);
+		}
+
+		[OnEvent(CreateCharaterEvents.VoicesLoaded)]
+		private void OnVoicesLoaded(object payload)
+		{
+			if (_voiceDropdown == null)
+			{
+				return;
+			}
+
+			var voices = payload as System.Collections.Generic.List<VoiceOptionData>;
+			_voiceDropdown.options.Clear();
+
+			if (voices != null)
+			{
+				for (var i = 0; i < voices.Count; i++)
+				{
+					var item = voices[i];
+					if (item == null || string.IsNullOrWhiteSpace(item.model) || string.IsNullOrWhiteSpace(item.voice))
+					{
+						continue;
+					}
+
+					_voiceDropdown.options.Add(new TMP_Dropdown.OptionData($"{item.model} - {item.voice}"));
+				}
+			}
+
+			if (_voiceDropdown.options.Count == 0)
+			{
+				_voiceDropdown.options.Add(new TMP_Dropdown.OptionData("openai - alloy"));
+			}
+
+			_voiceDropdown.value = 0;
+			_voiceDropdown.RefreshShownValue();
 		}
 
 		private void OnAvatarUploadClicked()

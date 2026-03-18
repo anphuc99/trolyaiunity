@@ -45,6 +45,11 @@ namespace Share.Model
 		public string Gender { get; set; }
 
 		/// <summary>
+		/// Character voice model/provider.
+		/// </summary>
+		public string VoiceModel { get; set; }
+
+		/// <summary>
 		/// Character voice name.
 		/// </summary>
 		public string VoiceName { get; set; }

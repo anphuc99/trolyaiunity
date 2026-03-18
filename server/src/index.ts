@@ -7,6 +7,7 @@ import "./env.js";
 import { AppDataSource } from "./data-source.js";
 import { createApiRouter } from "./routes/index.js";
 import { embeddedClientAssets, embeddedClientIndexHtml } from "./embedded-client.js";
+import { seedDefaultLevels, seedDefaultVoices } from "./services/seed.service.js";
 
 const DEFAULT_PORT = 4000;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -104,6 +105,14 @@ const createApp = () => {
 const startServer = async () => {
   try {
     await AppDataSource.initialize();
+    const levelSeedResult = await seedDefaultLevels(AppDataSource);
+    const voiceSeedResult = await seedDefaultVoices(AppDataSource);
+    if (levelSeedResult.inserted || levelSeedResult.updated || voiceSeedResult.inserted) {
+      console.log(
+        `Seeded defaults: levels(inserted=${levelSeedResult.inserted}, updated=${levelSeedResult.updated}), voices(inserted=${voiceSeedResult.inserted})`
+      );
+    }
+
     const app = createApp();
     const port = Number(process.env.PORT ?? DEFAULT_PORT);
     const host = process.env.HOST || "localhost";

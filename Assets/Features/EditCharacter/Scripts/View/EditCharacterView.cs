@@ -42,10 +42,13 @@ namespace Features.EditCharacter.View
 
 		[Header("Show pitch number")]
 		[SerializeField] private TMP_Text _pitchNumberText;
+		private string _pendingVoiceModel;
+		private string _pendingVoiceName;
 
 		protected override void OnEnabled()
 		{
 			TryAutoBindOptionalControls();
+			SendRequest(EditCharacterRequests.FetchVoices);
 
 			if (_submitButton != null)
 			{
@@ -166,17 +169,9 @@ namespace Features.EditCharacter.View
 				_descriptionInput.text = selected.Description ?? string.Empty;
 			}
 
-			if (_voiceDropdown != null && !string.IsNullOrWhiteSpace(selected.VoiceName) && _voiceDropdown.options != null)
-			{
-				for (var index = 0; index < _voiceDropdown.options.Count; index++)
-				{
-					if (string.Equals(_voiceDropdown.options[index].text, selected.VoiceName, StringComparison.OrdinalIgnoreCase))
-					{
-						_voiceDropdown.value = index;
-						break;
-					}
-				}
-			}
+			_pendingVoiceModel = selected.VoiceModel;
+			_pendingVoiceName = selected.VoiceName;
+			TrySelectPendingVoiceOption();
 
 			if (_pitchSlider != null)
 			{
@@ -245,7 +240,7 @@ namespace Features.EditCharacter.View
 				return;
 			}
 
-			var voiceName = ResolveVoiceName();
+			TryResolveSelectedVoice(out var voiceModel, out var voiceName);
 			var avatar = CharacterFormUtils.ToNullableString(_uploadedAvatarUrl);
 
 			var payload = new EditCharacterPayload
@@ -257,7 +252,7 @@ namespace Features.EditCharacter.View
 				personality = personality,
 				appearance = null,
 				avatar = avatar,
-				voiceModel = string.IsNullOrWhiteSpace(voiceName) ? null : "openai",
+				voiceModel = voiceModel,
 				voiceName = voiceName,
 				pitch = _pitchSlider != null ? _pitchSlider.value : null,
 				speakingRate = _speakingRateSlider != null ? _speakingRateSlider.value : null,
@@ -465,26 +460,128 @@ namespace Features.EditCharacter.View
 			return age;
 		}
 
-		private string ResolveVoiceName()
+		private bool TryResolveSelectedVoice(out string voiceModel, out string voiceName)
 		{
+			voiceModel = null;
+			voiceName = null;
+
 			if (_voiceDropdown == null || _voiceDropdown.options == null || _voiceDropdown.options.Count == 0)
 			{
-				return null;
+				return false;
 			}
 
 			var index = Mathf.Clamp(_voiceDropdown.value, 0, _voiceDropdown.options.Count - 1);
 			var text = (_voiceDropdown.options[index]?.text ?? string.Empty).Trim();
 			if (string.IsNullOrWhiteSpace(text))
 			{
-				return null;
+				return false;
 			}
 
 			if (text.StartsWith("option", StringComparison.OrdinalIgnoreCase))
 			{
-				return null;
+				return false;
 			}
 
-			return text;
+			var separatorIndex = text.IndexOf(" - ", StringComparison.Ordinal);
+			if (separatorIndex <= 0 || separatorIndex >= text.Length - 3)
+			{
+				return false;
+			}
+
+			voiceModel = text.Substring(0, separatorIndex).Trim().ToLowerInvariant();
+			voiceName = text.Substring(separatorIndex + 3).Trim();
+
+			if (string.IsNullOrWhiteSpace(voiceModel) || string.IsNullOrWhiteSpace(voiceName))
+			{
+				voiceModel = null;
+				voiceName = null;
+				return false;
+			}
+
+			return true;
+		}
+
+		[OnEvent(EditCharacterEvents.VoicesLoaded)]
+		private void OnVoicesLoaded(object payload)
+		{
+			if (_voiceDropdown == null)
+			{
+				return;
+			}
+
+			var voices = payload as System.Collections.Generic.List<EditVoiceOptionData>;
+			_voiceDropdown.options.Clear();
+
+			if (voices != null)
+			{
+				for (var i = 0; i < voices.Count; i++)
+				{
+					var item = voices[i];
+					if (item == null || string.IsNullOrWhiteSpace(item.model) || string.IsNullOrWhiteSpace(item.voice))
+					{
+						continue;
+					}
+
+					_voiceDropdown.options.Add(new TMP_Dropdown.OptionData($"{item.model} - {item.voice}"));
+				}
+			}
+
+			if (_voiceDropdown.options.Count == 0)
+			{
+				_voiceDropdown.options.Add(new TMP_Dropdown.OptionData("openai - alloy"));
+			}
+
+			TrySelectPendingVoiceOption();
+			_voiceDropdown.RefreshShownValue();
+		}
+
+		private void TrySelectPendingVoiceOption()
+		{
+			if (_voiceDropdown == null || _voiceDropdown.options == null || _voiceDropdown.options.Count == 0)
+			{
+				return;
+			}
+
+			var targetModel = (_pendingVoiceModel ?? string.Empty).Trim();
+			var targetVoice = (_pendingVoiceName ?? string.Empty).Trim();
+			if (string.IsNullOrWhiteSpace(targetVoice))
+			{
+				_voiceDropdown.value = 0;
+				return;
+			}
+
+			var bestMatchIndex = -1;
+			for (var i = 0; i < _voiceDropdown.options.Count; i++)
+			{
+				var optionText = (_voiceDropdown.options[i]?.text ?? string.Empty).Trim();
+				var separatorIndex = optionText.IndexOf(" - ", StringComparison.Ordinal);
+				if (separatorIndex <= 0 || separatorIndex >= optionText.Length - 3)
+				{
+					continue;
+				}
+
+				var optionModel = optionText.Substring(0, separatorIndex).Trim();
+				var optionVoice = optionText.Substring(separatorIndex + 3).Trim();
+
+				if (!string.Equals(optionVoice, targetVoice, StringComparison.OrdinalIgnoreCase))
+				{
+					continue;
+				}
+
+				if (bestMatchIndex < 0)
+				{
+					bestMatchIndex = i;
+				}
+
+				if (!string.IsNullOrWhiteSpace(targetModel)
+					&& string.Equals(optionModel, targetModel, StringComparison.OrdinalIgnoreCase))
+				{
+					bestMatchIndex = i;
+					break;
+				}
+			}
+
+			_voiceDropdown.value = bestMatchIndex >= 0 ? bestMatchIndex : 0;
 		}
 
 		public void UpdatePitchNumberText()

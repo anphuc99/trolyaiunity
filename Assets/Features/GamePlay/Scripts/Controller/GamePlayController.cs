@@ -355,6 +355,7 @@ namespace Features.GamePlay.Controller
 				Age = cachedCharacter.Age,
 				Description = cachedCharacter.Personality,
 				Gender = cachedCharacter.Gender,
+				VoiceModel = cachedCharacter.VoiceModel,
 				VoiceName = cachedCharacter.VoiceName,
 				Pitch = cachedCharacter.Pitch,
 				SpeakingRate = cachedCharacter.SpeakingRate,
@@ -425,6 +426,7 @@ namespace Features.GamePlay.Controller
 			existing.AvatarUrl = string.IsNullOrWhiteSpace(notice.AvatarUrl)
 				? (string.IsNullOrWhiteSpace(preservedAvatarUrl) ? existing.AvatarUrl : preservedAvatarUrl)
 				: notice.AvatarUrl;
+			existing.VoiceModel = edited.VoiceModel;
 			existing.VoiceName = edited.VoiceName;
 			existing.Pitch = edited.Pitch;
 			existing.SpeakingRate = notice.SpeakingRate;

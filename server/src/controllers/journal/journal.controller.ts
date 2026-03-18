@@ -14,7 +14,7 @@ import StoryEntity from "../../models/story.entity.js";
 import UserEntity from "../../models/user.entity.js";
 import { createOpenAIChatService, type OpenAIChatService } from "../../services/openai.service.js";
 import { createChatHistoryStore, type ChatHistoryMessage, type ChatHistoryStore } from "../../services/chat-history.service.js";
-import { buildAudioId, getAudioPath, createTtsAudio } from "../../services/tts.service.js";
+import { buildAudioId, getAudioPath, createTtsAudio, createGeminiTtsAudio } from "../../services/tts.service.js";
 import {
   createInitialReviewState,
   updateReviewAfterRating,
@@ -877,9 +877,10 @@ Please summarize the above conversation in Vietnamese, update the story descript
       const resolveCharacterVoiceSettings = async (characterName: string) => {
         if (!characterName) {
           return {
-            voiceName: undefined,
-            pitch: undefined,
-            speakingRate: undefined
+            voiceModel: "openai" as string,
+            voiceName: undefined as string | undefined,
+            pitch: undefined as number | undefined,
+            speakingRate: undefined as number | undefined
           };
         }
 
@@ -890,9 +891,10 @@ Please summarize the above conversation in Vietnamese, update the story descript
             .getOne();
 
           return {
+            voiceModel: "openai" as string,
             voiceName: user?.voiceName?.trim() || undefined,
             pitch: user?.pitch ?? undefined,
-            speakingRate: undefined
+            speakingRate: undefined as number | undefined
           };
         }
 
@@ -903,6 +905,7 @@ Please summarize the above conversation in Vietnamese, update the story descript
           .getOne();
 
         return {
+          voiceModel: character?.voiceModel ?? "openai",
           voiceName: character?.voiceName?.trim() || undefined,
           pitch: character?.pitch ?? undefined,
           speakingRate: character?.speakingRate ?? undefined
@@ -916,12 +919,13 @@ Please summarize the above conversation in Vietnamese, update the story descript
           audioId = message.audio.trim();
         }
         else {
-          const { voiceName, pitch, speakingRate } = await resolveCharacterVoiceSettings(message.characterName);
+          const { voiceModel, voiceName, pitch, speakingRate } = await resolveCharacterVoiceSettings(message.characterName);
+          const isGemini = voiceModel === "gemini";
 
           audioId = buildAudioId(
             message.content,
             message.tone ?? "neutral",
-            voiceName,
+            `${voiceModel}:${voiceName ?? ""}`,
             pitch,
             speakingRate
           );
@@ -930,14 +934,25 @@ Please summarize the above conversation in Vietnamese, update the story descript
           try {
             await fs.access(getAudioPath(audioId));
           } catch {
-            await createTtsAudio(
-              message.content,
-              message.tone ?? "neutral",
-              audioId,
-              voiceName,
-              pitch,
-              speakingRate
-            );
+            if (isGemini && voiceName) {
+              await createGeminiTtsAudio(
+                message.content,
+                message.tone ?? "neutral",
+                audioId,
+                voiceName,
+                pitch,
+                speakingRate
+              );
+            } else {
+              await createTtsAudio(
+                message.content,
+                message.tone ?? "neutral",
+                audioId,
+                voiceName,
+                pitch,
+                speakingRate
+              );
+            }
           }
         }
         const audioPath = getAudioPath(audioId);

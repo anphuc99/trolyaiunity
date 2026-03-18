@@ -8,6 +8,7 @@ namespace Features.EditCharacter.Requests
 	public static class EditCharacterRequests
 	{
 		public const string Echo = "edit.character.echo.request";
+		public const string FetchVoices = "edit.character.fetch.voices.request";
 		public const string LoadSelectedCharacter = "edit.character.load.selected.character.request";
 		public const string SubmitCharacter = "edit.character.submit.character.request";
 		public const string UploadAvatar = "edit.character.upload.avatar.request";
