@@ -195,7 +195,6 @@ LANGUAGE LEVEL: ${level}
 ====================================
 ${levelDescriptionBlock}
 ${levelGuidelineBlock}
-${vocabularyBlock}
 ${userInfoBlock}
 ====================================
 SCENE / CONTEXT
@@ -210,7 +209,6 @@ DIALOGUE RULES
 - If the user mixes Vietnamese/Chinese, still respond in Chinese.
 - If the user asks for translation/explanation, keep it short and at the same level.
 - If the character is thinking, please put it in parentheses.
-- If Target vocabulary (DB) is provided, prioritize using those words as much as possible.
 - Repeat and recycle Target vocabulary words as often as possible across sentences while keeping the reply natural.
 - Prefer exact vocabulary forms from Target vocabulary (DB) over synonyms when possible.
 
