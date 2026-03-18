@@ -75,27 +75,27 @@ export interface ChatPromptParams {
 const LEVEL_CONFIG: Record<string, ChatPromptLevelConfig> = {
   HSK1: {
     maxWords: 5,
-    guideline: "Use simple sentences. Allowed patterns: 是...的, 有, 在, and basic measure words. Avoid complex particles (Equivalent to HSK 1-2)."
+    guideline: "Use HSK1 grammar only with very simple patterns such as 是, 有, 在, and basic greetings/questions. Avoid complex complements and long clauses."
   },
   HSK2: {
     maxWords: 7,
-    guideline: "Basic compound structures are allowed: 因为...所以, 虽然...但是, 的/得/地, and basic 了/过/着 usage. Avoid intermediate-level grammar (Equivalent to HSK 3)."
+    guideline: "Use HSK2 grammar. Basic compound structures are allowed: 因为...所以, 虽然...但是, 一边...一边..., 先...然后..., and common 了 usage. Avoid HSK3+ grammar."
   },
   HSK3: {
     maxWords: 10,
-    guideline: "Use lower-intermediate grammar. Allowed patterns: 把/被 sentences, complements of state/result, 越来越, 只要...就. Keep sentences relatively short. Avoid advanced grammar (Equivalent to HSK 4)."
+    guideline: "Use HSK3 grammar. Allowed patterns: 把/被 sentences, complements of state/result, 越来越, 只要...就. Keep sentences relatively short and avoid HSK4+ grammar."
   },
   HSK4: {
     maxWords: 12,
-    guideline: "Use advanced grammar. Express opinions and more abstract ideas, but keep replies concise (Equivalent to HSK 5)."
+    guideline: "Use HSK4 grammar to express opinions and more abstract ideas, but keep replies concise."
   },
   HSK5: {
     maxWords: 15,
-    guideline: "Use advanced grammar, idiomatic expressions (成语), and nuanced language while staying concise (Equivalent to HSK 6)."
+    guideline: "Use HSK5 grammar, nuanced connectors, and occasional idiomatic expressions (成语) while staying concise."
   },
   HSK6: {
     maxWords: 20,
-    guideline: "Use natural, native-like language. Keep replies concise and helpful for learning."
+    guideline: "Use HSK6 near-native language with precise register control. Keep replies concise and helpful for learning."
   }
 };
 

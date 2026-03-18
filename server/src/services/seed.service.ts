@@ -7,7 +7,7 @@ const DEFAULT_LEVELS: Array<Pick<LevelEntity, "level" | "maxWords" | "descript" 
     level: "HSK1",
     maxWords: 5,
     descript: "Basic phrases for familiar topics.",
-    guideline: "Use simple HSK 1-2 grammar. Allowed patterns: 是...的, 想..., 在...呢, 会..., 可以.... Avoid advanced complements and long clauses.",
+    guideline: "Use HSK1 grammar only. Focus on very simple sentence patterns such as 是, 有, 在, and basic greetings/questions. Keep sentences short and avoid complex complements.",
     vocabulary: "我,你,他,喜欢,学习"
   },
   {
@@ -15,7 +15,7 @@ const DEFAULT_LEVELS: Array<Pick<LevelEntity, "level" | "maxWords" | "descript" 
     maxWords: 7,
     descript: "Simple conversation and routine tasks.",
     guideline:
-      "Use HSK 2-3 compound structures: 因为...所以..., 虽然...但是..., 一边...一边..., 先...然后.... Allow basic 了/过/着 usage, avoid advanced abstract constructions.",
+      "Use HSK2 grammar. Allowed patterns include 因为...所以..., 虽然...但是..., 一边...一边..., 先...然后..., and common 了 usage. Avoid HSK3+ abstract constructions.",
     vocabulary: "今天,昨天,明天,一起,因为"
   },
   {
@@ -23,28 +23,28 @@ const DEFAULT_LEVELS: Array<Pick<LevelEntity, "level" | "maxWords" | "descript" 
     maxWords: 10,
     descript: "Handle everyday situations and short texts.",
     guideline:
-      "Use lower-intermediate HSK 4 grammar. Allowed patterns: 把/被 sentences, 越来越..., 除了...以外..., 只要...就..., 即使...也.... Keep sentences concise and avoid HSK 5+ idiomatic density.",
+      "Use HSK3 grammar. Allowed patterns: 把/被 sentences, 越来越..., 除了...以外..., 只要...就..., 即使...也.... Keep sentences concise and avoid HSK4+ density.",
     vocabulary: "计划,准备,参加,练习,进步"
   },
   {
     level: "HSK4",
     maxWords: 12,
     descript: "Discuss abstract topics with some fluency.",
-    guideline: "Use HSK 5 grammar to discuss opinions and abstract topics. Prefer clear logic markers such as 不仅...而且..., 与其...不如..., 既...又.... Keep replies concise.",
+    guideline: "Use HSK4 grammar to discuss opinions and abstract topics. Prefer clear logic markers such as 不仅...而且..., 与其...不如..., 既...又.... Keep replies concise.",
     vocabulary: "观点,经验,影响,分析,原因"
   },
   {
     level: "HSK5",
     maxWords: 15,
     descript: "Understand complex texts and express ideas.",
-    guideline: "Use HSK 6-level grammar with nuanced connectors and occasional idiomatic expressions (成语) when natural. Maintain clarity and concise sentence flow.",
+    guideline: "Use HSK5 grammar with nuanced connectors and occasional idiomatic expressions (成语) when natural. Maintain clarity and concise sentence flow.",
     vocabulary: "策略,判断,比较,细节,表达"
   },
   {
     level: "HSK6",
     maxWords: 20,
     descript: "Near-native understanding and expression.",
-    guideline: "Use near-native, HSK 6+ natural Chinese with precise register control. Keep responses concise, coherent, and pedagogically useful.",
+    guideline: "Use HSK6 near-native Chinese with precise register control. Keep responses concise, coherent, and pedagogically useful.",
     vocabulary: "语境,隐喻,推理,辩论,连贯"
   }
 ];
