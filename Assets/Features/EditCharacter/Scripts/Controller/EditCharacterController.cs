@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Core.Infrastructure.Network;
 using Core.Infrastructure.Scenes;
 using Core.Infrastructure.State;
@@ -31,6 +32,7 @@ namespace Features.EditCharacter.Controller
 			public string gender;
 			public int? age;
 			public string avatar;
+			public string voiceModel;
 			public string voiceName;
 			public float? pitch;
 			public float? speakingRate;
@@ -85,6 +87,12 @@ namespace Features.EditCharacter.Controller
 		public static void HandleLoadSelectedCharacter()
 		{
 			PublishSelectedCharacter();
+		}
+
+		[Request(EditCharacterRequests.FetchVoices)]
+		public static void HandleFetchVoices()
+		{
+			_ = FetchVoicesAsync();
 		}
 
 		[Request(EditCharacterRequests.UploadAvatar)]
@@ -165,7 +173,7 @@ namespace Features.EditCharacter.Controller
 				age = payload.age,
 				appearance = null,
 				avatar = payload.avatar,
-				voiceModel = string.IsNullOrWhiteSpace(payload.voiceName) ? null : "openai",
+				voiceModel = NormalizeVoiceModel(payload.voiceModel, payload.voiceName),
 				voiceName = payload.voiceName,
 				pitch = payload.pitch,
 				speakingRate = payload.speakingRate,
@@ -198,6 +206,7 @@ namespace Features.EditCharacter.Controller
 						gender = payload.gender,
 						age = payload.age,
 						avatar = payload.avatar,
+						voiceModel = payload.voiceModel,
 						voiceName = payload.voiceName,
 						pitch = payload.pitch,
 						speakingRate = payload.speakingRate,
@@ -211,6 +220,7 @@ namespace Features.EditCharacter.Controller
 					Age = response.age,
 					Description = response.personality,
 					Gender = response.gender,
+					VoiceModel = response.voiceModel,
 					VoiceName = response.voiceName,
 					Pitch = response.pitch,
 					SpeakingRate = response.speakingRate,
@@ -226,6 +236,43 @@ namespace Features.EditCharacter.Controller
 			{
 				EventBus.Publish(EditCharacterEvents.SubmitFailed, "Cập nhật nhân vật thất bại.");
 			}
+		}
+
+		private static async Task FetchVoicesAsync()
+		{
+			var json = await HttpClient.GetTaskAsync(NetworkEndpoints.Voices);
+			if (string.IsNullOrWhiteSpace(json))
+			{
+				EventBus.Publish(EditCharacterEvents.VoicesLoaded, null);
+				return;
+			}
+
+			try
+			{
+				var data = JsonConvert.DeserializeObject<EditVoiceOptionsResponse>(json);
+				EditCharacterModel.AvailableVoices = data?.voices ?? new List<EditVoiceOptionData>();
+				EventBus.Publish(EditCharacterEvents.VoicesLoaded, EditCharacterModel.AvailableVoices);
+			}
+			catch
+			{
+				EventBus.Publish(EditCharacterEvents.VoicesLoaded, null);
+			}
+		}
+
+		private static string NormalizeVoiceModel(string voiceModel, string voiceName)
+		{
+			if (string.IsNullOrWhiteSpace(voiceName))
+			{
+				return null;
+			}
+
+			var model = (voiceModel ?? string.Empty).Trim().ToLowerInvariant();
+			if (model == "openai" || model == "gemini")
+			{
+				return model;
+			}
+
+			return "openai";
 		}
 
 		private static void SetEditedCharacterNotice(SelectedCharacterInfo updated, string avatarUrl, float? speakingRate)

@@ -9,6 +9,7 @@ namespace Features.CreateCharater.Events
 	{
 		public const string Echoed = "create.charater.echo.event";
 		public const string PersonalitiesLoaded = "create.charater.personalities_loaded.event";
+		public const string VoicesLoaded = "create.charater.voices.loaded.event";
 		public const string CharacterCreationSucceeded = "create.charater.creation_succeeded.event";
 		public const string CharacterCreationFailed = "create.charater.creation_failed.event";
 		public const string AvatarUploadSucceeded = "create.charater.avatar_upload_succeeded.event";

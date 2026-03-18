@@ -46,6 +46,7 @@ namespace Features.CreateCharater.Controller
 		public static void OnExitScope()
 		{
 			CreateCharaterModel.AvailablePersonalities.Clear();
+			CreateCharaterModel.AvailableVoices.Clear();
 		}
 
 		/// <summary>
@@ -65,6 +66,15 @@ namespace Features.CreateCharater.Controller
 		public static void FetchPersonalities()
 		{
 			_ = FetchPersonalitiesAsync();
+		}
+
+		/// <summary>
+		/// Fetches available voices from the server DB.
+		/// </summary>
+		[Request(CreateCharaterRequests.FetchVoices)]
+		public static void FetchVoices()
+		{
+			_ = FetchVoicesAsync();
 		}
 
 		private static async Task FetchPersonalitiesAsync()
@@ -87,6 +97,44 @@ namespace Features.CreateCharater.Controller
 				Debug.LogError($"[CreateCharaterController] Failed to parse personalities: {e.Message}");
 				EventBus.Publish(CreateCharaterEvents.PersonalitiesLoaded, null);
 			}
+		}
+
+		private static async Task FetchVoicesAsync()
+		{
+			var json = await HttpClient.GetTaskAsync(NetworkEndpoints.Voices);
+			if (string.IsNullOrWhiteSpace(json))
+			{
+				EventBus.Publish(CreateCharaterEvents.VoicesLoaded, null);
+				return;
+			}
+
+			try
+			{
+				var data = JsonConvert.DeserializeObject<VoiceOptionsResponse>(json);
+				CreateCharaterModel.AvailableVoices = data?.voices ?? new List<VoiceOptionData>();
+				EventBus.Publish(CreateCharaterEvents.VoicesLoaded, CreateCharaterModel.AvailableVoices);
+			}
+			catch (System.Exception e)
+			{
+				Debug.LogError($"[CreateCharaterController] Failed to parse voices: {e.Message}");
+				EventBus.Publish(CreateCharaterEvents.VoicesLoaded, null);
+			}
+		}
+
+		private static string NormalizeVoiceModel(string value, string voiceName)
+		{
+			if (string.IsNullOrWhiteSpace(voiceName))
+			{
+				return null;
+			}
+
+			var model = (value ?? string.Empty).Trim().ToLowerInvariant();
+			if (model == "openai" || model == "gemini")
+			{
+				return model;
+			}
+
+			return "openai";
 		}
 
 		/// <summary>
@@ -176,6 +224,7 @@ namespace Features.CreateCharater.Controller
 			}
 
 			var voiceName = string.IsNullOrWhiteSpace(payload.voiceName) ? null : payload.voiceName.Trim();
+			var voiceModel = NormalizeVoiceModel(payload.voiceModel, voiceName);
 
 			return new CreateCharacterPayload
 			{
@@ -185,7 +234,7 @@ namespace Features.CreateCharater.Controller
 				gender = gender,
 				appearance = string.IsNullOrWhiteSpace(payload.appearance) ? null : payload.appearance.Trim(),
 				avatar = string.IsNullOrWhiteSpace(payload.avatar) ? null : payload.avatar.Trim(),
-				voiceModel = string.IsNullOrWhiteSpace(voiceName) ? null : "openai",
+				voiceModel = voiceModel,
 				voiceName = voiceName,
 				pitch = payload.pitch,
 				speakingRate = payload.speakingRate

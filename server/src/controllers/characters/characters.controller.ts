@@ -14,7 +14,7 @@ interface CharacterPayload {
   age?: number | null;
   appearance?: string | null;
   avatar?: string | null;
-  voiceModel?: "openai" | null;
+  voiceModel?: "openai" | "gemini" | null;
   voiceName?: string | null;
   pitch?: number | null;
   speakingRate?: number | null;
@@ -72,11 +72,16 @@ const resolveVoiceModel = (voiceModel: unknown, voiceName: string | null) => {
     return voiceName ? "openai" : null;
   }
 
-  if (voiceModel !== "openai") {
+  if (typeof voiceModel !== "string") {
     return "invalid" as const;
   }
 
-  return "openai" as const;
+  const normalized = voiceModel.trim().toLowerCase();
+  if (normalized !== "openai" && normalized !== "gemini") {
+    return "invalid" as const;
+  }
+
+  return normalized as "openai" | "gemini";
 };
 
 const resolveExtension = (mime: string, filename?: string) => {
@@ -128,7 +133,7 @@ const toResponse = (entity: CharacterEntity): CharacterResponse => ({
   age: entity.age ?? null,
   appearance: entity.appearance ?? null,
   avatar: entity.avatar ?? null,
-  voiceModel: entity.voiceModel === "openai" ? "openai" : null,
+  voiceModel: entity.voiceModel === "openai" || entity.voiceModel === "gemini" ? entity.voiceModel : null,
   voiceName: entity.voiceName ?? null,
   pitch: entity.pitch ?? null,
   speakingRate: entity.speakingRate ?? null,

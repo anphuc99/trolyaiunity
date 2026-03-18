@@ -12,6 +12,7 @@ namespace Core.Infrastructure.Network
 		public const string TokenRefresh = "/api/token/refresh";
 		public const string Characters = "/api/characters";
 		public const string CharactersUploadAvatar = "/api/characters/upload-avatar";
+		public const string Voices = "/api/voices";
 		public const string Levels = "/api/levels";
 		public const string ChatHistory = "/api/chat/history";
 		public const string ChatSend = "/api/chat/send";

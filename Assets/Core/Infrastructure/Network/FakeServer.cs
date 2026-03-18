@@ -24,6 +24,7 @@ namespace Core.Infrastructure.Network
 			{ BuildKey("PUT", NetworkEndpoints.Characters), payload => payload ?? "{}" },
 			{ BuildKey("DELETE", NetworkEndpoints.Characters), _ => "{}" },
 			{ BuildKey("POST", NetworkEndpoints.CharactersUploadAvatar), _ => "{\"url\":\"/public/avatars/fake-avatar.jpg\"}" },
+			{ BuildKey("GET", NetworkEndpoints.Voices), _ => "{\"voices\":[{\"id\":1,\"model\":\"openai\",\"voice\":\"alloy\"},{\"id\":2,\"model\":\"openai\",\"voice\":\"nova\"},{\"id\":3,\"model\":\"gemini\",\"voice\":\"Zephyr\"}]}" },
 			{ BuildKey("GET", NetworkEndpoints.Levels), _ => "{\"levels\":[]}" },
 			{ BuildKey("GET", NetworkEndpoints.Stories), _ => "{\"stories\":[]}" },
 			{ BuildKey("GET", NetworkEndpoints.UserMe), _ => "{\"user\":{\"id\":1,\"username\":\"mimi\",\"name\":\"Mimi\",\"age\":18,\"description\":\"Learner\",\"levelId\":null,\"currentStoryId\":null,\"voiceName\":\"alloy\",\"pitch\":1.0}}" },
