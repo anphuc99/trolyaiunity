@@ -99,14 +99,16 @@ const wrapPcmInWav = (pcm: Buffer, sampleRate: number): Buffer => {
  *
  * @param text - Text to synthesise.
  * @param voiceName - Gemini prebuilt voice name (e.g. "Kore", "Puck").
+ * @param tone - Optional style/tone instruction forwarded as systemInstruction (e.g. "neutral, medium pitch").
  * @returns WAV audio buffer ready for ffmpeg post-processing.
  */
-export const synthesizeGeminiTts = async (text: string, voiceName: string): Promise<Buffer> => {
+export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?: string): Promise<Buffer> => {
   const apiKey = getNextGeminiVoiceKey();
   const genAI = new GoogleGenerativeAI(apiKey);
 
   const model = genAI.getGenerativeModel({
     model: GEMINI_TTS_MODEL,
+    ...(tone?.trim() ? { systemInstruction: tone.trim() } : {}),
     generationConfig: {
       // @ts-expect-error — SDK types lag behind API; responseModalities+speechConfig are valid at runtime.
       responseModalities: ["AUDIO"],

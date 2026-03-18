@@ -1818,6 +1818,7 @@ Return ONLY the JSON object. No markdown. No extra text.
           if (isGemini && voiceName) {
             await createGeminiTtsAudio(
               message.content,
+              message.tone,
               audioId,
               voiceName,
               pitch,

@@ -232,6 +232,7 @@ export const createTtsAudio = async (
  * The Gemini voice key is rotated automatically (round-robin).
  *
  * @param text - Text to synthesize.
+ * @param tone - Tone/style instruction forwarded to Gemini as systemInstruction.
  * @param audioId - Target audio file id (hash).
  * @param voiceName - Gemini prebuilt voice name.
  * @param pitch - Optional pitch adjustment.
@@ -240,6 +241,7 @@ export const createTtsAudio = async (
  */
 export const createGeminiTtsAudio = async (
   text: string,
+  tone: string,
   audioId: string,
   voiceName: string,
   pitch?: number,
@@ -247,7 +249,7 @@ export const createGeminiTtsAudio = async (
 ) => {
   await fs.mkdir(AUDIO_DIR, { recursive: true });
 
-  const wavBuffer = await synthesizeGeminiTts(clampText(text), voiceName);
+  const wavBuffer = await synthesizeGeminiTts(clampText(text), voiceName, tone);
   const mp3Buffer = await convertWavToMp3(wavBuffer, pitch, speakingRate);
   const filePath = path.join(AUDIO_DIR, `${audioId}.mp3`);
   await fs.writeFile(filePath, mp3Buffer);

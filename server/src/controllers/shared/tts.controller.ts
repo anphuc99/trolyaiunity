@@ -155,6 +155,7 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
       if (isGemini && resolvedSettings.voiceName) {
         await createGeminiTtsAudio(
           text,
+          tone,
           audioId,
           resolvedSettings.voiceName,
           resolvedSettings.pitch,

@@ -929,6 +929,7 @@ Please summarize the above conversation in Vietnamese, update the story descript
             if (isGemini && voiceName) {
               await createGeminiTtsAudio(
                 message.content,
+                message.tone ?? "neutral",
                 audioId,
                 voiceName,
                 pitch,
