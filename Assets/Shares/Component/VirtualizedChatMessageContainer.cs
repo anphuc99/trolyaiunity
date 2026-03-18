@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System;
+using Share.Utils;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -17,6 +18,7 @@ namespace Share.Components
 		public Action<MessageBubbleData> OnMessageTranslateClicked { get; set; }
 
 		private const string TranslationSeparator = "---------------------";
+		private const string PinyinLabel = "Pinyin: ";
 
 		[SerializeField]
 		private RectTransform _viewport;
@@ -245,17 +247,26 @@ namespace Share.Components
 				var originalText = string.IsNullOrWhiteSpace(message.OriginalMessage)
 					? (message.Message ?? string.Empty)
 					: message.OriginalMessage;
+				var displayBaseText = BuildDisplayBaseText(message, originalText);
+				var pinyinLine = BuildPinyinLine(message.Pinyin);
 
 				if (message.IsTranslationExpanded)
 				{
-					message.Message = originalText;
+					message.Message = displayBaseText;
 					message.IsTranslationExpanded = false;
 				}
 				else
 				{
 					message.OriginalMessage = originalText;
 					message.Translation = resolvedTranslation;
-					message.Message = originalText + "\n" + TranslationSeparator + "\n" + resolvedTranslation;
+					if (string.IsNullOrWhiteSpace(pinyinLine))
+					{
+						message.Message = displayBaseText + "\n" + TranslationSeparator + "\n" + resolvedTranslation;
+					}
+					else
+					{
+						message.Message = displayBaseText + "\n" + pinyinLine + "\n" + TranslationSeparator + "\n" + resolvedTranslation;
+					}
 					message.IsTranslationExpanded = true;
 				}
 
@@ -272,6 +283,31 @@ namespace Share.Components
 				}
 				RefreshVisible();
 			}
+		}
+
+		private static string BuildDisplayBaseText(MessageBubbleData message, string originalText)
+		{
+			if (message == null)
+			{
+				return originalText ?? string.Empty;
+			}
+
+			if (message.Type != MessageBubbleType.Character)
+			{
+				return originalText ?? string.Empty;
+			}
+
+			return PinyinRichTextUtils.BuildInlineRuby(originalText ?? string.Empty, message.Pinyin);
+		}
+
+		private static string BuildPinyinLine(string pinyin)
+		{
+			if (string.IsNullOrWhiteSpace(pinyin))
+			{
+				return string.Empty;
+			}
+
+			return PinyinLabel + pinyin.Trim();
 		}
 
 		/// <summary>
