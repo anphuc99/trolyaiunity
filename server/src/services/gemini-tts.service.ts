@@ -20,6 +20,8 @@ const voiceKeys: string[] = [];
 /** Current index into `voiceKeys`. */
 let keyIndex = 0;
 
+const RETRYABLE_STATUS_CODES = [429, 500, 502, 503, 504];
+
 /**
  * Reads GEMINI_API_KEY_VOICE1 … GEMINI_API_KEY_VOICE4 from env once.
  */
@@ -52,6 +54,32 @@ export const getNextGeminiVoiceKey = (): string => {
   const key = voiceKeys[keyIndex % voiceKeys.length];
   keyIndex = (keyIndex + 1) % voiceKeys.length;
   return key;
+};
+
+const getConfiguredGeminiVoiceKeyCount = (): number => {
+  loadKeys();
+  return voiceKeys.length;
+};
+
+const isRetryableGeminiError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return RETRYABLE_STATUS_CODES.some((statusCode) => message.includes(`(${statusCode})`));
+};
+
+const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+const buildStyledPrompt = (text: string, tone?: string): string => {
+  const trimmedTone = tone?.trim();
+  if (!trimmedTone) {
+    return text;
+  }
+
+  return [
+    "Read the following text aloud.",
+    `Style instruction: ${trimmedTone}`,
+    "Speak naturally and keep the original words unchanged.",
+    `Text: ${text}`
+  ].join("\n");
 };
 
 // ---------------------------------------------------------------------------
@@ -99,46 +127,63 @@ const wrapPcmInWav = (pcm: Buffer, sampleRate: number): Buffer => {
  *
  * @param text - Text to synthesise.
  * @param voiceName - Gemini prebuilt voice name (e.g. "Kore", "Puck").
- * @param tone - Optional style/tone instruction forwarded as systemInstruction (e.g. "neutral, medium pitch").
+ * @param tone - Optional style/tone instruction from client (e.g. "neutral, medium pitch").
  * @returns WAV audio buffer ready for ffmpeg post-processing.
  */
 export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?: string): Promise<Buffer> => {
-  const apiKey = getNextGeminiVoiceKey();
-  const genAI = new GoogleGenerativeAI(apiKey);
+  const maxAttempts = getConfiguredGeminiVoiceKeyCount();
+  const prompt = buildStyledPrompt(text, tone);
+  let lastError: unknown;
 
-  const model = genAI.getGenerativeModel({
-    model: GEMINI_TTS_MODEL,
-    ...(tone?.trim() ? { systemInstruction: tone.trim() } : {}),
-    generationConfig: {
-      // @ts-expect-error — SDK types lag behind API; responseModalities+speechConfig are valid at runtime.
-      responseModalities: ["AUDIO"],
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName }
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const apiKey = getNextGeminiVoiceKey();
+
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({
+        model: GEMINI_TTS_MODEL,
+        generationConfig: {
+          // @ts-expect-error — SDK types lag behind API; responseModalities+speechConfig are valid at runtime.
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName }
+            }
+          }
         }
+      });
+
+      const result = await model.generateContent(prompt);
+      const response = result.response;
+      const part = response.candidates?.[0]?.content?.parts?.[0];
+      const inlineData = part?.inlineData;
+
+      if (!inlineData?.data) {
+        throw new Error("Gemini TTS returned no audio data");
       }
+
+      const rawBuffer = Buffer.from(inlineData.data, "base64");
+      const mime: string = inlineData.mimeType ?? "";
+
+      // Raw PCM (audio/L16;rate=24000) -> wrap in WAV container.
+      if (mime.startsWith("audio/L16") || mime.startsWith("audio/pcm")) {
+        const rateMatch = mime.match(/rate=(\d+)/);
+        const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+        return wrapPcmInWav(rawBuffer, sampleRate);
+      }
+
+      // Already WAV or another format ffmpeg can handle.
+      return rawBuffer;
+    } catch (error) {
+      lastError = error;
+      const retryable = isRetryableGeminiError(error);
+      if (!retryable || attempt >= maxAttempts - 1) {
+        break;
+      }
+
+      await delay(120 * (attempt + 1));
     }
-  });
-
-  const result = await model.generateContent(text);
-  const response = result.response;
-  const part = response.candidates?.[0]?.content?.parts?.[0];
-  const inlineData = part?.inlineData;
-
-  if (!inlineData?.data) {
-    throw new Error("Gemini TTS returned no audio data");
   }
 
-  const rawBuffer = Buffer.from(inlineData.data, "base64");
-  const mime: string = inlineData.mimeType ?? "";
-
-  // Raw PCM (audio/L16;rate=24000) → wrap in WAV container.
-  if (mime.startsWith("audio/L16") || mime.startsWith("audio/pcm")) {
-    const rateMatch = mime.match(/rate=(\d+)/);
-    const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
-    return wrapPcmInWav(rawBuffer, sampleRate);
-  }
-
-  // Already WAV or another format ffmpeg can handle.
-  return rawBuffer;
+  throw lastError instanceof Error ? lastError : new Error("Gemini TTS failed");
 };
