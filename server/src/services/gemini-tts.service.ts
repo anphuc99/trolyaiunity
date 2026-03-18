@@ -77,6 +77,54 @@ const buildStyledPrompt = (text: string, tone?: string): string => {
   return `Say ${trimmedTone}: ${text}`;
 };
 
+type GeminiInlineData = {
+  data?: string;
+  mimeType?: string;
+};
+
+type GeminiCandidatePart = {
+  inlineData?: GeminiInlineData;
+  text?: string;
+};
+
+type GeminiGenerateResponseShape = {
+  candidates?: Array<{
+    finishReason?: string;
+    content?: {
+      parts?: GeminiCandidatePart[];
+    };
+  }>;
+  promptFeedback?: {
+    blockReason?: string;
+  };
+};
+
+const extractInlineData = (response: GeminiGenerateResponseShape): GeminiInlineData | null => {
+  const candidates = response.candidates ?? [];
+  for (const candidate of candidates) {
+    const parts = candidate.content?.parts ?? [];
+    for (const part of parts) {
+      const inline = part.inlineData;
+      if (inline?.data) {
+        return inline;
+      }
+    }
+  }
+
+  return null;
+};
+
+const buildNoAudioError = (response: GeminiGenerateResponseShape): Error => {
+  const candidate = response.candidates?.[0];
+  const finishReason = candidate?.finishReason ?? "unknown";
+  const blockReason = response.promptFeedback?.blockReason ?? "none";
+  const textFallback = candidate?.content?.parts?.map((part) => part.text ?? "").join(" ").trim() ?? "";
+
+  return new Error(
+    `Gemini TTS returned no audio data (finishReason=${finishReason}, blockReason=${blockReason}, textFallback=${textFallback || "empty"})`
+  );
+};
+
 // ---------------------------------------------------------------------------
 // WAV helper
 // ---------------------------------------------------------------------------
@@ -127,7 +175,7 @@ const wrapPcmInWav = (pcm: Buffer, sampleRate: number): Buffer => {
  */
 export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?: string): Promise<Buffer> => {
   const maxAttempts = getConfiguredGeminiVoiceKeyCount();
-  const prompt = buildStyledPrompt(text, tone);
+  const styledPrompt = buildStyledPrompt(text, tone);
   let lastError: unknown;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -135,10 +183,11 @@ export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?
 
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({
-        model: GEMINI_TTS_MODEL,
+      const model = genAI.getGenerativeModel({ model: GEMINI_TTS_MODEL });
+
+      const buildRequest = (promptText: string) => ({
+        contents: [{ role: "user", parts: [{ text: promptText }] }],
         generationConfig: {
-          // @ts-expect-error — SDK types lag behind API; responseModalities+speechConfig are valid at runtime.
           responseModalities: ["AUDIO"],
           speechConfig: {
             voiceConfig: {
@@ -148,16 +197,33 @@ export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?
         }
       });
 
-      const result = await model.generateContent(prompt);
-      const response = result.response;
-      const part = response.candidates?.[0]?.content?.parts?.[0];
-      const inlineData = part?.inlineData;
+      // @ts-expect-error — SDK typings may lag, but request shape is supported by Gemini API.
+      const styledResult = await model.generateContent(buildRequest(styledPrompt));
+      const styledResponse = styledResult.response as unknown as GeminiGenerateResponseShape;
+      let inlineData = extractInlineData(styledResponse);
 
-      if (!inlineData?.data) {
-        throw new Error("Gemini TTS returned no audio data");
+      // Fallback: when style instruction yields text-only response, retry same key with raw text.
+      if (!inlineData && tone?.trim()) {
+        // @ts-expect-error — SDK typings may lag, but request shape is supported by Gemini API.
+        const plainResult = await model.generateContent(buildRequest(text));
+        const plainResponse = plainResult.response as unknown as GeminiGenerateResponseShape;
+        inlineData = extractInlineData(plainResponse);
+
+        if (!inlineData) {
+          throw buildNoAudioError(plainResponse);
+        }
       }
 
-      const rawBuffer = Buffer.from(inlineData.data, "base64");
+      if (!inlineData) {
+        throw buildNoAudioError(styledResponse);
+      }
+
+      const base64Audio = inlineData.data;
+      if (!base64Audio) {
+        throw buildNoAudioError(styledResponse);
+      }
+
+      const rawBuffer = Buffer.from(base64Audio, "base64");
       const mime: string = inlineData.mimeType ?? "";
 
       // Raw PCM (audio/L16;rate=24000) -> wrap in WAV container.
