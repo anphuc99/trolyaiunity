@@ -1,5 +1,6 @@
 import type { DataSource, Repository } from "typeorm";
 import LevelEntity from "../models/level.entity.js";
+import VoiceEntity, { type VoiceModel } from "../models/voice.entity.js";
 
 const DEFAULT_LEVELS: Array<Pick<LevelEntity, "level" | "maxWords" | "descript" | "guideline">> = [
   {
@@ -53,6 +54,58 @@ export interface SeedLevelsResult {
   updated: number;
 }
 
+export interface SeedVoicesResult {
+  inserted: number;
+}
+
+const DEFAULT_VOICES: Array<Pick<VoiceEntity, "model" | "voice">> = [
+  { model: "openai", voice: "alloy" },
+  { model: "openai", voice: "ballad" },
+  { model: "openai", voice: "coral" },
+  { model: "openai", voice: "cedar" },
+  { model: "openai", voice: "echo" },
+  { model: "openai", voice: "fable" },
+  { model: "openai", voice: "marin" },
+  { model: "openai", voice: "nova" },
+  { model: "openai", voice: "onyx" },
+
+  { model: "gemini", voice: "Zephyr" },
+  { model: "gemini", voice: "Puck" },
+  { model: "gemini", voice: "Charon" },
+  { model: "gemini", voice: "Kore" },
+  { model: "gemini", voice: "Fenrir" },
+  { model: "gemini", voice: "Leda" },
+  { model: "gemini", voice: "Orus" },
+  { model: "gemini", voice: "Aoede" },
+  { model: "gemini", voice: "Callirrhoe" },
+  { model: "gemini", voice: "Autonoe" },
+  { model: "gemini", voice: "Enceladus" },
+  { model: "gemini", voice: "Iapetus" },
+  { model: "gemini", voice: "Umbriel" },
+  { model: "gemini", voice: "Algieba" },
+  { model: "gemini", voice: "Despina" },
+  { model: "gemini", voice: "Erinome" },
+  { model: "gemini", voice: "Algenib" },
+  { model: "gemini", voice: "Rasalgethi" },
+  { model: "gemini", voice: "Laomedeia" },
+  { model: "gemini", voice: "Achernar" },
+  { model: "gemini", voice: "Alnilam" },
+  { model: "gemini", voice: "Schedar" },
+  { model: "gemini", voice: "Gacrux" },
+  { model: "gemini", voice: "Pulcherrima" },
+  { model: "gemini", voice: "Achird" },
+  { model: "gemini", voice: "Zubenelgenubi" },
+  { model: "gemini", voice: "Vindemiatrix" },
+  { model: "gemini", voice: "Sadachbia" },
+  { model: "gemini", voice: "Sadaltager" },
+  { model: "gemini", voice: "Sulafat" }
+];
+
+const normalizeVoiceModel = (value: string): VoiceModel => {
+  const lower = value.trim().toLowerCase();
+  return lower === "gemini" ? "gemini" : "openai";
+};
+
 /**
  * Ensures the default CEFR levels exist and are up to date.
  *
@@ -91,4 +144,45 @@ export const seedDefaultLevels = async (dataSource: DataSource): Promise<SeedLev
   }
 
   return { inserted, updated };
+};
+
+/**
+ * Ensures the default TTS voice options exist.
+ * Existing rows are kept intact and only missing rows are inserted.
+ *
+ * @param dataSource - Initialized TypeORM data source.
+ * @returns Count of inserted voices.
+ */
+export const seedDefaultVoices = async (dataSource: DataSource): Promise<SeedVoicesResult> => {
+  const repository: Repository<VoiceEntity> = dataSource.getRepository(VoiceEntity);
+  let inserted = 0;
+
+  for (const entry of DEFAULT_VOICES) {
+    const model = normalizeVoiceModel(entry.model);
+    const voice = entry.voice.trim();
+    if (!voice) {
+      continue;
+    }
+
+    const existing = await repository.findOne({
+      where: {
+        model,
+        voice
+      }
+    });
+
+    if (existing) {
+      continue;
+    }
+
+    await repository.save(
+      repository.create({
+        model,
+        voice
+      })
+    );
+    inserted += 1;
+  }
+
+  return { inserted };
 };

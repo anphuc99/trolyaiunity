@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { AppDataSource } from "../data-source.js";
-import { seedDefaultLevels } from "../services/seed.service.js";
+import { seedDefaultLevels, seedDefaultVoices } from "../services/seed.service.js";
 
 /**
  * Initializes a data source with schema synchronization enabled for local setup.
@@ -26,9 +26,14 @@ const run = async () => {
 
   try {
     dataSource = await createSyncDataSource();
-    const seedResult = await seedDefaultLevels(dataSource);
-    if (seedResult.inserted || seedResult.updated) {
-      console.log(`Seeded levels: inserted=${seedResult.inserted}, updated=${seedResult.updated}`);
+    const levelSeedResult = await seedDefaultLevels(dataSource);
+    if (levelSeedResult.inserted || levelSeedResult.updated) {
+      console.log(`Seeded levels: inserted=${levelSeedResult.inserted}, updated=${levelSeedResult.updated}`);
+    }
+
+    const voiceSeedResult = await seedDefaultVoices(dataSource);
+    if (voiceSeedResult.inserted) {
+      console.log(`Seeded voices: inserted=${voiceSeedResult.inserted}`);
     }
     console.log("Database schema synchronized successfully.");
   } catch (error) {
