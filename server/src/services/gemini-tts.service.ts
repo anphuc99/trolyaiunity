@@ -57,6 +57,20 @@ export const getNextGeminiVoiceKey = (): string => {
   return key;
 };
 
+const getNextGeminiVoiceKeyEntry = (): { key: string; slot: number } => {
+  loadKeys();
+
+  if (voiceKeys.length === 0) {
+    throw new Error("No GEMINI_API_KEY_VOICEn environment variables configured");
+  }
+
+  const slot = (keyIndex % voiceKeys.length) + 1;
+  const key = voiceKeys[keyIndex % voiceKeys.length];
+  keyIndex = (keyIndex + 1) % voiceKeys.length;
+
+  return { key, slot };
+};
+
 const getConfiguredGeminiVoiceKeyCount = (): number => {
   loadKeys();
   return voiceKeys.length;
@@ -186,7 +200,7 @@ export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?
   let lastError: unknown;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const apiKey = getNextGeminiVoiceKey();
+    const { key: apiKey, slot: keySlot } = getNextGeminiVoiceKeyEntry();
 
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
@@ -244,6 +258,13 @@ export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?
       return rawBuffer;
     } catch (error) {
       lastError = error;
+      const message = error instanceof Error ? error.message : String(error ?? "");
+      if (message.toLowerCase().includes(NO_AUDIO_ERROR_MARKER)) {
+        console.warn(
+          `[GeminiTTS] no-audio response on key slot ${keySlot} (attempt ${attempt + 1}/${maxAttempts}).`
+        );
+      }
+
       const retryable = isRetryableGeminiError(error);
       if (!retryable || attempt >= maxAttempts - 1) {
         break;
