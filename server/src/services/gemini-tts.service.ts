@@ -21,6 +21,7 @@ const voiceKeys: string[] = [];
 let keyIndex = 0;
 
 const RETRYABLE_STATUS_CODES = [429, 500, 502, 503, 504];
+const NO_AUDIO_ERROR_MARKER = "gemini tts returned no audio data";
 
 /**
  * Reads GEMINI_API_KEY_VOICE1 … GEMINI_API_KEY_VOICE4 from env once.
@@ -63,6 +64,12 @@ const getConfiguredGeminiVoiceKeyCount = (): number => {
 
 const isRetryableGeminiError = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : String(error ?? "");
+  const normalizedMessage = message.toLowerCase();
+
+  if (normalizedMessage.includes(NO_AUDIO_ERROR_MARKER)) {
+    return true;
+  }
+
   return RETRYABLE_STATUS_CODES.some((statusCode) => message.includes(`(${statusCode})`));
 };
 
