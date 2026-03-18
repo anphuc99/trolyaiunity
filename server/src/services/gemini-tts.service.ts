@@ -74,12 +74,7 @@ const buildStyledPrompt = (text: string, tone?: string): string => {
     return text;
   }
 
-  return [
-    "Read the following text aloud.",
-    `Style instruction: ${trimmedTone}`,
-    "Speak naturally and keep the original words unchanged.",
-    `Text: ${text}`
-  ].join("\n");
+  return `Say ${trimmedTone}: ${text}`;
 };
 
 // ---------------------------------------------------------------------------

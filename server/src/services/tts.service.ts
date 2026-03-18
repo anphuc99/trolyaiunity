@@ -232,7 +232,7 @@ export const createTtsAudio = async (
  * The Gemini voice key is rotated automatically (round-robin).
  *
  * @param text - Text to synthesize.
- * @param tone - Tone/style instruction forwarded to Gemini as systemInstruction.
+ * @param tone - Tone/style instruction forwarded to Gemini as style prompt content.
  * @param audioId - Target audio file id (hash).
  * @param voiceName - Gemini prebuilt voice name.
  * @param pitch - Optional pitch adjustment.
