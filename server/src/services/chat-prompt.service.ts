@@ -5,7 +5,7 @@ export interface ChatPromptLevelConfig {
 
 export interface ChatPromptParams {
   /**
-   * CEFR level label (A0-C2). Unknown levels fall back to A1.
+  * HSK level label (HSK1-HSK6). Legacy A0-C2 values are mapped for backward compatibility.
    */
   level?: string | null;
   /**
@@ -73,39 +73,53 @@ export interface ChatPromptParams {
 }
 
 const LEVEL_CONFIG: Record<string, ChatPromptLevelConfig> = {
-  A0: {
-    maxWords: 3,
-    guideline: "Use only simple phrases and greetings. Avoid any complex grammar (Equivalent to early HSK 1)."
-  },
-  A1: {
+  HSK1: {
     maxWords: 5,
     guideline: "Use simple sentences. Allowed patterns: 是...的, 有, 在, and basic measure words. Avoid complex particles (Equivalent to HSK 1-2)."
   },
-  A2: {
+  HSK2: {
     maxWords: 7,
     guideline: "Basic compound structures are allowed: 因为...所以, 虽然...但是, 的/得/地, and basic 了/过/着 usage. Avoid intermediate-level grammar (Equivalent to HSK 3)."
   },
-  B1: {
+  HSK3: {
     maxWords: 10,
     guideline: "Use lower-intermediate grammar. Allowed patterns: 把/被 sentences, complements of state/result, 越来越, 只要...就. Keep sentences relatively short. Avoid advanced grammar (Equivalent to HSK 4)."
   },
-  B2: {
+  HSK4: {
     maxWords: 12,
     guideline: "Use advanced grammar. Express opinions and more abstract ideas, but keep replies concise (Equivalent to HSK 5)."
   },
-  C1: {
+  HSK5: {
     maxWords: 15,
     guideline: "Use advanced grammar, idiomatic expressions (成语), and nuanced language while staying concise (Equivalent to HSK 6)."
   },
-  C2: {
+  HSK6: {
     maxWords: 20,
     guideline: "Use natural, native-like language. Keep replies concise and helpful for learning."
   }
 };
 
+const LEGACY_LEVEL_MAP: Record<string, string> = {
+  A0: "HSK1",
+  A1: "HSK1",
+  A2: "HSK2",
+  B1: "HSK3",
+  B2: "HSK4",
+  C1: "HSK5",
+  C2: "HSK6"
+};
+
 const normalizeLevel = (value: string | null | undefined) => {
   const trimmed = (value ?? "").trim().toUpperCase();
-  return trimmed && trimmed in LEVEL_CONFIG ? trimmed : "A1";
+  if (trimmed && trimmed in LEVEL_CONFIG) {
+    return trimmed;
+  }
+
+  if (trimmed && trimmed in LEGACY_LEVEL_MAP) {
+    return LEGACY_LEVEL_MAP[trimmed];
+  }
+
+  return "HSK1";
 };
 
 /**

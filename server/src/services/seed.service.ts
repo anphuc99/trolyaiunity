@@ -1,24 +1,17 @@
-import type { DataSource, Repository } from "typeorm";
+import { In, type DataSource, type Repository } from "typeorm";
 import LevelEntity from "../models/level.entity.js";
 import VoiceEntity, { type VoiceModel } from "../models/voice.entity.js";
 
 const DEFAULT_LEVELS: Array<Pick<LevelEntity, "level" | "maxWords" | "descript" | "guideline" | "vocabulary">> = [
   {
-    level: "A0",
-    maxWords: 3,
-    descript: "Starting out: recognition of basic words and sounds.",
-    guideline: "Use only very simple HSK 1 patterns: 是, 有, 在, and basic greetings. Keep sentence structure short and avoid complex particles.",
-    vocabulary: "你好,谢谢,再见,是,不"
-  },
-  {
-    level: "A1",
+    level: "HSK1",
     maxWords: 5,
     descript: "Basic phrases for familiar topics.",
     guideline: "Use simple HSK 1-2 grammar. Allowed patterns: 是...的, 想..., 在...呢, 会..., 可以.... Avoid advanced complements and long clauses.",
     vocabulary: "我,你,他,喜欢,学习"
   },
   {
-    level: "A2",
+    level: "HSK2",
     maxWords: 7,
     descript: "Simple conversation and routine tasks.",
     guideline:
@@ -26,7 +19,7 @@ const DEFAULT_LEVELS: Array<Pick<LevelEntity, "level" | "maxWords" | "descript" 
     vocabulary: "今天,昨天,明天,一起,因为"
   },
   {
-    level: "B1",
+    level: "HSK3",
     maxWords: 10,
     descript: "Handle everyday situations and short texts.",
     guideline:
@@ -34,27 +27,36 @@ const DEFAULT_LEVELS: Array<Pick<LevelEntity, "level" | "maxWords" | "descript" 
     vocabulary: "计划,准备,参加,练习,进步"
   },
   {
-    level: "B2",
+    level: "HSK4",
     maxWords: 12,
     descript: "Discuss abstract topics with some fluency.",
     guideline: "Use HSK 5 grammar to discuss opinions and abstract topics. Prefer clear logic markers such as 不仅...而且..., 与其...不如..., 既...又.... Keep replies concise.",
     vocabulary: "观点,经验,影响,分析,原因"
   },
   {
-    level: "C1",
+    level: "HSK5",
     maxWords: 15,
     descript: "Understand complex texts and express ideas.",
     guideline: "Use HSK 6-level grammar with nuanced connectors and occasional idiomatic expressions (成语) when natural. Maintain clarity and concise sentence flow.",
     vocabulary: "策略,判断,比较,细节,表达"
   },
   {
-    level: "C2",
+    level: "HSK6",
     maxWords: 20,
     descript: "Near-native understanding and expression.",
     guideline: "Use near-native, HSK 6+ natural Chinese with precise register control. Keep responses concise, coherent, and pedagogically useful.",
     vocabulary: "语境,隐喻,推理,辩论,连贯"
   }
 ];
+
+const LEGACY_LEVEL_ALIASES: Record<string, string[]> = {
+  HSK1: ["A0", "A1"],
+  HSK2: ["A2"],
+  HSK3: ["B1"],
+  HSK4: ["B2"],
+  HSK5: ["C1"],
+  HSK6: ["C2"]
+};
 
 export interface SeedLevelsResult {
   inserted: number;
@@ -114,7 +116,7 @@ const normalizeVoiceModel = (value: string): VoiceModel => {
 };
 
 /**
- * Ensures the default CEFR levels exist and are up to date.
+ * Ensures the default HSK levels exist and are up to date.
  *
  * @param dataSource - Initialized TypeORM data source.
  * @returns Counts of inserted/updated levels.
@@ -125,7 +127,18 @@ export const seedDefaultLevels = async (dataSource: DataSource): Promise<SeedLev
   let updated = 0;
 
   for (const entry of DEFAULT_LEVELS) {
-    const existing = await repository.findOne({ where: { level: entry.level } });
+    let existing = await repository.findOne({ where: { level: entry.level } });
+
+    if (!existing) {
+      const legacyAliases = LEGACY_LEVEL_ALIASES[entry.level] ?? [];
+      if (legacyAliases.length > 0) {
+        existing = await repository.findOne({
+          where: {
+            level: In(legacyAliases)
+          }
+        });
+      }
+    }
 
     if (!existing) {
       await repository.save(repository.create(entry));
@@ -144,6 +157,7 @@ export const seedDefaultLevels = async (dataSource: DataSource): Promise<SeedLev
     if (shouldUpdateDescript || shouldUpdateGuideline || shouldUpdateVocabulary || shouldUpdateMaxWords) {
       await repository.save({
         ...existing,
+        level: entry.level,
         descript: nextDescript,
         guideline: nextGuideline,
         vocabulary: nextVocabulary,
