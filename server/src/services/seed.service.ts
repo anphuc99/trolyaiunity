@@ -2,50 +2,57 @@ import type { DataSource, Repository } from "typeorm";
 import LevelEntity from "../models/level.entity.js";
 import VoiceEntity, { type VoiceModel } from "../models/voice.entity.js";
 
-const DEFAULT_LEVELS: Array<Pick<LevelEntity, "level" | "maxWords" | "descript" | "guideline">> = [
+const DEFAULT_LEVELS: Array<Pick<LevelEntity, "level" | "maxWords" | "descript" | "guideline" | "vocabulary">> = [
   {
     level: "A0",
     maxWords: 3,
     descript: "Starting out: recognition of basic words and sounds.",
-    guideline: "Use only simple present tense. Avoid any complex grammar."
+    guideline: "Use only very simple HSK 1 patterns: 是, 有, 在, and basic greetings. Keep sentence structure short and avoid complex particles.",
+    vocabulary: "你好,谢谢,再见,是,不"
   },
   {
     level: "A1",
     maxWords: 5,
     descript: "Basic phrases for familiar topics.",
-    guideline: "Use simple sentences. Present tense and basic past. Allowed patterns: -고 싶다, -아/어요."
+    guideline: "Use simple HSK 1-2 grammar. Allowed patterns: 是...的, 想..., 在...呢, 会..., 可以.... Avoid advanced complements and long clauses.",
+    vocabulary: "我,你,他,喜欢,学习"
   },
   {
     level: "A2",
     maxWords: 7,
     descript: "Simple conversation and routine tasks.",
     guideline:
-      "Basic A2 compound structures are allowed: -고, -지만, -아서/-어서, -(으)면, -(으)려고. Avoid intermediate-level grammar."
+      "Use HSK 2-3 compound structures: 因为...所以..., 虽然...但是..., 一边...一边..., 先...然后.... Allow basic 了/过/着 usage, avoid advanced abstract constructions.",
+    vocabulary: "今天,昨天,明天,一起,因为"
   },
   {
     level: "B1",
     maxWords: 10,
     descript: "Handle everyday situations and short texts.",
     guideline:
-      "Use lower-intermediate (B1) grammar. Keep sentences not too long. Allowed patterns: -(으)ㄹ 수 있다, -아/어서, -(으)니까, -기 때문에, -(으)면, -는데, -(으)려고 하다, -(으)면서, -(으)ㄴ/는 것 같다, -아/어도 되다, -아/어야 하다. Avoid B2+ grammar."
+      "Use lower-intermediate HSK 4 grammar. Allowed patterns: 把/被 sentences, 越来越..., 除了...以外..., 只要...就..., 即使...也.... Keep sentences concise and avoid HSK 5+ idiomatic density.",
+    vocabulary: "计划,准备,参加,练习,进步"
   },
   {
     level: "B2",
     maxWords: 12,
     descript: "Discuss abstract topics with some fluency.",
-    guideline: "Use advanced grammar. Express opinions and more abstract ideas, but keep replies concise."
+    guideline: "Use HSK 5 grammar to discuss opinions and abstract topics. Prefer clear logic markers such as 不仅...而且..., 与其...不如..., 既...又.... Keep replies concise.",
+    vocabulary: "观点,经验,影响,分析,原因"
   },
   {
     level: "C1",
     maxWords: 15,
     descript: "Understand complex texts and express ideas.",
-    guideline: "Use advanced grammar, idiomatic expressions, and nuanced language while staying concise."
+    guideline: "Use HSK 6-level grammar with nuanced connectors and occasional idiomatic expressions (成语) when natural. Maintain clarity and concise sentence flow.",
+    vocabulary: "策略,判断,比较,细节,表达"
   },
   {
     level: "C2",
     maxWords: 20,
     descript: "Near-native understanding and expression.",
-    guideline: "Use natural, native-like language. Keep replies concise and helpful for learning."
+    guideline: "Use near-native, HSK 6+ natural Chinese with precise register control. Keep responses concise, coherent, and pedagogically useful.",
+    vocabulary: "语境,隐喻,推理,辩论,连贯"
   }
 ];
 
@@ -128,15 +135,18 @@ export const seedDefaultLevels = async (dataSource: DataSource): Promise<SeedLev
 
     const nextDescript = entry.descript.trim();
     const nextGuideline = entry.guideline.trim();
+    const nextVocabulary = entry.vocabulary.trim();
     const shouldUpdateDescript = existing.descript.trim() !== nextDescript;
     const shouldUpdateGuideline = (existing.guideline ?? "").trim() !== nextGuideline;
+    const shouldUpdateVocabulary = (existing.vocabulary ?? "").trim() !== nextVocabulary;
     const shouldUpdateMaxWords = existing.maxWords !== entry.maxWords;
 
-    if (shouldUpdateDescript || shouldUpdateGuideline || shouldUpdateMaxWords) {
+    if (shouldUpdateDescript || shouldUpdateGuideline || shouldUpdateVocabulary || shouldUpdateMaxWords) {
       await repository.save({
         ...existing,
         descript: nextDescript,
         guideline: nextGuideline,
+        vocabulary: nextVocabulary,
         maxWords: entry.maxWords
       });
       updated += 1;
