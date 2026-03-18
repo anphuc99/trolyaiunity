@@ -5,7 +5,7 @@ import CharacterEntity from "../../models/character.entity.js";
 import MessageEntity from "../../models/message.entity.js";
 import MyLogMessageEntity from "../../models/my-log-message.entity.js";
 import UserEntity from "../../models/user.entity.js";
-import { buildAudioId, createTtsAudio, getAudioPath } from "../../services/tts.service.js";
+import { buildAudioId, createTtsAudio, createGeminiTtsAudio, getAudioPath } from "../../services/tts.service.js";
 
 interface TtsController {
   getTextToSpeech: (request: Request, response: Response) => Promise<void>;
@@ -26,9 +26,10 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
   const resolveCharacterVoiceSettings = async (userId: number, characterName: string) => {
     if (!characterName) {
       return {
-        voiceName: undefined,
-        pitch: undefined,
-        speakingRate: undefined
+        voiceModel: "openai" as string,
+        voiceName: undefined as string | undefined,
+        pitch: undefined as number | undefined,
+        speakingRate: undefined as number | undefined
       };
     }
 
@@ -39,9 +40,10 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
         .getOne();
 
       return {
+        voiceModel: "openai" as string,
         voiceName: user?.voiceName?.trim() || undefined,
         pitch: user?.pitch ?? undefined,
-        speakingRate: undefined
+        speakingRate: undefined as number | undefined
       };
     }
 
@@ -51,8 +53,11 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
       .andWhere("LOWER(character.name) = LOWER(:name)", { name: characterName })
       .getOne();
 
+    const voiceModel = character?.voiceModel ?? "openai";
+
     return {
-      voiceName: character?.voiceModel === "openai" ? character?.voiceName?.trim() || undefined : undefined,
+      voiceModel,
+      voiceName: character?.voiceName?.trim() || undefined,
       pitch: character?.pitch ?? undefined,
       speakingRate: character?.speakingRate ?? undefined
     };
@@ -84,10 +89,11 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
     const userId = request.user.id;
 
     const resolvedSettings = await resolveCharacterVoiceSettings(userId, characterName);
+    const isGemini = resolvedSettings.voiceModel === "gemini";
     const audioId = buildAudioId(
       text,
       tone,
-      resolvedSettings.voiceName,
+      `${resolvedSettings.voiceModel}:${resolvedSettings.voiceName ?? ""}`,
       resolvedSettings.pitch,
       resolvedSettings.speakingRate
     );
@@ -146,14 +152,24 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
         }
       }
 
-      await createTtsAudio(
-        text,
-        tone,
-        audioId,
-        resolvedSettings.voiceName,
-        resolvedSettings.pitch,
-        resolvedSettings.speakingRate
-      );
+      if (isGemini && resolvedSettings.voiceName) {
+        await createGeminiTtsAudio(
+          text,
+          audioId,
+          resolvedSettings.voiceName,
+          resolvedSettings.pitch,
+          resolvedSettings.speakingRate
+        );
+      } else {
+        await createTtsAudio(
+          text,
+          tone,
+          audioId,
+          resolvedSettings.voiceName,
+          resolvedSettings.pitch,
+          resolvedSettings.speakingRate
+        );
+      }
       await attachAudioToMessageIfMissing();
       response.json({ success: true, output: audioId, url: `/audio/${audioId}.mp3` });
     } catch (error) {

@@ -64,3 +64,8 @@ MYLOG_AI_MODEL=gemini-3-flash-preview
 # Example SQLite connection (for reference):
 # DB_TYPE=sqlite
 # DB_SQLITE_PATH=server/data/sqlite/mimi_chat.sqlite
+# Gemini TTS voice API keys (round-robin rotation to spread rate limits)
+GEMINI_API_KEY_VOICE1=key1
+GEMINI_API_KEY_VOICE2=key2
+GEMINI_API_KEY_VOICE3=key3
+GEMINI_API_KEY_VOICE4=key4

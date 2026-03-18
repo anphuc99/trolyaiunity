@@ -16,7 +16,7 @@ import MyLogMessageEntity from "../../models/my-log-message.entity.js";
 import CharacterEntity from "../../models/character.entity.js";
 import UserEntity from "../../models/user.entity.js";
 import { createChatHistoryStore, type ChatHistoryMessage, type ChatHistoryStore } from "../../services/chat-history.service.js";
-import { buildAudioId, getAudioPath, createTtsAudio } from "../../services/tts.service.js";
+import { buildAudioId, getAudioPath, createTtsAudio, createGeminiTtsAudio } from "../../services/tts.service.js";
 
 const MYLOG_TEMP_DIR = path.join(process.cwd(), "data", "temp");
 
@@ -1796,6 +1796,8 @@ Return ONLY the JSON object. No markdown. No extra text.
         }
 
         const character = characterByName.get(normalizeName(message.characterName));
+        const voiceModel = character?.voiceModel ?? "openai";
+        const isGemini = voiceModel === "gemini";
         const voiceName = character?.voiceName?.trim() || undefined;
         const pitch = character?.pitch ?? undefined;
         const speakingRate = character?.speakingRate ?? undefined;
@@ -1803,7 +1805,7 @@ Return ONLY the JSON object. No markdown. No extra text.
         const audioId = buildAudioId(
           message.content,
           message.tone,
-          voiceName,
+          `${voiceModel}:${voiceName ?? ""}`,
           pitch,
           speakingRate
         );
@@ -1813,14 +1815,24 @@ Return ONLY the JSON object. No markdown. No extra text.
         try {
           await fs.access(audioPath);
         } catch {
-          await createTtsAudio(
-            message.content,
-            message.tone,
-            audioId,
-            voiceName,
-            pitch,
-            speakingRate
-          );
+          if (isGemini && voiceName) {
+            await createGeminiTtsAudio(
+              message.content,
+              audioId,
+              voiceName,
+              pitch,
+              speakingRate
+            );
+          } else {
+            await createTtsAudio(
+              message.content,
+              message.tone,
+              audioId,
+              voiceName,
+              pitch,
+              speakingRate
+            );
+          }
         }
 
         audioPaths.push(audioPath);

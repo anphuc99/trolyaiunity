@@ -4,6 +4,7 @@ import fs from "fs/promises";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import path from "path";
 import { createOpenAIClient } from "./openai.service.js";
+import { synthesizeGeminiTts } from "./gemini-tts.service.js";
 
 const AUDIO_DIR = path.join(process.cwd(), "data", "audio");
 const DEFAULT_MODEL = "gpt-4o-mini-tts-2025-03-20";
@@ -62,7 +63,7 @@ const clampPlaybackRate = (value: number) => Math.min(MAX_PLAYBACK_RATE, Math.ma
  */
 const readWavSampleRate = (wavBuffer: Buffer): number => wavBuffer.readUInt32LE(24);
 
-const clampText = (text: string) => {
+export const clampText = (text: string) => {
   let finalText = text.trim();
 
   if (finalText.length > MAX_CHARS) {
@@ -99,7 +100,7 @@ const clampText = (text: string) => {
  * @param speakingRate - Optional playback speed multiplier.
  * @returns MP3 buffer.
  */
-const convertWavToMp3 = async (
+export const convertWavToMp3 = async (
   wavBuffer: Buffer,
   pitch?: number,
   speakingRate?: number
@@ -220,6 +221,34 @@ export const createTtsAudio = async (
 
   const rawBuffer = Buffer.from(await response.arrayBuffer());
   const mp3Buffer = await convertWavToMp3(rawBuffer, pitch, speakingRate);
+  const filePath = path.join(AUDIO_DIR, `${audioId}.mp3`);
+  await fs.writeFile(filePath, mp3Buffer);
+
+  return audioId;
+};
+
+/**
+ * Creates a TTS audio file using the Gemini API.
+ * The Gemini voice key is rotated automatically (round-robin).
+ *
+ * @param text - Text to synthesize.
+ * @param audioId - Target audio file id (hash).
+ * @param voiceName - Gemini prebuilt voice name.
+ * @param pitch - Optional pitch adjustment.
+ * @param speakingRate - Optional playback speed multiplier.
+ * @returns The audio file id.
+ */
+export const createGeminiTtsAudio = async (
+  text: string,
+  audioId: string,
+  voiceName: string,
+  pitch?: number,
+  speakingRate?: number
+) => {
+  await fs.mkdir(AUDIO_DIR, { recursive: true });
+
+  const wavBuffer = await synthesizeGeminiTts(clampText(text), voiceName);
+  const mp3Buffer = await convertWavToMp3(wavBuffer, pitch, speakingRate);
   const filePath = path.join(AUDIO_DIR, `${audioId}.mp3`);
   await fs.writeFile(filePath, mp3Buffer);
 
