@@ -1,3 +1,4 @@
+using System;
 using Core.Infrastructure.Attributes;
 using Core.Infrastructure.Requests;
 using UnityEngine;
@@ -97,7 +98,24 @@ namespace Core.Infrastructure.Views
 		/// </summary>
 		protected virtual void OnEnable()
 		{
+			EnsureCurrentSceneScopeActive();
 			OnEnabled();
+		}
+
+		private void EnsureCurrentSceneScopeActive()
+		{
+			var scene = gameObject.scene;
+			if (!scene.IsValid() || string.IsNullOrWhiteSpace(scene.name))
+			{
+				return;
+			}
+
+			if (!System.Enum.TryParse(scene.name, ignoreCase: false, out ControllerScopeKey scopeKey))
+			{
+				return;
+			}
+
+			RequestController.ActivateScope(scopeKey);
 		}
 
 		/// <summary>
