@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System;
-using Share.Utils;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -287,17 +286,7 @@ namespace Share.Components
 
 		private static string BuildDisplayBaseText(MessageBubbleData message, string originalText)
 		{
-			if (message == null)
-			{
-				return originalText ?? string.Empty;
-			}
-
-			if (message.Type != MessageBubbleType.Character)
-			{
-				return originalText ?? string.Empty;
-			}
-
-			return PinyinRichTextUtils.BuildInlineRuby(originalText ?? string.Empty, message.Pinyin);
+			return originalText ?? string.Empty;
 		}
 
 		private static string BuildPinyinLine(string pinyin)

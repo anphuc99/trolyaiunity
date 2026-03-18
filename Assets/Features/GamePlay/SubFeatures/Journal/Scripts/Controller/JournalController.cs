@@ -250,7 +250,7 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 						MessageId = message.Id,
 						Type = message.CharacterName == "User" ? MessageBubbleType.User : MessageBubbleType.Character,
 						SenderName = message.CharacterName,
-						Message = PinyinRichTextUtils.BuildInlineRuby(message.Content, message.Pinyin),
+						Message = message.Content,
 						OriginalMessage = message.Content,
 						Avatar = GetAvatar(message.CharacterName), // Avatar can be set based on sender or other logic
 						Tone = message.Tone,
