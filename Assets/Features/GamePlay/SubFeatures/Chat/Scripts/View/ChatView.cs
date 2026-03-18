@@ -377,6 +377,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 						Message = text,
 						OriginalMessage = text,
 						Translation = turn.Translation,
+						Pinyin = turn.Pinyin,
 						Tone = string.IsNullOrWhiteSpace(turn.Tone) ? DefaultTtsTone : turn.Tone.Trim(),
 						Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, characterName),
 					});
@@ -476,6 +477,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					Message = messageText,
 					OriginalMessage = messageText,
 					Translation = turn.Translation,
+					Pinyin = turn.Pinyin,
 					Tone = tone,
 					Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, characterName),
 				});

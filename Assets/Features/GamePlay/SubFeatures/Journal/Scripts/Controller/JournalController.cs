@@ -254,6 +254,7 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 						Avatar = GetAvatar(message.CharacterName), // Avatar can be set based on sender or other logic
 						Tone = message.Tone,
 						Translation = message.Translation,
+						Pinyin = message.Pinyin,
 						IsTranslationExpanded = false,
 						IsTtsReloading = false,
 						MessageIndex = i,

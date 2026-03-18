@@ -45,6 +45,10 @@ namespace Share.Components
 		private string _translation;
 
 		[SerializeField]
+		[TextArea(1, 6)]
+		private string _pinyin;
+
+		[SerializeField]
 		private bool _isTranslationExpanded;
 
 		[SerializeField]
@@ -126,6 +130,15 @@ namespace Share.Components
 		{
 			get => _translation;
 			set => _translation = value;
+		}
+
+		/// <summary>
+		/// Pinyin reading of this message.
+		/// </summary>
+		public string Pinyin
+		{
+			get => _pinyin;
+			set => _pinyin = value;
 		}
 
 		/// <summary>

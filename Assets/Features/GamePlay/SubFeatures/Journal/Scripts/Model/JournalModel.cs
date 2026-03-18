@@ -92,6 +92,9 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 		[JsonProperty("translation")]
 		public string Translation { get; set; }
 
+		[JsonProperty("pinyin")]
+		public string Pinyin { get; set; }
+
 		[JsonProperty("tone")]
 		public string Tone { get; set; }
 

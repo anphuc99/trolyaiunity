@@ -298,6 +298,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		public string Text { get; set; }
 
 		/// <summary>
+		/// Pinyin reading of the text.
+		/// </summary>
+		[JsonProperty("Pinyin")]
+		public string Pinyin { get; set; }
+
+		/// <summary>
 		/// Tone hint from server.
 		/// </summary>
 		[JsonProperty("Tone")]

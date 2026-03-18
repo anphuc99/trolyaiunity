@@ -45,6 +45,7 @@ interface AssistantTurn {
   MessageId?: string;
   CharacterName?: string;
   Text?: string;
+  Pinyin?: string;
   Tone?: string;
   Translation?: string;
 }
@@ -228,8 +229,8 @@ export const createJournalController = (
     userId: number,
     journalId: number,
     voiceByCharacter: Map<string, { voiceName: string; pitch: number | null; speakingRate: number | null }>
-  ): Array<Pick<MessageEntity, "content" | "characterName" | "translation" | "tone" | "audio" | "userId" | "journalId">> => {
-    const result: Array<Pick<MessageEntity, "content" | "characterName" | "translation" | "tone" | "audio" | "userId" | "journalId">> = [];
+  ): Array<Pick<MessageEntity, "content" | "characterName" | "translation" | "pinyin" | "tone" | "audio" | "userId" | "journalId">> => {
+    const result: Array<Pick<MessageEntity, "content" | "characterName" | "translation" | "pinyin" | "tone" | "audio" | "userId" | "journalId">> = [];
 
     for (const message of history) {
       if (message.role === "user") {
@@ -242,6 +243,7 @@ export const createJournalController = (
           content,
           characterName: "User",
           translation: null,
+          pinyin: null,
           tone: null,
           audio: null,
           userId,
@@ -265,6 +267,7 @@ export const createJournalController = (
           content: fallback,
           characterName: "Mimi",
           translation: null,
+          pinyin: null,
           tone: null,
           audio: null,
           userId,
@@ -281,6 +284,7 @@ export const createJournalController = (
 
         const characterName = typeof turn.CharacterName === "string" ? turn.CharacterName.trim() : "Mimi";
         const translation = typeof turn.Translation === "string" ? turn.Translation.trim() : "";
+        const pinyin = typeof turn.Pinyin === "string" ? turn.Pinyin.trim() : "";
         const tone = typeof turn.Tone === "string" ? turn.Tone.trim() : "";
         const voiceKey = normalizeName(characterName || "Mimi");
         const voiceSettings = voiceByCharacter.get(voiceKey);
@@ -290,6 +294,7 @@ export const createJournalController = (
           content,
           characterName: characterName || "Mimi",
           translation: translation || null,
+          pinyin: pinyin || null,
           tone: tone || null,
           audio,
           userId,
@@ -385,6 +390,7 @@ export const createJournalController = (
           content: message.content,
           characterName: message.characterName,
           translation: message.translation,
+          pinyin: message.pinyin,
           tone: message.tone,
           audio: message.audio,
           createdAt: message.createdAt.toISOString()
@@ -431,6 +437,7 @@ export const createJournalController = (
         content: string;
         characterName: string;
         translation: string | null;
+        pinyin: string | null;
         tone: string | null;
         audio: string | null;
       }> = [];
@@ -463,6 +470,7 @@ export const createJournalController = (
               content: message.content,
               characterName: message.characterName,
               translation: message.translation ?? null,
+              pinyin: message.pinyin ?? null,
               tone: message.tone ?? null,
               audio: message.audio ?? null
             });

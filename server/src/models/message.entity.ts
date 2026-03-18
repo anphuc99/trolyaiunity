@@ -28,6 +28,9 @@ class MessageEntity {
   @Column({ name: "translation", type: "text", nullable: true })
   translation?: string | null;
 
+  @Column({ name: "pinyin", type: "text", nullable: true })
+  pinyin?: string | null;
+
   @Column({ name: "tone", type: "varchar", length: 120, nullable: true })
   tone?: string | null;
 
