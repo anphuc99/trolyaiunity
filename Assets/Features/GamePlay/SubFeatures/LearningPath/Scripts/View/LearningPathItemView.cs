@@ -11,10 +11,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.View
 	public class LearningPathItemView : MonoBehaviour
 	{
 		[SerializeField]
-		private TextMeshProUGUI _contextText;
-
-		[SerializeField]
-		private TextMeshProUGUI _vocabularyText;
+		private TextMeshProUGUI _contentText;
 
 		[SerializeField]
 		private Button _editButton;
@@ -53,14 +50,11 @@ namespace Features.GamePlay.SubFeatures.LearningPath.View
 		{
 			LearningPathId = id;
 
-			if (_contextText != null)
+			if (_contentText != null)
 			{
-				_contextText.text = context ?? string.Empty;
-			}
-
-			if (_vocabularyText != null)
-			{
-				_vocabularyText.text = vocabulary ?? string.Empty;
+				var safeContext = context ?? string.Empty;
+				var safeVocabulary = vocabulary ?? string.Empty;
+				_contentText.text = safeContext + "\n---------------\n" + safeVocabulary;
 			}
 		}
 
