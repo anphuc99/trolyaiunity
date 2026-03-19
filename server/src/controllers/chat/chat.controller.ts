@@ -239,6 +239,38 @@ export const createChatController = (
   };
 
   /**
+   * Builds a developer message when a learning path is applied to chat.
+   *
+   * @param payload - Request payload containing learning path id/context/vocabulary.
+   * @returns A formatted developer message or empty string when invalid.
+   */
+  const formatLearningPathAppliedMessage = (payload: Record<string, unknown>) => {
+    const learningPathIdRaw = typeof payload.learningPathId === "number"
+      ? payload.learningPathId
+      : Number.parseInt(String(payload.learningPathId ?? ""), 10);
+    const learningPathId = Number.isInteger(learningPathIdRaw) && learningPathIdRaw > 0 ? learningPathIdRaw : null;
+    const context = typeof payload.context === "string" ? payload.context.trim() : "";
+    const vocabulary = typeof payload.vocabulary === "string" ? payload.vocabulary.trim() : "";
+
+    if (!learningPathId || !context || !vocabulary) {
+      return "";
+    }
+
+    return [
+      "Developer learning path applied:",
+      `LearningPathId: ${learningPathId}`,
+      "LearningPathContext:",
+      context,
+      "LearningPathVocabulary:",
+      vocabulary,
+      "AI requirements:",
+      "- Follow the learning-path context strictly.",
+      "- Use the provided vocabulary naturally in the dialogue.",
+      "- Do not drift outside the selected learning path context."
+    ].join("\n");
+  };
+
+  /**
    * Formats a developer note for edited assistant messages.
    *
    * @param messageId - Message identifier from the assistant output.
@@ -504,6 +536,30 @@ export const createChatController = (
     }
 
     return null;
+  };
+
+  const parseDeveloperLearningPathState = (content: string) => {
+    if (!/^Developer\s+learning\s+path\s+applied:/i.test(content)) {
+      return null;
+    }
+
+    const idMatch = content.match(/^LearningPathId:\s*(\d+)\s*$/im);
+    const contextMatch = content.match(/^LearningPathContext:\s*\n([\s\S]*?)\nLearningPathVocabulary:\s*$/im);
+    const vocabMatch = content.match(/^LearningPathVocabulary:\s*\n([\s\S]*?)(?:\nAI requirements:|$)/im);
+
+    const id = idMatch ? Number.parseInt(idMatch[1], 10) : Number.NaN;
+    const context = contextMatch?.[1]?.trim() ?? "";
+    const vocabulary = vocabMatch?.[1]?.trim() ?? "";
+
+    if (!Number.isInteger(id) || id <= 0 || !context || !vocabulary) {
+      return null;
+    }
+
+    return {
+      learningPathId: id,
+      context,
+      vocabulary
+    };
   };
 
   const parseAssistantEditNote = (content: string) => {
@@ -818,7 +874,7 @@ export const createChatController = (
     const sessionId = getSessionId(payload.sessionId);
     const kind = typeof payload.kind === "string" ? payload.kind.trim() : "";
 
-    if (kind !== "character_added" && kind !== "character_removed" && kind !== "context_update") {
+    if (kind !== "character_added" && kind !== "character_removed" && kind !== "context_update" && kind !== "learning_path_apply") {
       response.status(400).json({ message: "Invalid developer message kind" });
       return;
     }
@@ -828,10 +884,16 @@ export const createChatController = (
         ? formatCharacterAddedMessage(payload)
         : kind === "character_removed"
         ? formatCharacterRemovedMessage(payload)
+        : kind === "learning_path_apply"
+        ? formatLearningPathAppliedMessage(payload)
         : formatContextMessage(payload);
 
     if (!content) {
-      const message = kind === "context_update" ? "Context is required" : "Character name is required";
+      const message = kind === "context_update"
+        ? "Context is required"
+        : kind === "learning_path_apply"
+        ? "LearningPathId, context, and vocabulary are required"
+        : "Character name is required";
       response.status(400).json({ message });
       return;
     }
@@ -1010,7 +1072,31 @@ export const createChatController = (
         .filter(([, isActive]) => isActive)
         .map(([name]) => name);
 
-      response.json({ activeCharacterNames });
+      let activeLearningPathId: number | null = null;
+      let activeLearningPathContext = "";
+      let activeLearningPathVocabulary = "";
+
+      for (const message of messages) {
+        if (message.role !== "developer") {
+          continue;
+        }
+
+        const learningPathState = parseDeveloperLearningPathState(message.content);
+        if (!learningPathState) {
+          continue;
+        }
+
+        activeLearningPathId = learningPathState.learningPathId;
+        activeLearningPathContext = learningPathState.context;
+        activeLearningPathVocabulary = learningPathState.vocabulary;
+      }
+
+      response.json({
+        activeCharacterNames,
+        activeLearningPathId,
+        activeLearningPathContext,
+        activeLearningPathVocabulary
+      });
     } catch (error) {
       console.error("Error in getDeveloperState:", error);
       response.status(500).json({

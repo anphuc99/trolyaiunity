@@ -46,6 +46,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			RegisterContextMenu();
 			RegisterLearningPathMenu();
 			RegisterEndConversationMenu();
+			_ = LoadDeveloperStateInternalAsync();
 			EventBus.Publish(ChatEvents.Installed, null);
 		}
 
@@ -250,6 +251,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
+		/// Loads developer-state from server and publishes it to views.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[Request(ChatRequests.LoadDeveloperState)]
+		public static void HandleLoadDeveloperState(object payload)
+		{
+			_ = LoadDeveloperStateInternalAsync();
+		}
+
+		/// <summary>
 		/// Handles save-context requests from popup and syncs context via developer message API.
 		/// </summary>
 		/// <param name="payload">Context payload.</param>
@@ -266,6 +277,34 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 
 			_ = SaveContextInternalAsync(payload);
+		}
+
+		/// <summary>
+		/// Applies a learning path as developer context and triggers an immediate reply.
+		/// </summary>
+		/// <param name="payload">Learning path context payload.</param>
+		[Request(ChatRequests.ApplyLearningPath)]
+		public static void HandleApplyLearningPath(ChatApplyLearningPathRequestPayload payload)
+		{
+			if (payload == null || payload.LearningPathId <= 0)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Learning path id is required."
+				});
+				return;
+			}
+
+			if (string.IsNullOrWhiteSpace(payload.Context) || string.IsNullOrWhiteSpace(payload.Vocabulary))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Learning path context and vocabulary are required."
+				});
+				return;
+			}
+
+			_ = ApplyLearningPathInternalAsync(payload);
 		}
 
 		/// <summary>
@@ -430,7 +469,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 		private static void HandleOpenEndConversationMenu()
 		{
-			_ = EndConversationInternalAsync();
+			EventBus.Publish(ChatEvents.EndConversationRequested, null);
 		}
 
 		private static async Task<List<ChatSelectableCharacterPayload>> BuildSelectableCharactersAsync()
@@ -442,7 +481,19 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				return result;
 			}
 
-			var activeNames = await GetActiveCharacterNamesAsync();
+			var state = await LoadDeveloperStatePayloadAsync();
+			var activeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			if (state?.ActiveCharacterNames != null)
+			{
+				for (var i = 0; i < state.ActiveCharacterNames.Count; i++)
+				{
+					var n = state.ActiveCharacterNames[i];
+					if (!string.IsNullOrWhiteSpace(n))
+					{
+						activeNames.Add(n.Trim());
+					}
+				}
+			}
 
 			for (var i = 0; i < names.Count; i++)
 			{
@@ -464,41 +515,31 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			return result;
 		}
 
-		private static async Task<HashSet<string>> GetActiveCharacterNamesAsync()
+		private static async Task<ChatDeveloperStatePayload> LoadDeveloperStatePayloadAsync()
 		{
-			var activeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
 			try
 			{
 				var responseJson = await HttpClient.GetTaskAsync(GetChatDeveloperStateEndpoint());
 				if (string.IsNullOrWhiteSpace(responseJson))
 				{
-					return activeNames;
+					return new ChatDeveloperStatePayload();
 				}
 
 				var response = JsonConvert.DeserializeObject<ChatDeveloperStatePayload>(responseJson);
-				if (response?.ActiveCharacterNames == null || response.ActiveCharacterNames.Count == 0)
-				{
-					return activeNames;
-				}
-
-				for (var i = 0; i < response.ActiveCharacterNames.Count; i++)
-				{
-					var name = response.ActiveCharacterNames[i];
-					if (string.IsNullOrWhiteSpace(name))
-					{
-						continue;
-					}
-
-					activeNames.Add(name.Trim());
-				}
+				return response ?? new ChatDeveloperStatePayload();
 			}
 			catch (Exception exception)
 			{
-				Debug.LogWarning("[ChatController] Failed to load active character names: " + exception.Message);
+				Debug.LogWarning("[ChatController] Failed to load developer state: " + exception.Message);
 			}
 
-			return activeNames;
+			return new ChatDeveloperStatePayload();
+		}
+
+		private static async Task LoadDeveloperStateInternalAsync()
+		{
+			var state = await LoadDeveloperStatePayloadAsync();
+			EventBus.Publish(ChatEvents.DeveloperStateLoaded, state ?? new ChatDeveloperStatePayload());
 		}
 
 		private static async Task SetCharacterActiveInternalAsync(ChatSetCharacterActiveRequestPayload payload)
@@ -530,6 +571,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 						Message = "Failed to sync character active state."
 					});
 				}
+
+				await LoadDeveloperStateInternalAsync();
 			}
 			catch (Exception exception)
 			{
@@ -559,12 +602,53 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 						Message = "Failed to save developer context."
 					});
 				}
+
+				await LoadDeveloperStateInternalAsync();
 			}
 			catch (Exception exception)
 			{
 				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
 				{
 					Message = "Failed to save developer context: " + exception.Message
+				});
+			}
+		}
+
+		private static async Task ApplyLearningPathInternalAsync(ChatApplyLearningPathRequestPayload payload)
+		{
+			try
+			{
+				var request = new
+				{
+					SessionId = string.IsNullOrWhiteSpace(payload.SessionId) ? null : payload.SessionId.Trim(),
+					Kind = "learning_path_apply",
+					LearningPathId = payload.LearningPathId,
+					Context = payload.Context.Trim(),
+					Vocabulary = payload.Vocabulary.Trim(),
+				};
+
+				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatDeveloperEndpoint(), request);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = "Failed to apply learning path context."
+					});
+					return;
+				}
+
+				await LoadDeveloperStateInternalAsync();
+
+				await GenerateReplyFromHistoryInternalAsync(new ChatSendRequestPayload
+				{
+					SessionId = string.IsNullOrWhiteSpace(payload.SessionId) ? null : payload.SessionId.Trim(),
+				});
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to apply learning path context: " + exception.Message
 				});
 			}
 		}

@@ -17,7 +17,9 @@ namespace Features.GamePlay.SubFeatures.Chat.Requests
 		public const string GetCharacterSpeakingRate = "game.play.chat.get.character.speaking.rate.request";
 		public const string PlayMessageAudio = "game.play.chat.play.message.audio.request";
 		public const string SetCharacterActive = "game.play.chat.set.character.active.request";
+		public const string LoadDeveloperState = "game.play.chat.load.developer.state.request";
 		public const string SaveContext = "game.play.chat.save.context.request";
+		public const string ApplyLearningPath = "game.play.chat.apply.learning.path.request";
 		public const string EndConversation = "game.play.chat.end.conversation.request";
 		public const string TranscribeAudio = "game.play.chat.transcribe.audio.request";
 	}

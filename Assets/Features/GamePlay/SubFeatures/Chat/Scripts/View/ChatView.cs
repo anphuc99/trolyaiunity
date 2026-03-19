@@ -57,6 +57,13 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private Button _sendButton;
 		[SerializeField]
 		private ChatLearningPathView _learingPathTab;
+		[SerializeField]
+		private TextMeshProUGUI _coutVocab;
+
+		private readonly List<string> _conversationTextCache = new List<string>();
+		private readonly List<string> _activeLearningPathVocabulary = new List<string>();
+		private int _remainingLearningPathVocabularyCount;
+		private bool _hasActiveLearningPath;
 
 		private readonly Queue<ChatAssistantTurnPayload> _pendingCharacterTurns = new Queue<ChatAssistantTurnPayload>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
@@ -135,6 +142,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			var trimmed = message?.Trim();
 			var hasAudio = !string.IsNullOrEmpty(_pendingAudioBase64);
+			var userTextForTracking = trimmed ?? string.Empty;
 
 			if (string.IsNullOrWhiteSpace(trimmed) && !hasAudio)
 			{
@@ -154,6 +162,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				Message = displayText,
 				Avatar = null,
 			});
+			if (!hasAudio && !string.IsNullOrWhiteSpace(userTextForTracking))
+			{
+				AppendConversationText(userTextForTracking);
+			}
 			ScrollMessagesToBottom();
 
 			var payload = new ChatSendRequestPayload
@@ -212,6 +224,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			gameObject.SetActive(true);
 			EnsureDependencies();
+			SendRequest(ChatRequests.LoadDeveloperState);
 			RefreshHistory();
 		}
 
@@ -255,6 +268,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				_learingPathTab.HideImmediate();
 			}
+			_conversationTextCache.Clear();
+			_activeLearningPathVocabulary.Clear();
+			_hasActiveLearningPath = false;
+			_remainingLearningPathVocabularyCount = 0;
+			UpdateRemainingVocabularyLabel();
 			gameObject.SetActive(false);
 		}
 
@@ -316,6 +334,35 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			_learingPathTab.Show(new List<ChatLearningPathPayload>());
+		}
+
+		/// <summary>
+		/// Updates active learning-path state from server developer-state.
+		/// </summary>
+		/// <param name="payload">Developer-state payload.</param>
+		[OnEvent(ChatEvents.DeveloperStateLoaded)]
+		private void OnDeveloperStateLoaded(object payload)
+		{
+			var state = payload as ChatDeveloperStatePayload;
+			ApplyLearningPathState(state);
+		}
+
+		/// <summary>
+		/// Handles request from controller to end conversation.
+		/// Blocks ending when active learning-path vocabulary is not fully used.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[OnEvent(ChatEvents.EndConversationRequested)]
+		private void OnEndConversationRequested(object payload)
+		{
+			if (_hasActiveLearningPath && _remainingLearningPathVocabularyCount > 0)
+			{
+				UpdateRemainingVocabularyLabel();
+				Debug.LogWarning("[ChatView] Cannot end conversation while some learning-path vocabulary is still unused.", this);
+				return;
+			}
+
+			SendRequest(ChatRequests.EndConversation);
 		}
 
 		/// <summary>
@@ -414,6 +461,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			_messageContainer.SetMessages(mapped);
+			RebuildConversationTextCache(mapped);
+			RecalculateRemainingLearningPathVocabulary();
 			ScrollMessagesToBottom();
 		}
 
@@ -448,6 +497,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					Tone = DefaultTtsTone,
 					Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, DefaultCharacterDisplayName),
 				});
+				if (!string.IsNullOrWhiteSpace(response.Reply))
+				{
+					AppendConversationText(response.Reply);
+				}
 				ScrollMessagesToBottom();
 				return;
 			}
@@ -510,6 +563,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					Tone = tone,
 					Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, characterName),
 				});
+				if (!string.IsNullOrWhiteSpace(messageText))
+				{
+					AppendConversationText(messageText);
+				}
 				ScrollMessagesToBottom();
 
 				if (turn.AudioClip != null)
@@ -976,6 +1033,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				_messageContainer.UpdateMessageText(transcribed.UserMessageId, transcribed.Transcribe);
 			}
+
+			AppendConversationText(transcribed.Transcribe);
 		}
 
 		private void UpdateRecordButtonVisualState()
@@ -1115,47 +1174,17 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			var developerContext = BuildLearningPathDeveloperContext(payload.Context, payload.Vocabulary);
-			if (string.IsNullOrWhiteSpace(developerContext))
+			if (string.IsNullOrWhiteSpace(payload.Context) || string.IsNullOrWhiteSpace(payload.Vocabulary))
 			{
 				return;
 			}
 
-			SendRequest(ChatRequests.SaveContext, new ChatSaveContextRequestPayload
+			SendRequest(ChatRequests.ApplyLearningPath, new ChatApplyLearningPathRequestPayload
 			{
 				SessionId = string.IsNullOrWhiteSpace(_sessionId) ? null : _sessionId,
-				Context = developerContext,
-			});
-
-			// Trigger assistant reply immediately from history without waiting for a new user message.
-			SendRequest(ChatRequests.GenerateReplyFromHistory, new ChatSendRequestPayload
-			{
-				SessionId = string.IsNullOrWhiteSpace(_sessionId) ? null : _sessionId,
-				Model = string.IsNullOrWhiteSpace(_modelOverride) ? null : _modelOverride,
-			});
-		}
-
-		private static string BuildLearningPathDeveloperContext(string context, string vocabulary)
-		{
-			var safeContext = string.IsNullOrWhiteSpace(context) ? string.Empty : context.Trim();
-			var safeVocabulary = string.IsNullOrWhiteSpace(vocabulary) ? string.Empty : vocabulary.Trim();
-
-			if (string.IsNullOrWhiteSpace(safeContext) && string.IsNullOrWhiteSpace(safeVocabulary))
-			{
-				return string.Empty;
-			}
-
-			return string.Join("\n", new[]
-			{
-				"LEARNING PATH CONTEXT (BẮT BUỘC):",
-				safeContext,
-				"---------------",
-				"VOCABULARY BẮT BUỘC PHẢI SỬ DỤNG:",
-				safeVocabulary,
-				"YÊU CẦU CHO AI:",
-				"- Phải bám sát tuyệt đối bối cảnh ở trên.",
-				"- Phải sử dụng các từ vựng trong danh sách ở trên một cách tự nhiên trong lời thoại.",
-				"- Không đi chệch chủ đề hoặc tạo ngữ cảnh ngoài lộ trình đã cung cấp."
+				LearningPathId = payload.Id,
+				Context = payload.Context,
+				Vocabulary = payload.Vocabulary,
 			});
 		}
 
@@ -1174,6 +1203,163 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			return string.Empty;
+		}
+
+		private void ApplyLearningPathState(ChatDeveloperStatePayload state)
+		{
+			_activeLearningPathVocabulary.Clear();
+			_hasActiveLearningPath = state != null && state.ActiveLearningPathId.HasValue && state.ActiveLearningPathId.Value > 0;
+
+			if (_hasActiveLearningPath)
+			{
+				var tokens = ParseVocabularyTokens(state.ActiveLearningPathVocabulary);
+				for (var i = 0; i < tokens.Count; i++)
+				{
+					_activeLearningPathVocabulary.Add(tokens[i]);
+				}
+			}
+
+			RecalculateRemainingLearningPathVocabulary();
+		}
+
+		private static List<string> ParseVocabularyTokens(string rawVocabulary)
+		{
+			var result = new List<string>();
+			if (string.IsNullOrWhiteSpace(rawVocabulary))
+			{
+				return result;
+			}
+
+			var split = rawVocabulary.Split(',');
+			var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			for (var i = 0; i < split.Length; i++)
+			{
+				var token = split[i]?.Trim();
+				if (string.IsNullOrWhiteSpace(token))
+				{
+					continue;
+				}
+
+				if (seen.Add(token))
+				{
+					result.Add(token);
+				}
+			}
+
+			return result;
+		}
+
+		private void RebuildConversationTextCache(List<MessageBubbleData> mapped)
+		{
+			_conversationTextCache.Clear();
+			if (mapped == null)
+			{
+				return;
+			}
+
+			for (var i = 0; i < mapped.Count; i++)
+			{
+				var message = mapped[i];
+				var text = message?.OriginalMessage;
+				if (string.IsNullOrWhiteSpace(text))
+				{
+					text = message?.Message;
+				}
+
+				if (!string.IsNullOrWhiteSpace(text))
+				{
+					_conversationTextCache.Add(text.Trim());
+				}
+			}
+		}
+
+		private void AppendConversationText(string text)
+		{
+			if (string.IsNullOrWhiteSpace(text))
+			{
+				return;
+			}
+
+			_conversationTextCache.Add(text.Trim());
+			RecalculateRemainingLearningPathVocabulary();
+		}
+
+		private void RecalculateRemainingLearningPathVocabulary()
+		{
+			if (!_hasActiveLearningPath || _activeLearningPathVocabulary.Count == 0)
+			{
+				_remainingLearningPathVocabularyCount = 0;
+				UpdateRemainingVocabularyLabel();
+				return;
+			}
+
+			var unusedCount = 0;
+			for (var i = 0; i < _activeLearningPathVocabulary.Count; i++)
+			{
+				if (!IsVocabularyUsed(_activeLearningPathVocabulary[i]))
+				{
+					unusedCount++;
+				}
+			}
+
+			_remainingLearningPathVocabularyCount = unusedCount;
+			UpdateRemainingVocabularyLabel();
+		}
+
+		private bool IsVocabularyUsed(string vocabulary)
+		{
+			if (string.IsNullOrWhiteSpace(vocabulary))
+			{
+				return true;
+			}
+
+			for (var i = 0; i < _conversationTextCache.Count; i++)
+			{
+				var text = _conversationTextCache[i];
+				if (string.IsNullOrWhiteSpace(text))
+				{
+					continue;
+				}
+
+				if (text.IndexOf(vocabulary, StringComparison.OrdinalIgnoreCase) >= 0)
+				{
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		private void UpdateRemainingVocabularyLabel()
+		{
+			if (_coutVocab == null)
+			{
+				return;
+			}
+
+			if (!_hasActiveLearningPath)
+			{
+				_coutVocab.text = string.Empty;
+				return;
+			}
+
+			if (_remainingLearningPathVocabularyCount <= 0)
+			{
+				_coutVocab.text = "Đã sử dụng hết từ vựng của lộ trình.";
+				return;
+			}
+
+			var unused = new List<string>();
+			for (var i = 0; i < _activeLearningPathVocabulary.Count; i++)
+			{
+				var token = _activeLearningPathVocabulary[i];
+				if (!IsVocabularyUsed(token))
+				{
+					unused.Add(token);
+				}
+			}
+
+			_coutVocab.text = "Từ vựng chưa dùng: " + _remainingLearningPathVocabularyCount + "\n" + string.Join(", ", unused);
 		}
 
 		/// <summary>
@@ -1255,6 +1441,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_inputField.text = string.Empty;
 				_inputField.DeactivateInputField();
 			}
+
+			_conversationTextCache.Clear();
+			RecalculateRemainingLearningPathVocabulary();
 		}
 
 		/// <summary>
