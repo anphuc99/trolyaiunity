@@ -105,5 +105,11 @@ namespace Features.GamePlay.SubFeatures.Home.Controller
 		{
 			HomeState.ParentSignals?.OpenTask?.Invoke();
 		}
+
+		[Request(HomeRequests.OpenLearningPath)]
+		public static void HandleOpenLearningPath()
+		{
+			HomeState.ParentSignals?.OpenLearningPath?.Invoke();
+		}
 	}
 }

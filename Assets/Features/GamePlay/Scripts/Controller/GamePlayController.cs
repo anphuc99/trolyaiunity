@@ -239,6 +239,7 @@ namespace Features.GamePlay.Controller
 				OpenCharacter = () => HandleOpenSubController(GamePlaySubControllerType.Character),
 				OpenPractice = () => HandleOpenSubController(GamePlaySubControllerType.Practice),
 				OpenTask = () => HandleOpenSubController(GamePlaySubControllerType.Task),
+				OpenLearningPath = () => HandleOpenSubController(GamePlaySubControllerType.LearningPath),
 			});
 			CharacterController.SetParentSignals(new CharacterParentSignals
 			{

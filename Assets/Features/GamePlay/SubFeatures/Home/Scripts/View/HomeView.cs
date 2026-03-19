@@ -86,5 +86,10 @@ namespace Features.GamePlay.SubFeatures.Home.View
 		{
 			SendRequest(HomeRequests.OpenTask);
 		}
+
+		public void OpenLearningPath()
+		{
+			SendRequest(HomeRequests.OpenLearningPath);
+		}
 	}
 }
