@@ -55,6 +55,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		[SerializeField]
 		private Button _sendButton;
+		[SerializeField]
+		private ChatLearningPathView _learingPathTab;
 
 		private readonly Queue<ChatAssistantTurnPayload> _pendingCharacterTurns = new Queue<ChatAssistantTurnPayload>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
@@ -62,6 +64,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private bool _isCharacterResponding;
 		private bool _isPopupInitialized;
 		private bool _isContextPopupInitialized;
+		private bool _isLearningPathPopupInitialized;
 		private bool _isRecordingVoice;
 		private bool _isTranscribingVoice;
 		private string _recordingDeviceName;
@@ -248,6 +251,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				_contextPopupView.HideImmediate();
 			}
+			if (_learingPathTab != null)
+			{
+				_learingPathTab.HideImmediate();
+			}
 			gameObject.SetActive(false);
 		}
 
@@ -287,6 +294,28 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			_contextPopupView.Show();
+		}
+
+		/// <summary>
+		/// Opens learning-path popup with list from controller.
+		/// </summary>
+		/// <param name="payload">Learning path list payload.</param>
+		[OnEvent(ChatEvents.LearningPathsLoaded)]
+		private void OnLearningPathsLoaded(object payload)
+		{
+			EnsureDependencies();
+			if (_learingPathTab == null)
+			{
+				return;
+			}
+
+			if (payload is ChatLearningPathListResponsePayload response)
+			{
+				_learingPathTab.Show(response.LearningPaths);
+				return;
+			}
+
+			_learingPathTab.Show(new List<ChatLearningPathPayload>());
 		}
 
 		/// <summary>
@@ -574,6 +603,17 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				_contextPopupView.OnSaveContextClicked = HandleSaveContextClicked;
 				_contextPopupView.OnSaveAndSendContextClicked = HandleSaveAndSendContextClicked;
+			}
+
+			if (_learingPathTab != null && !_isLearningPathPopupInitialized)
+			{
+				_learingPathTab.HideImmediate();
+				_isLearningPathPopupInitialized = true;
+			}
+
+			if (_learingPathTab != null)
+			{
+				_learingPathTab.OnLearningPathSelected = HandleLearningPathSelected;
 			}
 
 			if (_messageContainer != null)
@@ -1066,6 +1106,57 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			SendChatMessage(messageToSend);
+		}
+
+		private void HandleLearningPathSelected(ChatLearningPathPayload payload)
+		{
+			if (payload == null)
+			{
+				return;
+			}
+
+			var developerContext = BuildLearningPathDeveloperContext(payload.Context, payload.Vocabulary);
+			if (string.IsNullOrWhiteSpace(developerContext))
+			{
+				return;
+			}
+
+			SendRequest(ChatRequests.SaveContext, new ChatSaveContextRequestPayload
+			{
+				SessionId = string.IsNullOrWhiteSpace(_sessionId) ? null : _sessionId,
+				Context = developerContext,
+			});
+
+			// Trigger assistant reply immediately from history without waiting for a new user message.
+			SendRequest(ChatRequests.GenerateReplyFromHistory, new ChatSendRequestPayload
+			{
+				SessionId = string.IsNullOrWhiteSpace(_sessionId) ? null : _sessionId,
+				Model = string.IsNullOrWhiteSpace(_modelOverride) ? null : _modelOverride,
+			});
+		}
+
+		private static string BuildLearningPathDeveloperContext(string context, string vocabulary)
+		{
+			var safeContext = string.IsNullOrWhiteSpace(context) ? string.Empty : context.Trim();
+			var safeVocabulary = string.IsNullOrWhiteSpace(vocabulary) ? string.Empty : vocabulary.Trim();
+
+			if (string.IsNullOrWhiteSpace(safeContext) && string.IsNullOrWhiteSpace(safeVocabulary))
+			{
+				return string.Empty;
+			}
+
+			return string.Join("\n", new[]
+			{
+				"LEARNING PATH CONTEXT (BẮT BUỘC):",
+				safeContext,
+				"---------------",
+				"VOCABULARY BẮT BUỘC PHẢI SỬ DỤNG:",
+				safeVocabulary,
+				"YÊU CẦU CHO AI:",
+				"- Phải bám sát tuyệt đối bối cảnh ở trên.",
+				"- Phải sử dụng các từ vựng trong danh sách ở trên một cách tự nhiên trong lời thoại.",
+				"- Không đi chệch chủ đề hoặc tạo ngữ cảnh ngoài lộ trình đã cung cấp."
+			});
 		}
 
 		private string ResolveCurrentInputMessage()

@@ -398,6 +398,31 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 	}
 
 	/// <summary>
+	/// One learning path entry used by chat context menu.
+	/// </summary>
+	public sealed class ChatLearningPathPayload
+	{
+		[JsonProperty("id")]
+		public int Id { get; set; }
+
+		[JsonProperty("context")]
+		public string Context { get; set; }
+
+		[JsonProperty("vocabulary")]
+		public string Vocabulary { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload for listing learning paths.
+	/// </summary>
+	public sealed class ChatLearningPathListResponsePayload
+	{
+		[JsonProperty("learningPaths")]
+		public System.Collections.Generic.List<ChatLearningPathPayload> LearningPaths { get; set; }
+			= new System.Collections.Generic.List<ChatLearningPathPayload>();
+	}
+
+	/// <summary>
 	/// Response payload from /api/chat/developer-state.
 	/// </summary>
 	public sealed class ChatDeveloperStatePayload

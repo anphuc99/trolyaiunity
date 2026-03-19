@@ -11,6 +11,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 
 		public static string ContextMenuId { get; set; }
 
+		public static string LearningPathMenuId { get; set; }
+
 		public static string EndConversationMenuId { get; set; }
 	}
 }

@@ -44,6 +44,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			RegisterAddCharacterMenu();
 			RegisterContextMenu();
+			RegisterLearningPathMenu();
 			RegisterEndConversationMenu();
 			EventBus.Publish(ChatEvents.Installed, null);
 		}
@@ -55,6 +56,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			UnregisterAddCharacterMenu();
 			UnregisterContextMenu();
+			UnregisterLearningPathMenu();
 			UnregisterEndConversationMenu();
 			// Clear API mode so the next chat session starts fresh (default mode).
 			GlobalVariables.Remove(CoreGlobalModes.ChatApiModeKey);
@@ -71,6 +73,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			{
 				UnregisterAddCharacterMenu();
 				UnregisterContextMenu();
+				UnregisterLearningPathMenu();
 				UnregisterEndConversationMenu();
 			}
 
@@ -337,6 +340,19 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			ChatState.EndConversationMenuId = menuId;
 		}
 
+		private static void RegisterLearningPathMenu()
+		{
+			UnregisterLearningPathMenu();
+
+			var menuId = ChatState.ParentSignals?.AddMenu?.Invoke("Thêm lộ trình", HandleOpenLearningPathMenu);
+			if (string.IsNullOrWhiteSpace(menuId))
+			{
+				return;
+			}
+
+			ChatState.LearningPathMenuId = menuId;
+		}
+
 		private static void UnregisterContextMenu()
 		{
 			if (string.IsNullOrWhiteSpace(ChatState.ContextMenuId))
@@ -361,6 +377,18 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			ChatState.EndConversationMenuId = null;
 		}
 
+		private static void UnregisterLearningPathMenu()
+		{
+			if (string.IsNullOrWhiteSpace(ChatState.LearningPathMenuId))
+			{
+				ChatState.LearningPathMenuId = null;
+				return;
+			}
+
+			ChatState.ParentSignals?.RemoveMenu?.Invoke(ChatState.LearningPathMenuId);
+			ChatState.LearningPathMenuId = null;
+		}
+
 		private static async void HandleOpenAddCharacterMenu()
 		{
 			var payload = await BuildSelectableCharactersAsync();
@@ -370,6 +398,34 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		private static void HandleOpenContextMenu()
 		{
 			EventBus.Publish(ChatEvents.ContextInputRequested, null);
+		}
+
+		private static async void HandleOpenLearningPathMenu()
+		{
+			try
+			{
+				var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.LearningPaths);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = "Empty learning path response from server."
+					});
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<ChatLearningPathListResponsePayload>(responseJson)
+					?? new ChatLearningPathListResponsePayload();
+				response.LearningPaths ??= new List<ChatLearningPathPayload>();
+				EventBus.Publish(ChatEvents.LearningPathsLoaded, response);
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to load learning paths: " + exception.Message
+				});
+			}
 		}
 
 		private static void HandleOpenEndConversationMenu()
