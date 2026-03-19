@@ -7,39 +7,39 @@ const DEFAULT_LEVELS: Array<Pick<LevelEntity, "level" | "maxWords" | "descript" 
     level: "HSK1",
     maxWords: 5,
     descript: "Basic phrases for familiar topics.",
-    guideline: "Use HSK1 grammar only. Focus on very simple sentence patterns such as 是, 有, 在, and basic greetings/questions. Keep sentences short and avoid complex complements."
+    guideline: "Use HSK 3.0 Level 1 grammar only. Keep sentences extremely short and concrete. Prioritize basic sentence types and core patterns: simple affirmative/negative/interrogative sentences; A是B; 有/没有; 在 + location; this/that/which; basic possession with 的; basic modal verbs such as 想, 会, 能; simple adjective predicates with 很/太; simple verb-object statements; basic time expressions; simple imperative/polite forms with 请. Avoid comparison, serial clauses, complements, passive/disposal structures, abstract connectors, and any idiomatic compression."
   },
   {
     level: "HSK2",
     maxWords: 7,
     descript: "Simple conversation and routine tasks.",
     guideline:
-      "Use HSK2 grammar. Allowed patterns include 因为...所以..., 虽然...但是..., 一边...一边..., 先...然后..., and common 了 usage. Avoid HSK3+ abstract constructions."
+      "Use HSK 3.0 Level 2 grammar. Allow common daily-life expansion beyond Level 1: sentence-final 了 for change/new situation, experiential 过 in simple contexts, progressive 在/正在, simple result/state complements such as 到/见/好, basic comparison with 比, existence/location refinements, choice and sequence markers such as 还是, 或者, 先...再/然后..., frequency/time expressions, and common cause/result patterns in simple form. Use everyday topic sentences only. Avoid 把/被, complex complement chains, concessive structures with heavy subordination, and abstract argumentative writing."
   },
   {
     level: "HSK3",
     maxWords: 10,
     descript: "Handle everyday situations and short texts.",
     guideline:
-      "Use HSK3 grammar. Allowed patterns: 把/被 sentences, 越来越..., 除了...以外..., 只要...就..., 即使...也.... Keep sentences concise and avoid HSK4+ density."
+      "Use HSK 3.0 Level 3 grammar. Allow fuller everyday narration and explanation with intermediate patterns: directional complements, potential complements in common forms, comparison extensions, 连动/兼语 constructions, 越来越..., 一边...一边..., 一...就..., 先...然后..., 因为...所以..., 虽然...但是..., 如果...就..., 除了...以外..., 只要...就..., even basic 把/被 in very clear contexts. Use simple paragraph logic but keep each sentence concise. Avoid dense formal written style, heavy nominalization, advanced rhetorical inversion, and idioms unless extremely common."
   },
   {
     level: "HSK4",
     maxWords: 12,
     descript: "Discuss abstract topics with some fluency.",
-    guideline: "Use HSK4 grammar to discuss opinions and abstract topics. Prefer clear logic markers such as 不仅...而且..., 与其...不如..., 既...又.... Keep replies concise."
+    guideline: "Use HSK 3.0 Level 4 grammar. Permit broader discussion, explanation, and opinion with clearer logical structure: 不但/不仅...而且..., 既...又..., 先...再..., 无论...都..., 即使...也..., 与其...不如..., 一方面...另一方面..., as well as more flexible 把/被, complement structures, and topic-comment organization. Sentences may be moderately complex but should remain readable and conversational. Avoid highly literary compression, overly formal bureaucratic phrasing, and HSK5-6 style abstract discourse density."
   },
   {
     level: "HSK5",
     maxWords: 15,
     descript: "Understand complex texts and express ideas.",
-    guideline: "Use HSK5 grammar with nuanced connectors and occasional idiomatic expressions (成语) when natural. Maintain clarity and concise sentence flow."
+    guideline: "Use HSK 3.0 Level 5 grammar. Allow mature discussion, explanation, and argument with richer connectors and nuanced stance marking: 之所以...是因为..., 并非...而是..., 不论/无论..., 既然..., 尽管..., 甚至..., 反而..., 从而..., 以便..., 以免..., 何况..., 况且..., rather complete complement usage, and occasional natural 成语 or书面词 when helpful. Keep logic explicit and elegant, but do not become excessively literary or obscure."
   },
   {
     level: "HSK6",
     maxWords: 20,
     descript: "Near-native understanding and expression.",
-    guideline: "Use HSK6 near-native Chinese with precise register control. Keep responses concise, coherent, and pedagogically useful."
+    guideline: "Use HSK 3.0 Level 6 grammar with near-native flexibility and precise register control. Allow layered subordination, nuanced discourse markers, formal/informal register shifts, compact but natural argumentation, rhetorical emphasis, advanced complements, and idiomatic expressions when contextually appropriate. Maintain coherence, precision, and pedagogical readability. Avoid archaic classical wording unless explicitly requested."
   }
 ];
 
