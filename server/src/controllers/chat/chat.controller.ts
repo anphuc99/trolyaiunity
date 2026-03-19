@@ -609,7 +609,6 @@ export const createChatController = (
       levelMaxWords: user?.level?.maxWords ?? null,
       levelDescription: user?.level?.descript ?? null,
       levelGuideline: user?.level?.guideline ?? null,
-      levelVocabulary: user?.level?.vocabulary ?? null,
       userName: user?.name ?? null,
       userAge: user?.age ?? null,
       userDescription: user?.description ?? null,

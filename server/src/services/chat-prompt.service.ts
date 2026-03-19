@@ -23,10 +23,6 @@ export interface ChatPromptParams {
     */
     levelMaxWords?: number | null;
   /**
-   * Optional comma-separated target vocabulary from the database (`levels.vocabulary`).
-   */
-  levelVocabulary?: string | null;
-  /**
    * User's display name.
    */
   userName?: string | null;
@@ -136,14 +132,6 @@ export const buildChatSystemPrompt = (params: ChatPromptParams): string => {
   const dbMaxWords = typeof params.levelMaxWords === "number" ? params.levelMaxWords : null;
   const maxWords = Number.isFinite(dbMaxWords) && (dbMaxWords as number) > 0 ? (dbMaxWords as number) : levelCfg.maxWords;
   const dbGuideline = (params.levelGuideline ?? "").trim();
-  const dbVocabularyRaw = (params.levelVocabulary ?? "").trim();
-  const vocabularyList = dbVocabularyRaw
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry, index, arr) => entry.length > 0 && arr.indexOf(entry) === index);
-  const vocabularyBlock = vocabularyList.length > 0
-    ? `\nTarget vocabulary (DB):\n${vocabularyList.join(", ")}\n`
-    : "";
   const guideline = dbGuideline || levelCfg.guideline;
   const context = params.context?.trim() ? params.context.trim() : "A casual Chinese practice chat between the user and the assistant.";
 
@@ -209,8 +197,6 @@ DIALOGUE RULES
 - If the user mixes Vietnamese/Chinese, still respond in Chinese.
 - If the user asks for translation/explanation, keep it short and at the same level.
 - If the character is thinking, please put it in parentheses.
-- Repeat and recycle Target vocabulary words as often as possible across sentences while keeping the reply natural.
-- Prefer exact vocabulary forms from Target vocabulary (DB) over synonyms when possible.
 
 ====================================
 RESPONSE FORMAT (JSON ARRAY)
