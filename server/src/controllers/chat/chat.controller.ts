@@ -259,6 +259,7 @@ export const createChatController = (
     return [
       "Developer learning path applied:",
       `LearningPathId: ${learningPathId}`,
+      "Please note that the message must follow the correct sequence from beginning to end; no stages should be skipped.",
       "LearningPathContext:",
       context,
       "LearningPathVocabulary:",
