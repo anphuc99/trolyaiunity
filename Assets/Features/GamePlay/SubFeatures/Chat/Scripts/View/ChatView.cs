@@ -1345,7 +1345,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			if (_remainingLearningPathVocabularyCount <= 0)
 			{
-				_coutVocab.text = "Đã sử dụng hết từ vựng của lộ trình.";
+				_coutVocab.text = "";
 				return;
 			}
 
@@ -1359,7 +1359,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				}
 			}
 
-			_coutVocab.text = "Từ vựng chưa dùng: " + _remainingLearningPathVocabularyCount + "\n" + string.Join(", ", unused);
+			_coutVocab.text =  _remainingLearningPathVocabularyCount.ToString() + "/" + _activeLearningPathVocabulary.Count.ToString();
 		}
 
 		/// <summary>
