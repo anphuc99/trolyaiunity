@@ -216,7 +216,7 @@ export const createTtsAudio = async (
     voice: resolvedVoice,
     response_format: "wav",
     instructions: tone,
-    speed: 0.8
+    speed: 0.9
   });
 
   const rawBuffer = Buffer.from(await response.arrayBuffer());
