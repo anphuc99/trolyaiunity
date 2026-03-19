@@ -29,7 +29,6 @@ namespace Features.GamePlay.SubFeatures.LearningPath.View
 		[SerializeField] private TMP_Text _buttonSubmitLabel;
 
 		[Header("Tab xem lộ trình đã tạo")]
-		[SerializeField] private GameObject _listContainer;
 		[SerializeField] private LearningPathItemView _itemPrefab;
 		[SerializeField] private Transform _learningPathListRoot;
 
@@ -164,8 +163,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.View
 		{
 			ClearItems();
 
-			var root = _learningPathListRoot != null ? _learningPathListRoot : (_listContainer != null ? _listContainer.transform : null);
-			if (root == null || _itemPrefab == null)
+			if (_learningPathListRoot == null || _itemPrefab == null)
 			{
 				return;
 			}
@@ -184,7 +182,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.View
 					continue;
 				}
 
-				var instance = Instantiate(_itemPrefab, root);
+				var instance = Instantiate(_itemPrefab, _learningPathListRoot);
 				instance.name = "LearningPathItem-" + item.Id;
 				instance.gameObject.SetActive(true);
 				instance.Bind(item.Id, item.Context, item.Vocabulary);
