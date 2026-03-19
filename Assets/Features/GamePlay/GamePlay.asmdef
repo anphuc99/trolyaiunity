@@ -13,7 +13,8 @@
         "GamePlay.Chat",
         "Unity.TextMeshPro",
         "GamePlay.Setting",
-        "GamePlay.MyLog"
+        "GamePlay.MyLog",
+        "GamePlay.LearningPath"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

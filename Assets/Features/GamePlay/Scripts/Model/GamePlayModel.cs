@@ -13,7 +13,8 @@ namespace Features.GamePlay.Model
 		Story,
 		Task,
 		Setting,
-		MyLog
+		MyLog,
+		LearningPath
 	}
 
 	/// <summary>

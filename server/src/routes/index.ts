@@ -14,6 +14,7 @@ import { createTranslationRoutes } from "./translation.routes.js";
 import { createUsersRoutes } from "./users.routes.js";
 import { createVocabularyRoutes } from "./vocabulary.routes.js";
 import { createMyLogRoutes } from "./mylog.routes.js";
+import { createLearningPathRoutes } from "./learning-path.routes.js";
 
 /**
  * Creates the root API router with all route groups.
@@ -37,6 +38,7 @@ export const createApiRouter = (dataSource: DataSource) => {
   router.use("/users", createUsersRoutes(dataSource));
   router.use("/vocabulary", createVocabularyRoutes(dataSource));
   router.use("/mylog", createMyLogRoutes(dataSource));
+  router.use("/learning-paths", createLearningPathRoutes(dataSource));
   router.use("/", createSharedRoutes(dataSource));
 
   return router;

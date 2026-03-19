@@ -23,6 +23,8 @@ using Features.GamePlay.SubFeatures.Task.Controller;
 using Features.GamePlay.SubFeatures.Task.Model;
 using Features.GamePlay.SubFeatures.Setting.Controller;
 using Features.GamePlay.SubFeatures.Setting.Model;
+using Features.GamePlay.SubFeatures.LearningPath.Controller;
+using Features.GamePlay.SubFeatures.LearningPath.Model;
 using Core.Infrastructure.Network;
 using Core.Infrastructure.State;
 using CoreEvents = Core.Infrastructure.Events;
@@ -216,6 +218,9 @@ namespace Features.GamePlay.Controller
 				case GamePlaySubControllerType.Setting:
 					SettingController.Install();
 					break;
+				case GamePlaySubControllerType.LearningPath:
+					LearningPathController.Install();
+					break;
 			}
 			GamePlayState.CurrentSubController = subControllerType;
 		}
@@ -278,6 +283,7 @@ namespace Features.GamePlay.Controller
 				GetCharacterVoiceName = GetChatCharacterVoiceName,
 				GetCharacterPitch = GetChatCharacterPitch
 			});
+			LearningPathController.SetParentSignals(new LearningPathParentSignals { OnEchoed = OnSubControllerEchoed });
 		}
 
 		private static UnityEngine.Sprite GetChatCharacterAvatar(string characterName)
@@ -669,6 +675,7 @@ namespace Features.GamePlay.Controller
 			StoryController.SetParentSignals(null);
 			TaskController.SetParentSignals(null);
 			SettingController.SetParentSignals(null);
+			LearningPathController.SetParentSignals(null);
 		}
 
 		/// <summary>
@@ -705,6 +712,9 @@ namespace Features.GamePlay.Controller
 					break;
 				case GamePlaySubControllerType.Setting:
 					SettingController.Uninstall();
+					break;
+				case GamePlaySubControllerType.LearningPath:
+					LearningPathController.Uninstall();
 					break;
 			}
 		}
