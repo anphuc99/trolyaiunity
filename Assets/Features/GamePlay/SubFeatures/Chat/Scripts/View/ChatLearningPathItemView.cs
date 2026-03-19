@@ -20,7 +20,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
         [SerializeField]
         private TMP_Text _contentText;
 
-        private Action<ChatLearningPathPayload> _onSelected;
+        private Action<ChatLearningPathItemView, ChatLearningPathPayload> _onSelected;
         private ChatLearningPathPayload _payload;
 
         private void Awake()
@@ -45,7 +45,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
         /// </summary>
         /// <param name="payload">Learning path payload.</param>
         /// <param name="onSelected">Selection callback.</param>
-        public void Bind(ChatLearningPathPayload payload, Action<ChatLearningPathPayload> onSelected)
+        public void Bind(ChatLearningPathPayload payload, Action<ChatLearningPathItemView, ChatLearningPathPayload> onSelected)
         {
             _payload = payload;
             _onSelected = onSelected;
@@ -63,14 +63,23 @@ namespace Features.GamePlay.SubFeatures.Chat.View
             }
         }
 
-        private void HandleSelectClicked()
+        /// <summary>
+        /// Updates selected state without triggering toggle callbacks.
+        /// </summary>
+        /// <param name="isSelected">Whether this item is selected.</param>
+        public void SetSelected(bool isSelected)
         {
-            if (_selectedToggle != null)
+            if (_selectedToggle == null)
             {
-                _selectedToggle.isOn = true;
+                return;
             }
 
-            _onSelected?.Invoke(_payload);
+            _selectedToggle.SetIsOnWithoutNotify(isSelected);
+        }
+
+        private void HandleSelectClicked()
+        {
+            _onSelected?.Invoke(this, _payload);
         }
     }
 }

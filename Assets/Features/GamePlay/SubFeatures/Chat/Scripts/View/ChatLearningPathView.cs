@@ -18,14 +18,25 @@ namespace Features.GamePlay.SubFeatures.Chat.View
         private Transform _learningPathListContainer;
 
         [SerializeField]
+        private Button _submitButton;
+
+        [SerializeField]
         private Button _closeButton;
 
         private readonly List<ChatLearningPathItemView> _spawnedItems = new List<ChatLearningPathItemView>();
+        private ChatLearningPathPayload _selectedLearningPath;
+        private ChatLearningPathItemView _selectedItemView;
 
         public Action<ChatLearningPathPayload> OnLearningPathSelected;
 
         private void Awake()
         {
+            if (_submitButton != null)
+            {
+                _submitButton.onClick.RemoveListener(HandleSubmitClicked);
+                _submitButton.onClick.AddListener(HandleSubmitClicked);
+            }
+
             if (_closeButton != null)
             {
                 _closeButton.onClick.RemoveListener(Hide);
@@ -35,6 +46,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
         private void OnDestroy()
         {
+            if (_submitButton != null)
+            {
+                _submitButton.onClick.RemoveListener(HandleSubmitClicked);
+            }
+
             if (_closeButton != null)
             {
                 _closeButton.onClick.RemoveListener(Hide);
@@ -47,6 +63,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
         /// <param name="items">Learning path items.</param>
         public void Show(List<ChatLearningPathPayload> items)
         {
+            _selectedLearningPath = null;
             RenderItems(items);
             if (!gameObject.activeSelf)
             {
@@ -97,14 +114,39 @@ namespace Features.GamePlay.SubFeatures.Chat.View
             }
         }
 
-        private void HandleItemSelected(ChatLearningPathPayload payload)
+        private void HandleItemSelected(ChatLearningPathItemView itemView, ChatLearningPathPayload payload)
         {
-            OnLearningPathSelected?.Invoke(payload);
+            _selectedLearningPath = payload;
+            _selectedItemView = itemView;
+
+            for (var i = 0; i < _spawnedItems.Count; i++)
+            {
+                if (_spawnedItems[i] == null)
+                {
+                    continue;
+                }
+
+                var isSelected = ReferenceEquals(_spawnedItems[i], _selectedItemView);
+                _spawnedItems[i].SetSelected(isSelected);
+            }
+        }
+
+        private void HandleSubmitClicked()
+        {
+            if (_selectedLearningPath == null)
+            {
+                return;
+            }
+
+            OnLearningPathSelected?.Invoke(_selectedLearningPath);
             Hide();
         }
 
         private void ClearSpawnedItems()
         {
+            _selectedLearningPath = null;
+            _selectedItemView = null;
+
             for (var i = 0; i < _spawnedItems.Count; i++)
             {
                 if (_spawnedItems[i] != null)
