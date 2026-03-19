@@ -342,6 +342,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _selectButton: {fileID: 2490023045419919945}
   _selectedToggle: {fileID: 7939054435705181910}
+  _contentText: {fileID: 382279902267191677}
 --- !u!114 &2490023045419919945
 MonoBehaviour:
   m_ObjectHideFlags: 0
