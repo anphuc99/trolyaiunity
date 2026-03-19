@@ -809,12 +809,13 @@ export const createChatController = (
     }
 
     try {
+      const fallbackMessage = "Continue the conversation naturally based on the current context.";
       const systemPrompt = await buildSystemPrompt(request.user.id, request.body);
       await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
       const history = await historyStore.load(request.user.id);
       const result = await requestJsonReplyWithRetry(
         selectedService,
-        undefined,
+        fallbackMessage,
         history,
         modelOverride || undefined,
         2,

@@ -620,11 +620,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			{
 				var request = new
 				{
-					SessionId = string.IsNullOrWhiteSpace(payload.SessionId) ? null : payload.SessionId.Trim(),
-					Kind = "learning_path_apply",
-					LearningPathId = payload.LearningPathId,
-					Context = payload.Context.Trim(),
-					Vocabulary = payload.Vocabulary.Trim(),
+					sessionId = string.IsNullOrWhiteSpace(payload.SessionId) ? null : payload.SessionId.Trim(),
+					kind = "learning_path_apply",
+					learningPathId = payload.LearningPathId,
+					context = payload.Context.Trim(),
+					vocabulary = payload.Vocabulary.Trim(),
 				};
 
 				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatDeveloperEndpoint(), request);
