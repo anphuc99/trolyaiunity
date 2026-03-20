@@ -22,11 +22,6 @@ namespace Share.Utils
 				return null;
 			}
 
-			if (Uri.TryCreate(audioUrl, UriKind.Absolute, out var absoluteUri))
-			{
-				return absoluteUri.ToString();
-			}
-
 			if (string.IsNullOrWhiteSpace(normalizedServerBaseUrl))
 			{
 				return null;
