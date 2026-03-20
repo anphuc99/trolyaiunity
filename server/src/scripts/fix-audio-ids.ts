@@ -134,13 +134,21 @@ async function main() {
     const userChars = charactersByUser.get(msg.userId);
     const character = userChars?.get(normalizeName(msg.characterName));
 
+    const oldAudioId = msg.audio;
+
     const newAudioId = buildAudioId(
       msg.content,
       msg.tone,
-      character?.voiceName || undefined,
+      `${character?.voiceModel ?? "openai"}:${character?.voiceName ?? ""}`,
       character?.pitch ?? undefined,
       character?.speakingRate ?? undefined
     );
+
+    try {
+      await fs.rename(getAudioPath(oldAudioId), getAudioPath(newAudioId));
+    } catch {
+      console.warn(`[Warning] Audio file for new ID not found: ${newAudioId} (message ID: ${msg.id})`);
+    }
 
     if (msg.audio !== newAudioId) {
       console.log(`[my_log_messages] ${msg.id}: ${msg.audio} -> ${newAudioId}`);
