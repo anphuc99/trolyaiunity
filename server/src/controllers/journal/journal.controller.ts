@@ -228,7 +228,7 @@ export const createJournalController = (
     history: ChatHistoryMessage[],
     userId: number,
     journalId: number,
-    voiceByCharacter: Map<string, { voiceName: string; pitch: number | null; speakingRate: number | null }>
+    voiceByCharacter: Map<string, { voiceModel: string; voiceName: string; pitch: number | null; speakingRate: number | null }>
   ): Array<Pick<MessageEntity, "content" | "characterName" | "translation" | "pinyin" | "tone" | "audio" | "userId" | "journalId">> => {
     const result: Array<Pick<MessageEntity, "content" | "characterName" | "translation" | "pinyin" | "tone" | "audio" | "userId" | "journalId">> = [];
 
@@ -288,7 +288,7 @@ export const createJournalController = (
         const tone = typeof turn.Tone === "string" ? turn.Tone.trim() : "";
         const voiceKey = normalizeName(characterName || "Mimi");
         const voiceSettings = voiceByCharacter.get(voiceKey);
-        const audio = tone ? buildAudioId(content, tone, voiceSettings?.voiceName || undefined, voiceSettings?.pitch ?? undefined, voiceSettings?.speakingRate ?? undefined) : null;
+        const audio = tone ? buildAudioId(content, tone, `${voiceSettings?.voiceModel ?? "openai"}:${voiceSettings?.voiceName ?? ""}`, voiceSettings?.pitch ?? undefined, voiceSettings?.speakingRate ?? undefined) : null;
 
         result.push({
           content,
@@ -570,9 +570,10 @@ Please summarize the above conversation in Vietnamese, update the story descript
         characters
           .filter((character) => character.voiceName)
           .map((character) => [normalizeName(character.name), {
+            voiceModel: character.voiceModel ?? "openai",
             voiceName: character.voiceName as string,
             pitch: character.pitch ?? null,
-            speakingRate: character.speakingRate ?? null
+            speakingRate: character.speakingRate ?? null,
           }])
       );
 

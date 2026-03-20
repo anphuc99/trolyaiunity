@@ -17,9 +17,13 @@ import { AppDataSource } from "../data-source.js";
 import MessageEntity from "../models/message.entity.js";
 import MyLogMessageEntity from "../models/my-log-message.entity.js";
 import CharacterEntity from "../models/character.entity.js";
+import fs from "fs/promises";
+import path from "path";
+import { get } from "http";
 
 const DEFAULT_SPEAKING_RATE = 1;
 const DEFAULT_PITCH = 0;
+const AUDIO_DIR = path.join(process.cwd(), "data", "audio");
 
 /**
  * Normalizes text for stable hash generation (same as tts.service.ts).
@@ -55,6 +59,8 @@ const buildAudioId = (
 
 const normalizeName = (value: string) => value.trim().toLowerCase();
 
+const getAudioPath = (audioId: string) => path.join(AUDIO_DIR, `${audioId}.mp3`);
+
 async function main() {
   console.log("Connecting to database...");
   await AppDataSource.initialize();
@@ -89,13 +95,21 @@ async function main() {
     const userChars = charactersByUser.get(msg.userId);
     const character = userChars?.get(normalizeName(msg.characterName));
 
+    const oldAudioId = msg.audio;
+
     const newAudioId = buildAudioId(
       msg.content,
       msg.tone,
-      character?.voiceName || undefined,
+      `${character?.voiceModel ?? "openai"}:${character?.voiceName ?? ""}`,
       character?.pitch ?? undefined,
       character?.speakingRate ?? undefined
     );
+
+    try {
+      await fs.rename(getAudioPath(oldAudioId), getAudioPath(newAudioId));
+    } catch {
+      console.warn(`[Warning] Audio file for new ID not found: ${newAudioId} (message ID: ${msg.id})`);
+    }
 
     if (msg.audio !== newAudioId) {
       console.log(`[messages] ${msg.id}: ${msg.audio} -> ${newAudioId}`);
