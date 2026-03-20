@@ -93,7 +93,7 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
     const audioId = buildAudioId(
       text,
       tone,
-      `${resolvedSettings.voiceModel}:${resolvedSettings.voiceName ?? ""}`,
+      resolvedSettings.voiceName,
       resolvedSettings.pitch,
       resolvedSettings.speakingRate
     );

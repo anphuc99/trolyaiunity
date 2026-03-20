@@ -925,7 +925,7 @@ Please summarize the above conversation in Vietnamese, update the story descript
           audioId = buildAudioId(
             message.content,
             message.tone ?? "neutral",
-            `${voiceModel}:${voiceName ?? ""}`,
+            voiceName,
             pitch,
             speakingRate
           );
