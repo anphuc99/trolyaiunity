@@ -19,7 +19,8 @@
     "audio:trim:all": "tsx src/scripts/trim-audio.ts ./data",
     "trim": "npm run audio:trim:all",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "fix-audio-ids": "tsx src/scripts/fix-audio-ids.ts"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
