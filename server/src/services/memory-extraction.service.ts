@@ -21,10 +21,14 @@ interface AssistantTurn {
   Pinyin?: string;
   Tone?: string;
   Translation?: string;
+  /** Global/objective memory fields — first item only. */
+  GlobalMemoryEn?: string;
+  GlobalMemoryType?: string;
+  GlobalMemoryImportance?: string;
+  /** Character subjective memory fields — any item, actor = CharacterName. */
   ImportantMemoryEn?: string;
   ImportantMemoryType?: string;
   ImportantMemoryImportance?: string;
-  /** Character name whose subjective memory this is (first-person voice). */
   ImportantMemoryActor?: string;
   [key: string]: unknown;
 }
@@ -55,9 +59,10 @@ const VALID_IMPORTANCE: ReadonlySet<string> = new Set<MemoryImportance>([
  * Extracts memory sidecars from all assistant turns in a reply.
  *
  * Rules:
- * - Global memory (no actor): allowed only on the FIRST item.
- * - Character memory (with actor): allowed on ANY item.
- * - Multiple characters can each emit their own memory in the same reply.
+ * - Global memory (GlobalMemory* fields, no actor): only on the FIRST item.
+ * - Character memory (ImportantMemory* fields + actor): on ANY item.
+ * - Both types can coexist on the first item (different field names).
+ * - Multiple characters can each emit their own character memory in the same reply.
  *
  * @param turns - Parsed assistant turns from the AI reply.
  * @returns Array of valid memory candidates (may be empty).
@@ -67,28 +72,37 @@ export const extractMemorySidecars = (turns: AssistantTurn[]): MemoryCandidate[]
 
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
-    const text = typeof turn.ImportantMemoryEn === "string" ? turn.ImportantMemoryEn.trim() : "";
-    const type = typeof turn.ImportantMemoryType === "string" ? turn.ImportantMemoryType.trim().toLowerCase() : "";
-    const importance = typeof turn.ImportantMemoryImportance === "string"
-      ? turn.ImportantMemoryImportance.trim().toLowerCase()
-      : "";
-    const actor = typeof turn.ImportantMemoryActor === "string" ? turn.ImportantMemoryActor.trim() : "";
 
-    if (!text || !VALID_TYPES.has(type) || !VALID_IMPORTANCE.has(importance)) {
-      continue;
+    // ── Global memory (first item only, GlobalMemory* prefix) ──────────────
+    if (i === 0) {
+      const gText = typeof turn.GlobalMemoryEn === "string" ? turn.GlobalMemoryEn.trim() : "";
+      const gType = typeof turn.GlobalMemoryType === "string" ? turn.GlobalMemoryType.trim().toLowerCase() : "";
+      const gImportance = typeof turn.GlobalMemoryImportance === "string" ? turn.GlobalMemoryImportance.trim().toLowerCase() : "";
+
+      if (gText && VALID_TYPES.has(gType) && VALID_IMPORTANCE.has(gImportance)) {
+        candidates.push({
+          text: gText,
+          type: gType as MemoryType,
+          importance: gImportance as MemoryImportance,
+          actor: null
+        });
+      }
     }
 
-    // Global memory (no actor) is only allowed on the first item
-    if (!actor && i > 0) {
-      continue;
-    }
+    // ── Character memory (any item, ImportantMemory* prefix + actor) ────────
+    const cText = typeof turn.ImportantMemoryEn === "string" ? turn.ImportantMemoryEn.trim() : "";
+    const cType = typeof turn.ImportantMemoryType === "string" ? turn.ImportantMemoryType.trim().toLowerCase() : "";
+    const cImportance = typeof turn.ImportantMemoryImportance === "string" ? turn.ImportantMemoryImportance.trim().toLowerCase() : "";
+    const cActor = typeof turn.ImportantMemoryActor === "string" ? turn.ImportantMemoryActor.trim() : "";
 
-    candidates.push({
-      text,
-      type: type as MemoryType,
-      importance: importance as MemoryImportance,
-      actor: actor || null
-    });
+    if (cText && VALID_TYPES.has(cType) && VALID_IMPORTANCE.has(cImportance) && cActor) {
+      candidates.push({
+        text: cText,
+        type: cType as MemoryType,
+        importance: cImportance as MemoryImportance,
+        actor: cActor
+      });
+    }
   }
 
   return candidates;
@@ -152,6 +166,11 @@ export const stripMemorySidecar = (replyJson: string): string => {
       if (!item || typeof item !== "object") return item;
 
       const copy = { ...item };
+      // Strip global memory fields
+      delete copy.GlobalMemoryEn;
+      delete copy.GlobalMemoryType;
+      delete copy.GlobalMemoryImportance;
+      // Strip character memory fields
       delete copy.ImportantMemoryEn;
       delete copy.ImportantMemoryType;
       delete copy.ImportantMemoryImportance;

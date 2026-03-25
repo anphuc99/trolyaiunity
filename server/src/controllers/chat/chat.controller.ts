@@ -47,12 +47,15 @@ interface AssistantTurn {
   Tone?: string;
   Translation?: string;
   Transcribe?: string;
-  /** Sidecar field: English canonical memory text (emitted by AI when something important happens). */
+  /** Sidecar: global/objective memory (first item only). */
+  GlobalMemoryEn?: string;
+  GlobalMemoryType?: string;
+  GlobalMemoryImportance?: string;
+  /** Sidecar: character subjective memory (any item, actor = CharacterName). */
   ImportantMemoryEn?: string;
-  /** Sidecar field: Memory category (preference, relationship, story_fact, plan, profile, learning). */
   ImportantMemoryType?: string;
-  /** Sidecar field: Importance level (high, medium). */
   ImportantMemoryImportance?: string;
+  ImportantMemoryActor?: string;
   [key: string]: unknown;
 }
 

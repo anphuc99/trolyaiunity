@@ -225,23 +225,26 @@ RESPONSE FORMAT (JSON ARRAY)
 
   A) GLOBAL MEMORY (objective facts about the world/story):
      - Allowed ONLY on the FIRST item in the array.
+     - Uses prefix "Global": "GlobalMemoryEn", "GlobalMemoryType", "GlobalMemoryImportance".
      - Do NOT include "ImportantMemoryActor".
-     - Write ImportantMemoryEn in third-person objective voice.
+     - Write GlobalMemoryEn in third-person objective voice.
      - Example: "The group decided to visit the park this weekend."
 
   B) CHARACTER MEMORY (subjective thoughts/feelings/preferences of a specific character):
      - Allowed on ANY item in the array, attached to the item whose CharacterName owns the memory.
+     - Uses prefix "Important": "ImportantMemoryEn", "ImportantMemoryType", "ImportantMemoryImportance", "ImportantMemoryActor".
      - MUST include "ImportantMemoryActor" matching that item's CharacterName.
      - Write ImportantMemoryEn in FIRST-PERSON from that character's perspective.
      - Example: ImportantMemoryActor: "Mimi", ImportantMemoryEn: "I love fried chicken the most."
      - Multiple characters can each have their own memory in the same reply.
      - Two characters can also store memories about the same event from their own perspective.
+     - The FIRST item can have BOTH a GlobalMemory* and an ImportantMemory* at the same time (different field names).
 
-  Required sidecar fields (when emitting):
-  - "ImportantMemoryEn": concise English description (1 sentence max).
-  - "ImportantMemoryType": one of "preference", "relationship", "story_fact", "plan", "profile", "learning".
-  - "ImportantMemoryImportance": "high" or "medium".
-  - "ImportantMemoryActor": (ONLY for character memory) the CharacterName.
+  Required sidecar fields:
+  - Global memory: "GlobalMemoryEn" (third-person, 1 sentence), "GlobalMemoryType", "GlobalMemoryImportance".
+  - Character memory: "ImportantMemoryEn" (first-person, 1 sentence), "ImportantMemoryType", "ImportantMemoryImportance", "ImportantMemoryActor".
+  - Type values: "preference", "relationship", "story_fact", "plan", "profile", "learning".
+  - Importance values: "high" or "medium".
 
   IMPORTANT: Do NOT emit memories for every reply. Only store truly important, lasting facts worth remembering across sessions:
   food preferences, relationship changes, story-critical events, future plans, recurring learning mistakes.
