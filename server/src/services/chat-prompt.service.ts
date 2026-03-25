@@ -278,10 +278,25 @@ Example (normal reply — no important memory):
   }
 ]
 
-Example (reply WITH important memory on first item):
+Example (GLOBAL memory on first item — objective fact, no actor):
 [
   {
     "MessageId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "CharacterName": "Mimi",
+    "Text": "好的，我们这周末去公园！",
+    "Pinyin": "Hǎo de, wǒmen zhè zhōumò qù gōngyuán!",
+    "Tone": "Happy, medium pitch",
+    "Translation": "Được rồi, chúng ta sẽ đi công viên cuối tuần này!",
+    "ImportantMemoryEn": "The group decided to visit the park this weekend.",
+    "ImportantMemoryType": "plan",
+    "ImportantMemoryImportance": "high"
+  }
+]
+
+Example (CHARACTER memory on first item — subjective first-person voice):
+[
+  {
+    "MessageId": "b0c1d2e3-f4a5-6789-abcd-ef1234567890",
     "CharacterName": "Mimi",
     "Text": "那我们去吃炸鸡吧！",
     "Pinyin": "Nà wǒmen qù chī zhá jī ba!",
