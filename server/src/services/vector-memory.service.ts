@@ -43,6 +43,8 @@ export interface MemoryQueryOptions {
   storyId?: number | null;
   topK?: number;
   types?: MemoryType[];
+  /** When true, exclude character-subjective memories (actor != ""). Only return global memories. */
+  excludeActorMemories?: boolean;
 }
 
 /** A single result from a memory query. */
@@ -152,6 +154,10 @@ export const createVectorMemoryService = (config: VectorMemoryServiceConfig): Ve
 
     if (options?.types?.length) {
       whereConditions.push({ type: { $in: options.types } });
+    }
+
+    if (options?.excludeActorMemories) {
+      whereConditions.push({ actor: { $eq: "" } });
     }
 
     const where = whereConditions.length === 1

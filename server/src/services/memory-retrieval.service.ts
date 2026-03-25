@@ -83,7 +83,8 @@ export const createMemoryRetrievalService = (
       try {
         const results = await vectorMemory.query(userId, intent, {
           storyId: options?.storyId,
-          topK
+          topK,
+          excludeActorMemories: true
         });
 
         for (const result of results) {

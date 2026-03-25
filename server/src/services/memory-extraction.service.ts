@@ -9,6 +9,8 @@ export interface MemoryCandidate {
   text: string;
   type: MemoryType;
   importance: MemoryImportance;
+  /** Character name when this is a subjective character memory. Null for global memories. */
+  actor?: string | null;
 }
 
 /** Shape of a parsed assistant turn (mirrors chat controller). */
@@ -22,6 +24,8 @@ interface AssistantTurn {
   ImportantMemoryEn?: string;
   ImportantMemoryType?: string;
   ImportantMemoryImportance?: string;
+  /** Character name whose subjective memory this is (first-person voice). */
+  ImportantMemoryActor?: string;
   [key: string]: unknown;
 }
 
@@ -62,6 +66,7 @@ export const extractMemorySidecar = (turns: AssistantTurn[]): MemoryCandidate | 
   const importance = typeof first.ImportantMemoryImportance === "string"
     ? first.ImportantMemoryImportance.trim().toLowerCase()
     : "";
+  const actor = typeof first.ImportantMemoryActor === "string" ? first.ImportantMemoryActor.trim() : "";
 
   if (!text || !VALID_TYPES.has(type) || !VALID_IMPORTANCE.has(importance)) {
     return null;
@@ -70,7 +75,8 @@ export const extractMemorySidecar = (turns: AssistantTurn[]): MemoryCandidate | 
   return {
     text,
     type: type as MemoryType,
-    importance: importance as MemoryImportance
+    importance: importance as MemoryImportance,
+    actor: actor || null
   };
 };
 
@@ -107,7 +113,7 @@ export const buildMemoryItemFromCandidate = (
     storyId: storyId ?? null,
     type: candidate.type,
     importance: candidate.importance,
-    actor: null,
+    actor: candidate.actor ?? null,
     sourceSnippet: sourceSnippet ?? null,
     createdAt: new Date().toISOString()
   }
@@ -135,6 +141,7 @@ export const stripMemorySidecar = (replyJson: string): string => {
       delete copy.ImportantMemoryEn;
       delete copy.ImportantMemoryType;
       delete copy.ImportantMemoryImportance;
+      delete copy.ImportantMemoryActor;
       return copy;
     });
 

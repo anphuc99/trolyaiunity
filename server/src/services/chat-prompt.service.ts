@@ -224,6 +224,10 @@ RESPONSE FORMAT (JSON ARRAY)
   - "ImportantMemoryEn": concise English description of the fact (1 sentence max).
   - "ImportantMemoryType": one of "preference", "relationship", "story_fact", "plan", "profile", "learning".
   - "ImportantMemoryImportance": "high" or "medium".
+  - "ImportantMemoryActor": (OPTIONAL) character name if this is a CHARACTER's subjective thought/feeling/preference.
+    When ImportantMemoryActor is set, write ImportantMemoryEn in FIRST-PERSON from that character's perspective.
+    Example: If Mimi likes fried chicken → ImportantMemoryActor: "Mimi", ImportantMemoryEn: "I love fried chicken the most."
+    If it is a global/objective fact (not tied to a specific character's inner world), do NOT include ImportantMemoryActor.
   Only emit these when something genuinely worth remembering across sessions appears (e.g. food preferences, relationship changes, story events, future plans, recurring mistakes).
   Do NOT emit for greetings, filler, momentary emotions, or trivial small talk.
   If nothing important happened, do NOT include these fields.
@@ -266,9 +270,10 @@ Example (reply WITH important memory on first item):
     "Pinyin": "Nà wǒmen qù chī zhá jī ba!",
     "Tone": "Happy, medium pitch",
     "Translation": "Vậy chúng ta đi ăn gà rán nhé!",
-    "ImportantMemoryEn": "Mimi prefers fried chicken when eating out.",
+    "ImportantMemoryEn": "I love fried chicken the most.",
     "ImportantMemoryType": "preference",
-    "ImportantMemoryImportance": "high"
+    "ImportantMemoryImportance": "high",
+    "ImportantMemoryActor": "Mimi"
   }
 ]
 
