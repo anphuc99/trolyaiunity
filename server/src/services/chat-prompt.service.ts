@@ -66,6 +66,11 @@ export interface ChatPromptParams {
    * Optional pronunciation-check mode. If true, ask the user short clarifying questions.
    */
   checkPronunciation?: boolean;
+  /**
+   * Optional long-term memory brief retrieved from ChromaDB.
+   * Injected by the memory retrieval service before building the prompt.
+   */
+  longTermMemoryBrief?: string | null;
 }
 
 const LEVEL_CONFIG: Record<string, ChatPromptLevelConfig> = {
@@ -167,6 +172,11 @@ export const buildChatSystemPrompt = (params: ChatPromptParams): string => {
 
   const characterRules = "";
 
+  const longTermMemoryBrief = (params.longTermMemoryBrief ?? "").trim();
+  const longTermMemoryBlock = longTermMemoryBrief
+    ? `\n====================================\nLONG-TERM MEMORY (from previous conversations)\n====================================\n${longTermMemoryBrief}\nUse this memory naturally in your responses. Do not mention that you "retrieved" or "looked up" this information.\n`
+    : "";
+
   const p = `YOU ARE A CONVERSATION PARTNER FOR CHINESE LEARNERS.
 
 ====================================
@@ -188,7 +198,7 @@ ${userInfoBlock}
 SCENE / CONTEXT
 ====================================
 ${context}
-${maybe("STORY PLOT", params.storyPlot)}${maybe("STORY DESCRIPTION", params.storyDescription)}${maybe("STORY PROGRESS", params.storyProgress)}${maybe("RELATIONSHIPS", params.relationshipSummary)}${maybe("PREVIOUS SUMMARY", params.contextSummary)}${relatedStoryBlock}${characterRules}${pronunciationBlock}
+${maybe("STORY PLOT", params.storyPlot)}${maybe("STORY DESCRIPTION", params.storyDescription)}${maybe("STORY PROGRESS", params.storyProgress)}${maybe("RELATIONSHIPS", params.relationshipSummary)}${maybe("PREVIOUS SUMMARY", params.contextSummary)}${relatedStoryBlock}${characterRules}${pronunciationBlock}${longTermMemoryBlock}
 ====================================
 DIALOGUE RULES
 ====================================
@@ -210,6 +220,14 @@ RESPONSE FORMAT (JSON ARRAY)
 - Tone: short English description for TTS (e.g. "neutral, medium pitch").
 - Translation: Vietnamese translation of Text.
 - Return ONLY valid JSON. No markdown, no extra commentary.
+- OPTIONAL MEMORY EXTRACTION: In the FIRST object only, you MAY include these fields when a truly important long-term fact emerges:
+  - "ImportantMemoryEn": concise English description of the fact (1 sentence max).
+  - "ImportantMemoryType": one of "preference", "relationship", "story_fact", "plan", "profile", "learning".
+  - "ImportantMemoryImportance": "high" or "medium".
+  Only emit these when something genuinely worth remembering across sessions appears (e.g. food preferences, relationship changes, story events, future plans, recurring mistakes).
+  Do NOT emit for greetings, filler, momentary emotions, or trivial small talk.
+  If nothing important happened, do NOT include these fields.
+  Memory text MUST be in English regardless of conversation language.
 
 ====================================
 TTS TEXT FORMATTING PLEASE FOLLOW THESE TONE INDICATORS FOR CHINESE TTS:
@@ -227,7 +245,7 @@ Excited: 哇! !!!
 Serious: .  
 Neutral: unchanged
 
-Example:
+Example (normal reply — no important memory):
 [
   {
     "MessageId": "30dd879c-ee2f-11db-8314-0800200c9a66",
@@ -236,6 +254,21 @@ Example:
     "Pinyin": "Nǐ hǎo!",
     "Tone": "Happy, medium pitch",
     "Translation": "Xin chào."
+  }
+]
+
+Example (reply WITH important memory on first item):
+[
+  {
+    "MessageId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "CharacterName": "Mimi",
+    "Text": "那我们去吃炸鸡吧！",
+    "Pinyin": "Nà wǒmen qù chī zhá jī ba!",
+    "Tone": "Happy, medium pitch",
+    "Translation": "Vậy chúng ta đi ăn gà rán nhé!",
+    "ImportantMemoryEn": "Mimi prefers fried chicken when eating out.",
+    "ImportantMemoryType": "preference",
+    "ImportantMemoryImportance": "high"
   }
 ]
 

@@ -92,3 +92,30 @@ When adding a new GamePlay subfeature (or any parent-scoped subfeature), follow 
 Note:
 
 - When changing feature-related code patterns or conventions, update the Feature Generator templates accordingly to prevent new features from compiling with outdated code.
+
+## Server: Long-Term Memory (ChromaDB)
+
+The chat server supports optional long-term AI memory backed by ChromaDB. When enabled, the AI can remember important facts across conversations (user preferences, relationships, story progress, etc.).
+
+### Architecture
+
+1. **Big AI** (gemini-3-flash-preview) emits optional sidecar fields (`ImportantMemoryEn`, `ImportantMemoryType`, `ImportantMemoryImportance`) on its first reply turn when something important happens.
+2. The sidecar is extracted, validated, and stored in ChromaDB as an English-canonical vector document (fire-and-forget, non-blocking).
+3. The sidecar fields are stripped before saving to chat history.
+4. On next user message, a **cheap AI** (gemini-2.0-flash-lite) rewrites the user intent into English search queries, queries ChromaDB, and compresses the results into a brief.
+5. The compressed memory brief is injected into the system prompt under `LONG-TERM MEMORY`.
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `CHROMA_URL` | No | _(empty — memory disabled)_ | ChromaDB server URL (e.g. `http://localhost:8000`) |
+| `CHEAP_AI_MODEL` | No | `gemini-2.0-flash-lite` | Model for intent rewriting and memory compression |
+| `GOOGLE_API_KEY` | Yes (for memory) | — | Shared with Gemini chat; used by cheap AI service |
+
+### New Service Files
+
+- `server/src/services/vector-memory.service.ts` — ChromaDB wrapper (upsert/query/delete)
+- `server/src/services/memory-extraction.service.ts` — Parse/strip memory sidecar from AI reply
+- `server/src/services/cheap-ai.service.ts` — Gemini Flash Lite for intent rewriting + compression
+- `server/src/services/memory-retrieval.service.ts` — Orchestrates retrieve + compress pipeline

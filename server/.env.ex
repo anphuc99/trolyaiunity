@@ -48,6 +48,12 @@ REGISTRATION_TOKEN=change-me
 # Defaults to server/data/chat-history
 # CHAT_HISTORY_DIR=
 
+# Long-term memory (ChromaDB)
+# Set CHROMA_URL to enable AI long-term memory via ChromaDB.
+# When not set, memory features are disabled gracefully.
+# CHROMA_URL=http://localhost:8000
+# CHEAP_AI_MODEL=gemini-2.0-flash-lite
+
 # MyLog (Diary) feature
 # AI model for diary chat (supports any Gemini or OpenAI model)
 MYLOG_AI_MODEL=gemini-3-flash-preview

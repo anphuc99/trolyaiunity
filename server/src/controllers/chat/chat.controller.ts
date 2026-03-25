@@ -8,6 +8,10 @@ import { buildChatSystemPrompt } from "../../services/chat-prompt.service.js";
 import StoryEntity from "../../models/story.entity.js";
 import UserEntity from "../../models/user.entity.js";
 import { createChatHistoryStore, type ChatHistoryMessage, type ChatHistoryStore } from "../../services/chat-history.service.js";
+import { createVectorMemoryService, type VectorMemoryService } from "../../services/vector-memory.service.js";
+import { extractMemorySidecar, shouldStoreMemory, buildMemoryItemFromCandidate, stripMemorySidecar } from "../../services/memory-extraction.service.js";
+import { createMemoryRetrievalService, type MemoryRetrievalService } from "../../services/memory-retrieval.service.js";
+import { createCheapAIService } from "../../services/cheap-ai.service.js";
 
 interface ChatController {
   sendMessage: (request: Request, response: Response) => Promise<void>;
@@ -29,6 +33,10 @@ interface ChatControllerDeps {
    * Primarily used by unit tests to avoid database lookups.
    */
   systemPromptBuilder?: (params: { userId: number; body: unknown }) => Promise<string> | string;
+  /** Optional vector memory service for long-term memory storage. */
+  vectorMemoryService?: VectorMemoryService;
+  /** Optional memory retrieval service for recalling long-term memories. */
+  memoryRetrievalService?: MemoryRetrievalService;
 }
 
 interface AssistantTurn {
@@ -39,6 +47,13 @@ interface AssistantTurn {
   Tone?: string;
   Translation?: string;
   Transcribe?: string;
+  /** Sidecar field: English canonical memory text (emitted by AI when something important happens). */
+  ImportantMemoryEn?: string;
+  /** Sidecar field: Memory category (preference, relationship, story_fact, plan, profile, learning). */
+  ImportantMemoryType?: string;
+  /** Sidecar field: Importance level (high, medium). */
+  ImportantMemoryImportance?: string;
+  [key: string]: unknown;
 }
 
 type ChatReplyService = OpenAIChatService | GeminiChatService;
@@ -108,6 +123,24 @@ export const createChatController = (
     deps.geminiService ?? (geminiApiKey ? createGeminiChatService({ apiKey: geminiApiKey, model: geminiModel }) : null);
   
   const historyStore = deps.historyStore ?? createChatHistoryStore();
+
+  // Long-term memory services (active only when CHROMA_URL is set)
+  const chromaUrl = process.env.CHROMA_URL ?? "";
+  let vectorMemoryService: VectorMemoryService | undefined = deps.vectorMemoryService;
+  let memoryRetrievalService: MemoryRetrievalService | undefined = deps.memoryRetrievalService;
+
+  if (chromaUrl && !vectorMemoryService) {
+    try {
+      vectorMemoryService = createVectorMemoryService({ chromaUrl });
+      const cheapAI = createCheapAIService();
+      memoryRetrievalService = createMemoryRetrievalService({ vectorMemory: vectorMemoryService, cheapAI });
+      console.log("Long-term memory enabled (ChromaDB at", chromaUrl, ")");
+    } catch (error) {
+      console.warn("Failed to initialise long-term memory services:", error);
+      vectorMemoryService = undefined;
+      memoryRetrievalService = undefined;
+    }
+  }
 
   const transcribeWithOpenAI =
     deps.transcribeWithOpenAI ??
@@ -646,7 +679,7 @@ export const createChatController = (
    * This mirrors the older MimiChat initChat prompt style (level rules, characters, optional
    * story/context blocks), while skipping any missing fields.
    */
-  const buildSystemPrompt = async (userId: number, body: unknown) => {
+  const buildSystemPrompt = async (userId: number, body: unknown, userMessage?: string) => {
     if (deps.systemPromptBuilder) {
       const prompt = await deps.systemPromptBuilder({ userId, body });
       return (prompt ?? "").trim();
@@ -661,6 +694,23 @@ export const createChatController = (
 
     const story = await loadStoryForPrompt(userId);
     console.log("Loaded story for prompt:", story);
+
+    // Retrieve long-term memory brief if memory services are available
+    let longTermMemoryBrief: string | null = null;
+    if (memoryRetrievalService && userMessage) {
+      try {
+        const history = await historyStore.load(userId);
+        longTermMemoryBrief = await memoryRetrievalService.retrieveMemoryBrief(
+          userId,
+          userMessage,
+          history,
+          { storyId: story?.id ?? null }
+        ) || null;
+      } catch (error) {
+        console.warn("Memory retrieval failed, proceeding without long-term memory:", error);
+      }
+    }
+
     return buildChatSystemPrompt({
       level: user?.level?.level ?? null,
       levelMaxWords: user?.level?.maxWords ?? null,
@@ -676,7 +726,8 @@ export const createChatController = (
       relationshipSummary: getOptionalString(payload.relationshipSummary) || null,
       contextSummary: getOptionalString(payload.contextSummary) || null,
       relatedStoryMessages: getOptionalString(payload.relatedStoryMessages) || null,
-      checkPronunciation: Boolean(payload.checkPronunciation)
+      checkPronunciation: Boolean(payload.checkPronunciation),
+      longTermMemoryBrief
     });
   };
 
@@ -737,7 +788,7 @@ export const createChatController = (
 
       const effectiveMessage = (message || "The user sent an audio message. Please listen and respond.") + audioTranscribeInstruction;
 
-      const systemPrompt = await buildSystemPrompt(request.user.id, request.body);
+      const systemPrompt = await buildSystemPrompt(request.user.id, request.body, message);
       await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
       const history = await historyStore.load(request.user.id);
       const result = await requestJsonReplyWithRetry(
@@ -769,15 +820,31 @@ export const createChatController = (
         }
       }
 
+      // Extract and store memory sidecar (fire-and-forget, non-blocking)
+      let cleanReply = normalizedReply;
+      if (vectorMemoryService) {
+        const turns = parseAssistantReply(normalizedReply);
+        const candidate = extractMemorySidecar(turns);
+        if (shouldStoreMemory(candidate)) {
+          const user = await userRepository.findOne({ where: { id: request.user.id } });
+          const storyId = user?.currentStoryId ?? null;
+          const item = buildMemoryItemFromCandidate(candidate, request.user.id, storyId, message);
+          vectorMemoryService.upsert(request.user.id, [item]).catch((err) =>
+            console.warn("Memory upsert failed (non-blocking):", err)
+          );
+        }
+        cleanReply = stripMemorySidecar(normalizedReply);
+      }
+
       // Store the transcribed text as the user message in history (not the raw instruction)
       const userHistoryContent = hasAudio && transcribe ? transcribe : message;
       await historyStore.append(request.user.id, [
         { role: "user", content: userHistoryContent },
-        { role: "assistant", content: normalizedReply }
+        { role: "assistant", content: cleanReply }
       ]);
 
       response.json({
-        reply: normalizedReply,
+        reply: cleanReply,
         model: result.model,
         ...(transcribe ? { transcribe } : {})
       });
@@ -811,7 +878,7 @@ export const createChatController = (
 
     try {
       const fallbackMessage = "Continue the conversation naturally based on the current context.";
-      const systemPrompt = await buildSystemPrompt(request.user.id, request.body);
+      const systemPrompt = await buildSystemPrompt(request.user.id, request.body, fallbackMessage);
       await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
       const history = await historyStore.load(request.user.id);
       const result = await requestJsonReplyWithRetry(
@@ -828,10 +895,26 @@ export const createChatController = (
         ? normalizeAssistantReplyMessageIds(result.reply, collectAssistantMessageIds(history))
         : result.reply;
 
-      await historyStore.append(request.user.id, [{ role: "assistant", content: normalizedReply }]);
+      // Extract and store memory sidecar (fire-and-forget, non-blocking)
+      let cleanReply = normalizedReply;
+      if (vectorMemoryService) {
+        const turns = parseAssistantReply(normalizedReply);
+        const candidate = extractMemorySidecar(turns);
+        if (shouldStoreMemory(candidate)) {
+          const user = await userRepository.findOne({ where: { id: request.user.id } });
+          const storyId = user?.currentStoryId ?? null;
+          const item = buildMemoryItemFromCandidate(candidate, request.user.id, storyId);
+          vectorMemoryService.upsert(request.user.id, [item]).catch((err) =>
+            console.warn("Memory upsert failed (non-blocking):", err)
+          );
+        }
+        cleanReply = stripMemorySidecar(normalizedReply);
+      }
+
+      await historyStore.append(request.user.id, [{ role: "assistant", content: cleanReply }]);
 
       response.json({
-        reply: normalizedReply,
+        reply: cleanReply,
         model: result.model
       });
     } catch (error) {
