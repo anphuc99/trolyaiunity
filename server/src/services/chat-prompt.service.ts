@@ -281,7 +281,7 @@ Example (normal reply — no important memory):
   }
 ]
 
-Example (GLOBAL memory on first item — objective fact, no actor):
+Example (GLOBAL memory on first item — objective fact, GlobalMemory* fields):
 [
   {
     "MessageId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
@@ -290,13 +290,13 @@ Example (GLOBAL memory on first item — objective fact, no actor):
     "Pinyin": "Hǎo de, wǒmen zhè zhōumò qù gōngyuán!",
     "Tone": "Happy, medium pitch",
     "Translation": "Được rồi, chúng ta sẽ đi công viên cuối tuần này!",
-    "ImportantMemoryEn": "The group decided to visit the park this weekend.",
-    "ImportantMemoryType": "plan",
-    "ImportantMemoryImportance": "high"
+    "GlobalMemoryEn": "The group decided to visit the park this weekend.",
+    "GlobalMemoryType": "plan",
+    "GlobalMemoryImportance": "high"
   }
 ]
 
-Example (CHARACTER memory on first item — subjective first-person voice):
+Example (CHARACTER memory on first item — subjective first-person, ImportantMemory* fields):
 [
   {
     "MessageId": "b0c1d2e3-f4a5-6789-abcd-ef1234567890",
@@ -308,6 +308,25 @@ Example (CHARACTER memory on first item — subjective first-person voice):
     "ImportantMemoryEn": "I love fried chicken the most.",
     "ImportantMemoryType": "preference",
     "ImportantMemoryImportance": "high",
+    "ImportantMemoryActor": "Mimi"
+  }
+]
+
+Example (BOTH on first item — global fact + character memory coexist, different prefixes):
+[
+  {
+    "MessageId": "d4e5f6a7-b8c9-0123-def0-333333333333",
+    "CharacterName": "Mimi",
+    "Text": "好！我们这周末去公园吧！",
+    "Pinyin": "Hǎo! Wǒmen zhè zhōumò qù gōngyuán ba!",
+    "Tone": "Happy, medium pitch",
+    "Translation": "Tuyệt! Chúng ta đi công viên cuối tuần này nhé!",
+    "GlobalMemoryEn": "The group decided to visit the park this weekend.",
+    "GlobalMemoryType": "plan",
+    "GlobalMemoryImportance": "high",
+    "ImportantMemoryEn": "I really enjoy outdoor activities.",
+    "ImportantMemoryType": "preference",
+    "ImportantMemoryImportance": "medium",
     "ImportantMemoryActor": "Mimi"
   }
 ]
