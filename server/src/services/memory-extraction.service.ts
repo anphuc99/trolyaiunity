@@ -4,7 +4,7 @@ import { buildMemoryId, type MemoryImportance, type MemoryItem, type MemoryType 
 // Types
 // ────────────────────────────────────────────────────────────────────────────
 
-/** Raw sidecar fields that the AI may attach to the first turn. */
+/** Raw sidecar fields that the AI may attach to assistant turns. */
 export interface MemoryCandidate {
   text: string;
   type: MemoryType;
@@ -52,32 +52,46 @@ const VALID_IMPORTANCE: ReadonlySet<string> = new Set<MemoryImportance>([
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
- * Extracts the optional memory sidecar from the first assistant turn.
+ * Extracts memory sidecars from all assistant turns in a reply.
+ *
+ * Rules:
+ * - Global memory (no actor): allowed only on the FIRST item.
+ * - Character memory (with actor): allowed on ANY item.
+ * - Multiple characters can each emit their own memory in the same reply.
  *
  * @param turns - Parsed assistant turns from the AI reply.
- * @returns A memory candidate if the first turn contains valid sidecar fields, otherwise null.
+ * @returns Array of valid memory candidates (may be empty).
  */
-export const extractMemorySidecar = (turns: AssistantTurn[]): MemoryCandidate | null => {
-  if (!turns.length) return null;
+export const extractMemorySidecars = (turns: AssistantTurn[]): MemoryCandidate[] => {
+  const candidates: MemoryCandidate[] = [];
 
-  const first = turns[0];
-  const text = typeof first.ImportantMemoryEn === "string" ? first.ImportantMemoryEn.trim() : "";
-  const type = typeof first.ImportantMemoryType === "string" ? first.ImportantMemoryType.trim().toLowerCase() : "";
-  const importance = typeof first.ImportantMemoryImportance === "string"
-    ? first.ImportantMemoryImportance.trim().toLowerCase()
-    : "";
-  const actor = typeof first.ImportantMemoryActor === "string" ? first.ImportantMemoryActor.trim() : "";
+  for (let i = 0; i < turns.length; i++) {
+    const turn = turns[i];
+    const text = typeof turn.ImportantMemoryEn === "string" ? turn.ImportantMemoryEn.trim() : "";
+    const type = typeof turn.ImportantMemoryType === "string" ? turn.ImportantMemoryType.trim().toLowerCase() : "";
+    const importance = typeof turn.ImportantMemoryImportance === "string"
+      ? turn.ImportantMemoryImportance.trim().toLowerCase()
+      : "";
+    const actor = typeof turn.ImportantMemoryActor === "string" ? turn.ImportantMemoryActor.trim() : "";
 
-  if (!text || !VALID_TYPES.has(type) || !VALID_IMPORTANCE.has(importance)) {
-    return null;
+    if (!text || !VALID_TYPES.has(type) || !VALID_IMPORTANCE.has(importance)) {
+      continue;
+    }
+
+    // Global memory (no actor) is only allowed on the first item
+    if (!actor && i > 0) {
+      continue;
+    }
+
+    candidates.push({
+      text,
+      type: type as MemoryType,
+      importance: importance as MemoryImportance,
+      actor: actor || null
+    });
   }
 
-  return {
-    text,
-    type: type as MemoryType,
-    importance: importance as MemoryImportance,
-    actor: actor || null
-  };
+  return candidates;
 };
 
 /**

@@ -220,16 +220,33 @@ RESPONSE FORMAT (JSON ARRAY)
 - Tone: short English description for TTS (e.g. "neutral, medium pitch").
 - Translation: Vietnamese translation of Text.
 - Return ONLY valid JSON. No markdown, no extra commentary.
-- OPTIONAL MEMORY EXTRACTION: In the FIRST object only, you MAY include these fields when a truly important long-term fact emerges:
-  - "ImportantMemoryEn": concise English description of the fact (1 sentence max).
+- OPTIONAL MEMORY EXTRACTION: You MAY include memory sidecar fields on assistant reply items when a truly important long-term fact emerges.
+  There are TWO types of memory:
+
+  A) GLOBAL MEMORY (objective facts about the world/story):
+     - Allowed ONLY on the FIRST item in the array.
+     - Do NOT include "ImportantMemoryActor".
+     - Write ImportantMemoryEn in third-person objective voice.
+     - Example: "The group decided to visit the park this weekend."
+
+  B) CHARACTER MEMORY (subjective thoughts/feelings/preferences of a specific character):
+     - Allowed on ANY item in the array, attached to the item whose CharacterName owns the memory.
+     - MUST include "ImportantMemoryActor" matching that item's CharacterName.
+     - Write ImportantMemoryEn in FIRST-PERSON from that character's perspective.
+     - Example: ImportantMemoryActor: "Mimi", ImportantMemoryEn: "I love fried chicken the most."
+     - Multiple characters can each have their own memory in the same reply.
+     - Two characters can also store memories about the same event from their own perspective.
+
+  Required sidecar fields (when emitting):
+  - "ImportantMemoryEn": concise English description (1 sentence max).
   - "ImportantMemoryType": one of "preference", "relationship", "story_fact", "plan", "profile", "learning".
   - "ImportantMemoryImportance": "high" or "medium".
-  - "ImportantMemoryActor": (OPTIONAL) character name if this is a CHARACTER's subjective thought/feeling/preference.
-    When ImportantMemoryActor is set, write ImportantMemoryEn in FIRST-PERSON from that character's perspective.
-    Example: If Mimi likes fried chicken → ImportantMemoryActor: "Mimi", ImportantMemoryEn: "I love fried chicken the most."
-    If it is a global/objective fact (not tied to a specific character's inner world), do NOT include ImportantMemoryActor.
-  Only emit these when something genuinely worth remembering across sessions appears (e.g. food preferences, relationship changes, story events, future plans, recurring mistakes).
+  - "ImportantMemoryActor": (ONLY for character memory) the CharacterName.
+
+  IMPORTANT: Do NOT emit memories for every reply. Only store truly important, lasting facts worth remembering across sessions:
+  food preferences, relationship changes, story-critical events, future plans, recurring learning mistakes.
   Do NOT emit for greetings, filler, momentary emotions, or trivial small talk.
+  Avoid memory inflation — if unsure whether something is important enough, do NOT emit.
   If nothing important happened, do NOT include these fields.
   Memory text MUST be in English regardless of conversation language.
 
@@ -274,6 +291,34 @@ Example (reply WITH important memory on first item):
     "ImportantMemoryType": "preference",
     "ImportantMemoryImportance": "high",
     "ImportantMemoryActor": "Mimi"
+  }
+]
+
+Example (two characters each storing their own memory):
+[
+  {
+    "MessageId": "b1c2d3e4-f5a6-7890-abcd-111111111111",
+    "CharacterName": "Mimi",
+    "Text": "我喜欢吃炸鸡！",
+    "Pinyin": "Wǒ xǐhuan chī zhá jī!",
+    "Tone": "Happy, medium pitch",
+    "Translation": "Tôi thích ăn gà rán!",
+    "ImportantMemoryEn": "I love fried chicken the most.",
+    "ImportantMemoryType": "preference",
+    "ImportantMemoryImportance": "high",
+    "ImportantMemoryActor": "Mimi"
+  },
+  {
+    "MessageId": "c2d3e4f5-a6b7-8901-bcde-222222222222",
+    "CharacterName": "Lisa",
+    "Text": "我更喜欢披萨！",
+    "Pinyin": "Wǒ gèng xǐhuan pīsà!",
+    "Tone": "Happy, medium pitch",
+    "Translation": "Tôi thích pizza hơn!",
+    "ImportantMemoryEn": "I prefer pizza over other food.",
+    "ImportantMemoryType": "preference",
+    "ImportantMemoryImportance": "high",
+    "ImportantMemoryActor": "Lisa"
   }
 ]
 

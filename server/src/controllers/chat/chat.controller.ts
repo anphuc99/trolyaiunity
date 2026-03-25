@@ -9,7 +9,7 @@ import StoryEntity from "../../models/story.entity.js";
 import UserEntity from "../../models/user.entity.js";
 import { createChatHistoryStore, type ChatHistoryMessage, type ChatHistoryStore } from "../../services/chat-history.service.js";
 import { createVectorMemoryService, type VectorMemoryService } from "../../services/vector-memory.service.js";
-import { extractMemorySidecar, shouldStoreMemory, buildMemoryItemFromCandidate, stripMemorySidecar } from "../../services/memory-extraction.service.js";
+import { extractMemorySidecars, shouldStoreMemory, buildMemoryItemFromCandidate, stripMemorySidecar } from "../../services/memory-extraction.service.js";
 import { createMemoryRetrievalService, type MemoryRetrievalService } from "../../services/memory-retrieval.service.js";
 import { createCheapAIService } from "../../services/cheap-ai.service.js";
 
@@ -832,16 +832,17 @@ export const createChatController = (
         }
       }
 
-      // Extract and store memory sidecar (fire-and-forget, non-blocking)
+      // Extract and store memory sidecars (fire-and-forget, non-blocking)
       let cleanReply = normalizedReply;
       if (vectorMemoryService) {
         const turns = parseAssistantReply(normalizedReply);
-        const candidate = extractMemorySidecar(turns);
-        if (shouldStoreMemory(candidate)) {
-          const user = await userRepository.findOne({ where: { id: request.user.id } });
+        const candidates = extractMemorySidecars(turns);
+        const itemsToStore = candidates.filter(shouldStoreMemory);
+        if (itemsToStore.length) {
+          const user = await userRepository.findOne({ where: { id: request.user!.id } });
           const storyId = user?.currentStoryId ?? null;
-          const item = buildMemoryItemFromCandidate(candidate, request.user.id, storyId, message);
-          vectorMemoryService.upsert(request.user.id, [item]).catch((err) =>
+          const items = itemsToStore.map((c) => buildMemoryItemFromCandidate(c, request.user!.id, storyId, message));
+          vectorMemoryService.upsert(request.user!.id, items).catch((err) =>
             console.warn("Memory upsert failed (non-blocking):", err)
           );
         }
@@ -907,16 +908,17 @@ export const createChatController = (
         ? normalizeAssistantReplyMessageIds(result.reply, collectAssistantMessageIds(history))
         : result.reply;
 
-      // Extract and store memory sidecar (fire-and-forget, non-blocking)
+      // Extract and store memory sidecars (fire-and-forget, non-blocking)
       let cleanReply = normalizedReply;
       if (vectorMemoryService) {
         const turns = parseAssistantReply(normalizedReply);
-        const candidate = extractMemorySidecar(turns);
-        if (shouldStoreMemory(candidate)) {
-          const user = await userRepository.findOne({ where: { id: request.user.id } });
+        const candidates = extractMemorySidecars(turns);
+        const itemsToStore = candidates.filter(shouldStoreMemory);
+        if (itemsToStore.length) {
+          const user = await userRepository.findOne({ where: { id: request.user!.id } });
           const storyId = user?.currentStoryId ?? null;
-          const item = buildMemoryItemFromCandidate(candidate, request.user.id, storyId);
-          vectorMemoryService.upsert(request.user.id, [item]).catch((err) =>
+          const items = itemsToStore.map((c) => buildMemoryItemFromCandidate(c, request.user!.id, storyId));
+          vectorMemoryService.upsert(request.user!.id, items).catch((err) =>
             console.warn("Memory upsert failed (non-blocking):", err)
           );
         }
