@@ -62,8 +62,8 @@ class JournalReviewEntity {
    * Each entry: { date, rating, stabilityBefore, stabilityAfter,
    *   difficultyBefore, difficultyAfter, retrievability }
    */
-  @Column({ name: "review_history", type: "text", default: "[]" })
-  reviewHistoryJson!: string;
+  @Column({ name: "review_history", type: "text" })
+  reviewHistoryJson: string = "[]";
 
   @CreateDateColumn({ name: "created_at", type: "datetime" })
   createdAt!: Date;

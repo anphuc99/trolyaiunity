@@ -32,8 +32,8 @@ class VocabularyMemoryEntity {
   userMemory!: string;
 
   /** JSON array of message IDs linked inside the memory. */
-  @Column({ name: "linked_message_ids", type: "text", default: "[]" })
-  linkedMessageIdsJson!: string;
+  @Column({ name: "linked_message_ids", type: "text" })
+  linkedMessageIdsJson: string = "[]";
 
   @Column({ name: "user_id", type: "int" })
   userId!: number;

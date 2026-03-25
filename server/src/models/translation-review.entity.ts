@@ -50,8 +50,8 @@ class TranslationReviewEntity {
   @Column({ name: "last_review_date", type: "datetime", nullable: true })
   lastReviewDate!: Date | null;
 
-  @Column({ name: "review_history", type: "text", default: "[]" })
-  reviewHistoryJson!: string;
+  @Column({ name: "review_history", type: "text" })
+  reviewHistoryJson: string = "[]";
 
   @Column({ name: "is_starred", type: "boolean", default: false })
   isStarred!: boolean;

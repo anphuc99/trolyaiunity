@@ -14,8 +14,8 @@ class LevelEntity {
   @Column({ name: "max_words", type: "int", default: 5 })
   maxWords!: number;
 
-  @Column({ type: "text", default: "" })
-  guideline!: string;
+  @Column({ type: "text" })
+  guideline: string = "";
 
   @Column({ type: "text" })
   descript!: string;
