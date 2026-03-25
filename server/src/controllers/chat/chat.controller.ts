@@ -700,11 +700,23 @@ export const createChatController = (
     if (memoryRetrievalService && userMessage) {
       try {
         const history = await historyStore.load(userId);
+
+        // Extract active character names from developer messages in history
+        const activeCharMap = new Map<string, boolean>();
+        for (const msg of history) {
+          if (msg.role !== "developer") continue;
+          const action = parseDeveloperCharacterAction(msg.content);
+          if (action?.name) activeCharMap.set(action.name, action.active);
+        }
+        const activeCharacters = Array.from(activeCharMap.entries())
+          .filter(([, active]) => active)
+          .map(([name]) => name);
+
         longTermMemoryBrief = await memoryRetrievalService.retrieveMemoryBrief(
           userId,
           userMessage,
           history,
-          { storyId: story?.id ?? null }
+          { storyId: story?.id ?? null, activeCharacters }
         ) || null;
       } catch (error) {
         console.warn("Memory retrieval failed, proceeding without long-term memory:", error);

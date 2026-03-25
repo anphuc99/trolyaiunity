@@ -21,7 +21,7 @@ export interface MemoryRetrievalService {
     userId: number,
     userMessage: string,
     recentHistory: Array<{ role: string; content: string }>,
-    options?: { storyId?: number | null; topK?: number }
+    options?: { storyId?: number | null; topK?: number; activeCharacters?: string[] }
   ) => Promise<string>;
 }
 
@@ -66,7 +66,7 @@ export const createMemoryRetrievalService = (
     // Step 2: Cheap AI rewrites user intent into English search queries
     let intents: string[];
     try {
-      intents = await cheapAI.rewriteRetrievalIntents(trimmedMessage, recentTurns);
+      intents = await cheapAI.rewriteRetrievalIntents(trimmedMessage, recentTurns, options?.activeCharacters);
     } catch (error) {
       console.warn("Memory retrieval: intent rewrite failed, using raw message.", error);
       intents = [trimmedMessage.slice(0, 100)];

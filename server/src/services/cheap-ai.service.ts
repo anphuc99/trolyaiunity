@@ -12,11 +12,13 @@ export interface CheapAIService {
    *
    * @param userMessage - Latest user message in any language.
    * @param recentTurns - Last 3-5 conversation turns for context.
+   * @param activeCharacters - Names of characters currently in the scene.
    * @returns Array of English retrieval intent strings.
    */
   rewriteRetrievalIntents: (
     userMessage: string,
-    recentTurns: string[]
+    recentTurns: string[],
+    activeCharacters?: string[]
   ) => Promise<string[]>;
 
   /**
@@ -46,12 +48,13 @@ export interface CheapAIServiceConfig {
 
 const INTENT_REWRITE_PROMPT = `You are a search query rewriter for a memory retrieval system.
 
-Given a user message (which may be in Chinese, Vietnamese, or English) and recent conversation context, generate 2 to 4 concise English search queries that capture the user's intent and any implicit needs.
+Given a user message (which may be in Chinese, Vietnamese, or English), recent conversation context, and (optionally) a list of active characters in the scene, generate 2 to 4 concise English search queries that capture the user's intent and any implicit needs.
 
 Focus on:
 - What the user is asking about or suggesting
 - What background knowledge would be helpful (preferences, past events, relationships, plans)
 - Implicit needs that the user does not state directly
+- If active characters are provided, include at least one query related to the character(s) — e.g. their preferences, personality traits, past interactions, or relationship with the user
 
 Rules:
 - Output ONLY a JSON array of strings. No markdown, no explanation.
@@ -60,8 +63,9 @@ Rules:
 
 Example:
 User says (in Chinese): "我们出去吃饭吧"
+Active characters: Mimi
 Recent context: casual chat about weekend plans
-Output: ["dining suggestion based on food preferences", "favorite restaurants or food types", "previous plans to eat out together"]`;
+Output: ["dining suggestion based on food preferences", "favorite restaurants or food types", "Mimi's food preferences and dining habits", "previous plans to eat out together"]`;
 
 const COMPRESS_BRIEF_PROMPT = `You are a memory compression assistant.
 
@@ -97,14 +101,18 @@ export const createCheapAIService = (config: CheapAIServiceConfig = {}): CheapAI
 
   const rewriteRetrievalIntents: CheapAIService["rewriteRetrievalIntents"] = async (
     userMessage,
-    recentTurns
+    recentTurns,
+    activeCharacters
   ) => {
     const generativeModel = genAI.getGenerativeModel({ model });
     const contextBlock = recentTurns.length
       ? `\nRecent conversation:\n${recentTurns.join("\n")}\n`
       : "";
+    const charactersBlock = activeCharacters?.length
+      ? `\nActive characters: ${activeCharacters.join(", ")}\n`
+      : "";
 
-    const prompt = `${INTENT_REWRITE_PROMPT}\n${contextBlock}\nUser message: ${userMessage}\n\nOutput:`;
+    const prompt = `${INTENT_REWRITE_PROMPT}\n${contextBlock}${charactersBlock}\nUser message: ${userMessage}\n\nOutput:`;
 
     const result = await generativeModel.generateContent(prompt);
     const text = result.response.text().trim();
