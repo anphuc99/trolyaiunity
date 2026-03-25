@@ -300,6 +300,7 @@ export const createGeminiChatService = (config: GeminiChatServiceConfig): Gemini
     }
 
     messageParts.push({ text: userMessage || "Continue the conversation." });
+    console.log("Sending message parts to Gemini:", userMessage);
 
     const result = await chat.sendMessage(messageParts);
     const response = result.response;

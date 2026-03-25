@@ -147,7 +147,7 @@ export const createCheapAIService = (config: CheapAIServiceConfig = {}): CheapAI
       .join("\n");
 
     const prompt = `${COMPRESS_BRIEF_PROMPT}\n\nRetrieved memories:\n${memoriesBlock}\n\nCurrent user message: ${userMessage}\n\nBrief:`;
-
+    console.log("Compressing memory brief with prompt:", prompt);
     const result = await generativeModel.generateContent(prompt);
     const brief = result.response.text().trim();
 
