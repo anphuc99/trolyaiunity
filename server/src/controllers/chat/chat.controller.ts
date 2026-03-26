@@ -50,6 +50,7 @@ interface JsonReplyResult {
 
 const MAX_AUDIO_BYTES = 12 * 1024 * 1024;
 const DEFAULT_TRANSCRIBE_LANGUAGE = "zh";
+const LEARNING_PATH_VOCAB_REMINDER_MARKER = "LearningPathVocabularyReminder: true";
 
 /**
  * Parses a base64 audio data URL and extracts mime type + binary buffer.
@@ -563,6 +564,165 @@ export const createChatController = (
     };
   };
 
+  const normalizeForComparison = (value: string) => value.trim().toLowerCase();
+
+  const shuffleInPlace = <T,>(items: T[]) => {
+    for (let i = items.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [items[i], items[j]] = [items[j], items[i]];
+    }
+    return items;
+  };
+
+  const randomIntInRange = (min: number, max: number) => {
+    const lower = Math.ceil(min);
+    const upper = Math.floor(max);
+    return Math.floor(Math.random() * (upper - lower + 1)) + lower;
+  };
+
+  const parseLearningPathVocabularyItems = (rawVocabulary: string) => {
+    return rawVocabulary
+      .split(/\r?\n|,|;|\u30fb|\u3001|\uFF0C/g)
+      .map((item) => item.trim())
+      .filter((item) => Boolean(item));
+  };
+
+  const getAssistantUtterances = (history: { role: string; content: string }[]) => {
+    const utterances: string[] = [];
+
+    for (const message of history) {
+      if (message.role !== "assistant") {
+        continue;
+      }
+
+      const turns = parseAssistantReply(message.content);
+      if (!turns.length) {
+        if (message.content.trim()) {
+          utterances.push(message.content.trim());
+        }
+        continue;
+      }
+
+      for (const turn of turns) {
+        const text = typeof turn.Text === "string" ? turn.Text.trim() : "";
+        if (text) {
+          utterances.push(text);
+        }
+      }
+    }
+
+    return utterances;
+  };
+
+  const getActiveLearningPathFromHistory = (history: { role: string; content: string }[]) => {
+    for (let i = history.length - 1; i >= 0; i -= 1) {
+      const message = history[i];
+      if (message.role !== "developer") {
+        continue;
+      }
+
+      const state = parseDeveloperLearningPathState(message.content);
+      if (state) {
+        return { ...state, historyIndex: i };
+      }
+    }
+
+    return null;
+  };
+
+  const buildLearningPathVocabularyReminderContext = (vocabularyItems: string[]) => {
+    return [
+      LEARNING_PATH_VOCAB_REMINDER_MARKER,
+      "Learning path vocabulary reminder:",
+      "Please try to naturally use these vocabulary items in your next reply:",
+      ...vocabularyItems.map((item, index) => `${index + 1}. ${item}`),
+      "Keep the dialogue natural and relevant to the current learning path context."
+    ].join("\n");
+  };
+
+  const shouldInjectLearningPathVocabularyReminder = (userMessagesSinceLastReminder: number) => {
+    if (userMessagesSinceLastReminder < 3) {
+      return false;
+    }
+
+    if (userMessagesSinceLastReminder >= 5) {
+      return true;
+    }
+
+    const chance = userMessagesSinceLastReminder === 3 ? 1 / 3 : 1 / 2;
+    return Math.random() < chance;
+  };
+
+  const maybeInjectLearningPathVocabularyReminder = async (
+    userId: number,
+    history: ChatHistoryMessage[]
+  ) => {
+    const activeLearningPathSnapshot = getActiveLearningPathFromHistory(history);
+    if (!activeLearningPathSnapshot) {
+      return false;
+    }
+    const { vocabulary, historyIndex: learningPathAppliedIndex } = activeLearningPathSnapshot;
+
+    const assistantUtterances = getAssistantUtterances(history.slice(learningPathAppliedIndex + 1))
+      .map((line) => normalizeForComparison(line))
+      .filter((line) => Boolean(line));
+    const vocabularyItems = parseLearningPathVocabularyItems(vocabulary);
+    const remainingVocabulary = vocabularyItems.filter((item) => {
+      const normalizedItem = normalizeForComparison(item);
+      if (!normalizedItem) {
+        return false;
+      }
+
+      return !assistantUtterances.some((line) => line.includes(normalizedItem));
+    });
+
+    if (!remainingVocabulary.length) {
+      return false;
+    }
+
+    let lastReminderIndex = -1;
+    for (let i = history.length - 1; i >= 0; i -= 1) {
+      const message = history[i];
+      if (message.role !== "developer") {
+        continue;
+      }
+
+      if (message.content.includes(LEARNING_PATH_VOCAB_REMINDER_MARKER)) {
+        lastReminderIndex = i;
+        break;
+      }
+    }
+
+    const baselineIndex = lastReminderIndex >= learningPathAppliedIndex
+      ? lastReminderIndex
+      : learningPathAppliedIndex;
+
+    let userMessagesSinceLastReminder = 1;
+    for (let i = baselineIndex + 1; i < history.length; i += 1) {
+      if (history[i].role === "user") {
+        userMessagesSinceLastReminder += 1;
+      }
+    }
+
+    if (!shouldInjectLearningPathVocabularyReminder(userMessagesSinceLastReminder)) {
+      return false;
+    }
+
+    const maxPick = Math.min(5, remainingVocabulary.length);
+    const minPick = Math.min(3, maxPick);
+    const pickCount = randomIntInRange(minPick, maxPick);
+    const selected = shuffleInPlace([...remainingVocabulary]).slice(0, pickCount);
+
+    const context = buildLearningPathVocabularyReminderContext(selected);
+    const developerMessage = formatContextMessage({ context });
+    if (!developerMessage) {
+      return false;
+    }
+
+    await historyStore.append(userId, [{ role: "developer", content: developerMessage }]);
+    return true;
+  };
+
   const parseAssistantEditNote = (content: string) => {
     const englishMatch = content.match(/^Assistant\s+message\s+edited:\s+([^\.\n]+)\./i);
     const vietnameseMatch = content.match(/^Chat\s+co\s+messageID\s+duoc\s+sua\s+thanh\s+([^\.\n]+)\./i);
@@ -739,7 +899,11 @@ export const createChatController = (
 
       const systemPrompt = await buildSystemPrompt(request.user.id, request.body);
       await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
-      const history = await historyStore.load(request.user.id);
+      let history = await historyStore.load(request.user.id);
+      const injectedLearningPathContext = await maybeInjectLearningPathVocabularyReminder(request.user.id, history);
+      if (injectedLearningPathContext) {
+        history = await historyStore.load(request.user.id);
+      }
       const result = await requestJsonReplyWithRetry(
         selectedService,
         effectiveMessage,
