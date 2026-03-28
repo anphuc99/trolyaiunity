@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { randomUUID } from "crypto";
-import type { DataSource } from "typeorm";
+import { IsNull, type DataSource } from "typeorm";
 import { toFile, type Uploadable } from "openai/uploads";
 import { createOpenAIChatService, createOpenAIClient, type OpenAIChatService } from "../../services/openai.service.js";
 import { createGeminiChatService, isGeminiModel, type GeminiChatService, type GeminiAudioPart } from "../../services/gemini.service.js";
@@ -821,10 +821,39 @@ Please summarize the above conversation in Vietnamese, update the story descript
     const sessionId = getSessionId(request.query?.sessionId);
 
     try {
-      const messages = await historyStore.load(request.user.id);
-      const adjustedMessages = applyAssistantEdits(messages);
+      const dbMessages = await messageRepository.find({
+        where: { userId: request.user.id, journalId: IsNull() },
+        order: { createdAt: "ASC" }
+      });
+
+      const dbHistory: ChatHistoryMessage[] = dbMessages.map(msg => {
+        if (msg.characterName === "User") {
+          return { role: "user", content: msg.content };
+        } else {
+          const turn = {
+            MessageId: msg.id,
+            CharacterName: msg.characterName,
+            Text: msg.content,
+            Pinyin: msg.pinyin || "",
+            Tone: msg.tone || "",
+            Translation: msg.translation || "",
+            ...(msg.audio ? { Audio: msg.audio } : {})
+          };
+          return { role: "assistant", content: JSON.stringify([turn]) };
+        }
+      });
+
+      const activeMessages = await historyStore.load(request.user.id);
+      
+      const combinedMessages = [...dbHistory, ...activeMessages];
+      const adjustedCombinedMessages = applyAssistantEdits(combinedMessages);
+      
+      const finalHistory = adjustedCombinedMessages.filter(
+        (message) => message.role !== "system" && message.role !== "developer"
+      );
+
       response.json({
-        messages: adjustedMessages.filter((message) => message.role !== "system" && message.role !== "developer")
+        messages: finalHistory
       });
     } catch (error) {
       console.error("Error in getHistory:", error);
@@ -958,8 +987,19 @@ Please summarize the above conversation in Vietnamese, update the story descript
     }
 
     try {
+      const dbUserCount = await messageRepository.count({
+        where: { userId: request.user.id, journalId: IsNull(), characterName: "User" }
+      });
+      
       const history = await historyStore.load(request.user.id);
-      const targetIndex = findUserHistoryIndex(history, userIndex);
+      const adjustedUserIndex = userIndex - dbUserCount;
+      
+      if (adjustedUserIndex < 0) {
+        response.status(400).json({ message: "Cannot edit summarized history" });
+        return;
+      }
+      
+      const targetIndex = findUserHistoryIndex(history, adjustedUserIndex);
 
       if (targetIndex < 0) {
         response.status(404).json({ message: "User message not found" });
@@ -1004,8 +1044,36 @@ Please summarize the above conversation in Vietnamese, update the story descript
 
       await handleAutoSummaryAndSave(request.user.id, systemPrompt, selectedService, modelOverride || "");
 
+      const dbMessages = await messageRepository.find({
+        where: { userId: request.user.id, journalId: IsNull() },
+        order: { createdAt: "ASC" }
+      });
+
+      const dbHistory: ChatHistoryMessage[] = dbMessages.map(msg => {
+        if (msg.characterName === "User") {
+          return { role: "user", content: msg.content };
+        } else {
+          const turn = {
+            MessageId: msg.id,
+            CharacterName: msg.characterName,
+            Text: msg.content,
+            Pinyin: msg.pinyin || "",
+            Tone: msg.tone || "",
+            Translation: msg.translation || "",
+            ...(msg.audio ? { Audio: msg.audio } : {})
+          };
+          return { role: "assistant", content: JSON.stringify([turn]) };
+        }
+      });
+      
+      const updatedActiveMessages = await historyStore.load(request.user.id);
+      const finalCombinedMessages = applyAssistantEdits([...dbHistory, ...updatedActiveMessages]);
+      const finalActiveHistory = finalCombinedMessages.filter(
+        (message) => message.role !== "system" && message.role !== "developer"
+      );
+
       response.json({
-        messages: nextMessages.filter((message) => message.role !== "system" && message.role !== "developer"),
+        messages: finalActiveHistory,
         reply: normalizedReply,
         model: result.model
       });
