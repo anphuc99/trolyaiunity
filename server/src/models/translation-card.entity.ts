@@ -40,8 +40,8 @@ class TranslationCardEntity {
   @Column({ name: "explanation_md", type: "text", nullable: true })
   explanationMd?: string | null;
 
-  @Column({ name: "journal_id", type: "int" })
-  journalId!: number;
+  @Column({ name: "journal_id", type: "int", nullable: true })
+  journalId?: number | null;
 
   @Column({ name: "user_id", type: "int" })
   userId!: number;

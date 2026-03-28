@@ -40,16 +40,16 @@ class MessageEntity {
   @Column({ name: "user_id", type: "int" })
   userId!: number;
 
-  @Column({ name: "journal_id", type: "int" })
-  journalId!: number;
+  @Column({ name: "journal_id", type: "int", nullable: true })
+  journalId?: number | null;
 
   @ManyToOne(() => UserEntity, { nullable: false, onDelete: "CASCADE" })
   @JoinColumn({ name: "user_id" })
   user!: UserEntity;
 
-  @ManyToOne(() => JournalEntity, { nullable: false, onDelete: "CASCADE" })
+  @ManyToOne(() => JournalEntity, { nullable: true, onDelete: "CASCADE" })
   @JoinColumn({ name: "journal_id" })
-  journal!: JournalEntity;
+  journal?: JournalEntity | null;
 
   @CreateDateColumn({ name: "created_at", type: "datetime" })
   createdAt!: Date;

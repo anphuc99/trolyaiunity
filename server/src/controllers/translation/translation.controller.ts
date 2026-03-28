@@ -56,8 +56,14 @@ const serialiseReview = (entity: TranslationReviewEntity) => {
     difficulty: entity.difficulty,
     lapses: entity.lapses,
     currentIntervalDays: entity.currentIntervalDays,
-    nextReviewDate: entity.nextReviewDate,
-    lastReviewDate: entity.lastReviewDate,
+    nextReviewDate: entity.nextReviewDate instanceof Date
+      ? entity.nextReviewDate.toISOString()
+      : String(entity.nextReviewDate),
+    lastReviewDate: entity.lastReviewDate
+      ? entity.lastReviewDate instanceof Date
+        ? entity.lastReviewDate.toISOString()
+        : String(entity.lastReviewDate)
+      : null,
     isStarred: entity.isStarred,
     reviewHistory
   };
@@ -226,18 +232,21 @@ export const createTranslationController = (
       const toneMap = new Map<string, string | null>(messages.map((message: MessageEntity) => [message.id, message.tone ?? null]));
 
       // Fetch journal summaries for the cards
-      const journalIds = [...new Set(cards.map((card: TranslationCardEntity) => card.journalId))];
-      const journals = journalIds.length
+      const journalIds = Array.from(
+        new Set(cards.map((c) => c.journalId).filter((id): id is number => id != null))
+      );
+
+      const journals = journalIds.length > 0
         ? await journalRepo.find({ where: journalIds.map((id) => ({ id })) })
         : [];
-      const journalMap = new Map<number, string>(journals.map((j: JournalEntity) => [j.id, j.summary]));
+      const journalMap = new Map(journals.map((j) => [j.id, j.summary]));
 
       const items = cards.map((card: TranslationCardEntity) => {
         const review = reviewMap.get(card.id);
         return {
           ...serialiseCard(card),
           tone: toneMap.get(card.messageId) ?? null,
-          journalSummary: journalMap.get(card.journalId) ?? null,
+          journalSummary: card.journalId != null ? (journalMap.get(card.journalId) ?? null) : null,
           review: review ? serialiseReview(review) : null
         };
       });
@@ -277,11 +286,14 @@ export const createTranslationController = (
         : [];
 
       // Fetch journal summaries for the cards
-      const journalIds = [...new Set(cards.map((card: TranslationCardEntity) => card.journalId))];
-      const journals = journalIds.length
+      const journalIds = Array.from(
+        new Set(cards.map((c) => c.journalId).filter((id): id is number => id != null))
+      );
+
+      const journals = journalIds.length > 0
         ? await journalRepo.find({ where: journalIds.map((id) => ({ id })) })
         : [];
-      const journalMap = new Map<number, string>(journals.map((j: JournalEntity) => [j.id, j.summary]));
+      const journalMap = new Map(journals.map((j) => [j.id, j.summary]));
 
       const cardMap = new Map<number, TranslationCardEntity>(cards.map((card: TranslationCardEntity) => [card.id, card]));
       const reviewMap = new Map<number, TranslationReviewEntity>(dueReviews.map((review: TranslationReviewEntity) => [review.translationCardId, review]));
@@ -301,7 +313,7 @@ export const createTranslationController = (
         return {
           ...serialiseCard(card),
           tone: toneMap.get(card.messageId) ?? null,
-          journalSummary: journalMap.get(card.journalId) ?? null,
+          journalSummary: card.journalId != null ? (journalMap.get(card.journalId) ?? null) : null,
           review: review ? serialiseReview(review) : null
         };
       });
@@ -419,11 +431,11 @@ export const createTranslationController = (
       }
 
       // Fetch journal summaries
-      const journalIds = [...new Set(messages.map((m: MessageEntity) => m.journalId))];
+      const journalIds = [...new Set(messages.map((m: MessageEntity) => m.journalId).filter((id): id is number => id != null))];
       const journals = journalIds.length
         ? await journalRepo.find({ where: journalIds.map((id) => ({ id })) })
         : [];
-      const journalMap = new Map<number, string>(journals.map((j: JournalEntity) => [j.id, j.summary]));
+      const journalMap = new Map(journals.map((j) => [j.id, j.summary]));
 
       const candidates = messages.map((message: MessageEntity) => ({
         messageId: message.id,
@@ -432,7 +444,7 @@ export const createTranslationController = (
         characterName: message.characterName,
         tone: message.tone?.trim() || "neutral, medium pitch",
         journalId: message.journalId,
-        journalSummary: journalMap.get(message.journalId) ?? null,
+        journalSummary: message.journalId != null ? (journalMap.get(message.journalId) ?? null) : null,
         createdAt: message.createdAt
       }));
 
@@ -462,36 +474,33 @@ export const createTranslationController = (
     }
 
     try {
-      const currentMessage = await messageRepo.findOne({ where: { id: messageId, userId } });
+      const currentMessage = await messageRepo.findOne({
+        where: { id: messageId, userId }
+      });
 
       if (!currentMessage) {
         response.status(404).json({ message: "Message not found" });
         return;
       }
 
-      const journalMessages = await messageRepo.find({
-        where: { userId, journalId: currentMessage.journalId },
-        order: { createdAt: "ASC" }
-      });
-
-      const currentIndex = journalMessages.findIndex((item: MessageEntity) => item.id === messageId);
-
-      if (currentIndex < 0) {
-        response.json({ before: [], after: [] });
-        return;
+      // We only lookup related messages in the same journal, if there is a journal.
+      let relatedMessages: MessageEntity[] = [];
+      if (currentMessage.journalId != null) {
+        relatedMessages = await messageRepo.find({
+          where: { userId, journalId: currentMessage.journalId },
+          order: { createdAt: "ASC" }
+        });
+      } else {
+        relatedMessages = [currentMessage];
       }
 
-      const toVietnameseText = (item: MessageEntity) => {
-        const isUserMessage = item.characterName?.trim().toLowerCase() === "user";
+      const relatedContext = relatedMessages
+        .map((m) => `${m.characterName}: ${m.content}`);
 
-        if (isUserMessage) {
-          return item.content?.trim() || "(Tin nhan user rong)";
-        }
+      const currentIndex = relatedMessages.findIndex((m) => m.id === messageId);
+      const toVietnameseText = (item: MessageEntity) => item.translation || item.content;
 
-        return item.translation?.trim() || "(Chua co ban dich tieng Viet)";
-      };
-
-      const before = journalMessages
+      const before = relatedMessages
         .slice(Math.max(0, currentIndex - 5), currentIndex)
         .map((item: MessageEntity) => ({
           messageId: item.id,
@@ -499,7 +508,7 @@ export const createTranslationController = (
           text: toVietnameseText(item)
         }));
 
-      const after = journalMessages
+      const after = relatedMessages
         .slice(currentIndex + 1, currentIndex + 6)
         .map((item: MessageEntity) => ({
           messageId: item.id,

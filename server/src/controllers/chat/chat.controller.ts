@@ -8,6 +8,17 @@ import { buildChatSystemPrompt } from "../../services/chat-prompt.service.js";
 import StoryEntity from "../../models/story.entity.js";
 import UserEntity from "../../models/user.entity.js";
 import { createChatHistoryStore, type ChatHistoryMessage, type ChatHistoryStore } from "../../services/chat-history.service.js";
+import {
+  parseAssistantReply,
+  parseAssistantEditNote,
+  applyAssistantEdits,
+  parseDeveloperCharacterAction,
+  parseDeveloperLearningPathState,
+  buildMessageEntities,
+  normalizeName
+} from "../../utils/chat.utils.js";
+import MessageEntity from "../../models/message.entity.js";
+import CharacterEntity from "../../models/character.entity.js";
 
 interface ChatController {
   sendMessage: (request: Request, response: Response) => Promise<void>;
@@ -92,6 +103,8 @@ export const createChatController = (
   const dataSource = _dataSource;
   const userRepository = dataSource.getRepository(UserEntity);
   const storyRepository = dataSource.getRepository(StoryEntity);
+  const messageRepository = dataSource.getRepository(MessageEntity);
+  const characterRepository = dataSource.getRepository(CharacterEntity);
   
   // OpenAI configuration
   const openAIApiKey = process.env.OPENAI_API_KEY ?? "";
@@ -132,6 +145,128 @@ export const createChatController = (
     });
 
   let hasLoggedAssistantReplyParseFailure = false;
+
+  const handleAutoSummaryAndSave = async (userId: number, systemPrompt: string, selectedService: ChatReplyService, modelOverride: string) => {
+    try {
+      const updatedHistory = await historyStore.load(userId);
+      const userMessageCount = updatedHistory.filter((msg) => msg.role === "user").length;
+
+      if (userMessageCount >= 3) {
+        const adjustedHistory = applyAssistantEdits(updatedHistory);
+        const summaryInstruction = `
+Please summarize the above conversation in Vietnamese, update the story description, and return it in JSON format as follows:
+{
+  "Summary": "Summary of the conversation here.", 
+  "UpdatedStoryDescription": "The story description has been updated here." 
+}
+`.trim();
+
+        const summaryReply = await selectedService.createReply(undefined, [
+          ...adjustedHistory,
+          { role: "developer", content: summaryInstruction }
+        ], modelOverride || undefined, undefined, `summary_${userId}`);
+        
+        let cleanReply = summaryReply.reply;
+        cleanReply = cleanReply.replace(/```json/i, "").replace(/```/g, "").trim();
+        const summaryStory = JSON.parse(cleanReply) as { Summary: string; UpdatedStoryDescription: string };
+
+        // Update story progress
+        const story = await loadStoryForPrompt(userId);
+        if (story) {
+          const updatedProgress = summaryStory.UpdatedStoryDescription;
+          if (updatedProgress) {
+            story.currentProgress = updatedProgress;
+            await storyRepository.save(story);
+          }
+        }
+
+        // Save messages to DB with journalId = null
+        const characters = await characterRepository.find({ where: { userId } });
+        const voiceByCharacter = new Map(
+          characters
+            .filter((character) => character.voiceName)
+            .map((character) => [normalizeName(character.name), {
+              voiceModel: character.voiceModel ?? "openai",
+              voiceName: character.voiceName as string,
+              pitch: character.pitch ?? null,
+              speakingRate: character.speakingRate ?? null,
+            }])
+        );
+        
+        const messageEntities = buildMessageEntities(adjustedHistory, userId, null, voiceByCharacter);
+        if (messageEntities.length) {
+          await messageRepository.save(messageEntities.map((msg) => messageRepository.create(msg)));
+        }
+
+        // Determine active developer state (characters, learning path)
+        const activeMap = new Map<string, boolean>();
+        let activeLearningPathId: number | null = null;
+        let activeLearningPathContext = "";
+        let activeLearningPathVocabulary = "";
+
+        for (const msg of adjustedHistory) {
+          if (msg.role !== "developer") continue;
+
+          const action = parseDeveloperCharacterAction(msg.content);
+          if (action?.name) {
+            activeMap.set(action.name, action.active);
+          }
+
+          const learningPathState = parseDeveloperLearningPathState(msg.content);
+          if (learningPathState) {
+            activeLearningPathId = learningPathState.learningPathId;
+            activeLearningPathContext = learningPathState.context;
+            activeLearningPathVocabulary = learningPathState.vocabulary;
+          }
+        }
+
+        const activeCharacterNames = Array.from(activeMap.entries())
+          .filter(([, isActive]) => isActive)
+          .map(([name]) => name);
+
+        // Clear chat history
+        await historyStore.clear(userId);
+        if (geminiService) {
+          geminiService.clearSession(`chat_${userId}`);
+        }
+
+        // Re-insert system message and current active state
+        await historyStore.ensureSystemMessage(userId, systemPrompt);
+        
+        const newMessages: ChatHistoryMessage[] = [];
+        
+        if (summaryStory.Summary) {
+          newMessages.push({ role: "developer", content: `Developer context update:\n${summaryStory.Summary}` });
+        }
+
+        for (const name of activeCharacterNames) {
+          const char = characters.find(c => normalizeName(c.name) === normalizeName(name));
+          if (char) {
+             newMessages.push({ role: "developer", content: formatCharacterAddedMessage({ character: char }) });
+          } else {
+             newMessages.push({ role: "developer", content: `Character "${name}" has been added.` });
+          }
+        }
+
+        if (activeLearningPathId) {
+           newMessages.push({
+             role: "developer",
+             content: formatLearningPathAppliedMessage({
+               learningPathId: activeLearningPathId,
+               context: activeLearningPathContext,
+               vocabulary: activeLearningPathVocabulary
+             })
+           });
+        }
+
+        if (newMessages.length > 0) {
+          await historyStore.append(userId, newMessages);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to auto-summarize and clear history:", error);
+    }
+  };
 
   const getSessionId = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 
@@ -294,59 +429,6 @@ export const createChatController = (
       "New content:",
       updatedContent
     ].join("\n");
-  };
-
-  const parseAssistantReply = (content: string): AssistantTurn[] => {
-    const trimmed = content.trim();
-
-    if (!trimmed) {
-      return [];
-    }
-
-    const tryParse = (input: string) => {
-      try {
-        const parsed = JSON.parse(input) as unknown;
-        if (Array.isArray(parsed)) {
-          return parsed as AssistantTurn[];
-        }
-        if (parsed && typeof parsed === "object") {
-          return [parsed as AssistantTurn];
-        }
-      } catch (error) {
-        if (!hasLoggedAssistantReplyParseFailure) {
-          console.warn("Failed to parse assistant reply as JSON; attempting fallback extraction.", error);
-          hasLoggedAssistantReplyParseFailure = true;
-        }
-        return null;
-      }
-
-      return null;
-    };
-
-    const direct = tryParse(trimmed);
-    if (direct) {
-      return direct;
-    }
-
-    const arrayStart = trimmed.indexOf("[");
-    const arrayEnd = trimmed.lastIndexOf("]");
-    if (arrayStart !== -1 && arrayEnd > arrayStart) {
-      const sliced = tryParse(trimmed.slice(arrayStart, arrayEnd + 1));
-      if (sliced) {
-        return sliced;
-      }
-    }
-
-    const objectStart = trimmed.indexOf("{");
-    const objectEnd = trimmed.lastIndexOf("}");
-    if (objectStart !== -1 && objectEnd > objectStart) {
-      const sliced = tryParse(trimmed.slice(objectStart, objectEnd + 1));
-      if (sliced) {
-        return sliced;
-      }
-    }
-
-    return [];
   };
 
   /**
@@ -525,121 +607,6 @@ export const createChatController = (
     return -1;
   };
 
-  const parseDeveloperCharacterAction = (content: string) => {
-    const addedMatch = content.match(/^Character\s+"([^"]+)"\s+has been added\./m);
-    if (addedMatch) {
-      return { name: addedMatch[1].trim(), active: true };
-    }
-
-    const removedMatch = content.match(/^Character\s+"([^"]+)"\s+has been removed from this conversation\./m);
-    if (removedMatch) {
-      return { name: removedMatch[1].trim(), active: false };
-    }
-
-    return null;
-  };
-
-  const parseDeveloperLearningPathState = (content: string) => {
-    if (!/^Developer\s+learning\s+path\s+applied:/i.test(content)) {
-      return null;
-    }
-
-    const idMatch = content.match(/^LearningPathId:\s*(\d+)\s*$/im);
-    const contextMatch = content.match(/^LearningPathContext:\s*\n([\s\S]*?)\nLearningPathVocabulary:\s*$/im);
-    const vocabMatch = content.match(/^LearningPathVocabulary:\s*\n([\s\S]*?)(?:\nAI requirements:|$)/im);
-
-    const id = idMatch ? Number.parseInt(idMatch[1], 10) : Number.NaN;
-    const context = contextMatch?.[1]?.trim() ?? "";
-    const vocabulary = vocabMatch?.[1]?.trim() ?? "";
-
-    if (!Number.isInteger(id) || id <= 0 || !context || !vocabulary) {
-      return null;
-    }
-
-    return {
-      learningPathId: id,
-      context,
-      vocabulary
-    };
-  };
-
-  const parseAssistantEditNote = (content: string) => {
-    const englishMatch = content.match(/^Assistant\s+message\s+edited:\s+([^\.\n]+)\./i);
-    const vietnameseMatch = content.match(/^Chat\s+co\s+messageID\s+duoc\s+sua\s+thanh\s+([^\.\n]+)\./i);
-    const idMatch = englishMatch ?? vietnameseMatch;
-
-    if (!idMatch) {
-      return null;
-    }
-
-    const messageId = idMatch[1].trim();
-    if (!messageId) {
-      return null;
-    }
-
-    const englishContentMatch = content.match(/New\s+content:\s*([\s\S]+)/i);
-    const vietnameseContentMatch = content.match(/Noi\s+dung\s+moi:\s*([\s\S]+)/i);
-    const contentMatch = englishContentMatch ?? vietnameseContentMatch;
-    const updatedText = contentMatch ? contentMatch[1].trim() : "";
-    if (!updatedText) {
-      return null;
-    }
-
-    return { messageId, updatedText };
-  };
-
-  const applyAssistantEdits = (history: { role: string; content: string }[]) => {
-    const edits = new Map<string, string>();
-
-    for (const message of history) {
-      if (message.role !== "developer") {
-        continue;
-      }
-
-      const edit = parseAssistantEditNote(message.content);
-      if (edit) {
-        edits.set(edit.messageId, edit.updatedText);
-      }
-    }
-
-    if (!edits.size) {
-      return history;
-    }
-
-    return history.map((message) => {
-      if (message.role !== "assistant") {
-        return message;
-      }
-
-      const turns = parseAssistantReply(message.content);
-      if (!turns.length) {
-        return message;
-      }
-
-      let didUpdate = false;
-      const nextTurns = turns.map((turn) => {
-        const turnId = typeof turn.MessageId === "string" ? turn.MessageId.trim() : "";
-        const updatedText = turnId ? edits.get(turnId) : null;
-
-        if (updatedText) {
-          didUpdate = true;
-          return { ...turn, Text: updatedText };
-        }
-
-        return turn;
-      });
-
-      if (!didUpdate) {
-        return message;
-      }
-
-      return {
-        ...message,
-        content: JSON.stringify(nextTurns)
-      };
-    });
-  };
-
   /**
    * Builds a dynamic system instruction string for the current user/session.
    *
@@ -775,6 +742,8 @@ export const createChatController = (
         { role: "user", content: userHistoryContent },
         { role: "assistant", content: normalizedReply }
       ]);
+
+      await handleAutoSummaryAndSave(request.user.id, systemPrompt, selectedService, modelOverride || "");
 
       response.json({
         reply: normalizedReply,
@@ -1032,6 +1001,8 @@ export const createChatController = (
       ];
 
       await historyStore.append(request.user.id, nextMessages);
+
+      await handleAutoSummaryAndSave(request.user.id, systemPrompt, selectedService, modelOverride || "");
 
       response.json({
         messages: nextMessages.filter((message) => message.role !== "system" && message.role !== "developer"),

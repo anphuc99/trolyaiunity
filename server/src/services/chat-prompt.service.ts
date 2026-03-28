@@ -240,16 +240,6 @@ Example:
 ]
 
 ====================================
-SUMMARY
-====================================
-
-If a summary is requested by the developer, summarize the entire conversation and update the STORY DESCRIPTION to return JSON as follows:
-{
-  "Summary": "The summary of the conversation is here.", 
-  "UpdatedStoryDescription": "The story description has been updated here." 
-}
-
-====================================
 FINAL CHECK
 ====================================
 Silently verify all ABSOLUTE RULES before responding.`;
