@@ -5,7 +5,7 @@ import path from "path";
 import crypto from "crypto";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import type { DataSource } from "typeorm";
-import { Like } from "typeorm";
+import { Like, IsNull } from "typeorm";
 import JournalEntity from "../../models/journal.entity.js";
 import JournalReviewEntity from "../../models/journal-review.entity.js";
 import MessageEntity from "../../models/message.entity.js";
@@ -365,23 +365,11 @@ Please summarize the above conversation in Vietnamese, update the story descript
       });
 
       const savedJournal = await journalRepository.save(journal);
-      const characters = await characterRepository.find({ where: { userId: request.user.id } });
-      const voiceByCharacter = new Map(
-        characters
-          .filter((character) => character.voiceName)
-          .map((character) => [normalizeName(character.name), {
-            voiceModel: character.voiceModel ?? "openai",
-            voiceName: character.voiceName as string,
-            pitch: character.pitch ?? null,
-            speakingRate: character.speakingRate ?? null,
-          }])
+      
+      await messageRepository.update(
+        { userId: request.user.id, journalId: IsNull() },
+        { journalId: savedJournal.id }
       );
-
-      const messageEntities = buildMessageEntities(adjustedHistory, request.user.id, savedJournal.id, voiceByCharacter);
-
-      if (messageEntities.length) {
-        await messageRepository.save(messageEntities.map((message) => messageRepository.create(message)));
-      }
 
       if (story) {
         try {

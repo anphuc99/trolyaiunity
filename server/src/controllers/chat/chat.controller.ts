@@ -146,6 +146,25 @@ export const createChatController = (
 
   let hasLoggedAssistantReplyParseFailure = false;
 
+  const saveMessagesToDb = async (userId: number, messages: ChatHistoryMessage[]) => {
+    const characters = await characterRepository.find({ where: { userId } });
+    const voiceByCharacter = new Map(
+      characters
+        .filter((c) => c.voiceName)
+        .map((c) => [normalizeName(c.name), {
+          voiceModel: c.voiceModel ?? "openai",
+          voiceName: c.voiceName as string,
+          pitch: c.pitch ?? null,
+          speakingRate: c.speakingRate ?? null,
+        }])
+    );
+    
+    const messageEntities = buildMessageEntities(messages, userId, null, voiceByCharacter);
+    if (messageEntities.length) {
+      await messageRepository.save(messageEntities.map((msg) => messageRepository.create(msg)));
+    }
+  };
+
   const handleAutoSummaryAndSave = async (userId: number, systemPrompt: string, selectedService: ChatReplyService, modelOverride: string) => {
     try {
       const updatedHistory = await historyStore.load(userId);
@@ -178,24 +197,6 @@ Please summarize the above conversation in Vietnamese, update the story descript
             story.currentProgress = updatedProgress;
             await storyRepository.save(story);
           }
-        }
-
-        // Save messages to DB with journalId = null
-        const characters = await characterRepository.find({ where: { userId } });
-        const voiceByCharacter = new Map(
-          characters
-            .filter((character) => character.voiceName)
-            .map((character) => [normalizeName(character.name), {
-              voiceModel: character.voiceModel ?? "openai",
-              voiceName: character.voiceName as string,
-              pitch: character.pitch ?? null,
-              speakingRate: character.speakingRate ?? null,
-            }])
-        );
-        
-        const messageEntities = buildMessageEntities(adjustedHistory, userId, null, voiceByCharacter);
-        if (messageEntities.length) {
-          await messageRepository.save(messageEntities.map((msg) => messageRepository.create(msg)));
         }
 
         // Determine active developer state (characters, learning path)
@@ -239,6 +240,7 @@ Please summarize the above conversation in Vietnamese, update the story descript
           newMessages.push({ role: "developer", content: `Developer context update:\n${summaryStory.Summary}` });
         }
 
+        const characters = await characterRepository.find({ where: { userId } });
         for (const name of activeCharacterNames) {
           const char = characters.find(c => normalizeName(c.name) === normalizeName(name));
           if (char) {
@@ -738,10 +740,12 @@ Please summarize the above conversation in Vietnamese, update the story descript
 
       // Store the transcribed text as the user message in history (not the raw instruction)
       const userHistoryContent = hasAudio && transcribe ? transcribe : message;
-      await historyStore.append(request.user.id, [
+      const newMessages: ChatHistoryMessage[] = [
         { role: "user", content: userHistoryContent },
         { role: "assistant", content: normalizedReply }
-      ]);
+      ];
+      await historyStore.append(request.user.id, newMessages);
+      await saveMessagesToDb(request.user.id, newMessages);
 
       await handleAutoSummaryAndSave(request.user.id, systemPrompt, selectedService, modelOverride || "");
 
@@ -797,7 +801,9 @@ Please summarize the above conversation in Vietnamese, update the story descript
         ? normalizeAssistantReplyMessageIds(result.reply, collectAssistantMessageIds(history))
         : result.reply;
 
-      await historyStore.append(request.user.id, [{ role: "assistant", content: normalizedReply }]);
+      const newMessages: ChatHistoryMessage[] = [{ role: "assistant", content: normalizedReply }];
+      await historyStore.append(request.user.id, newMessages);
+      await saveMessagesToDb(request.user.id, newMessages);
 
       response.json({
         reply: normalizedReply,
@@ -843,17 +849,8 @@ Please summarize the above conversation in Vietnamese, update the story descript
         }
       });
 
-      const activeMessages = await historyStore.load(request.user.id);
-      
-      const combinedMessages = [...dbHistory, ...activeMessages];
-      const adjustedCombinedMessages = applyAssistantEdits(combinedMessages);
-      
-      const finalHistory = adjustedCombinedMessages.filter(
-        (message) => message.role !== "system" && message.role !== "developer"
-      );
-
       response.json({
-        messages: finalHistory
+        messages: dbHistory
       });
     } catch (error) {
       console.error("Error in getHistory:", error);
@@ -950,6 +947,12 @@ Please summarize the above conversation in Vietnamese, update the story descript
       }
 
       try {
+        const msg = await messageRepository.findOne({ where: { id: messageId, userId: request.user.id } });
+        if (msg) {
+          msg.content = editedContent;
+          await messageRepository.save(msg);
+        }
+
         await historyStore.append(request.user.id, [{ role: "developer", content }]);
         response.json({ ok: true });
       } catch (error) {
@@ -987,23 +990,45 @@ Please summarize the above conversation in Vietnamese, update the story descript
     }
 
     try {
-      const dbUserCount = await messageRepository.count({
-        where: { userId: request.user.id, journalId: IsNull(), characterName: "User" }
+      const dbMessages = await messageRepository.find({
+        where: { userId: request.user.id, journalId: IsNull() },
+        order: { createdAt: "ASC" }
       });
+      const dbUserCount = dbMessages.filter(m => m.characterName === "User").length;
       
       const history = await historyStore.load(request.user.id);
-      const adjustedUserIndex = userIndex - dbUserCount;
+      const activeUserCount = history.filter(m => m.role === "user").length;
       
-      if (adjustedUserIndex < 0) {
+      const summarizedUserCount = dbUserCount - activeUserCount;
+      const targetIndexInHistory = userIndex - summarizedUserCount;
+      
+      if (targetIndexInHistory < 0) {
         response.status(400).json({ message: "Cannot edit summarized history" });
         return;
       }
       
-      const targetIndex = findUserHistoryIndex(history, adjustedUserIndex);
+      const targetIndex = findUserHistoryIndex(history, targetIndexInHistory);
 
       if (targetIndex < 0) {
         response.status(404).json({ message: "User message not found" });
         return;
+      }
+
+      // 1. Delete DB messages from the global userIndex onwards
+      let count = 0;
+      let targetDbIndex = -1;
+      for (let i = 0; i < dbMessages.length; i++) {
+        if (dbMessages[i].characterName === "User") {
+          if (count === userIndex) {
+            targetDbIndex = i;
+            break;
+          }
+          count++;
+        }
+      }
+      if (targetDbIndex !== -1) {
+        const messagesToDelete = dbMessages.slice(targetDbIndex);
+        await messageRepository.remove(messagesToDelete);
       }
 
       const prefix = history.slice(0, targetIndex);
@@ -1035,21 +1060,24 @@ Please summarize the above conversation in Vietnamese, update the story descript
         ? normalizeAssistantReplyMessageIds(result.reply, collectAssistantMessageIds(prefixWithoutSystem))
         : result.reply;
       const nextMessages: ChatHistoryMessage[] = [
-        ...prefixWithoutSystem,
         { role: "user", content: editedContent },
         { role: "assistant", content: normalizedReply }
       ];
 
-      await historyStore.append(request.user.id, nextMessages);
+      await historyStore.append(request.user.id, [
+        ...prefixWithoutSystem,
+        ...nextMessages
+      ]);
+      await saveMessagesToDb(request.user.id, nextMessages);
 
       await handleAutoSummaryAndSave(request.user.id, systemPrompt, selectedService, modelOverride || "");
 
-      const dbMessages = await messageRepository.find({
+      const finalDbMessages = await messageRepository.find({
         where: { userId: request.user.id, journalId: IsNull() },
         order: { createdAt: "ASC" }
       });
 
-      const dbHistory: ChatHistoryMessage[] = dbMessages.map(msg => {
+      const finalDbHistory: ChatHistoryMessage[] = finalDbMessages.map(msg => {
         if (msg.characterName === "User") {
           return { role: "user", content: msg.content };
         } else {
@@ -1066,14 +1094,8 @@ Please summarize the above conversation in Vietnamese, update the story descript
         }
       });
       
-      const updatedActiveMessages = await historyStore.load(request.user.id);
-      const finalCombinedMessages = applyAssistantEdits([...dbHistory, ...updatedActiveMessages]);
-      const finalActiveHistory = finalCombinedMessages.filter(
-        (message) => message.role !== "system" && message.role !== "developer"
-      );
-
       response.json({
-        messages: finalActiveHistory,
+        messages: finalDbHistory,
         reply: normalizedReply,
         model: result.model
       });
