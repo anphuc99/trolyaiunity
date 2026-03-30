@@ -258,7 +258,7 @@ Output: {"pinyin": "nǐ hǎo", "vietnamese": "xin chào"}`;
  */
 export const createCheapAIService = (config: CheapAIServiceConfig = {}): CheapAIService => {
   const apiKey = config.apiKey ?? process.env.GOOGLE_API_KEY ?? "";
-  const model = config.model ?? process.env.CHEAP_AI_MODEL ?? "gemini-2.0-flash-lite";
+  const model = config.model ?? process.env.CHEAP_AI_MODEL ?? "gemini-flash-lite-latest";
 
   if (!apiKey) {
     throw new Error("Cheap AI service requires GOOGLE_API_KEY");
