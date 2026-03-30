@@ -67,6 +67,7 @@ export const createMemoryRetrievalService = (
     let intents: string[];
     try {
       intents = await cheapAI.rewriteRetrievalIntents(trimmedMessage, recentTurns, options?.activeCharacters);
+      console.log("[Memory] CheapAI intents:", JSON.stringify(intents));
     } catch (error) {
       console.warn("Memory retrieval: intent rewrite failed, using raw message.", error);
       intents = [trimmedMessage.slice(0, 100)];
@@ -128,6 +129,11 @@ export const createMemoryRetrievalService = (
     allResults.sort((a, b) => a.distance - b.distance);
     const topResults = allResults.slice(0, topK * 2);
 
+    console.log(
+      `[Memory] ChromaDB results (${topResults.length}):`,
+      topResults.map((r) => `[${r.metadata?.type ?? "?"} | ${r.metadata?.actor ?? "global"} | dist:${r.distance.toFixed(3)}] ${r.text.slice(0, 100)}`)
+    );
+
     // Step 4: Cheap AI compresses retrieved memories into a brief
     const docs = topResults.map((r) => ({
       text: r.text,
@@ -137,6 +143,7 @@ export const createMemoryRetrievalService = (
 
     try {
       const brief = await cheapAI.compressMemoryBrief(docs, trimmedMessage);
+      console.log("[Memory] Compressed brief:", brief.slice(0, 300));
       return brief === "No relevant memories." ? "" : brief;
     } catch (error) {
       console.warn("Memory retrieval: compression failed, using raw results.", error);

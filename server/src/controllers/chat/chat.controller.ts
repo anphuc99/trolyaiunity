@@ -1024,6 +1024,8 @@ export const createChatController = (
 
       const effectiveMessage = (message || "The user sent an audio message. Please listen and respond.") + audioTranscribeInstruction;
 
+      console.log("[Chat] User message:", message || "<audio>");
+
       const systemPrompt = await buildSystemPrompt(request.user.id, request.body, message);
       await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
       let history = await historyStore.load(request.user.id);
@@ -1031,6 +1033,8 @@ export const createChatController = (
       if (injectedLearningPathContext) {
         history = await historyStore.load(request.user.id);
       }
+      console.log("[Chat] Sending to AI — model:", modelOverride || openAIModel, "| message:", effectiveMessage.slice(0, 300));
+
       const result = await requestJsonReplyWithRetry(
         selectedService,
         effectiveMessage,
@@ -1040,6 +1044,8 @@ export const createChatController = (
         geminiAudioParts,
         `chat_${request.user.id}`
       );
+
+      console.log("[Chat] AI response (model:", result.model, "):", result.reply.slice(0, 500));
 
       const normalizedReply = useGemini
         ? normalizeAssistantReplyMessageIds(result.reply, collectAssistantMessageIds(history))
