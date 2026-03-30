@@ -23,6 +23,7 @@
     "fix-audio-ids": "tsx src/scripts/fix-audio-ids.ts"
   },
   "dependencies": {
+    "@chroma-core/default-embed": "^0.1.9",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^2.4.3",
