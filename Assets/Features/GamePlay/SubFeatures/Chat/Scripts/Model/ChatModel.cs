@@ -398,31 +398,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 	}
 
 	/// <summary>
-	/// One learning path entry used by chat context menu.
-	/// </summary>
-	public sealed class ChatLearningPathPayload
-	{
-		[JsonProperty("id")]
-		public int Id { get; set; }
-
-		[JsonProperty("context")]
-		public string Context { get; set; }
-
-		[JsonProperty("vocabulary")]
-		public string Vocabulary { get; set; }
-	}
-
-	/// <summary>
-	/// Response payload for listing learning paths.
-	/// </summary>
-	public sealed class ChatLearningPathListResponsePayload
-	{
-		[JsonProperty("learningPaths")]
-		public System.Collections.Generic.List<ChatLearningPathPayload> LearningPaths { get; set; }
-			= new System.Collections.Generic.List<ChatLearningPathPayload>();
-	}
-
-	/// <summary>
 	/// Response payload from /api/chat/developer-state.
 	/// </summary>
 	public sealed class ChatDeveloperStatePayload
@@ -432,50 +407,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		[JsonProperty("activeCharacterNames")]
 		public System.Collections.Generic.List<string> ActiveCharacterNames { get; set; }
-
-		/// <summary>
-		/// Active learning path id applied to the current chat, if any.
-		/// </summary>
-		[JsonProperty("activeLearningPathId")]
-		public int? ActiveLearningPathId { get; set; }
-
-		/// <summary>
-		/// Context of the active learning path.
-		/// </summary>
-		[JsonProperty("activeLearningPathContext")]
-		public string ActiveLearningPathContext { get; set; }
-
-		/// <summary>
-		/// Comma-separated vocabulary of the active learning path.
-		/// </summary>
-		[JsonProperty("activeLearningPathVocabulary")]
-		public string ActiveLearningPathVocabulary { get; set; }
-	}
-
-	/// <summary>
-	/// Request payload from view for applying a learning path to developer context.
-	/// </summary>
-	public sealed class ChatApplyLearningPathRequestPayload
-	{
-		/// <summary>
-		/// Optional chat session id.
-		/// </summary>
-		public string SessionId { get; set; }
-
-		/// <summary>
-		/// Learning path id.
-		/// </summary>
-		public int LearningPathId { get; set; }
-
-		/// <summary>
-		/// Learning path context.
-		/// </summary>
-		public string Context { get; set; }
-
-		/// <summary>
-		/// Comma-separated learning path vocabulary.
-		/// </summary>
-		public string Vocabulary { get; set; }
 	}
 
 	/// <summary>

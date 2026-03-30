@@ -90,9 +90,9 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Controller
 		[Request(LearningPathRequests.Create)]
 		public static void HandleCreate(LearningPathCreateRequestPayload payload)
 		{
-			if (payload == null || string.IsNullOrWhiteSpace(payload.Context))
+			if (payload == null || string.IsNullOrWhiteSpace(payload.Level))
 			{
-				PublishError("Context is required.");
+				PublishError("Level is required.");
 				return;
 			}
 
@@ -118,9 +118,9 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Controller
 				return;
 			}
 
-			if (string.IsNullOrWhiteSpace(payload.Context))
+			if (string.IsNullOrWhiteSpace(payload.Level))
 			{
-				PublishError("Context is required.");
+				PublishError("Level is required.");
 				return;
 			}
 
@@ -157,7 +157,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Controller
 			EventBus.Publish(LearningPathEvents.EditLoaded, new LearningPathEditPayload
 			{
 				LearningPathId = item.Id,
-				Context = item.Context,
+				Level = item.Level,
 				Vocabulary = item.Vocabulary
 			});
 		}

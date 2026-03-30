@@ -44,17 +44,17 @@ namespace Features.GamePlay.SubFeatures.LearningPath.View
 		/// Binds learning path data to this item view.
 		/// </summary>
 		/// <param name="id">Learning path id.</param>
-		/// <param name="context">Learning path context description.</param>
+		/// <param name="level">HSK level label.</param>
 		/// <param name="vocabulary">Comma-separated vocabulary.</param>
-		public void Bind(int id, string context, string vocabulary)
+		public void Bind(int id, string level, string vocabulary)
 		{
 			LearningPathId = id;
 
 			if (_contentText != null)
 			{
-				var safeContext = context ?? string.Empty;
+				var safeLevel = level ?? string.Empty;
 				var safeVocabulary = vocabulary ?? string.Empty;
-				_contentText.text = safeContext + "\n---------------\n" + safeVocabulary;
+				_contentText.text = safeLevel + "\n---------------\n" + safeVocabulary;
 			}
 		}
 

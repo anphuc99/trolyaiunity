@@ -23,7 +23,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.View
 
 		[Header("Tab tạo hoặc chỉnh sửa lộ trình")]
 		[SerializeField] private TextMeshProUGUI _titleText;
-		[SerializeField] private TMP_InputField _inputContext;
+		[SerializeField] private TMP_InputField _inputLevel;
 		[SerializeField] private TMP_InputField _inputVocabulary;
 		[SerializeField] private Button _buttonSubmit;
 		[SerializeField] private TMP_Text _buttonSubmitLabel;
@@ -145,7 +145,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.View
 				SendRequest(LearningPathRequests.Update, new LearningPathUpdateRequestPayload
 				{
 					LearningPathId = _editingId.Value,
-					Context = _inputContext != null ? _inputContext.text : string.Empty,
+					Level = _inputLevel != null ? _inputLevel.text : string.Empty,
 					Vocabulary = _inputVocabulary != null ? _inputVocabulary.text : string.Empty
 				});
 			}
@@ -153,7 +153,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.View
 			{
 				SendRequest(LearningPathRequests.Create, new LearningPathCreateRequestPayload
 				{
-					Context = _inputContext != null ? _inputContext.text : string.Empty,
+					Level = _inputLevel != null ? _inputLevel.text : string.Empty,
 					Vocabulary = _inputVocabulary != null ? _inputVocabulary.text : string.Empty
 				});
 			}
@@ -185,7 +185,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.View
 				var instance = Instantiate(_itemPrefab, _learningPathListRoot);
 				instance.name = "LearningPathItem-" + item.Id;
 				instance.gameObject.SetActive(true);
-				instance.Bind(item.Id, item.Context, item.Vocabulary);
+				instance.Bind(item.Id, item.Level, item.Vocabulary);
 				instance.EditRequested += HandleEditRequested;
 				_spawnedItems.Add(instance);
 			}
@@ -222,9 +222,9 @@ namespace Features.GamePlay.SubFeatures.LearningPath.View
 			_editingId = null;
 			SetTitleAndButton(CreateTitleText, CreateButtonText);
 
-			if (_inputContext != null)
+			if (_inputLevel != null)
 			{
-				_inputContext.text = string.Empty;
+				_inputLevel.text = string.Empty;
 			}
 
 			if (_inputVocabulary != null)
@@ -238,9 +238,9 @@ namespace Features.GamePlay.SubFeatures.LearningPath.View
 			_editingId = payload.LearningPathId;
 			SetTitleAndButton(EditTitleText, EditButtonText);
 
-			if (_inputContext != null)
+			if (_inputLevel != null)
 			{
-				_inputContext.text = payload.Context ?? string.Empty;
+				_inputLevel.text = payload.Level ?? string.Empty;
 			}
 
 			if (_inputVocabulary != null)

@@ -3,13 +3,13 @@ import type { DataSource } from "typeorm";
 import LearningPathEntity from "../../models/learning-path.entity.js";
 
 interface LearningPathPayload {
-  context?: string;
+  level?: string;
   vocabulary?: string;
 }
 
 interface LearningPathResponse {
   id: number;
-  context: string;
+  level: string;
   vocabulary: string;
   createdAt: string;
   updatedAt: string;
@@ -30,7 +30,7 @@ const parseId = (value: string) => {
 
 const toResponse = (entity: LearningPathEntity): LearningPathResponse => ({
   id: entity.id,
-  context: entity.context,
+  level: entity.level,
   vocabulary: entity.vocabulary,
   createdAt: entity.createdAt.toISOString(),
   updatedAt: entity.updatedAt.toISOString()
@@ -116,11 +116,11 @@ export const createLearningPathController = (dataSource: DataSource): LearningPa
     }
 
     const payload = request.body as LearningPathPayload;
-    const context = typeof payload?.context === "string" ? payload.context.trim() : "";
+    const level = typeof payload?.level === "string" ? payload.level.trim() : "";
     const vocabulary = typeof payload?.vocabulary === "string" ? payload.vocabulary.trim() : "";
 
-    if (!context) {
-      response.status(400).json({ message: "Context is required" });
+    if (!level) {
+      response.status(400).json({ message: "Level is required" });
       return;
     }
 
@@ -131,7 +131,7 @@ export const createLearningPathController = (dataSource: DataSource): LearningPa
 
     try {
       const item = repository.create({
-        context,
+        level,
         vocabulary,
         userId: request.user.id
       });
@@ -164,16 +164,16 @@ export const createLearningPathController = (dataSource: DataSource): LearningPa
     }
 
     const payload = request.body as LearningPathPayload;
-    const context = typeof payload?.context === "string" ? payload.context.trim() : "";
+    const level = typeof payload?.level === "string" ? payload.level.trim() : "";
     const vocabulary = typeof payload?.vocabulary === "string" ? payload.vocabulary.trim() : "";
 
-    if (!context && !vocabulary) {
+    if (!level && !vocabulary) {
       response.status(400).json({ message: "No learning path fields to update" });
       return;
     }
 
-    if (payload?.context !== undefined && !context) {
-      response.status(400).json({ message: "Context cannot be empty" });
+    if (payload?.level !== undefined && !level) {
+      response.status(400).json({ message: "Level cannot be empty" });
       return;
     }
 
@@ -192,8 +192,8 @@ export const createLearningPathController = (dataSource: DataSource): LearningPa
         return;
       }
 
-      if (payload?.context !== undefined) {
-        item.context = context;
+      if (payload?.level !== undefined) {
+        item.level = level;
       }
 
       if (payload?.vocabulary !== undefined) {

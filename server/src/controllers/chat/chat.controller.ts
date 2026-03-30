@@ -9,6 +9,7 @@ import StoryEntity from "../../models/story.entity.js";
 import UserEntity from "../../models/user.entity.js";
 import CharacterEntity from "../../models/character.entity.js";
 import CharacterRelationshipEntity from "../../models/character-relationship.entity.js";
+import LearningPathEntity from "../../models/learning-path.entity.js";
 import { createChatHistoryStore, type ChatHistoryMessage, type ChatHistoryStore } from "../../services/chat-history.service.js";
 import { createVectorMemoryService, type VectorMemoryService } from "../../services/vector-memory.service.js";
 import { extractMemorySidecars, shouldStoreMemory, buildMemoryItemFromCandidate, stripMemorySidecar } from "../../services/memory-extraction.service.js";
@@ -115,6 +116,7 @@ export const createChatController = (
   const storyRepository = dataSource.getRepository(StoryEntity);
   const characterRepository = dataSource.getRepository(CharacterEntity);
   const relationshipRepository = dataSource.getRepository(CharacterRelationshipEntity);
+  const learningPathRepository = dataSource.getRepository(LearningPathEntity);
   
   // OpenAI configuration
   const openAIApiKey = process.env.OPENAI_API_KEY ?? "";
@@ -337,27 +339,6 @@ export const createChatController = (
     }
 
     return ["Developer context update:", context].join("\n");
-  };
-
-  /**
-   * Builds a developer message when a learning path is applied to chat.
-   *
-   * @param payload - Request payload containing learning path id/context/vocabulary.
-   * @returns A formatted developer message or empty string when invalid.
-   */
-  const formatLearningPathAppliedMessage = (payload: Record<string, unknown>) => {
-    const learningPathIdRaw = typeof payload.learningPathId === "number"
-      ? payload.learningPathId
-      : Number.parseInt(String(payload.learningPathId ?? ""), 10);
-    const learningPathId = Number.isInteger(learningPathIdRaw) && learningPathIdRaw > 0 ? learningPathIdRaw : null;
-    const context = typeof payload.context === "string" ? payload.context.trim() : "";
-    const vocabulary = typeof payload.vocabulary === "string" ? payload.vocabulary.trim() : "";
-
-    if (!learningPathId || !context || !vocabulary) {
-      return "";
-    }
-
-    return context;
   };
 
   /**
@@ -628,30 +609,6 @@ export const createChatController = (
     return null;
   };
 
-  const parseDeveloperLearningPathState = (content: string) => {
-    if (!/^Developer\s+learning\s+path\s+applied:/i.test(content)) {
-      return null;
-    }
-
-    const idMatch = content.match(/^LearningPathId:\s*(\d+)\s*$/im);
-    const contextMatch = content.match(/^LearningPathContext:\s*\n([\s\S]*?)\nLearningPathVocabulary:\s*$/im);
-    const vocabMatch = content.match(/^LearningPathVocabulary:\s*\n([\s\S]*?)(?:\nAI requirements:|$)/im);
-
-    const id = idMatch ? Number.parseInt(idMatch[1], 10) : Number.NaN;
-    const context = contextMatch?.[1]?.trim() ?? "";
-    const vocabulary = vocabMatch?.[1]?.trim() ?? "";
-
-    if (!Number.isInteger(id) || id <= 0 || !context || !vocabulary) {
-      return null;
-    }
-
-    return {
-      learningPathId: id,
-      context,
-      vocabulary
-    };
-  };
-
   const normalizeForComparison = (value: string) => value.trim().toLowerCase();
 
   const shuffleInPlace = <T,>(items: T[]) => {
@@ -702,22 +659,6 @@ export const createChatController = (
     return utterances;
   };
 
-  const getActiveLearningPathFromHistory = (history: { role: string; content: string }[]) => {
-    for (let i = history.length - 1; i >= 0; i -= 1) {
-      const message = history[i];
-      if (message.role !== "developer") {
-        continue;
-      }
-
-      const state = parseDeveloperLearningPathState(message.content);
-      if (state) {
-        return { ...state, historyIndex: i };
-      }
-    }
-
-    return null;
-  };
-
   const buildLearningPathVocabularyReminderContext = (vocabularyItems: string[]) => {
     return [
       LEARNING_PATH_VOCAB_REMINDER_MARKER,
@@ -745,22 +686,33 @@ export const createChatController = (
     userId: number,
     history: ChatHistoryMessage[]
   ) => {
-    const activeLearningPathSnapshot = getActiveLearningPathFromHistory(history);
-    if (!activeLearningPathSnapshot) {
+    // Load all learning paths for the user from DB
+    const learningPaths = await learningPathRepository.find({ where: { userId } });
+    if (!learningPaths.length) {
       return false;
     }
-    const { vocabulary, historyIndex: learningPathAppliedIndex } = activeLearningPathSnapshot;
 
-    const assistantUtterances = getAssistantUtterances(history.slice(learningPathAppliedIndex + 1))
+    // Collect all vocabulary items from all learning paths
+    const allVocabulary: string[] = [];
+    for (const lp of learningPaths) {
+      const items = parseLearningPathVocabularyItems(lp.vocabulary);
+      allVocabulary.push(...items);
+    }
+
+    if (!allVocabulary.length) {
+      return false;
+    }
+
+    // Check which vocabulary has already been used in assistant utterances
+    const assistantUtterances = getAssistantUtterances(history)
       .map((line) => normalizeForComparison(line))
       .filter((line) => Boolean(line));
-    const vocabularyItems = parseLearningPathVocabularyItems(vocabulary);
-    const remainingVocabulary = vocabularyItems.filter((item) => {
+
+    const remainingVocabulary = allVocabulary.filter((item) => {
       const normalizedItem = normalizeForComparison(item);
       if (!normalizedItem) {
         return false;
       }
-
       return !assistantUtterances.some((line) => line.includes(normalizedItem));
     });
 
@@ -768,6 +720,7 @@ export const createChatController = (
       return false;
     }
 
+    // Find last vocabulary reminder in history
     let lastReminderIndex = -1;
     for (let i = history.length - 1; i >= 0; i -= 1) {
       const message = history[i];
@@ -781,12 +734,9 @@ export const createChatController = (
       }
     }
 
-    const baselineIndex = lastReminderIndex >= learningPathAppliedIndex
-      ? lastReminderIndex
-      : learningPathAppliedIndex;
-
+    // Count user messages since last reminder (or from start if no reminder yet)
     let userMessagesSinceLastReminder = 1;
-    for (let i = baselineIndex + 1; i < history.length; i += 1) {
+    for (let i = lastReminderIndex + 1; i < history.length; i += 1) {
       if (history[i].role === "user") {
         userMessagesSinceLastReminder += 1;
       }
@@ -1207,7 +1157,7 @@ export const createChatController = (
     const sessionId = getSessionId(payload.sessionId);
     const kind = typeof payload.kind === "string" ? payload.kind.trim() : "";
 
-    if (kind !== "character_added" && kind !== "character_removed" && kind !== "context_update" && kind !== "learning_path_apply") {
+    if (kind !== "character_added" && kind !== "character_removed" && kind !== "context_update") {
       response.status(400).json({ message: "Invalid developer message kind" });
       return;
     }
@@ -1217,15 +1167,11 @@ export const createChatController = (
         ? formatCharacterAddedMessage(payload)
         : kind === "character_removed"
         ? formatCharacterRemovedMessage(payload)
-        : kind === "learning_path_apply"
-        ? formatLearningPathAppliedMessage(payload)
         : formatContextMessage(payload);
 
     if (!content) {
       const message = kind === "context_update"
         ? "Context is required"
-        : kind === "learning_path_apply"
-        ? "LearningPathId, context, and vocabulary are required"
         : "Character name is required";
       response.status(400).json({ message });
       return;
@@ -1405,30 +1351,8 @@ export const createChatController = (
         .filter(([, isActive]) => isActive)
         .map(([name]) => name);
 
-      let activeLearningPathId: number | null = null;
-      let activeLearningPathContext = "";
-      let activeLearningPathVocabulary = "";
-
-      for (const message of messages) {
-        if (message.role !== "developer") {
-          continue;
-        }
-
-        const learningPathState = parseDeveloperLearningPathState(message.content);
-        if (!learningPathState) {
-          continue;
-        }
-
-        activeLearningPathId = learningPathState.learningPathId;
-        activeLearningPathContext = learningPathState.context;
-        activeLearningPathVocabulary = learningPathState.vocabulary;
-      }
-
       response.json({
-        activeCharacterNames,
-        activeLearningPathId,
-        activeLearningPathContext,
-        activeLearningPathVocabulary
+        activeCharacterNames
       });
     } catch (error) {
       console.error("Error in getDeveloperState:", error);

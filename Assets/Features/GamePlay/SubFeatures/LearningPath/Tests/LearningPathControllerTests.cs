@@ -32,7 +32,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Tests
 			}
 
 			FakeServer.Register("GET", NetworkEndpoints.LearningPaths,
-				_ => "{\"learningPaths\":[{\"id\":1,\"context\":\"At the cafe\",\"vocabulary\":\"hello,coffee,sugar\"}]}"
+				_ => "{\"learningPaths\":[{\"id\":1,\"level\":\"HSK1\",\"vocabulary\":\"hello,coffee,sugar\"}]}"
 			);
 
 			Core.Infrastructure.Events.EventBus.Subscribe(LearningPathEvents.ListLoaded, Handler);
@@ -49,7 +49,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Tests
 			Assert.IsNotNull(listPayload);
 			Assert.AreEqual(1, listPayload.LearningPaths.Count);
 			Assert.AreEqual(1, listPayload.LearningPaths[0].Id);
-			Assert.AreEqual("At the cafe", listPayload.LearningPaths[0].Context);
+			Assert.AreEqual("HSK1", listPayload.LearningPaths[0].Level);
 			Assert.AreEqual("hello,coffee,sugar", listPayload.LearningPaths[0].Vocabulary);
 		}
 
@@ -60,7 +60,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Tests
 			{
 				LearningPaths = new List<LearningPathPayload>
 				{
-					new LearningPathPayload { Id = 5, Context = "In the park", Vocabulary = "tree,bench,walk" }
+					new LearningPathPayload { Id = 5, Level = "HSK2", Vocabulary = "tree,bench,walk" }
 				}
 			};
 
@@ -82,7 +82,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Tests
 
 			Assert.IsNotNull(editPayload);
 			Assert.AreEqual(5, editPayload.LearningPathId);
-			Assert.AreEqual("In the park", editPayload.Context);
+			Assert.AreEqual("HSK2", editPayload.Level);
 			Assert.AreEqual("tree,bench,walk", editPayload.Vocabulary);
 		}
 
@@ -128,7 +128,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Tests
 			}
 
 			Assert.IsNotNull(errorPayload);
-			Assert.IsTrue(errorPayload.Message.Contains("Context"));
+			Assert.IsTrue(errorPayload.Message.Contains("Level"));
 		}
 
 		[Test]
@@ -145,7 +145,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Tests
 			{
 				LearningPathController.HandleCreate(new LearningPathCreateRequestPayload
 				{
-					Context = "Some context",
+					Level = "Some context",
 					Vocabulary = ""
 				});
 			}
@@ -173,7 +173,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Tests
 				LearningPathController.HandleUpdate(new LearningPathUpdateRequestPayload
 				{
 					LearningPathId = 0,
-					Context = "Context",
+					Level = "Level",
 					Vocabulary = "word"
 				});
 			}
@@ -195,10 +195,10 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Tests
 			}
 
 			FakeServer.Register("POST", NetworkEndpoints.LearningPaths,
-				_ => "{\"learningPath\":{\"id\":2,\"context\":\"At school\",\"vocabulary\":\"book,pen,desk\"}}"
+				_ => "{\"learningPath\":{\"id\":2,\"level\":\"HSK1\",\"vocabulary\":\"book,pen,desk\"}}"
 			);
 			FakeServer.Register("GET", NetworkEndpoints.LearningPaths,
-				_ => "{\"learningPaths\":[{\"id\":2,\"context\":\"At school\",\"vocabulary\":\"book,pen,desk\"}]}"
+				_ => "{\"learningPaths\":[{\"id\":2,\"level\":\"HSK1\",\"vocabulary\":\"book,pen,desk\"}]}"
 			);
 
 			Core.Infrastructure.Events.EventBus.Subscribe(LearningPathEvents.ListLoaded, Handler);
@@ -206,7 +206,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Tests
 			{
 				LearningPathController.HandleCreate(new LearningPathCreateRequestPayload
 				{
-					Context = "At school",
+					Level = "HSK1",
 					Vocabulary = "book,pen,desk"
 				});
 				yield return AwaitTask(Task.Delay(100));

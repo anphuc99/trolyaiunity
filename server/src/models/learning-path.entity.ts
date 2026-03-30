@@ -3,7 +3,7 @@ import UserEntity from "./user.entity.js";
 
 /**
  * Persists user-designed learning paths.
- * Each path stores a linear story context and comma-separated vocabulary.
+ * Each path stores an HSK level label and comma-separated vocabulary.
  */
 @Entity({ name: "learning_paths" })
 class LearningPathEntity {
@@ -11,7 +11,7 @@ class LearningPathEntity {
   id!: number;
 
   @Column({ type: "text" })
-  context!: string;
+  level!: string;
 
   @Column({ type: "text" })
   vocabulary!: string;

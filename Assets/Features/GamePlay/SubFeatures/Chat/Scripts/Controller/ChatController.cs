@@ -44,7 +44,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			RegisterAddCharacterMenu();
 			RegisterContextMenu();
-			RegisterLearningPathMenu();
 			RegisterEndConversationMenu();
 			_ = LoadDeveloperStateInternalAsync();
 			EventBus.Publish(ChatEvents.Installed, null);
@@ -60,7 +59,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 			UnregisterAddCharacterMenu();
 			UnregisterContextMenu();
-			UnregisterLearningPathMenu();
 			UnregisterEndConversationMenu();
 			// Clear API mode so the next chat session starts fresh (default mode).
 			GlobalVariables.Remove(CoreGlobalModes.ChatApiModeKey);
@@ -77,7 +75,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			{
 				UnregisterAddCharacterMenu();
 				UnregisterContextMenu();
-				UnregisterLearningPathMenu();
 				UnregisterEndConversationMenu();
 			}
 
@@ -283,34 +280,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
-		/// Applies a learning path as developer context and triggers an immediate reply.
-		/// </summary>
-		/// <param name="payload">Learning path context payload.</param>
-		[Request(ChatRequests.ApplyLearningPath)]
-		public static void HandleApplyLearningPath(ChatApplyLearningPathRequestPayload payload)
-		{
-			if (payload == null || payload.LearningPathId <= 0)
-			{
-				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
-				{
-					Message = "Learning path id is required."
-				});
-				return;
-			}
-
-			if (string.IsNullOrWhiteSpace(payload.Context) || string.IsNullOrWhiteSpace(payload.Vocabulary))
-			{
-				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
-				{
-					Message = "Learning path context and vocabulary are required."
-				});
-				return;
-			}
-
-			_ = ApplyLearningPathInternalAsync(payload);
-		}
-
-		/// <summary>
 		/// Handles end-conversation request and syncs journal creation on server.
 		/// </summary>
 		/// <param name="payload">Unused payload.</param>
@@ -382,19 +351,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			ChatState.EndConversationMenuId = menuId;
 		}
 
-		private static void RegisterLearningPathMenu()
-		{
-			UnregisterLearningPathMenu();
-
-			var menuId = ChatState.ParentSignals?.AddMenu?.Invoke("Thêm lộ trình", HandleOpenLearningPathMenu);
-			if (string.IsNullOrWhiteSpace(menuId))
-			{
-				return;
-			}
-
-			ChatState.LearningPathMenuId = menuId;
-		}
-
 		private static void UnregisterContextMenu()
 		{
 			if (string.IsNullOrWhiteSpace(ChatState.ContextMenuId))
@@ -419,18 +375,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			ChatState.EndConversationMenuId = null;
 		}
 
-		private static void UnregisterLearningPathMenu()
-		{
-			if (string.IsNullOrWhiteSpace(ChatState.LearningPathMenuId))
-			{
-				ChatState.LearningPathMenuId = null;
-				return;
-			}
-
-			ChatState.ParentSignals?.RemoveMenu?.Invoke(ChatState.LearningPathMenuId);
-			ChatState.LearningPathMenuId = null;
-		}
-
 		private static async void HandleOpenAddCharacterMenu()
 		{
 			var payload = await BuildSelectableCharactersAsync();
@@ -440,34 +384,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		private static void HandleOpenContextMenu()
 		{
 			EventBus.Publish(ChatEvents.ContextInputRequested, null);
-		}
-
-		private static async void HandleOpenLearningPathMenu()
-		{
-			try
-			{
-				var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.LearningPaths);
-				if (string.IsNullOrWhiteSpace(responseJson))
-				{
-					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
-					{
-						Message = "Empty learning path response from server."
-					});
-					return;
-				}
-
-				var response = JsonConvert.DeserializeObject<ChatLearningPathListResponsePayload>(responseJson)
-					?? new ChatLearningPathListResponsePayload();
-				response.LearningPaths ??= new List<ChatLearningPathPayload>();
-				EventBus.Publish(ChatEvents.LearningPathsLoaded, response);
-			}
-			catch (Exception exception)
-			{
-				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
-				{
-					Message = "Failed to load learning paths: " + exception.Message
-				});
-			}
 		}
 
 		private static void HandleOpenEndConversationMenu()
@@ -652,45 +568,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
 				{
 					Message = "Failed to save developer context: " + exception.Message
-				});
-			}
-		}
-
-		private static async Task ApplyLearningPathInternalAsync(ChatApplyLearningPathRequestPayload payload)
-		{
-			try
-			{
-				var request = new
-				{
-					sessionId = string.IsNullOrWhiteSpace(payload.SessionId) ? null : payload.SessionId.Trim(),
-					kind = "learning_path_apply",
-					learningPathId = payload.LearningPathId,
-					context = payload.Context.Trim(),
-					vocabulary = payload.Vocabulary.Trim(),
-				};
-
-				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatDeveloperEndpoint(), request);
-				if (string.IsNullOrWhiteSpace(responseJson))
-				{
-					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
-					{
-						Message = "Failed to apply learning path context."
-					});
-					return;
-				}
-
-				await LoadDeveloperStateInternalAsync();
-
-				await GenerateReplyFromHistoryInternalAsync(new ChatSendRequestPayload
-				{
-					SessionId = string.IsNullOrWhiteSpace(payload.SessionId) ? null : payload.SessionId.Trim(),
-				});
-			}
-			catch (Exception exception)
-			{
-				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
-				{
-					Message = "Failed to apply learning path context: " + exception.Message
 				});
 			}
 		}

@@ -11,8 +11,8 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Model
 		[JsonProperty("id")]
 		public int Id { get; set; }
 
-		[JsonProperty("context")]
-		public string Context { get; set; }
+		[JsonProperty("level")]
+		public string Level { get; set; }
 
 		[JsonProperty("vocabulary")]
 		public string Vocabulary { get; set; }
@@ -47,8 +47,8 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Model
 	/// </summary>
 	public sealed class LearningPathCreateRequestPayload
 	{
-		[JsonProperty("context")]
-		public string Context { get; set; }
+		[JsonProperty("level")]
+		public string Level { get; set; }
 
 		[JsonProperty("vocabulary")]
 		public string Vocabulary { get; set; }
@@ -62,8 +62,8 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Model
 		[JsonIgnore]
 		public int LearningPathId { get; set; }
 
-		[JsonProperty("context")]
-		public string Context { get; set; }
+		[JsonProperty("level")]
+		public string Level { get; set; }
 
 		[JsonProperty("vocabulary")]
 		public string Vocabulary { get; set; }
@@ -83,7 +83,7 @@ namespace Features.GamePlay.SubFeatures.LearningPath.Model
 	public sealed class LearningPathEditPayload
 	{
 		public int LearningPathId { get; set; }
-		public string Context { get; set; }
+		public string Level { get; set; }
 		public string Vocabulary { get; set; }
 	}
 
