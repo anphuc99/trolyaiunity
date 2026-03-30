@@ -1097,9 +1097,25 @@ export const createChatController = (
           const user = await userRepository.findOne({ where: { id: request.user!.id } });
           const storyId = user?.currentStoryId ?? null;
           const items = itemsToStore.map((c) => buildMemoryItemFromCandidate(c, request.user!.id, storyId, message));
-          vectorMemoryService.upsert(request.user!.id, items).catch((err) =>
-            console.warn("Memory upsert failed (non-blocking):", err)
-          );
+          vectorMemoryService
+            .upsert(request.user!.id, items)
+            .then(() => {
+              console.log("[Memory] Chroma upsert success:", {
+                userId: request.user!.id,
+                storyId,
+                itemCount: items.length,
+                source: "sendMessage"
+              });
+            })
+            .catch((err) => {
+              console.warn("[Memory] Chroma upsert failed:", {
+                userId: request.user!.id,
+                storyId,
+                itemCount: items.length,
+                source: "sendMessage",
+                error: err instanceof Error ? err.message : String(err)
+              });
+            });
         }
         cleanReply = stripMemorySidecar(normalizedReply);
       }
@@ -1173,9 +1189,25 @@ export const createChatController = (
           const user = await userRepository.findOne({ where: { id: request.user!.id } });
           const storyId = user?.currentStoryId ?? null;
           const items = itemsToStore.map((c) => buildMemoryItemFromCandidate(c, request.user!.id, storyId));
-          vectorMemoryService.upsert(request.user!.id, items).catch((err) =>
-            console.warn("Memory upsert failed (non-blocking):", err)
-          );
+          vectorMemoryService
+            .upsert(request.user!.id, items)
+            .then(() => {
+              console.log("[Memory] Chroma upsert success:", {
+                userId: request.user!.id,
+                storyId,
+                itemCount: items.length,
+                source: "respondFromHistory"
+              });
+            })
+            .catch((err) => {
+              console.warn("[Memory] Chroma upsert failed:", {
+                userId: request.user!.id,
+                storyId,
+                itemCount: items.length,
+                source: "respondFromHistory",
+                error: err instanceof Error ? err.message : String(err)
+              });
+            });
         }
         cleanReply = stripMemorySidecar(normalizedReply);
       }
