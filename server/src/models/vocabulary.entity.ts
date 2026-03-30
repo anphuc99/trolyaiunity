@@ -35,6 +35,10 @@ class VocabularyEntity {
   @Column({ type: "varchar", length: 255 })
   vietnamese!: string;
 
+  /** Optional pinyin reading. */
+  @Column({ type: "varchar", length: 255, nullable: true })
+  pinyin?: string | null;
+
   /** Whether user added manually (not from chat). */
   @Column({ name: "is_manually_added", type: "boolean", default: false })
   isManuallyAdded!: boolean;

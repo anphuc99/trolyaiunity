@@ -190,12 +190,14 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     const {
       korean,
       vietnamese,
+      pinyin,
       memory,
       linkedMessageIds,
       difficultyRating
     } = request.body as {
       korean?: string;
       vietnamese?: string;
+      pinyin?: string;
       memory?: string;
       linkedMessageIds?: string[];
       difficultyRating?: "very_easy" | "easy" | "medium" | "hard";
@@ -203,6 +205,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
 
     const trimmedKorean = (korean ?? "").trim();
     const trimmedVietnamese = (vietnamese ?? "").trim();
+    const trimmedPinyin = (pinyin ?? "").trim();
 
     if (!trimmedKorean || !trimmedVietnamese) {
       response.status(400).json({ message: "Korean and Vietnamese are required" });
@@ -222,6 +225,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       const vocab = vocabRepo.create({
         korean: trimmedKorean,
         vietnamese: trimmedVietnamese,
+        pinyin: trimmedPinyin || null,
         isManuallyAdded: !memory,
         userId
       });
@@ -289,7 +293,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       return;
     }
 
-    const { korean, vietnamese } = request.body as { korean?: string; vietnamese?: string };
+    const { korean, vietnamese, pinyin } = request.body as { korean?: string; vietnamese?: string; pinyin?: string };
 
     try {
       const vocab = await vocabRepo.findOne({ where: { id: vocabId, userId } });
@@ -305,6 +309,11 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
 
       if (vietnamese?.trim()) {
         vocab.vietnamese = vietnamese.trim();
+      }
+
+      if (typeof pinyin === "string") {
+        const trimmedPinyin = pinyin.trim();
+        vocab.pinyin = trimmedPinyin || null;
       }
 
       const updated = await vocabRepo.save(vocab);
