@@ -48,6 +48,7 @@ interface OldVocabularyItem {
   korean: string;
   vietnamese: string;
   pinyin?: string;
+  level?: string;
   storyId?: string;
   dailyChatId?: string;
   createdDate?: string;
@@ -331,6 +332,7 @@ async function migrateVocabularies(
       newVocab.korean = oldVocab.korean;
       newVocab.vietnamese = oldVocab.vietnamese;
       newVocab.pinyin = oldVocab.pinyin?.trim() || null;
+      newVocab.level = oldVocab.level?.trim() || null;
       newVocab.isManuallyAdded = oldVocab.isManuallyAdded ?? false;
       newVocab.userId = DEFAULT_USER_ID;
 

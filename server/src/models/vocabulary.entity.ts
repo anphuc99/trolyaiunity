@@ -39,6 +39,10 @@ class VocabularyEntity {
   @Column({ type: "varchar", length: 255, nullable: true })
   pinyin?: string | null;
 
+  /** Optional vocabulary level label (for example: HSK1, HSK2, Beginner). */
+  @Column({ type: "varchar", length: 100, nullable: true })
+  level?: string | null;
+
   /** Whether user added manually (not from chat). */
   @Column({ name: "is_manually_added", type: "boolean", default: false })
   isManuallyAdded!: boolean;

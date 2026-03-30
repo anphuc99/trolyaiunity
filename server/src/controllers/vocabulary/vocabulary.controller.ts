@@ -193,6 +193,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       korean,
       vietnamese,
       pinyin,
+      level,
       memory,
       linkedMessageIds,
       difficultyRating
@@ -200,6 +201,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       korean?: string;
       vietnamese?: string;
       pinyin?: string;
+      level?: string;
       memory?: string;
       linkedMessageIds?: string[];
       difficultyRating?: "very_easy" | "easy" | "medium" | "hard";
@@ -208,6 +210,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     const trimmedKorean = (korean ?? "").trim();
     const trimmedVietnamese = (vietnamese ?? "").trim();
     const trimmedPinyin = (pinyin ?? "").trim();
+    const trimmedLevel = (level ?? "").trim();
 
     if (!trimmedKorean || !trimmedVietnamese) {
       response.status(400).json({ message: "Korean and Vietnamese are required" });
@@ -228,6 +231,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         korean: trimmedKorean,
         vietnamese: trimmedVietnamese,
         pinyin: trimmedPinyin || null,
+        level: trimmedLevel || null,
         isManuallyAdded: !memory,
         userId
       });
@@ -295,7 +299,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       return;
     }
 
-    const { korean, vietnamese, pinyin } = request.body as { korean?: string; vietnamese?: string; pinyin?: string };
+    const { korean, vietnamese, pinyin, level } = request.body as { korean?: string; vietnamese?: string; pinyin?: string; level?: string };
 
     try {
       const vocab = await vocabRepo.findOne({ where: { id: vocabId, userId } });
@@ -316,6 +320,11 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       if (typeof pinyin === "string") {
         const trimmedPinyin = pinyin.trim();
         vocab.pinyin = trimmedPinyin || null;
+      }
+
+      if (typeof level === "string") {
+        const trimmedLevel = level.trim();
+        vocab.level = trimmedLevel || null;
       }
 
       const updated = await vocabRepo.save(vocab);
@@ -749,6 +758,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
           korean: existing.korean,
           vietnamese,
           pinyin,
+          level: existing.level ?? null,
           isNew: false,
           review: review ? serialiseReview(review) : null
         });
@@ -776,6 +786,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         korean: word,
         vietnamese,
         pinyin: pinyin || null,
+        level: null,
         isManuallyAdded: false,
         userId
       });
@@ -801,6 +812,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         korean: saved.korean,
         vietnamese,
         pinyin,
+        level: saved.level ?? null,
         isNew: true,
         review: serialiseReview(savedReview)
       });
