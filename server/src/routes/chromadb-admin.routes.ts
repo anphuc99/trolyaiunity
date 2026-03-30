@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { ChromaClient, IncludeEnum } from "chromadb";
+import { DefaultEmbeddingFunction } from "@chroma-core/default-embed";
 import { createChromaClient } from "../services/chroma-client.factory.js";
 
 /**
@@ -16,6 +17,9 @@ export const createChromaDbAdminRoutes = (): Router => {
    * Returns a ChromaClient instance connected to the configured URL.
    */
   const getClient = (): ChromaClient => createChromaClient(chromaUrl);
+
+  /** Shared embedding function for all collection operations. */
+  const embeddingFunction = new DefaultEmbeddingFunction();
 
   // ── GET /status ─ Check ChromaDB connection ────────────────────────────
   router.get("/status", async (_req: Request, res: Response) => {
@@ -43,7 +47,7 @@ export const createChromaDbAdminRoutes = (): Router => {
   router.get("/collections/:name", async (req: Request, res: Response) => {
     try {
       const client = getClient();
-      const collection = await client.getCollection({ name: req.params.name });
+      const collection = await client.getCollection({ name: req.params.name, embeddingFunction });
       const count = await collection.count();
       const limit = Math.min(Number(req.query.limit) || 50, 200);
       const offset = Number(req.query.offset) || 0;
@@ -72,7 +76,7 @@ export const createChromaDbAdminRoutes = (): Router => {
   router.post("/collections/:name/query", async (req: Request, res: Response) => {
     try {
       const client = getClient();
-      const collection = await client.getCollection({ name: req.params.name });
+      const collection = await client.getCollection({ name: req.params.name, embeddingFunction });
 
       const { queryText, nResults = 10, where } = req.body;
       if (!queryText || typeof queryText !== "string") {
@@ -102,7 +106,7 @@ export const createChromaDbAdminRoutes = (): Router => {
   router.post("/collections/:name/add", async (req: Request, res: Response) => {
     try {
       const client = getClient();
-      const collection = await client.getCollection({ name: req.params.name });
+      const collection = await client.getCollection({ name: req.params.name, embeddingFunction });
 
       const { id, document, metadata } = req.body;
       if (!id || !document) {
@@ -126,7 +130,7 @@ export const createChromaDbAdminRoutes = (): Router => {
   router.put("/collections/:name/:id", async (req: Request, res: Response) => {
     try {
       const client = getClient();
-      const collection = await client.getCollection({ name: req.params.name });
+      const collection = await client.getCollection({ name: req.params.name, embeddingFunction });
       const docId = req.params.id;
 
       const { document, metadata } = req.body;
@@ -147,7 +151,7 @@ export const createChromaDbAdminRoutes = (): Router => {
   router.delete("/collections/:name/:id", async (req: Request, res: Response) => {
     try {
       const client = getClient();
-      const collection = await client.getCollection({ name: req.params.name });
+      const collection = await client.getCollection({ name: req.params.name, embeddingFunction });
 
       await collection.delete({ ids: [req.params.id] });
 
@@ -178,7 +182,7 @@ export const createChromaDbAdminRoutes = (): Router => {
       }
 
       const client = getClient();
-      await client.getOrCreateCollection({ name });
+      await client.getOrCreateCollection({ name, embeddingFunction });
       res.json({ ok: true, name });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
