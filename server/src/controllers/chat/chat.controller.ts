@@ -257,19 +257,7 @@ export const createChatController = (
       return "";
     }
 
-    return [
-      "Developer learning path applied:",
-      `LearningPathId: ${learningPathId}`,
-      "Please note that the message must follow the correct sequence from beginning to end; no stages should be skipped.",
-      "LearningPathContext:",
-      context,
-      "LearningPathVocabulary:",
-      vocabulary,
-      "AI requirements:",
-      "- Follow the learning-path context strictly.",
-      "- Use the provided vocabulary naturally in the dialogue.",
-      "- Do not drift outside the selected learning path context."
-    ].join("\n");
+    return context;
   };
 
   /**
