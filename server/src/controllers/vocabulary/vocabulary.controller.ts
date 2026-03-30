@@ -86,6 +86,34 @@ const isValidVocabId = (id: string | undefined): boolean => {
 };
 
 /**
+ * Checks whether a translation contains Han characters.
+ */
+const hasHanCharacters = (text: string): boolean => /[\u3400-\u9FFF]/u.test(text);
+
+/**
+ * Validates if a Vietnamese meaning is usable for display/storage.
+ * Rejects empty values, same-as-source values, and Han-script outputs.
+ */
+const isValidVietnameseMeaning = (sourceWord: string, meaning: string): boolean => {
+  const normalizedMeaning = meaning.trim();
+  const normalizedSource = sourceWord.trim();
+
+  if (!normalizedMeaning) {
+    return false;
+  }
+
+  if (normalizedMeaning === normalizedSource) {
+    return false;
+  }
+
+  if (hasHanCharacters(normalizedMeaning)) {
+    return false;
+  }
+
+  return true;
+};
+
+/**
  * Builds the vocabulary controller.
  *
  * @param dataSource - Initialised TypeORM data source.
@@ -740,29 +768,37 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     }
 
     try {
+      const cheapAI: CheapAIService = createCheapAIService();
+
       // Try to find existing vocabulary by korean (Chinese) text
       const existing = await vocabRepo.findOne({ where: { korean: word, userId } });
 
       if (existing) {
         let pinyin = existing.pinyin ?? "";
         let vietnamese = existing.vietnamese ?? "";
+        const meaningNeedsRefresh = !isValidVietnameseMeaning(word, vietnamese);
 
-        // If pinyin or meaning is missing, fill via cheap AI
-        if (!pinyin || !vietnamese) {
+        // If pinyin is missing or meaning is invalid, refresh via cheap AI.
+        if (!pinyin || meaningNeedsRefresh) {
           try {
-            const cheapAI = createCheapAIService();
             const translation = await cheapAI.translateVocabulary(word);
             if (!pinyin && translation.pinyin) {
               pinyin = translation.pinyin;
               existing.pinyin = pinyin;
             }
-            if (!vietnamese && translation.vietnamese) {
+            if (isValidVietnameseMeaning(word, translation.vietnamese ?? "")) {
               vietnamese = translation.vietnamese;
+              existing.vietnamese = vietnamese;
+            } else if (meaningNeedsRefresh) {
+              vietnamese = "chua co nghia";
               existing.vietnamese = vietnamese;
             }
             await vocabRepo.save(existing);
           } catch (aiError) {
             console.warn("Cheap AI translation fallback failed:", aiError);
+            if (meaningNeedsRefresh) {
+              vietnamese = "chua co nghia";
+            }
           }
         }
 
@@ -785,17 +821,16 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       let pinyin = "";
       let vietnamese = "";
       try {
-        const cheapAI = createCheapAIService();
         const translation = await cheapAI.translateVocabulary(word);
         pinyin = translation.pinyin;
-        vietnamese = translation.vietnamese;
+        if (isValidVietnameseMeaning(word, translation.vietnamese ?? "")) {
+          vietnamese = translation.vietnamese;
+        }
       } catch (aiError) {
         console.warn("Cheap AI translation failed for new word:", aiError);
       }
 
-      if (!vietnamese) {
-        vietnamese = word;
-      }
+      vietnamese = vietnamese || "chua co nghia";
 
       const currentUserLevel = await resolveCurrentUserLevel(userId);
 
