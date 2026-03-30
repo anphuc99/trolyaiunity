@@ -16,6 +16,7 @@ import { createVocabularyRoutes } from "./vocabulary.routes.js";
 import { createMyLogRoutes } from "./mylog.routes.js";
 import { createLearningPathRoutes } from "./learning-path.routes.js";
 import { createCharacterRelationshipsRoutes } from "./character-relationships.routes.js";
+import { createChromaDbAdminRoutes } from "./chromadb-admin.routes.js";
 
 /**
  * Creates the root API router with all route groups.
@@ -25,6 +26,9 @@ import { createCharacterRelationshipsRoutes } from "./character-relationships.ro
  */
 export const createApiRouter = (dataSource: DataSource) => {
   const router = Router();
+
+  // ChromaDB admin API
+  router.use("/chromadb", createChromaDbAdminRoutes());
 
   // mvc-gen:routes
   router.use("/characters", createCharactersRoutes(dataSource));

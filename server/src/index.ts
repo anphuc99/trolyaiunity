@@ -75,6 +75,11 @@ const createApp = () => {
 
   app.use("/api", createApiRouter(AppDataSource));
 
+  // Convenient redirect for ChromaDB admin UI
+  app.get("/chromadb", (_req, res) => {
+    res.redirect("/public/chromadb-admin.html");
+  });
+
   if (hasEmbeddedClient()) {
     app.get("*", (req, res) => {
       const assetPath = req.path === "/" ? "index.html" : req.path.replace(/^\/+/, "");

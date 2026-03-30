@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChromaDB Admin</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --border: #334155; --text: #e2e8f0;
+    --muted: #94a3b8; --primary: #3b82f6; --primary-hover: #2563eb;
+    --danger: #ef4444; --success: #22c55e; --warning: #f59e0b;
+    --radius: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  
+  .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+  .header h1 { font-size: 20px; font-weight: 600; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+  .status-dot.ok { background: var(--success); }
+  .status-dot.err { background: var(--danger); }
+  .status-text { font-size: 13px; color: var(--muted); }
+
+  .layout { display: flex; height: calc(100vh - 57px); }
+  .sidebar { width: 280px; border-right: 1px solid var(--border); background: var(--surface); overflow-y: auto; flex-shrink: 0; }
+  .main { flex: 1; overflow-y: auto; padding: 24px; }
+
+  .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .sidebar-header h2 { font-size: 14px; font-weight: 600; text-transform: uppercase; color: var(--muted); letter-spacing: 0.5px; }
+  .collection-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.15s; display: flex; justify-content: space-between; align-items: center; }
+  .collection-item:hover { background: rgba(59,130,246,0.1); }
+  .collection-item.active { background: rgba(59,130,246,0.15); border-left: 3px solid var(--primary); }
+  .collection-item .name { font-size: 14px; font-weight: 500; }
+  .collection-item .count { font-size: 12px; color: var(--muted); }
+
+  .btn { padding: 8px 16px; border: none; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-danger:hover { background: #dc2626; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--surface); color: var(--text); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+  .search-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
+  .search-box h3 { font-size: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .search-row { display: flex; gap: 10px; }
+  .search-row input, .search-row select { flex: 1; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 14px; outline: none; }
+  .search-row input:focus { border-color: var(--primary); }
+  .filter-row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+  .filter-row input, .filter-row select { padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 13px; outline: none; }
+
+  .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .results-header h3 { font-size: 16px; }
+
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--radius); overflow: hidden; }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; }
+  th { background: rgba(0,0,0,0.2); font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; position: sticky; top: 0; }
+  tr:hover { background: rgba(59,130,246,0.05); }
+  td.doc-cell { max-width: 400px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  td.meta-cell { max-width: 300px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  td.dist-cell { font-family: monospace; font-size: 12px; color: var(--warning); }
+  td.actions-cell { white-space: nowrap; }
+  td.id-cell { font-family: monospace; font-size: 11px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+
+  .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 16px; align-items: center; }
+  .pagination span { font-size: 13px; color: var(--muted); }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: 600px; max-width: 95vw; max-height: 85vh; overflow-y: auto; }
+  .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .modal-header h3 { font-size: 16px; }
+  .modal-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+  .modal-body { padding: 20px; }
+  .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
+  .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 14px; outline: none; font-family: inherit; }
+  .form-group textarea { min-height: 100px; resize: vertical; }
+  .form-group input:focus, .form-group textarea:focus { border-color: var(--primary); }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: var(--text); }
+
+  .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: var(--radius); font-size: 13px; z-index: 200; animation: slideIn 0.3s ease; }
+  .toast.success { background: var(--success); color: white; }
+  .toast.error { background: var(--danger); color: white; }
+  @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; background: rgba(59,130,246,0.15); color: var(--primary); margin-right: 4px; }
+  .tag.high { background: rgba(239,68,68,0.15); color: var(--danger); }
+  .tag.medium { background: rgba(245,158,11,0.15); color: var(--warning); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>ChromaDB Admin</h1>
+  <span class="status-dot" id="statusDot"></span>
+  <span class="status-text" id="statusText">Connecting...</span>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>Collections</h2>
+      <button class="btn btn-primary btn-sm" onclick="showCreateCollection()">+ New</button>
+    </div>
+    <div id="collectionList"></div>
+  </div>
+  <div class="main" id="mainContent">
+    <div class="empty-state">
+      <h3>Select a Collection</h3>
+      <p>Choose a collection from the sidebar to browse and search vector data.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Document Modal -->
+<div class="modal-overlay" id="docModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="docModalTitle">Add Document</h3>
+      <button class="modal-close" onclick="closeDocModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Document ID</label>
+        <input type="text" id="docId" placeholder="Leave empty for auto-generated ID">
+      </div>
+      <div class="form-group">
+        <label>Document Text *</label>
+        <textarea id="docText" placeholder="Enter the document content..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Metadata (JSON)</label>
+        <textarea id="docMeta" placeholder='{"type": "preference", "importance": "high"}'></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeDocModal()">Cancel</button>
+      <button class="btn btn-primary" id="docModalSave" onclick="saveDocument()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Collection Modal -->
+<div class="modal-overlay" id="collModal">
+  <div class="modal" style="width: 400px;">
+    <div class="modal-header">
+      <h3>Create Collection</h3>
+      <button class="modal-close" onclick="closeCollModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Collection Name *</label>
+        <input type="text" id="collName" placeholder="my_collection">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeCollModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="createCollection()">Create</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin + '/api/chromadb';
+let currentCollection = null;
+let currentOffset = 0;
+const PAGE_SIZE = 50;
+let currentTotalCount = 0;
+let editingDocId = null;
+
+// ── Utility ──────────────────────────────────────────────────────────────────
+
+async function api(path, opts = {}) {
+  const res = await fetch(API_BASE + path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// ── Status ───────────────────────────────────────────────────────────────────
+
+async function checkStatus() {
+  try {
+    const data = await api('/status');
+    document.getElementById('statusDot').className = 'status-dot ok';
+    document.getElementById('statusText').textContent = 'Connected to ' + data.chromaUrl;
+  } catch (e) {
+    document.getElementById('statusDot').className = 'status-dot err';
+    document.getElementById('statusText').textContent = 'Disconnected: ' + e.message;
+  }
+}
+
+// ── Collections ──────────────────────────────────────────────────────────────
+
+async function loadCollections() {
+  try {
+    const data = await api('/collections');
+    const list = document.getElementById('collectionList');
+    if (!data.collections || data.collections.length === 0) {
+      list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">No collections found</div>';
+      return;
+    }
+    list.innerHTML = data.collections.map(c => {
+      const name = typeof c === 'string' ? c : c.name;
+      const active = currentCollection === name ? ' active' : '';
+      return '<div class="collection-item' + active + '" onclick="selectCollection(\'' + escapeHtml(name) + '\')">' +
+        '<span class="name">' + escapeHtml(name) + '</span>' +
+        '</div>';
+    }).join('');
+  } catch (e) {
+    toast('Failed to load collections: ' + e.message, 'error');
+  }
+}
+
+async function selectCollection(name) {
+  currentCollection = name;
+  currentOffset = 0;
+  await loadCollections();
+  await loadCollectionData();
+}
+
+async function loadCollectionData() {
+  if (!currentCollection) return;
+  const main = document.getElementById('mainContent');
+  main.innerHTML = '<div style="padding:40px;text-align:center;"><div class="spinner"></div></div>';
+
+  try {
+    const data = await api('/collections/' + encodeURIComponent(currentCollection) + '?limit=' + PAGE_SIZE + '&offset=' + currentOffset);
+    currentTotalCount = data.count;
+    renderCollectionView(data);
+  } catch (e) {
+    main.innerHTML = '<div class="empty-state"><h3>Error</h3><p>' + escapeHtml(e.message) + '</p></div>';
+  }
+}
+
+function renderCollectionView(data) {
+  const main = document.getElementById('mainContent');
+  const totalPages = Math.ceil(data.count / PAGE_SIZE);
+  const currentPage = Math.floor(currentOffset / PAGE_SIZE) + 1;
+
+  let html = '';
+
+  // Search box
+  html += '<div class="search-box">';
+  html += '<h3>&#x1F50D; Semantic Search</h3>';
+  html += '<div class="search-row">';
+  html += '<input type="text" id="searchInput" placeholder="Enter query to search vectors..." onkeydown="if(event.key===\'Enter\')doSearch()">';
+  html += '<input type="number" id="searchTopK" value="10" min="1" max="50" style="flex:0 0 80px;" title="Number of results">';
+  html += '<button class="btn btn-primary" onclick="doSearch()">Search</button>';
+  html += '</div>';
+  html += '<div class="filter-row">';
+  html += '<input type="text" id="filterWhere" placeholder=\'Where filter JSON (optional): {"userId": {"$eq": 1}}\' style="flex:1;">';
+  html += '</div>';
+  html += '</div>';
+
+  // Results header
+  html += '<div class="results-header">';
+  html += '<h3>' + escapeHtml(currentCollection) + ' <span style="font-weight:normal;color:var(--muted);">(' + data.count + ' documents)</span></h3>';
+  html += '<div style="display:flex;gap:8px;">';
+  html += '<button class="btn btn-primary btn-sm" onclick="showAddDocument()">+ Add Document</button>';
+  html += '<button class="btn btn-danger btn-sm" onclick="deleteCollection()">Delete Collection</button>';
+  html += '</div>';
+  html += '</div>';
+
+  // Table
+  html += '<div id="dataTableWrap">';
+  html += renderTable(data.ids, data.documents, data.metadatas, null);
+  html += '</div>';
+
+  // Pagination
+  if (totalPages > 1) {
+    html += '<div class="pagination">';
+    html += '<button class="btn btn-ghost btn-sm" ' + (currentPage <= 1 ? 'disabled' : '') + ' onclick="prevPage()">&#x25C0; Prev</button>';
+    html += '<span>Page ' + currentPage + ' / ' + totalPages + '</span>';
+    html += '<button class="btn btn-ghost btn-sm" ' + (currentPage >= totalPages ? 'disabled' : '') + ' onclick="nextPage()">Next &#x25B6;</button>';
+    html += '</div>';
+  }
+
+  main.innerHTML = html;
+}
+
+function renderTable(ids, documents, metadatas, distances) {
+  if (!ids || ids.length === 0) {
+    return '<div style="padding:20px;text-align:center;color:var(--muted);">No documents found</div>';
+  }
+
+  let html = '<table><thead><tr>';
+  html += '<th style="width:50px;">#</th>';
+  html += '<th>ID</th>';
+  html += '<th>Document</th>';
+  html += '<th>Metadata</th>';
+  if (distances) html += '<th style="width:80px;">Distance</th>';
+  html += '<th style="width:130px;">Actions</th>';
+  html += '</tr></thead><tbody>';
+
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i] || '';
+    const doc = (documents && documents[i]) || '';
+    const meta = (metadatas && metadatas[i]) || {};
+    const dist = distances ? distances[i] : null;
+
+    html += '<tr>';
+    html += '<td>' + (currentOffset + i + 1) + '</td>';
+    html += '<td class="id-cell" title="' + escapeHtml(id) + '">' + escapeHtml(id.substring(0, 12)) + '...</td>';
+    html += '<td class="doc-cell" title="' + escapeHtml(doc) + '">' + escapeHtml(doc) + '</td>';
+    html += '<td class="meta-cell">' + renderMetaTags(meta) + '</td>';
+    if (distances) html += '<td class="dist-cell">' + (dist !== null ? Number(dist).toFixed(4) : '-') + '</td>';
+    html += '<td class="actions-cell">';
+    html += '<button class="btn btn-ghost btn-sm" onclick="showEditDocument(\'' + escapeHtml(id) + '\')">Edit</button> ';
+    html += '<button class="btn btn-danger btn-sm" onclick="deleteDocument(\'' + escapeHtml(id) + '\')">Delete</button>';
+    html += '</td>';
+    html += '</tr>';
+  }
+
+  html += '</tbody></table>';
+  return html;
+}
+
+function renderMetaTags(meta) {
+  if (!meta || Object.keys(meta).length === 0) return '<span style="color:var(--muted);">-</span>';
+  let tags = '';
+  if (meta.type) tags += '<span class="tag">' + escapeHtml(String(meta.type)) + '</span>';
+  if (meta.importance) tags += '<span class="tag ' + (meta.importance === 'high' ? 'high' : 'medium') + '">' + escapeHtml(String(meta.importance)) + '</span>';
+  if (meta.actor && meta.actor !== '') tags += '<span class="tag">' + escapeHtml(String(meta.actor)) + '</span>';
+  if (meta.userId !== undefined) tags += '<span class="tag">user:' + escapeHtml(String(meta.userId)) + '</span>';
+  
+  // Show full JSON on hover
+  const fullJson = JSON.stringify(meta, null, 2);
+  return '<span title="' + escapeHtml(fullJson) + '">' + (tags || escapeHtml(JSON.stringify(meta)).substring(0, 60)) + '</span>';
+}
+
+// ── Search ───────────────────────────────────────────────────────────────────
+
+async function doSearch() {
+  const queryText = document.getElementById('searchInput').value.trim();
+  if (!queryText) { toast('Please enter a search query', 'error'); return; }
+
+  const nResults = parseInt(document.getElementById('searchTopK').value) || 10;
+  const whereStr = document.getElementById('filterWhere').value.trim();
+  let where = undefined;
+  if (whereStr) {
+    try { where = JSON.parse(whereStr); } catch { toast('Invalid where JSON', 'error'); return; }
+  }
+
+  const wrap = document.getElementById('dataTableWrap');
+  wrap.innerHTML = '<div style="padding:20px;text-align:center;"><div class="spinner"></div> Searching...</div>';
+
+  try {
+    const data = await api('/collections/' + encodeURIComponent(currentCollection) + '/query', {
+      method: 'POST',
+      body: JSON.stringify({ queryText, nResults, where })
+    });
+
+    wrap.innerHTML = '<div style="margin-bottom:8px;font-size:13px;color:var(--muted);">Search results for: <strong style="color:var(--text);">"' + escapeHtml(queryText) + '"</strong> (' + (data.ids?.length || 0) + ' results)</div>' +
+      '<button class="btn btn-ghost btn-sm" style="margin-bottom:12px;" onclick="loadCollectionData()">&#x2190; Back to all documents</button>' +
+      renderTable(data.ids, data.documents, data.metadatas, data.distances);
+  } catch (e) {
+    wrap.innerHTML = '<div style="color:var(--danger);padding:20px;">Search failed: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+// ── Pagination ───────────────────────────────────────────────────────────────
+
+function prevPage() {
+  currentOffset = Math.max(0, currentOffset - PAGE_SIZE);
+  loadCollectionData();
+}
+
+function nextPage() {
+  if (currentOffset + PAGE_SIZE < currentTotalCount) {
+    currentOffset += PAGE_SIZE;
+    loadCollectionData();
+  }
+}
+
+// ── Add / Edit Document ──────────────────────────────────────────────────────
+
+function showAddDocument() {
+  editingDocId = null;
+  document.getElementById('docModalTitle').textContent = 'Add Document';
+  document.getElementById('docId').value = '';
+  document.getElementById('docId').disabled = false;
+  document.getElementById('docText').value = '';
+  document.getElementById('docMeta').value = '';
+  document.getElementById('docModal').classList.add('show');
+}
+
+async function showEditDocument(id) {
+  editingDocId = id;
+  document.getElementById('docModalTitle').textContent = 'Edit Document';
+  document.getElementById('docId').value = id;
+  document.getElementById('docId').disabled = true;
+  document.getElementById('docModal').classList.add('show');
+
+  // Fetch current data
+  try {
+    const data = await api('/collections/' + encodeURIComponent(currentCollection) + '?limit=200&offset=0');
+    const idx = data.ids.indexOf(id);
+    if (idx !== -1) {
+      document.getElementById('docText').value = data.documents[idx] || '';
+      document.getElementById('docMeta').value = data.metadatas[idx] ? JSON.stringify(data.metadatas[idx], null, 2) : '';
+    }
+  } catch (e) {
+    toast('Failed to load document: ' + e.message, 'error');
+  }
+}
+
+function closeDocModal() {
+  document.getElementById('docModal').classList.remove('show');
+}
+
+async function saveDocument() {
+  const id = document.getElementById('docId').value.trim();
+  const text = document.getElementById('docText').value.trim();
+  const metaStr = document.getElementById('docMeta').value.trim();
+
+  if (!text) { toast('Document text is required', 'error'); return; }
+
+  let metadata = undefined;
+  if (metaStr) {
+    try { metadata = JSON.parse(metaStr); } catch { toast('Invalid metadata JSON', 'error'); return; }
+  }
+
+  try {
+    if (editingDocId) {
+      await api('/collections/' + encodeURIComponent(currentCollection) + '/' + encodeURIComponent(editingDocId), {
+        method: 'PUT',
+        body: JSON.stringify({ document: text, metadata })
+      });
+      toast('Document updated');
+    } else {
+      const docId = id || crypto.randomUUID().replace(/-/g, '').substring(0, 32);
+      await api('/collections/' + encodeURIComponent(currentCollection) + '/add', {
+        method: 'POST',
+        body: JSON.stringify({ id: docId, document: text, metadata })
+      });
+      toast('Document added');
+    }
+    closeDocModal();
+    await loadCollectionData();
+  } catch (e) {
+    toast('Save failed: ' + e.message, 'error');
+  }
+}
+
+// ── Delete Document ──────────────────────────────────────────────────────────
+
+async function deleteDocument(id) {
+  if (!confirm('Delete document "' + id.substring(0, 16) + '..."?')) return;
+  try {
+    await api('/collections/' + encodeURIComponent(currentCollection) + '/' + encodeURIComponent(id), { method: 'DELETE' });
+    toast('Document deleted');
+    await loadCollectionData();
+  } catch (e) {
+    toast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+// ── Collection CRUD ──────────────────────────────────────────────────────────
+
+function showCreateCollection() {
+  document.getElementById('collName').value = '';
+  document.getElementById('collModal').classList.add('show');
+}
+
+function closeCollModal() {
+  document.getElementById('collModal').classList.remove('show');
+}
+
+async function createCollection() {
+  const name = document.getElementById('collName').value.trim();
+  if (!name) { toast('Collection name is required', 'error'); return; }
+  try {
+    await api('/collections', { method: 'POST', body: JSON.stringify({ name }) });
+    toast('Collection created');
+    closeCollModal();
+    await loadCollections();
+    await selectCollection(name);
+  } catch (e) {
+    toast('Create failed: ' + e.message, 'error');
+  }
+}
+
+async function deleteCollection() {
+  if (!confirm('Delete collection "' + currentCollection + '"? This cannot be undone!')) return;
+  try {
+    await api('/collections/' + encodeURIComponent(currentCollection), { method: 'DELETE' });
+    toast('Collection deleted');
+    currentCollection = null;
+    document.getElementById('mainContent').innerHTML = '<div class="empty-state"><h3>Select a Collection</h3><p>Choose a collection from the sidebar.</p></div>';
+    await loadCollections();
+  } catch (e) {
+    toast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+
+(async () => {
+  await checkStatus();
+  await loadCollections();
+})();
+</script>
+</body>
+</html>
