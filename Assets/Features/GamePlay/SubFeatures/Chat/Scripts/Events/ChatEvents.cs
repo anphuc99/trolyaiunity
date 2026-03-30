@@ -21,5 +21,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Events
 		public const string RequestFailed = "game.play.chat.request.failed.event";
 		public const string TranscriptionCompleted = "game.play.chat.transcription.completed.event";
 		public const string AudioRecordingTranscribed = "game.play.chat.audio.recording.transcribed.event";
+		public const string VocabLookupCompleted = "game.play.chat.vocab.lookup.completed.event";
+		public const string VocabReviewCompleted = "game.play.chat.vocab.review.completed.event";
 	}
 }

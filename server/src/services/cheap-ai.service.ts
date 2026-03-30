@@ -75,6 +75,21 @@ export interface CheapAIService {
    * @returns Structured update result.
    */
   evaluateRelationshipUpdate: (input: RelationshipEvalInput) => Promise<RelationshipUpdateResult>;
+
+  /**
+   * Translates a single Chinese vocabulary word into Vietnamese meaning and pinyin.
+   * Used as a fallback when the vocabulary database has no pinyin/meaning.
+   *
+   * @param word - A Chinese word or short phrase.
+   * @returns Object with pinyin and vietnamese fields.
+   */
+  translateVocabulary: (word: string) => Promise<VocabularyTranslation>;
+}
+
+/** Output of translateVocabulary. */
+export interface VocabularyTranslation {
+  pinyin: string;
+  vietnamese: string;
 }
 
 /** Input for evaluateRelationshipUpdate. */
@@ -211,6 +226,24 @@ Output JSON schema:
   "isShockEvent": boolean,
   "reasoning": string
 }`;
+
+const VOCABULARY_TRANSLATE_PROMPT = `You are a Chinese-Vietnamese dictionary assistant.
+
+Given a Chinese word or short phrase, return its pinyin (with tone marks) and Vietnamese meaning.
+
+Rules:
+- Output ONLY valid JSON with two fields: "pinyin" and "vietnamese".
+- pinyin must use tone marks (e.g. "ài", "nǐ hǎo"), NOT tone numbers.
+- vietnamese must be a concise translation (1-5 words).
+- No markdown, no explanation, no extra fields.
+
+Example:
+Input: 爱
+Output: {"pinyin": "ài", "vietnamese": "yêu"}
+
+Example:
+Input: 你好
+Output: {"pinyin": "nǐ hǎo", "vietnamese": "xin chào"}`;
 
 // ────────────────────────────────────────────────────────────────────────────
 // Factory
@@ -390,11 +423,31 @@ export const createCheapAIService = (config: CheapAIServiceConfig = {}): CheapAI
     };
   };
 
+  /**
+   * Translates a Chinese word into pinyin and Vietnamese meaning.
+   */
+  const translateVocabulary: CheapAIService["translateVocabulary"] = async (word) => {
+    const generativeModel = genAI.getGenerativeModel({ model });
+    const prompt = `${VOCABULARY_TRANSLATE_PROMPT}\n\nInput: ${word}\n\nOutput:`;
+
+    const result = await generativeModel.generateContent(prompt);
+    const text = result.response.text().trim();
+
+    const jsonText = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    const parsed = JSON.parse(jsonText) as { pinyin?: string; vietnamese?: string };
+
+    return {
+      pinyin: typeof parsed.pinyin === "string" ? parsed.pinyin.trim() : "",
+      vietnamese: typeof parsed.vietnamese === "string" ? parsed.vietnamese.trim() : ""
+    };
+  };
+
   return {
     rewriteRetrievalIntents,
     compressMemoryBrief,
     summarizeSessionImpact,
     generateDecisionQueries,
-    evaluateRelationshipUpdate
+    evaluateRelationshipUpdate,
+    translateVocabulary
   };
 };

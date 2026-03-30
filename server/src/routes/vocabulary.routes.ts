@@ -15,6 +15,7 @@ export const createVocabularyRoutes = (dataSource: DataSource) => {
 
   router.use(requireAuth);
 
+  router.get("/lookup", controller.lookupWord);
   router.get("/stats", controller.getStats);
   router.get("/due", controller.getDueReviews);
   router.get("/", controller.listVocabularies);

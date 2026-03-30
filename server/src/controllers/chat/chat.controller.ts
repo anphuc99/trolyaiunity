@@ -667,7 +667,8 @@ export const createChatController = (
     return [
       LEARNING_PATH_VOCAB_REMINDER_MARKER,
       "Learning path vocabulary reminder:",
-      "Please try to naturally use these vocabulary items in your next reply:",
+      "Please try to naturally use these vocabulary items in your next reply.",
+      "IMPORTANT: When you use any of these vocabulary words in the Text field, wrap ONLY the vocabulary word itself with double asterisks **. For example, if the word is 爱, write 我**爱**你. Do NOT wrap non-vocabulary words.",
       ...vocabularyItems.map((item, index) => `${index + 1}. ${item}`),
       "Keep the dialogue natural and relevant to the current learning path context."
     ].join("\n");

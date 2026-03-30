@@ -9,7 +9,7 @@ namespace Share.Components
 	/// <summary>
 	/// Message bubble presenter for either user or character prefab.
 	/// </summary>
-	public sealed class MessageBubble : MonoBehaviour
+	public sealed class MessageBubble : MonoBehaviour, IPointerClickHandler
 	{
 		[SerializeField]
 		private MessageBubbleType _bubbleType = MessageBubbleType.Character;
@@ -44,6 +44,7 @@ namespace Share.Components
 		private Action<MessageBubbleData> _onSpeakerClicked;
 		private Action<MessageBubbleData> _onSpeakerLongPressed;
 		private Action<MessageBubbleData> _onTranslateClicked;
+		private Action<string> _onVocabWordClicked;
 		private Coroutine _speakerLongPressCoroutine;
 		private bool _suppressNextSpeakerClick;
 
@@ -124,6 +125,15 @@ namespace Share.Components
 		public void SetTranslateClickHandler(Action<MessageBubbleData> onTranslateClicked)
 		{
 			_onTranslateClicked = onTranslateClicked;
+		}
+
+		/// <summary>
+		/// Configures callback for vocabulary word link click.
+		/// </summary>
+		/// <param name="onVocabWordClicked">Callback invoked with the clicked vocabulary word.</param>
+		public void SetVocabWordClickHandler(Action<string> onVocabWordClicked)
+		{
+			_onVocabWordClicked = onVocabWordClicked;
 		}
 
 		/// <summary>
@@ -391,6 +401,40 @@ namespace Share.Components
 			}
 
 			_onTranslateClicked?.Invoke(_boundData);
+		}
+
+		/// <summary>
+		/// Detects clicks on TMP_Text links with "vocab:" prefix.
+		/// </summary>
+		/// <param name="eventData">Pointer event data.</param>
+		public void OnPointerClick(PointerEventData eventData)
+		{
+			if (_messageText == null || _onVocabWordClicked == null)
+			{
+				return;
+			}
+
+			var linkIndex = TMP_TextUtilities.FindIntersectingLink(_messageText, eventData.position, eventData.pressEventCamera);
+			if (linkIndex < 0)
+			{
+				return;
+			}
+
+			var linkInfo = _messageText.textInfo.linkInfo[linkIndex];
+			var linkId = linkInfo.GetLinkID();
+			if (string.IsNullOrWhiteSpace(linkId))
+			{
+				return;
+			}
+
+			if (linkId.StartsWith("vocab:", StringComparison.Ordinal))
+			{
+				var word = linkId.Substring(6);
+				if (!string.IsNullOrWhiteSpace(word))
+				{
+					_onVocabWordClicked.Invoke(word);
+				}
+			}
 		}
 
         

@@ -281,6 +281,105 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 			Assert.AreEqual(1, historyPayload.Messages.Count);
 		}
 
+		[Test]
+		public void LookupVocabulary_ShouldPublishError_WhenWordIsMissing()
+		{
+			ChatErrorPayload errorPayload = null;
+			EventBus.Subscribe(ChatEvents.RequestFailed, payload =>
+			{
+				errorPayload = payload as ChatErrorPayload;
+			});
+
+			ChatController.HandleLookupVocabulary(new ChatVocabLookupRequestPayload
+			{
+				Word = " ",
+			});
+
+			Assert.IsNotNull(errorPayload);
+			Assert.AreEqual("Missing word for vocabulary lookup.", errorPayload.Message);
+		}
+
+		[Test]
+		public void LookupVocabulary_ShouldPublishError_WhenPayloadIsNull()
+		{
+			ChatErrorPayload errorPayload = null;
+			EventBus.Subscribe(ChatEvents.RequestFailed, payload =>
+			{
+				errorPayload = payload as ChatErrorPayload;
+			});
+
+			ChatController.HandleLookupVocabulary(null);
+
+			Assert.IsNotNull(errorPayload);
+			Assert.AreEqual("Missing word for vocabulary lookup.", errorPayload.Message);
+		}
+
+		[Test]
+		public void ReviewVocabulary_ShouldPublishError_WhenVocabularyIdIsMissing()
+		{
+			ChatErrorPayload errorPayload = null;
+			EventBus.Subscribe(ChatEvents.RequestFailed, payload =>
+			{
+				errorPayload = payload as ChatErrorPayload;
+			});
+
+			ChatController.HandleReviewVocabulary(new ChatVocabReviewRequestPayload
+			{
+				VocabularyId = " ",
+				Rating = 1,
+			});
+
+			Assert.IsNotNull(errorPayload);
+			Assert.AreEqual("Missing vocabulary id for review.", errorPayload.Message);
+		}
+
+		[Test]
+		public void ReviewVocabulary_ShouldPublishError_WhenPayloadIsNull()
+		{
+			ChatErrorPayload errorPayload = null;
+			EventBus.Subscribe(ChatEvents.RequestFailed, payload =>
+			{
+				errorPayload = payload as ChatErrorPayload;
+			});
+
+			ChatController.HandleReviewVocabulary(null);
+
+			Assert.IsNotNull(errorPayload);
+			Assert.AreEqual("Missing vocabulary id for review.", errorPayload.Message);
+		}
+
+		[UnityTest]
+		public System.Collections.IEnumerator LookupVocabulary_ShouldPublishResult_WhenServerReturnsData()
+		{
+			ChatVocabLookupResultPayload resultPayload = null;
+			void Handler(object payload)
+			{
+				resultPayload = payload as ChatVocabLookupResultPayload;
+			}
+
+			FakeServer.Register("GET", NetworkEndpoints.VocabularyLookup,
+				_ => "{\"id\":\"v1\",\"korean\":\"爱\",\"vietnamese\":\"yêu\",\"pinyin\":\"ài\",\"isNew\":false}"
+			);
+
+			EventBus.Subscribe(ChatEvents.VocabLookupCompleted, Handler);
+			try
+			{
+				ChatController.HandleLookupVocabulary(new ChatVocabLookupRequestPayload { Word = "爱" });
+				yield return AwaitTask(Task.Delay(100));
+			}
+			finally
+			{
+				EventBus.Unsubscribe(ChatEvents.VocabLookupCompleted, Handler);
+			}
+
+			Assert.IsNotNull(resultPayload);
+			Assert.AreEqual("v1", resultPayload.Id);
+			Assert.AreEqual("爱", resultPayload.Word);
+			Assert.AreEqual("yêu", resultPayload.Vietnamese);
+			Assert.AreEqual("ài", resultPayload.Pinyin);
+			Assert.IsFalse(resultPayload.IsNew);
+		}
+
 		private static System.Collections.IEnumerator AwaitTask(Task task)
 		{
 			while (!task.IsCompleted)

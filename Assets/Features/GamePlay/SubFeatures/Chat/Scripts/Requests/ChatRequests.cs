@@ -21,5 +21,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Requests
 		public const string SaveContext = "game.play.chat.save.context.request";
 		public const string EndConversation = "game.play.chat.end.conversation.request";
 		public const string TranscribeAudio = "game.play.chat.transcribe.audio.request";
+		public const string LookupVocabulary = "game.play.chat.lookup.vocabulary.request";
+		public const string ReviewVocabulary = "game.play.chat.review.vocabulary.request";
 	}
 }

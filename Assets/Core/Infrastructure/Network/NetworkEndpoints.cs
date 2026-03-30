@@ -48,5 +48,7 @@ namespace Core.Infrastructure.Network
 		public const string LearningPaths = "/api/learning-paths";
 		public const string CharacterRelationships = "/api/character-relationships";
 		public const string CharacterRelationshipsEvaluateSession = "/api/character-relationships/evaluate-session";
+		public const string VocabularyLookup = "/api/vocabulary/lookup";
+		public const string VocabularyReview = "/api/vocabulary";
 	}
 }

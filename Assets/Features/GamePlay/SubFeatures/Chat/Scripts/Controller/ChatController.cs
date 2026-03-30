@@ -10,6 +10,7 @@ using Share.Utils;
 using CoreGlobalModes = Core.Infrastructure.State.GlobalModes;
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -298,6 +299,44 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			EventBus.Publish(ChatEvents.Echoed, payload);
 			ChatState.ParentSignals?.OnEchoed?.Invoke(payload);
+		}
+
+		/// <summary>
+		/// Handles vocabulary word lookup from chat popup.
+		/// </summary>
+		/// <param name="payload">Lookup request payload with word.</param>
+		[Request(ChatRequests.LookupVocabulary)]
+		public static void HandleLookupVocabulary(ChatVocabLookupRequestPayload payload)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.Word))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Missing word for vocabulary lookup."
+				});
+				return;
+			}
+
+			_ = LookupVocabularyInternalAsync(payload);
+		}
+
+		/// <summary>
+		/// Handles vocabulary review rating from chat popup.
+		/// </summary>
+		/// <param name="payload">Review request payload with vocabulary id and rating.</param>
+		[Request(ChatRequests.ReviewVocabulary)]
+		public static void HandleReviewVocabulary(ChatVocabReviewRequestPayload payload)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.VocabularyId))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Missing vocabulary id for review."
+				});
+				return;
+			}
+
+			_ = ReviewVocabularyInternalAsync(payload);
 		}
 
 		private static void RegisterAddCharacterMenu()
@@ -863,7 +902,13 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
+		/// Regex to match **word** vocabulary markup for stripping before TTS.
+		/// </summary>
+		private static readonly Regex VocabMarkupRegex = new Regex(@"\*\*(.+?)\*\*", RegexOptions.Compiled);
+
+		/// <summary>
 		/// Pre-resolves TTS audio URLs for each turn so the View only needs to download audio clips.
+		/// Strips **vocab** markup from text before sending to TTS.
 		/// </summary>
 		/// <param name="turns">Parsed turn list to enrich with AudioUrl.</param>
 		/// <returns>Awaitable task.</returns>
@@ -884,7 +929,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 				var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
 				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? "neutral" : turn.Tone.Trim();
-				turn.AudioUrl = await ResolveTtsAudioUrlAsync(turn.Text, tone, characterName);
+				var cleanText = VocabMarkupRegex.Replace(turn.Text, "$1");
+				turn.AudioUrl = await ResolveTtsAudioUrlAsync(cleanText, tone, characterName);
 
 				if (!string.IsNullOrWhiteSpace(turn.AudioUrl))
 				{
@@ -989,6 +1035,79 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					Message = "Failed to transcribe audio: " + exception.Message
 				});
 				EventBus.Publish(ChatEvents.TranscriptionCompleted, null);
+			}
+		}
+
+		/// <summary>
+		/// Performs vocabulary word lookup via API and publishes result to views.
+		/// </summary>
+		/// <param name="payload">Lookup request payload.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task LookupVocabularyInternalAsync(ChatVocabLookupRequestPayload payload)
+		{
+			try
+			{
+				var word = payload.Word.Trim();
+				var endpoint = NetworkEndpoints.VocabularyLookup + "?word=" + Uri.EscapeDataString(word);
+				var responseJson = await HttpClient.GetTaskAsync(endpoint);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = "Empty vocabulary lookup response."
+					});
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<ChatVocabLookupResponsePayload>(responseJson);
+				if (response == null)
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = "Failed to parse vocabulary lookup response."
+					});
+					return;
+				}
+
+				EventBus.Publish(ChatEvents.VocabLookupCompleted, new ChatVocabLookupResultPayload
+				{
+					Id = response.Id,
+					Word = response.Korean,
+					Vietnamese = response.Vietnamese,
+					Pinyin = response.Pinyin,
+					IsNew = response.IsNew
+				});
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to lookup vocabulary: " + exception.Message
+				});
+			}
+		}
+
+		/// <summary>
+		/// Submits a vocabulary review rating via API and publishes completion.
+		/// </summary>
+		/// <param name="payload">Review request payload.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task ReviewVocabularyInternalAsync(ChatVocabReviewRequestPayload payload)
+		{
+			try
+			{
+				var endpoint = NetworkEndpoints.VocabularyReview + "/" + Uri.EscapeDataString(payload.VocabularyId) + "/review";
+				var body = new { rating = payload.Rating };
+				var responseJson = await HttpClient.PostJsonTaskAsync(endpoint, body);
+
+				EventBus.Publish(ChatEvents.VocabReviewCompleted, null);
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to review vocabulary: " + exception.Message
+				});
 			}
 		}
 

@@ -547,4 +547,98 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		public string UserMessageId { get; set; }
 	}
+
+	/// <summary>
+	/// Request payload for looking up a vocabulary word from chat.
+	/// </summary>
+	public sealed class ChatVocabLookupRequestPayload
+	{
+		/// <summary>
+		/// The Chinese word to look up.
+		/// </summary>
+		public string Word { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload from the vocabulary lookup endpoint.
+	/// </summary>
+	public sealed class ChatVocabLookupResponsePayload
+	{
+		/// <summary>
+		/// Vocabulary ID from server.
+		/// </summary>
+		[JsonProperty("id")]
+		public string Id { get; set; }
+
+		/// <summary>
+		/// Chinese word.
+		/// </summary>
+		[JsonProperty("korean")]
+		public string Korean { get; set; }
+
+		/// <summary>
+		/// Vietnamese meaning.
+		/// </summary>
+		[JsonProperty("vietnamese")]
+		public string Vietnamese { get; set; }
+
+		/// <summary>
+		/// Pinyin reading.
+		/// </summary>
+		[JsonProperty("pinyin")]
+		public string Pinyin { get; set; }
+
+		/// <summary>
+		/// Whether this word was newly created during lookup.
+		/// </summary>
+		[JsonProperty("isNew")]
+		public bool IsNew { get; set; }
+	}
+
+	/// <summary>
+	/// Request payload for reviewing a vocabulary word from the chat popup.
+	/// </summary>
+	public sealed class ChatVocabReviewRequestPayload
+	{
+		/// <summary>
+		/// Vocabulary ID.
+		/// </summary>
+		public string VocabularyId { get; set; }
+
+		/// <summary>
+		/// FSRS rating (1 = Again, 3 = Easy).
+		/// </summary>
+		public int Rating { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload when a vocabulary lookup result is ready for the popup.
+	/// </summary>
+	public sealed class ChatVocabLookupResultPayload
+	{
+		/// <summary>
+		/// Vocabulary ID from server.
+		/// </summary>
+		public string Id { get; set; }
+
+		/// <summary>
+		/// Chinese word.
+		/// </summary>
+		public string Word { get; set; }
+
+		/// <summary>
+		/// Vietnamese meaning.
+		/// </summary>
+		public string Vietnamese { get; set; }
+
+		/// <summary>
+		/// Pinyin reading.
+		/// </summary>
+		public string Pinyin { get; set; }
+
+		/// <summary>
+		/// Whether this word was newly created during lookup.
+		/// </summary>
+		public bool IsNew { get; set; }
+	}
 }

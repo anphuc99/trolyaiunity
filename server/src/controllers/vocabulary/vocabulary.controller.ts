@@ -10,6 +10,7 @@ import {
   type FSRSRating,
   type ReviewHistoryEntry
 } from "../../services/fsrs.service.js";
+import { createCheapAIService, type CheapAIService } from "../../services/cheap-ai.service.js";
 
 interface VocabularyController {
   listVocabularies: (request: Request, response: Response) => Promise<void>;
@@ -23,6 +24,7 @@ interface VocabularyController {
   saveMemory: (request: Request, response: Response) => Promise<void>;
   toggleStar: (request: Request, response: Response) => Promise<void>;
   setCardDirection: (request: Request, response: Response) => Promise<void>;
+  lookupWord: (request: Request, response: Response) => Promise<void>;
 }
 
 /**
@@ -693,6 +695,121 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     }
   };
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // Lookup a vocabulary by its Chinese word text.
+  // Returns existing DB data or uses cheap AI to translate on the fly.
+  // If the word is new, automatically creates the vocabulary entry.
+  // ──────────────────────────────────────────────────────────────────────────
+  const lookupWord: VocabularyController["lookupWord"] = async (request, response) => {
+    const userId = request.user?.id;
+
+    if (!userId) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const word = String(request.query.word ?? "").trim();
+    if (!word) {
+      response.status(400).json({ message: "Query parameter 'word' is required" });
+      return;
+    }
+
+    try {
+      // Try to find existing vocabulary by korean (Chinese) text
+      const existing = await vocabRepo.findOne({ where: { korean: word, userId } });
+
+      if (existing) {
+        let pinyin = existing.pinyin ?? "";
+        let vietnamese = existing.vietnamese ?? "";
+
+        // If pinyin or meaning is missing, fill via cheap AI
+        if (!pinyin || !vietnamese) {
+          try {
+            const cheapAI = createCheapAIService();
+            const translation = await cheapAI.translateVocabulary(word);
+            if (!pinyin && translation.pinyin) {
+              pinyin = translation.pinyin;
+              existing.pinyin = pinyin;
+            }
+            if (!vietnamese && translation.vietnamese) {
+              vietnamese = translation.vietnamese;
+              existing.vietnamese = vietnamese;
+            }
+            await vocabRepo.save(existing);
+          } catch (aiError) {
+            console.warn("Cheap AI translation fallback failed:", aiError);
+          }
+        }
+
+        // Load review if it exists
+        const review = await reviewRepo.findOne({ where: { vocabularyId: existing.id, userId } });
+
+        response.json({
+          id: existing.id,
+          korean: existing.korean,
+          vietnamese,
+          pinyin,
+          isNew: false,
+          review: review ? serialiseReview(review) : null
+        });
+        return;
+      }
+
+      // Word not in DB — use cheap AI to translate, then auto-create
+      let pinyin = "";
+      let vietnamese = "";
+      try {
+        const cheapAI = createCheapAIService();
+        const translation = await cheapAI.translateVocabulary(word);
+        pinyin = translation.pinyin;
+        vietnamese = translation.vietnamese;
+      } catch (aiError) {
+        console.warn("Cheap AI translation failed for new word:", aiError);
+      }
+
+      if (!vietnamese) {
+        vietnamese = word;
+      }
+
+      // Auto-create the vocabulary entry
+      const vocab = vocabRepo.create({
+        korean: word,
+        vietnamese,
+        pinyin: pinyin || null,
+        isManuallyAdded: false,
+        userId
+      });
+      const saved = await vocabRepo.save(vocab);
+
+      // Create initial review state
+      const reviewState = createInitialReviewState();
+      const reviewEntity = reviewRepo.create({
+        vocabularyId: saved.id,
+        userId,
+        stability: reviewState.stability,
+        difficulty: reviewState.difficulty,
+        lapses: reviewState.lapses,
+        currentIntervalDays: reviewState.currentIntervalDays,
+        nextReviewDate: new Date(reviewState.nextReviewDate),
+        lastReviewDate: null,
+        reviewHistoryJson: JSON.stringify(reviewState.reviewHistory)
+      });
+      const savedReview = await reviewRepo.save(reviewEntity);
+
+      response.json({
+        id: saved.id,
+        korean: saved.korean,
+        vietnamese,
+        pinyin,
+        isNew: true,
+        review: serialiseReview(savedReview)
+      });
+    } catch (error) {
+      console.error("Failed to lookup vocabulary word.", error);
+      response.status(500).json({ message: "Failed to lookup vocabulary word" });
+    }
+  };
+
   return {
     listVocabularies,
     getVocabulary,
@@ -704,6 +821,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     getStats,
     saveMemory,
     toggleStar,
-    setCardDirection
+    setCardDirection,
+    lookupWord
   };
 };

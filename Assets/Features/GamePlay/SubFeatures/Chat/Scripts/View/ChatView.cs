@@ -7,6 +7,7 @@ using Share.Utils;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using TMPro;
 using UnityEngine;
 using Share.Components;
@@ -55,6 +56,14 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		[SerializeField]
 		private Button _sendButton;
+
+		[SerializeField]
+		private ChatPopupVocabView _vocabPopupView;
+
+		/// <summary>
+		/// Regex to match **word** vocabulary markup in assistant text.
+		/// </summary>
+		private static readonly Regex VocabMarkupRegex = new Regex(@"\*\*(.+?)\*\*", RegexOptions.Compiled);
 
 		private readonly Queue<ChatAssistantTurnPayload> _pendingCharacterTurns = new Queue<ChatAssistantTurnPayload>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
@@ -236,6 +245,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_messageContainer.OnMessageSpeakerClicked = null;
 				_messageContainer.OnMessageSpeakerLongPressed = null;
 				_messageContainer.OnMessageTranslateClicked = null;
+				_messageContainer.OnVocabWordClicked = null;
 			}
 			_reloadingTtsMessageIndices.Clear();
 			if (_characterVoiceAudioSource != null)
@@ -386,8 +396,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 						MessageId = string.IsNullOrWhiteSpace(turn.MessageId) ? Guid.NewGuid().ToString("N") : turn.MessageId,
 						Type = MessageBubbleType.Character,
 						SenderName = characterName,
-						Message = text,
-						OriginalMessage = text,
+						Message = ConvertVocabMarkupToRichText(text),
+						OriginalMessage = StripVocabMarkup(text),
 						Translation = turn.Translation,
 						Pinyin = turn.Pinyin,
 						Tone = string.IsNullOrWhiteSpace(turn.Tone) ? DefaultTtsTone : turn.Tone.Trim(),
@@ -486,8 +496,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					MessageId = string.IsNullOrWhiteSpace(turn.MessageId) ? Guid.NewGuid().ToString("N") : turn.MessageId,
 					Type = MessageBubbleType.Character,
 					SenderName = characterName,
-					Message = messageText,
-					OriginalMessage = messageText,
+					Message = ConvertVocabMarkupToRichText(messageText),
+					OriginalMessage = StripVocabMarkup(messageText),
 					Translation = turn.Translation,
 					Pinyin = turn.Pinyin,
 					Tone = tone,
@@ -593,6 +603,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_messageContainer.OnMessageSpeakerClicked = HandleMessageSpeakerClicked;
 				_messageContainer.OnMessageSpeakerLongPressed = HandleMessageSpeakerLongPressed;
 				_messageContainer.OnMessageTranslateClicked = HandleMessageTranslateClicked;
+				_messageContainer.OnVocabWordClicked = HandleVocabWordClicked;
+			}
+
+			if (_vocabPopupView != null)
+			{
+				_vocabPopupView.SetReviewCallback(HandleVocabReviewRequested);
 			}
 
 			if (_recordButton != null)
@@ -1176,6 +1192,115 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_inputField.text = string.Empty;
 				_inputField.DeactivateInputField();
 			}
+
+			if (_vocabPopupView != null)
+			{
+				_vocabPopupView.Hide();
+			}
+		}
+
+		/// <summary>
+		/// Converts **word** markup to TMP rich text with underline and link tags.
+		/// Example: 我**爱**你 → 我<u><link="vocab:爱">爱</link></u>你
+		/// </summary>
+		/// <param name="text">Raw text with ** markup.</param>
+		/// <returns>TMP-compatible rich text string.</returns>
+		private static string ConvertVocabMarkupToRichText(string text)
+		{
+			if (string.IsNullOrEmpty(text))
+			{
+				return text;
+			}
+
+			return VocabMarkupRegex.Replace(text, match =>
+			{
+				var word = match.Groups[1].Value;
+				return "<u><link=\"vocab:" + word + "\">" + word + "</link></u>";
+			});
+		}
+
+		/// <summary>
+		/// Strips **word** markup from text, keeping only the word itself.
+		/// Used for TTS to ensure clean pronunciation.
+		/// </summary>
+		/// <param name="text">Raw text with ** markup.</param>
+		/// <returns>Clean text with ** removed.</returns>
+		private static string StripVocabMarkup(string text)
+		{
+			if (string.IsNullOrEmpty(text))
+			{
+				return text;
+			}
+
+			return VocabMarkupRegex.Replace(text, "$1");
+		}
+
+		/// <summary>
+		/// Handles vocab word click from message bubble.
+		/// </summary>
+		/// <param name="word">The Chinese word that was clicked.</param>
+		private void HandleVocabWordClicked(string word)
+		{
+			if (string.IsNullOrWhiteSpace(word))
+			{
+				return;
+			}
+
+			if (_vocabPopupView != null)
+			{
+				_vocabPopupView.ShowLoading(word);
+			}
+
+			SendRequest(ChatRequests.LookupVocabulary, new ChatVocabLookupRequestPayload
+			{
+				Word = word
+			});
+		}
+
+		/// <summary>
+		/// Handles vocabulary lookup result from controller.
+		/// </summary>
+		/// <param name="payload">Vocab lookup result payload.</param>
+		[OnEvent(ChatEvents.VocabLookupCompleted)]
+		private void OnVocabLookupCompleted(object payload)
+		{
+			var result = payload as ChatVocabLookupResultPayload;
+			if (result == null)
+			{
+				return;
+			}
+
+			if (_vocabPopupView != null)
+			{
+				_vocabPopupView.ShowResult(result);
+			}
+		}
+
+		/// <summary>
+		/// Handles vocabulary review completion from controller.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[OnEvent(ChatEvents.VocabReviewCompleted)]
+		private void OnVocabReviewCompleted(object payload)
+		{
+			if (_vocabPopupView != null)
+			{
+				_vocabPopupView.Hide();
+			}
+		}
+
+		/// <summary>
+		/// Handles vocab review rating from the popup and forwards to controller.
+		/// </summary>
+		/// <param name="payload">Review request payload from popup.</param>
+		private void HandleVocabReviewRequested(ChatVocabReviewRequestPayload payload)
+		{
+			if (payload == null)
+			{
+				return;
+			}
+
+			SendRequest(ChatRequests.ReviewVocabulary, payload);
 		}
 
 		/// <summary>

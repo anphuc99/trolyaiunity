@@ -15,6 +15,7 @@ namespace Share.Components
 		public Action<MessageBubbleData> OnMessageSpeakerClicked { get; set; }
 		public Action<MessageBubbleData> OnMessageSpeakerLongPressed { get; set; }
 		public Action<MessageBubbleData> OnMessageTranslateClicked { get; set; }
+		public Action<string> OnVocabWordClicked { get; set; }
 
 		private const string TranslationSeparator = "---------------------";
 		private const string PinyinLabel = "Pinyin: ";
@@ -687,6 +688,7 @@ namespace Share.Components
 			bubble.SetSpeakerClickHandler(HandleBubbleSpeakerClicked);
 			bubble.SetSpeakerLongPressHandler(HandleBubbleSpeakerLongPressed);
 			bubble.SetTranslateClickHandler(HandleBubbleTranslateClicked);
+			bubble.SetVocabWordClickHandler(HandleBubbleVocabWordClicked);
 
 			bubble.gameObject.SetActive(false);
 			return bubble;
@@ -723,6 +725,7 @@ namespace Share.Components
 			bubble.SetSpeakerClickHandler(null);
 			bubble.SetSpeakerLongPressHandler(null);
 			bubble.SetTranslateClickHandler(null);
+			bubble.SetVocabWordClickHandler(null);
 			bubble.gameObject.SetActive(true);
 			var rect = bubble.RootRect;
 			if (rect != null)
@@ -754,6 +757,11 @@ namespace Share.Components
 		private void HandleBubbleTranslateClicked(MessageBubbleData messageData)
 		{
 			OnMessageTranslateClicked?.Invoke(messageData);
+		}
+
+		private void HandleBubbleVocabWordClicked(string word)
+		{
+			OnVocabWordClicked?.Invoke(word);
 		}
 
 		private void DestroyBubbles(List<MessageBubble> pool)
