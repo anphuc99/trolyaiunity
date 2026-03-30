@@ -259,6 +259,11 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       return;
     }
 
+    if (!isValidVietnameseMeaning(trimmedKorean, trimmedVietnamese)) {
+      response.status(400).json({ message: "Vietnamese meaning is invalid (cannot be Chinese or same as source word)" });
+      return;
+    }
+
     try {
       // Check duplicate
       const existing = await vocabRepo.findOne({ where: { korean: trimmedKorean, userId } });
@@ -358,7 +363,15 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       }
 
       if (vietnamese?.trim()) {
-        vocab.vietnamese = vietnamese.trim();
+        const normalizedMeaning = vietnamese.trim();
+        const sourceWord = (korean?.trim() || vocab.korean || "").trim();
+
+        if (!isValidVietnameseMeaning(sourceWord, normalizedMeaning)) {
+          response.status(400).json({ message: "Vietnamese meaning is invalid (cannot be Chinese or same as source word)" });
+          return;
+        }
+
+        vocab.vietnamese = normalizedMeaning;
       }
 
       if (typeof pinyin === "string") {
