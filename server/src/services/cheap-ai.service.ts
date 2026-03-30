@@ -432,6 +432,7 @@ export const createCheapAIService = (config: CheapAIServiceConfig = {}): CheapAI
 
     const result = await generativeModel.generateContent(prompt);
     const text = result.response.text().trim();
+    console.log("Vocabulary translation result:", text);
 
     const jsonText = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
     const parsed = JSON.parse(jsonText) as { pinyin?: string; vietnamese?: string };
