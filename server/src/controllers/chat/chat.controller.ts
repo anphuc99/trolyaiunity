@@ -10,6 +10,8 @@ import UserEntity from "../../models/user.entity.js";
 import CharacterEntity from "../../models/character.entity.js";
 import CharacterRelationshipEntity from "../../models/character-relationship.entity.js";
 import LearningPathEntity from "../../models/learning-path.entity.js";
+import VocabularyEntity from "../../models/vocabulary.entity.js";
+import VocabularyReviewEntity from "../../models/vocabulary-review.entity.js";
 import { createChatHistoryStore, type ChatHistoryMessage, type ChatHistoryStore } from "../../services/chat-history.service.js";
 import { createVectorMemoryService, type VectorMemoryService } from "../../services/vector-memory.service.js";
 import { extractMemorySidecars, shouldStoreMemory, buildMemoryItemFromCandidate, stripMemorySidecar } from "../../services/memory-extraction.service.js";
@@ -117,6 +119,8 @@ export const createChatController = (
   const characterRepository = dataSource.getRepository(CharacterEntity);
   const relationshipRepository = dataSource.getRepository(CharacterRelationshipEntity);
   const learningPathRepository = dataSource.getRepository(LearningPathEntity);
+  const vocabularyRepository = dataSource.getRepository(VocabularyEntity);
+  const vocabularyReviewRepository = dataSource.getRepository(VocabularyReviewEntity);
   
   // OpenAI configuration
   const openAIApiKey = process.env.OPENAI_API_KEY ?? "";
@@ -746,10 +750,76 @@ export const createChatController = (
       return false;
     }
 
-    const maxPick = Math.min(5, remainingVocabulary.length);
+    // Categorize vocabulary: due-for-review vs new (not in DB) vs not-due (skip)
+    const now = new Date();
+    const userVocabularies = await vocabularyRepository.find({ where: { userId } });
+    const koreanToVocabId = new Map<string, string>();
+    for (const v of userVocabularies) {
+      koreanToVocabId.set(normalizeForComparison(v.korean), v.id);
+    }
+
+    const vocabIdsInRemaining: string[] = [];
+    for (const item of remainingVocabulary) {
+      const vocabId = koreanToVocabId.get(normalizeForComparison(item));
+      if (vocabId) {
+        vocabIdsInRemaining.push(vocabId);
+      }
+    }
+
+    // Batch-load reviews for all matched vocabulary items
+    const reviewMap = new Map<string, VocabularyReviewEntity>();
+    if (vocabIdsInRemaining.length > 0) {
+      const reviews = await vocabularyReviewRepository
+        .createQueryBuilder("r")
+        .where("r.vocabulary_id IN (:...ids)", { ids: vocabIdsInRemaining })
+        .getMany();
+      for (const r of reviews) {
+        reviewMap.set(r.vocabularyId, r);
+      }
+    }
+
+    const dueForReview: string[] = [];
+    const newWords: string[] = [];
+
+    for (const item of remainingVocabulary) {
+      const normalizedItem = normalizeForComparison(item);
+      const vocabId = koreanToVocabId.get(normalizedItem);
+
+      if (!vocabId) {
+        // Word not in vocabulary DB → new word
+        newWords.push(item);
+        continue;
+      }
+
+      const review = reviewMap.get(vocabId);
+      if (!review) {
+        // In vocabulary DB but no review record → treat as due
+        dueForReview.push(item);
+        continue;
+      }
+
+      // Compare nextReviewDate to current time (real-time, by second)
+      const nextReview = new Date(review.nextReviewDate);
+      if (nextReview.getTime() <= now.getTime()) {
+        dueForReview.push(item);
+      }
+      // else: not due yet → skip this word
+    }
+
+    const eligible = [...dueForReview, ...newWords];
+    if (!eligible.length) {
+      return false;
+    }
+
+    const maxPick = Math.min(5, eligible.length);
     const minPick = Math.min(3, maxPick);
     const pickCount = randomIntInRange(minPick, maxPick);
-    const selected = shuffleInPlace([...remainingVocabulary]).slice(0, pickCount);
+
+    // Priority selection: pick due-for-review first, then fill with new words
+    const shuffledDue = shuffleInPlace([...dueForReview]);
+    const shuffledNew = shuffleInPlace([...newWords]);
+    const prioritized = [...shuffledDue, ...shuffledNew];
+    const selected = prioritized.slice(0, pickCount);
 
     const context = buildLearningPathVocabularyReminderContext(selected);
     const developerMessage = formatContextMessage({ context });
