@@ -510,6 +510,7 @@ namespace Features.GamePlay.Controller
 		private static void ClearChatCharacterCache()
 		{
 			GamePlayState.ChatCharacterByName.Clear();
+			GamePlayState.RelationshipsByCharacterId.Clear();
 		}
 
 		private static async Task LoadChatCharactersCacheAsync()
@@ -579,6 +580,42 @@ namespace Features.GamePlay.Controller
 			catch (System.Exception exception)
 			{
 				UnityEngine.Debug.LogError("[GamePlayController] Failed to load chat character cache: " + exception);
+			}
+
+			// Fetch relationships for all cached characters
+			await LoadCharacterRelationshipsCacheAsync();
+		}
+
+		/// <summary>
+		/// Fetches relationships for all cached characters from the server
+		/// and populates GamePlayState.RelationshipsByCharacterId.
+		/// </summary>
+		private static async Task LoadCharacterRelationshipsCacheAsync()
+		{
+			GamePlayState.RelationshipsByCharacterId.Clear();
+
+			foreach (var entry in GamePlayState.ChatCharacterByName)
+			{
+				var characterId = entry.Value.Id;
+				try
+				{
+					var endpoint = NetworkEndpoints.CharacterRelationships + "?characterId=" + characterId;
+					var responseJson = await HttpClient.GetTaskAsync(endpoint);
+					if (string.IsNullOrWhiteSpace(responseJson))
+					{
+						continue;
+					}
+
+					var relationships = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Shares.Model.CharacterRelationshipInfo>>(responseJson);
+					if (relationships != null && relationships.Count > 0)
+					{
+						GamePlayState.RelationshipsByCharacterId[characterId] = relationships;
+					}
+				}
+				catch (System.Exception exception)
+				{
+					UnityEngine.Debug.LogWarning("[GamePlayController] Failed to load relationships for character " + characterId + ": " + exception.Message);
+				}
 			}
 		}
 

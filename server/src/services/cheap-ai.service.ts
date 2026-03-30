@@ -33,6 +33,75 @@ export interface CheapAIService {
     docs: Array<{ text: string; type: string; importance: string }>,
     userMessage: string
   ) => Promise<string>;
+
+  /**
+   * Summarizes the emotional impact of a chat session on active characters.
+   *
+   * @param chatHistory - Recent chat turns.
+   * @param activeCharacters - Names of characters active in the session.
+   * @returns English summary of emotional events and impacts.
+   */
+  summarizeSessionImpact: (
+    chatHistory: string[],
+    activeCharacters: string[]
+  ) => Promise<string>;
+
+  /**
+   * Generates 4-8 retrieval questions for ChromaDB to gather evidence
+   * before evaluating a relationship update.
+   *
+   * @param sessionSummary - Output of summarizeSessionImpact.
+   * @param ownerName - Character who feels the relationship.
+   * @param targetName - Target of the relationship (user name or character name).
+   * @param relationshipKind - e.g. "younger_sister", "friend".
+   * @param stableThought - Current stable thought text.
+   * @param stableEmotion - Current stable emotion value (0-10).
+   * @returns Array of English retrieval query strings.
+   */
+  generateDecisionQueries: (
+    sessionSummary: string,
+    ownerName: string,
+    targetName: string,
+    relationshipKind: string,
+    stableThought: string,
+    stableEmotion: number
+  ) => Promise<string[]>;
+
+  /**
+   * Evaluates how a relationship should be updated after a session,
+   * given the session summary, retrieved memories, and current state.
+   *
+   * @param input - All context needed for evaluation.
+   * @returns Structured update result.
+   */
+  evaluateRelationshipUpdate: (input: RelationshipEvalInput) => Promise<RelationshipUpdateResult>;
+}
+
+/** Input for evaluateRelationshipUpdate. */
+export interface RelationshipEvalInput {
+  sessionSummary: string;
+  retrievedMemories: string;
+  ownerName: string;
+  targetName: string;
+  relationshipKind: string;
+  stableThought: string;
+  temporaryThought: string | null;
+  stableEmotion: number;
+  currentEmotion: number;
+  emotionCause: string | null;
+  personality: string;
+}
+
+/** Output of evaluateRelationshipUpdate. */
+export interface RelationshipUpdateResult {
+  stableEmotionDelta: number;
+  newCurrentEmotion: number;
+  newTemporaryThought: string;
+  emotionCause: string;
+  stableThoughtRewrite: "none" | "light" | "medium" | "strong";
+  newStableThought?: string;
+  isShockEvent: boolean;
+  reasoning: string;
 }
 
 export interface CheapAIServiceConfig {
@@ -77,6 +146,71 @@ Rules:
 - Order by relevance to the current user message.
 - If no memories are relevant, output exactly: "No relevant memories."
 - Output ONLY the brief text. No markdown headers, no explanation.`;
+
+const SESSION_IMPACT_PROMPT = `You are an emotional analyst for a role-play AI system.
+
+Given a chat session transcript and a list of active character names, summarize the emotional impact of this session on each character.
+
+Focus on:
+- Key emotional events (compliments, conflicts, revelations, promises, betrayals, affection)
+- Interpersonal dynamics that shifted during the session
+- How each character likely FEELS at the end of the session
+- Any shock events (sudden betrayal, unexpected confession, traumatic news)
+
+Rules:
+- Write in English, third person.
+- Keep the summary under 300 words.
+- Be specific about which character is affected and how.
+- Output ONLY the summary text. No markdown, no JSON.`;
+
+const DECISION_QUERIES_PROMPT = `You are a retrieval query generator for an emotional memory system.
+
+Given a session summary and a character relationship, generate 4-8 English search queries to retrieve evidence from the long-term memory database before deciding how the relationship should change.
+
+The queries MUST cover these 4 categories:
+1. REPETITION HISTORY: Has this kind of event happened before between these two?
+2. LONG-TERM TRUST: Evidence of deep trust or distrust built over many sessions.
+3. RECONCILIATION PRECEDENT: Have they recovered from similar conflicts before?
+4. SHOCK EVENT EVIDENCE: Is there evidence that this session was truly extraordinary?
+
+Rules:
+- Include both confirming and disconfirming queries (e.g. "times X forgave Y" AND "times X refused to forgive Y").
+- Each query should be a short English phrase (5-15 words).
+- Queries must be specific to the owner→target pair.
+- Output ONLY a JSON array of strings. No markdown, no explanation.`;
+
+const RELATIONSHIP_EVAL_PROMPT = `You are a relationship evaluation engine for a role-play AI system.
+
+Given a session summary, retrieved long-term memories, and the current relationship state, decide how the relationship should be updated.
+
+REWRITE POLICY FOR STABLE THOUGHT:
+- Compute emotionDelta = abs(stableEmotionDelta)
+- If emotionDelta < 0.5 → stableThoughtRewrite: "none" (no change to stable thought)
+- If 0.5 ≤ emotionDelta < 1.5 → stableThoughtRewrite: "light" (soften absolutes, keep core meaning)
+- If 1.5 ≤ emotionDelta < 3.0 → stableThoughtRewrite: "medium" (change belief direction, keep emotional tone)
+- If emotionDelta ≥ 3.0 OR isShockEvent → stableThoughtRewrite: "strong" (full rewrite of core belief)
+
+ADDITIONAL CHECKS:
+- If the stable thought wording contradicts the emotion zone (e.g. thought says "I hate them" but stableEmotion > 7), flag for medium+ rewrite.
+- stableEmotionDelta should be small (usually -1.0 to +1.0 per session). Only shock events justify larger swings.
+- newCurrentEmotion is volatile and can swing freely (0-10).
+- isShockEvent should be true ONLY for genuinely extraordinary events (betrayal, life-saving, confession of love, serious trauma).
+
+Rules:
+- Output ONLY valid JSON matching the schema below. No markdown, no explanation.
+- "reasoning" should be 1-3 sentences explaining your logic.
+
+Output JSON schema:
+{
+  "stableEmotionDelta": number,
+  "newCurrentEmotion": number,
+  "newTemporaryThought": string,
+  "emotionCause": string,
+  "stableThoughtRewrite": "none" | "light" | "medium" | "strong",
+  "newStableThought": string | undefined,
+  "isShockEvent": boolean,
+  "reasoning": string
+}`;
 
 // ────────────────────────────────────────────────────────────────────────────
 // Factory
@@ -154,5 +288,113 @@ export const createCheapAIService = (config: CheapAIServiceConfig = {}): CheapAI
     return brief || "No relevant memories.";
   };
 
-  return { rewriteRetrievalIntents, compressMemoryBrief };
+  /**
+   * Summarizes the emotional impact of a chat session on active characters.
+   */
+  const summarizeSessionImpact: CheapAIService["summarizeSessionImpact"] = async (
+    chatHistory,
+    activeCharacters
+  ) => {
+    const generativeModel = genAI.getGenerativeModel({ model });
+    const historyBlock = chatHistory.join("\n");
+    const prompt = `${SESSION_IMPACT_PROMPT}\n\nActive characters: ${activeCharacters.join(", ")}\n\nChat transcript:\n${historyBlock}\n\nSummary:`;
+
+    const result = await generativeModel.generateContent(prompt);
+    return result.response.text().trim();
+  };
+
+  /**
+   * Generates 4-8 retrieval questions for ChromaDB evidence gathering.
+   */
+  const generateDecisionQueries: CheapAIService["generateDecisionQueries"] = async (
+    sessionSummary,
+    ownerName,
+    targetName,
+    relationshipKind,
+    stableThought,
+    stableEmotion
+  ) => {
+    const generativeModel = genAI.getGenerativeModel({ model });
+    const contextBlock = [
+      `Session summary: ${sessionSummary}`,
+      `Relationship: ${ownerName} → ${targetName} (${relationshipKind})`,
+      `Stable thought: ${stableThought}`,
+      `Stable emotion: ${stableEmotion.toFixed(1)} / 10`
+    ].join("\n");
+
+    const prompt = `${DECISION_QUERIES_PROMPT}\n\n${contextBlock}\n\nOutput:`;
+
+    const result = await generativeModel.generateContent(prompt);
+    const text = result.response.text().trim();
+
+    try {
+      const parsed = JSON.parse(text) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+          .map((item) => item.trim())
+          .slice(0, 8);
+      }
+    } catch {
+      // Fallback: split by newlines
+      return text
+        .split(/\n/)
+        .map((line) => line.replace(/^[-*\d.)\]]+\s*/, "").trim())
+        .filter((line) => line.length > 0)
+        .slice(0, 8);
+    }
+
+    return [];
+  };
+
+  /**
+   * Evaluates how a relationship should be updated after a session.
+   */
+  const evaluateRelationshipUpdate: CheapAIService["evaluateRelationshipUpdate"] = async (input) => {
+    const generativeModel = genAI.getGenerativeModel({ model });
+    const contextBlock = [
+      `Session summary: ${input.sessionSummary}`,
+      `Retrieved memories:\n${input.retrievedMemories}`,
+      `\nRelationship: ${input.ownerName} → ${input.targetName} (${input.relationshipKind})`,
+      `Personality: ${input.personality}`,
+      `Current state:`,
+      `  Stable thought: ${input.stableThought}`,
+      `  Temporary thought: ${input.temporaryThought ?? "(none)"}`,
+      `  Stable emotion: ${input.stableEmotion.toFixed(1)} / 10`,
+      `  Current emotion: ${input.currentEmotion.toFixed(1)} / 10`,
+      `  Emotion cause: ${input.emotionCause ?? "(none)"}`
+    ].join("\n");
+
+    const prompt = `${RELATIONSHIP_EVAL_PROMPT}\n\n${contextBlock}\n\nOutput:`;
+
+    const result = await generativeModel.generateContent(prompt);
+    const text = result.response.text().trim();
+
+    // Strip markdown code fences if present
+    const jsonText = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+
+    const parsed = JSON.parse(jsonText) as RelationshipUpdateResult;
+
+    // Validate and clamp values
+    return {
+      stableEmotionDelta: typeof parsed.stableEmotionDelta === "number" ? parsed.stableEmotionDelta : 0,
+      newCurrentEmotion: Math.min(10, Math.max(0, typeof parsed.newCurrentEmotion === "number" ? parsed.newCurrentEmotion : input.currentEmotion)),
+      newTemporaryThought: typeof parsed.newTemporaryThought === "string" ? parsed.newTemporaryThought : "",
+      emotionCause: typeof parsed.emotionCause === "string" ? parsed.emotionCause : "",
+      stableThoughtRewrite: (["none", "light", "medium", "strong"] as const).includes(parsed.stableThoughtRewrite as any)
+        ? parsed.stableThoughtRewrite
+        : "none",
+      newStableThought: typeof parsed.newStableThought === "string" ? parsed.newStableThought : undefined,
+      isShockEvent: Boolean(parsed.isShockEvent),
+      reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning : ""
+    };
+  };
+
+  return {
+    rewriteRetrievalIntents,
+    compressMemoryBrief,
+    summarizeSessionImpact,
+    generateDecisionQueries,
+    evaluateRelationshipUpdate
+  };
 };

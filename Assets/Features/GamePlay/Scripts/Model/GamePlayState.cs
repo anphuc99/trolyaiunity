@@ -30,5 +30,12 @@ namespace Features.GamePlay.Model
 
 		public static readonly System.Collections.Generic.Dictionary<string, GamePlayChatCharacterCache> ChatCharacterByName =
 			new System.Collections.Generic.Dictionary<string, GamePlayChatCharacterCache>(System.StringComparer.OrdinalIgnoreCase);
+
+		/// <summary>
+		/// Character relationships keyed by ownerCharacterId.
+		/// Populated during scope entry from GET /api/character-relationships.
+		/// </summary>
+		public static readonly System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<Shares.Model.CharacterRelationshipInfo>> RelationshipsByCharacterId =
+			new System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<Shares.Model.CharacterRelationshipInfo>>();
 	}
 }

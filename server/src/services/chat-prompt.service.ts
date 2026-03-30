@@ -177,6 +177,10 @@ export const buildChatSystemPrompt = (params: ChatPromptParams): string => {
     ? `\n====================================\nLONG-TERM MEMORY (from previous conversations)\n====================================\n${longTermMemoryBrief}\nUse this memory naturally in your responses. Do not mention that you "retrieved" or "looked up" this information.\n`
     : "";
 
+  const relationshipBlock = params.relationshipSummary?.trim()
+    ? `\n====================================\nCHARACTER RELATIONSHIPS & EMOTIONS\n====================================\n${params.relationshipSummary.trim()}\n\nINSTRUCTIONS FOR RELATIONSHIPS:\n- Each character MUST behave consistently with their relationship kind, thoughts, and emotion levels.\n- "Stable emotion" reflects the deep, long-term bond (hard to change). "Current emotion" reflects the right-now feeling (volatile).\n- If currentEmotion is low but stableEmotion is high, the character is upset but still deeply bonded — they may act cold or hurt, but underlying affection remains.\n- If currentEmotion is high but stableEmotion is low, the character is momentarily pleased but still guarded or distant.\n- "Stable thought" is the character's core belief about the target. "Temporary thought" is a situational reaction that may override behavior temporarily.\n- Do NOT reveal these numbers or mechanics to the user. Express emotions through dialogue tone, word choice, and actions naturally.\n`
+    : "";
+
   const p = `YOU ARE A CONVERSATION PARTNER FOR CHINESE LEARNERS.
 
 ====================================
@@ -198,7 +202,7 @@ ${userInfoBlock}
 SCENE / CONTEXT
 ====================================
 ${context}
-${maybe("STORY PLOT", params.storyPlot)}${maybe("STORY DESCRIPTION", params.storyDescription)}${maybe("STORY PROGRESS", params.storyProgress)}${maybe("RELATIONSHIPS", params.relationshipSummary)}${maybe("PREVIOUS SUMMARY", params.contextSummary)}${relatedStoryBlock}${characterRules}${pronunciationBlock}${longTermMemoryBlock}
+${maybe("STORY PLOT", params.storyPlot)}${maybe("STORY DESCRIPTION", params.storyDescription)}${maybe("STORY PROGRESS", params.storyProgress)}${relationshipBlock}${maybe("PREVIOUS SUMMARY", params.contextSummary)}${relatedStoryBlock}${characterRules}${pronunciationBlock}${longTermMemoryBlock}
 ====================================
 DIALOGUE RULES
 ====================================

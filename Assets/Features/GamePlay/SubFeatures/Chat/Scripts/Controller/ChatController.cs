@@ -55,6 +55,9 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		/// </summary>
 		public static void Uninstall()
 		{
+			// Fire-and-forget: trigger post-session relationship evaluation
+			_ = TriggerRelationshipEvaluationAsync();
+
 			UnregisterAddCharacterMenu();
 			UnregisterContextMenu();
 			UnregisterLearningPathMenu();
@@ -540,6 +543,45 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			var state = await LoadDeveloperStatePayloadAsync();
 			EventBus.Publish(ChatEvents.DeveloperStateLoaded, state ?? new ChatDeveloperStatePayload());
+		}
+
+		/// <summary>
+		/// Sends a fire-and-forget POST to /api/character-relationships/evaluate-session
+		/// with the currently active character names so the cheap AI pipeline can
+		/// update relationship emotions and thoughts.
+		/// </summary>
+		private static async Task TriggerRelationshipEvaluationAsync()
+		{
+			try
+			{
+				var state = await LoadDeveloperStatePayloadAsync();
+				if (state?.ActiveCharacterNames == null || state.ActiveCharacterNames.Count == 0)
+				{
+					return;
+				}
+
+				var activeNames = new List<string>();
+				for (var i = 0; i < state.ActiveCharacterNames.Count; i++)
+				{
+					var n = state.ActiveCharacterNames[i];
+					if (!string.IsNullOrWhiteSpace(n))
+					{
+						activeNames.Add(n.Trim());
+					}
+				}
+
+				if (activeNames.Count == 0)
+				{
+					return;
+				}
+
+				var payload = new { activeCharacterNames = activeNames };
+				await HttpClient.PostJsonTaskAsync(NetworkEndpoints.CharacterRelationshipsEvaluateSession, payload);
+			}
+			catch (Exception exception)
+			{
+				Debug.LogWarning("[ChatController] Relationship evaluation trigger failed: " + exception.Message);
+			}
 		}
 
 		private static async Task SetCharacterActiveInternalAsync(ChatSetCharacterActiveRequestPayload payload)

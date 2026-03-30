@@ -75,22 +75,46 @@ export const createMemoryRetrievalService = (
     if (!intents.length) return "";
 
     // Step 3: Query ChromaDB for each intent, deduplicate
+    // Round A: Global memories (excludeActorMemories)
+    // Round B: Per-actor memories for each active character
     const topK = options?.topK ?? 3;
     const seenIds = new Set<string>();
     const allResults: MemoryQueryResult[] = [];
 
     for (const intent of intents) {
       try {
-        const results = await vectorMemory.query(userId, intent, {
+        // Round A: global-only query
+        const globalResults = await vectorMemory.query(userId, intent, {
           storyId: options?.storyId,
           topK,
           excludeActorMemories: true
         });
 
-        for (const result of results) {
+        for (const result of globalResults) {
           if (!seenIds.has(result.id)) {
             seenIds.add(result.id);
             allResults.push(result);
+          }
+        }
+
+        // Round B: per-actor queries for active characters
+        const activeChars = options?.activeCharacters ?? [];
+        for (const charName of activeChars) {
+          try {
+            const actorResults = await vectorMemory.query(userId, intent, {
+              storyId: options?.storyId,
+              topK,
+              actor: charName
+            });
+
+            for (const result of actorResults) {
+              if (!seenIds.has(result.id)) {
+                seenIds.add(result.id);
+                allResults.push(result);
+              }
+            }
+          } catch (actorError) {
+            console.warn(`Memory retrieval: actor query failed for "${charName}" / intent "${intent}".`, actorError);
           }
         }
       } catch (error) {

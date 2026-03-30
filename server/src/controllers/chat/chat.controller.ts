@@ -7,6 +7,8 @@ import { createGeminiChatService, isGeminiModel, type GeminiChatService, type Ge
 import { buildChatSystemPrompt } from "../../services/chat-prompt.service.js";
 import StoryEntity from "../../models/story.entity.js";
 import UserEntity from "../../models/user.entity.js";
+import CharacterEntity from "../../models/character.entity.js";
+import CharacterRelationshipEntity from "../../models/character-relationship.entity.js";
 import { createChatHistoryStore, type ChatHistoryMessage, type ChatHistoryStore } from "../../services/chat-history.service.js";
 import { createVectorMemoryService, type VectorMemoryService } from "../../services/vector-memory.service.js";
 import { extractMemorySidecars, shouldStoreMemory, buildMemoryItemFromCandidate, stripMemorySidecar } from "../../services/memory-extraction.service.js";
@@ -111,6 +113,8 @@ export const createChatController = (
   const dataSource = _dataSource;
   const userRepository = dataSource.getRepository(UserEntity);
   const storyRepository = dataSource.getRepository(StoryEntity);
+  const characterRepository = dataSource.getRepository(CharacterEntity);
+  const relationshipRepository = dataSource.getRepository(CharacterRelationshipEntity);
   
   // OpenAI configuration
   const openAIApiKey = process.env.OPENAI_API_KEY ?? "";
@@ -257,6 +261,66 @@ export const createChatController = (
       `Character \"${name}\" has been removed from this conversation.`,
       "Do not use this character again unless it is added back."
     ].join("\n");
+  };
+
+  /**
+   * Queries relationship records for the given active characters and formats
+   * them into a structured text block suitable for the system prompt.
+   *
+   * @param userId - Authenticated user id.
+   * @param activeCharacterNames - Names of currently active characters.
+   * @returns Formatted relationship block or null when no relationships exist.
+   */
+  const buildRelationshipBlock = async (
+    userId: number,
+    activeCharacterNames: string[]
+  ): Promise<string | null> => {
+    if (activeCharacterNames.length === 0) return null;
+
+    // Resolve character IDs from names
+    const characters = await characterRepository
+      .createQueryBuilder("c")
+      .where("c.user_id = :userId", { userId })
+      .andWhere("c.name IN (:...names)", { names: activeCharacterNames })
+      .getMany();
+
+    if (characters.length === 0) return null;
+
+    const characterIds = characters.map(c => c.id);
+    const nameById = new Map(characters.map(c => [c.id, c.name]));
+
+    // Fetch all relationships owned by active characters for this user
+    const relationships = await relationshipRepository
+      .createQueryBuilder("r")
+      .where("r.ownerCharacterId IN (:...ids)", { ids: characterIds })
+      .andWhere("r.userId = :userId", { userId })
+      .getMany();
+
+    if (relationships.length === 0) return null;
+
+    const lines: string[] = [];
+
+    for (const rel of relationships) {
+      const ownerName = nameById.get(rel.ownerCharacterId) ?? `Character#${rel.ownerCharacterId}`;
+      const targetLabel = rel.targetType === "user"
+        ? "User"
+        : (nameById.get(rel.targetCharacterId ?? 0) ?? `Character#${rel.targetCharacterId}`);
+
+      lines.push(`[${ownerName} → ${targetLabel}]`);
+      lines.push(`Kind: ${rel.relationshipKind}`);
+      lines.push(`Stable thought: ${rel.stableThought}`);
+      if (rel.temporaryThought) {
+        lines.push(`Temporary thought: ${rel.temporaryThought}`);
+      }
+      lines.push(`Stable emotion: ${rel.stableEmotion.toFixed(1)} / 10`);
+      lines.push(`Current emotion: ${rel.currentEmotion.toFixed(1)} / 10`);
+      if (rel.emotionCause) {
+        lines.push(`Emotion cause: ${rel.emotionCause}`);
+      }
+      lines.push(""); // blank line separator
+    }
+
+    return lines.join("\n").trim() || null;
   };
 
   /**
@@ -848,21 +912,22 @@ export const createChatController = (
 
     // Retrieve long-term memory brief if memory services are available
     let longTermMemoryBrief: string | null = null;
+
+    // Extract active character names from developer messages in history
+    // (needed for both memory retrieval and relationship block)
+    const history = await historyStore.load(userId);
+    const activeCharMap = new Map<string, boolean>();
+    for (const msg of history) {
+      if (msg.role !== "developer") continue;
+      const action = parseDeveloperCharacterAction(msg.content);
+      if (action?.name) activeCharMap.set(action.name, action.active);
+    }
+    const activeCharacters = Array.from(activeCharMap.entries())
+      .filter(([, active]) => active)
+      .map(([name]) => name);
+
     if (memoryRetrievalService && userMessage) {
       try {
-        const history = await historyStore.load(userId);
-
-        // Extract active character names from developer messages in history
-        const activeCharMap = new Map<string, boolean>();
-        for (const msg of history) {
-          if (msg.role !== "developer") continue;
-          const action = parseDeveloperCharacterAction(msg.content);
-          if (action?.name) activeCharMap.set(action.name, action.active);
-        }
-        const activeCharacters = Array.from(activeCharMap.entries())
-          .filter(([, active]) => active)
-          .map(([name]) => name);
-
         longTermMemoryBrief = await memoryRetrievalService.retrieveMemoryBrief(
           userId,
           userMessage,
@@ -872,6 +937,14 @@ export const createChatController = (
       } catch (error) {
         console.warn("Memory retrieval failed, proceeding without long-term memory:", error);
       }
+    }
+
+    // Build structured relationship block from DB for active characters
+    let relationshipSummary: string | null = null;
+    try {
+      relationshipSummary = await buildRelationshipBlock(userId, activeCharacters);
+    } catch (error) {
+      console.warn("Relationship block build failed, proceeding without:", error);
     }
 
     return buildChatSystemPrompt({
@@ -886,7 +959,7 @@ export const createChatController = (
       storyPlot: story?.name || null,
       storyDescription: story?.description || null,
       storyProgress: story?.currentProgress ?? null,
-      relationshipSummary: getOptionalString(payload.relationshipSummary) || null,
+      relationshipSummary,
       contextSummary: getOptionalString(payload.contextSummary) || null,
       relatedStoryMessages: getOptionalString(payload.relatedStoryMessages) || null,
       checkPronunciation: Boolean(payload.checkPronunciation),

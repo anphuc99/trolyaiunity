@@ -20,6 +20,7 @@ import MyLogJournalEntity from "./models/my-log-journal.entity.js";
 import MyLogMessageEntity from "./models/my-log-message.entity.js";
 import VoiceEntity from "./models/voice.entity.js";
 import LearningPathEntity from "./models/learning-path.entity.js";
+import CharacterRelationshipEntity from "./models/character-relationship.entity.js";
 import { repoRoot } from "./env.js";
 
 type SupportedDbType = "mysql" | "sqlite";
@@ -98,7 +99,8 @@ export const AppDataSource = new DataSource({
     VocabularyEntity,
     VocabularyMemoryEntity,
     VocabularyReviewEntity,
-    LearningPathEntity
+    LearningPathEntity,
+    CharacterRelationshipEntity
   ],
   synchronize: readBool(process.env.TYPEORM_SYNCHRONIZE, false),
   logging: readBool(process.env.TYPEORM_LOGGING, false)

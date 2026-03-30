@@ -46,5 +46,7 @@ namespace Core.Infrastructure.Network
 		public const string UserProfile = "/api/users/profile";
 		public const string Personalities = "/personalities";
 		public const string LearningPaths = "/api/learning-paths";
+		public const string CharacterRelationships = "/api/character-relationships";
+		public const string CharacterRelationshipsEvaluateSession = "/api/character-relationships/evaluate-session";
 	}
 }
