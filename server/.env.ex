@@ -4,6 +4,9 @@
 NODE_ENV=development
 HOST=localhost
 
+# Web client custom dist path (optional)
+# CLIENT_DIST_DIR=
+
 # Database
 # Choose which DB driver TypeORM should use.
 # Supported: mysql | sqlite
@@ -23,6 +26,9 @@ DB_SQLITE_PATH=server/data/sqlite/mimi_chat.sqlite
 
 # Server
 PORT=4000
+
+# Google / Gemini
+GOOGLE_API_KEY=
 
 # OpenAI
 OPENAI_API_KEY=
