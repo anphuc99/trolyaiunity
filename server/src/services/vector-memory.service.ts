@@ -1,5 +1,6 @@
-import { ChromaClient, IncludeEnum, type Collection } from "chromadb";
+import { IncludeEnum, type Collection } from "chromadb";
 import crypto from "crypto";
+import { createChromaClient } from "./chroma-client.factory.js";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -104,7 +105,7 @@ export interface VectorMemoryServiceConfig {
  * @returns The vector memory service.
  */
 export const createVectorMemoryService = (config: VectorMemoryServiceConfig): VectorMemoryService => {
-  const client = new ChromaClient({ path: config.chromaUrl });
+  const client = createChromaClient(config.chromaUrl);
   const collectionName = config.collectionName ?? "troly_memories";
 
   let collectionPromise: Promise<Collection> | null = null;

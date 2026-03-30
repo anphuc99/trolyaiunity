@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { ChromaClient, IncludeEnum } from "chromadb";
+import { createChromaClient } from "../services/chroma-client.factory.js";
 
 /**
  * Creates routes for the ChromaDB admin web UI.
@@ -14,7 +15,7 @@ export const createChromaDbAdminRoutes = (): Router => {
   /**
    * Returns a ChromaClient instance connected to the configured URL.
    */
-  const getClient = () => new ChromaClient({ path: chromaUrl });
+  const getClient = (): ChromaClient => createChromaClient(chromaUrl);
 
   // ── GET /status ─ Check ChromaDB connection ────────────────────────────
   router.get("/status", async (_req: Request, res: Response) => {
