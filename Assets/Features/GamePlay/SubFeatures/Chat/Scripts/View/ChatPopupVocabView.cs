@@ -17,6 +17,8 @@ public class ChatPopupVocabView : MonoBehaviour
 
     [Header("Đánh giá")]
     [SerializeField] private Button _ratingAgainButton;
+    [SerializeField] private Button _ratingHardButton;
+    [SerializeField] private Button _ratingGoodButton;
     [SerializeField] private Button _ratingEasyButton;
 
     [Header("Button")]
@@ -43,6 +45,16 @@ public class ChatPopupVocabView : MonoBehaviour
             _ratingAgainButton.onClick.AddListener(HandleRatingAgain);
         }
 
+        if (_ratingHardButton != null)
+        {
+            _ratingHardButton.onClick.AddListener(HandleRatingHard);
+        }
+
+        if (_ratingGoodButton != null)
+        {
+            _ratingGoodButton.onClick.AddListener(HandleRatingGood);
+        }
+
         if (_ratingEasyButton != null)
         {
             _ratingEasyButton.onClick.AddListener(HandleRatingEasy);
@@ -61,6 +73,16 @@ public class ChatPopupVocabView : MonoBehaviour
         if (_ratingAgainButton != null)
         {
             _ratingAgainButton.onClick.RemoveListener(HandleRatingAgain);
+        }
+
+        if (_ratingHardButton != null)
+        {
+            _ratingHardButton.onClick.RemoveListener(HandleRatingHard);
+        }
+
+        if (_ratingGoodButton != null)
+        {
+            _ratingGoodButton.onClick.RemoveListener(HandleRatingGood);
         }
 
         if (_ratingEasyButton != null)
@@ -161,11 +183,27 @@ public class ChatPopupVocabView : MonoBehaviour
     }
 
     /// <summary>
-    /// Handles "Easy" rating button click (FSRS rating 3 = Easy).
+    /// Handles "Hard" rating button click (FSRS rating 2 = Hard).
+    /// </summary>
+    private void HandleRatingHard()
+    {
+        SubmitRating(2);
+    }
+
+    /// <summary>
+    /// Handles "Good" rating button click (FSRS rating 3 = Good).
+    /// </summary>
+    private void HandleRatingGood()
+    {
+        SubmitRating(3);
+    }
+
+    /// <summary>
+    /// Handles "Easy" rating button click (FSRS rating 4 = Easy).
     /// </summary>
     private void HandleRatingEasy()
     {
-        SubmitRating(3);
+        SubmitRating(4);
     }
 
     /// <summary>
@@ -214,6 +252,16 @@ public class ChatPopupVocabView : MonoBehaviour
         if (_ratingAgainButton != null)
         {
             _ratingAgainButton.interactable = interactable;
+        }
+
+        if (_ratingHardButton != null)
+        {
+            _ratingHardButton.interactable = interactable;
+        }
+
+        if (_ratingGoodButton != null)
+        {
+            _ratingGoodButton.interactable = interactable;
         }
 
         if (_ratingEasyButton != null)

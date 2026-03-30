@@ -606,7 +606,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		public string VocabularyId { get; set; }
 
 		/// <summary>
-		/// FSRS rating (1 = Again, 3 = Easy).
+		/// FSRS rating (1 = Again, 2 = Hard, 3 = Good, 4 = Easy).
 		/// </summary>
 		public int Rating { get; set; }
 	}
