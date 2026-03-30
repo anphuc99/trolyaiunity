@@ -1,4 +1,5 @@
 import { IncludeEnum, type Collection } from "chromadb";
+import { DefaultEmbeddingFunction } from "@chroma-core/default-embed";
 import crypto from "crypto";
 import { createChromaClient } from "./chroma-client.factory.js";
 
@@ -108,14 +109,17 @@ export const createVectorMemoryService = (config: VectorMemoryServiceConfig): Ve
   const client = createChromaClient(config.chromaUrl);
   const collectionName = config.collectionName ?? "troly_memories";
 
+  const embeddingFunction = new DefaultEmbeddingFunction();
   let collectionPromise: Promise<Collection> | null = null;
 
   /**
    * Lazily initialises the ChromaDB collection (created if missing).
+   * Passes the default embedding function explicitly so ChromaDB v3
+   * does not throw "No embedding function found".
    */
   const getCollection = (): Promise<Collection> => {
     if (!collectionPromise) {
-      collectionPromise = client.getOrCreateCollection({ name: collectionName });
+      collectionPromise = client.getOrCreateCollection({ name: collectionName, embeddingFunction });
     }
     return collectionPromise;
   };
