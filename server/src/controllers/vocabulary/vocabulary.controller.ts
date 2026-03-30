@@ -3,6 +3,7 @@ import type { DataSource, Repository } from "typeorm";
 import VocabularyEntity from "../../models/vocabulary.entity.js";
 import VocabularyReviewEntity from "../../models/vocabulary-review.entity.js";
 import VocabularyMemoryEntity from "../../models/vocabulary-memory.entity.js";
+import UserEntity from "../../models/user.entity.js";
 import {
   createInitialReviewState,
   createReviewFromDifficulty,
@@ -94,8 +95,21 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   const vocabRepo: Repository<VocabularyEntity> = dataSource.getRepository(VocabularyEntity);
   const reviewRepo: Repository<VocabularyReviewEntity> = dataSource.getRepository(VocabularyReviewEntity);
   const memoryRepo: Repository<VocabularyMemoryEntity> = dataSource.getRepository(VocabularyMemoryEntity);
+  const userRepo: Repository<UserEntity> = dataSource.getRepository(UserEntity);
   const toDateKey = (value: Date | string) =>
     new Date(value).toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
+
+  /**
+   * Resolves the current level label of the user (for example: HSK1, HSK2).
+   */
+  const resolveCurrentUserLevel = async (userId: number): Promise<string | null> => {
+    const user = await userRepo.findOne({
+      where: { id: userId },
+      relations: { level: true }
+    });
+
+    return user?.level?.level?.trim() || null;
+  };
 
   // ──────────────────────────────────────────────────────────────────────────
   // List all vocabularies for the current user (with reviews + memories).
@@ -226,12 +240,14 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         return;
       }
 
+      const currentUserLevel = await resolveCurrentUserLevel(userId);
+
       // Create vocabulary
       const vocab = vocabRepo.create({
         korean: trimmedKorean,
         vietnamese: trimmedVietnamese,
         pinyin: trimmedPinyin || null,
-        level: trimmedLevel || null,
+        level: trimmedLevel || currentUserLevel,
         isManuallyAdded: !memory,
         userId
       });
@@ -781,12 +797,14 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         vietnamese = word;
       }
 
+      const currentUserLevel = await resolveCurrentUserLevel(userId);
+
       // Auto-create the vocabulary entry
       const vocab = vocabRepo.create({
         korean: word,
         vietnamese,
         pinyin: pinyin || null,
-        level: null,
+        level: currentUserLevel,
         isManuallyAdded: false,
         userId
       });
