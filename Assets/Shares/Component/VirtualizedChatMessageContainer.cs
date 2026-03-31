@@ -125,7 +125,9 @@ namespace Share.Components
 			{
 				for (var i = 0; i < messages.Count; i++)
 				{
-					_messages.Add(messages[i] ?? new MessageBubbleData());
+					var mapped = messages[i] ?? new MessageBubbleData();
+					ApplyDefaultMessageDisplay(mapped);
+					_messages.Add(mapped);
 				}
 			}
 
@@ -142,7 +144,9 @@ namespace Share.Components
 		/// <param name="message">Message text.</param>
 		public void AddNewMessage(MessageBubbleData message)
 		{
-			_messages.Add(message ?? new MessageBubbleData());
+			var mapped = message ?? new MessageBubbleData();
+			ApplyDefaultMessageDisplay(mapped);
+			_messages.Add(mapped);
 			SyncMessageIndices();
 			RebuildMetrics();
 			_scrollOffset = GetMaxScrollOffset();
@@ -259,23 +263,22 @@ namespace Share.Components
 
 				if (_usePinyinRubyOnTranslate)
 				{
+					var resolvedTranslation = string.IsNullOrWhiteSpace(translation) ? message.Translation : translation;
+					if (string.IsNullOrWhiteSpace(resolvedTranslation))
+					{
+						break;
+					}
+
 					if (message.IsTranslationExpanded)
 					{
-						message.Message = displayBaseText;
+						message.Message = BuildDefaultMessageText(message, displayBaseText);
 						message.IsTranslationExpanded = false;
 					}
 					else
 					{
-						if (string.IsNullOrWhiteSpace(message.Pinyin))
-						{
-							break;
-						}
-
 						message.OriginalMessage = originalText;
-						message.Message = PinyinRichTextUtils.BuildWrappedInlineRuby(
-							displayBaseText,
-							message.Pinyin,
-							RubyWrapHanCountPerLine);
+						message.Translation = resolvedTranslation;
+						message.Message = resolvedTranslation;
 						message.IsTranslationExpanded = true;
 					}
 
@@ -339,6 +342,38 @@ namespace Share.Components
 			}
 
 			return PinyinLabel + pinyin.Trim();
+		}
+
+		private void ApplyDefaultMessageDisplay(MessageBubbleData message)
+		{
+			if (message == null || message.IsTranslationExpanded)
+			{
+				return;
+			}
+
+			var originalText = string.IsNullOrWhiteSpace(message.OriginalMessage)
+				? (message.Message ?? string.Empty)
+				: message.OriginalMessage;
+			message.OriginalMessage = originalText;
+			message.Message = BuildDefaultMessageText(message, originalText);
+		}
+
+		private string BuildDefaultMessageText(MessageBubbleData message, string originalText)
+		{
+			if (!_usePinyinRubyOnTranslate)
+			{
+				return originalText ?? string.Empty;
+			}
+
+			if (message == null || string.IsNullOrWhiteSpace(message.Pinyin))
+			{
+				return originalText ?? string.Empty;
+			}
+
+			return PinyinRichTextUtils.BuildWrappedInlineRuby(
+				originalText ?? string.Empty,
+				message.Pinyin,
+				RubyWrapHanCountPerLine);
 		}
 
 		/// <summary>
@@ -453,6 +488,8 @@ namespace Share.Components
 
 				message.Message = newText ?? string.Empty;
 				message.OriginalMessage = newText ?? string.Empty;
+				message.IsTranslationExpanded = false;
+				ApplyDefaultMessageDisplay(message);
 				updated = true;
 				break;
 			}
@@ -470,7 +507,9 @@ namespace Share.Components
 		/// <param name="message">Message text.</param>
 		public void AddOldMessage(MessageBubbleData message)
 		{
-			_messages.Insert(0, message ?? new MessageBubbleData());
+			var mapped = message ?? new MessageBubbleData();
+			ApplyDefaultMessageDisplay(mapped);
+			_messages.Insert(0, mapped);
 			SyncMessageIndices();
 			RebuildMetrics();
 			if (_messageHeights.Count > 0)
