@@ -13,7 +13,7 @@ namespace Share.Utils
 		private const string Prefix = "<voffset=1em><size=50%>";
 		private const string Suffix = "</size></voffset>";
 		private const float DefaultColumnStepEm = 0.8f;
-		private const int DefaultPinyinSize = 15;
+		private const int DefaultPinyinSize = 25;
 		private const int DefaultHanSize = 50;
 
 		/// <summary>
@@ -47,6 +47,17 @@ namespace Share.Utils
 			for (var i = 0; i < hanText.Length; i++)
 			{
 				var ch = hanText[i];
+				if (ch == '<')
+				{
+					var endIdx = hanText.IndexOf('>', i);
+					if (endIdx != -1)
+					{
+						builder.Append(hanText, i, endIdx - i + 1);
+						i = endIdx;
+						continue;
+					}
+				}
+
 				if (IsCjkIdeograph(ch) && syllableIndex < syllables.Length)
 				{
 					builder.Append(Prefix);
@@ -99,6 +110,17 @@ namespace Share.Utils
 			for (var i = 0; i < hanText.Length; i++)
 			{
 				var ch = hanText[i];
+				if (ch == '<')
+				{
+					var endIdx = hanText.IndexOf('>', i);
+					if (endIdx != -1)
+					{
+						hanLineBuilder.Append(hanText, i, endIdx - i + 1);
+						i = endIdx;
+						continue;
+					}
+				}
+
 				if (ch == '\r')
 				{
 					continue;
