@@ -220,7 +220,7 @@ RESPONSE FORMAT (JSON ARRAY)
 - MessageId: Globally Unique Identifier for this message within the current reply/session.
 - CharacterName: speaker name. Use "Mimi" if no character is specified.
 - Text: Chinese characters only (Simplified).
-- Pinyin: Pinyin reading of the Text (include tone marks, e.g., "Nǐ hǎo!").
+- Pinyin: Pinyin reading of the Text. MUST SEPARATE EVERY SINGLE SYLLABLE WITH A SPACE to map 1:1 with Chinese characters (include tone marks, e.g., "Nǐ hǎo", write "wǒ men" instead of "wǒmen").
 - Tone: short English description for TTS (e.g. "neutral, medium pitch").
 - Translation: Vietnamese translation of Text.
 - Return ONLY valid JSON. No markdown, no extra commentary.
@@ -291,7 +291,7 @@ Example (GLOBAL memory on first item — objective fact, GlobalMemory* fields):
     "MessageId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "CharacterName": "Mimi",
     "Text": "好的，我们这周末去公园！",
-    "Pinyin": "Hǎo de, wǒmen zhè zhōumò qù gōngyuán!",
+    "Pinyin": "Hǎo de, wǒ men zhè zhōu mò qù gōng yuán!",
     "Tone": "Happy, medium pitch",
     "Translation": "Được rồi, chúng ta sẽ đi công viên cuối tuần này!",
     "GlobalMemoryEn": "The group decided to visit the park this weekend.",
@@ -306,7 +306,7 @@ Example (CHARACTER memory on first item — subjective first-person, ImportantMe
     "MessageId": "b0c1d2e3-f4a5-6789-abcd-ef1234567890",
     "CharacterName": "Mimi",
     "Text": "那我们去吃炸鸡吧！",
-    "Pinyin": "Nà wǒmen qù chī zhá jī ba!",
+    "Pinyin": "Nà wǒ men qù chī zhá jī ba!",
     "Tone": "Happy, medium pitch",
     "Translation": "Vậy chúng ta đi ăn gà rán nhé!",
     "ImportantMemoryEn": "I love fried chicken the most.",
@@ -322,7 +322,7 @@ Example (BOTH on first item — global fact + character memory coexist, differen
     "MessageId": "d4e5f6a7-b8c9-0123-def0-333333333333",
     "CharacterName": "Mimi",
     "Text": "好！我们这周末去公园吧！",
-    "Pinyin": "Hǎo! Wǒmen zhè zhōumò qù gōngyuán ba!",
+    "Pinyin": "Hǎo! Wǒ men zhè zhōu mò qù gōng yuán ba!",
     "Tone": "Happy, medium pitch",
     "Translation": "Tuyệt! Chúng ta đi công viên cuối tuần này nhé!",
     "GlobalMemoryEn": "The group decided to visit the park this weekend.",
@@ -341,7 +341,7 @@ Example (two characters each storing their own memory):
     "MessageId": "b1c2d3e4-f5a6-7890-abcd-111111111111",
     "CharacterName": "Mimi",
     "Text": "我喜欢吃炸鸡！",
-    "Pinyin": "Wǒ xǐhuan chī zhá jī!",
+    "Pinyin": "Wǒ xǐ huan chī zhá jī!",
     "Tone": "Happy, medium pitch",
     "Translation": "Tôi thích ăn gà rán!",
     "ImportantMemoryEn": "I love fried chicken the most.",
@@ -353,7 +353,7 @@ Example (two characters each storing their own memory):
     "MessageId": "c2d3e4f5-a6b7-8901-bcde-222222222222",
     "CharacterName": "Lisa",
     "Text": "我更喜欢披萨！",
-    "Pinyin": "Wǒ gèng xǐhuan pīsà!",
+    "Pinyin": "Wǒ gèng xǐ huan pī sà!",
     "Tone": "Happy, medium pitch",
     "Translation": "Tôi thích pizza hơn!",
     "ImportantMemoryEn": "I prefer pizza over other food.",
