@@ -97,6 +97,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
                 return;
             }
 
+            messageContainer.UsePinyinRubyOnTranslate = false;
             messageContainer.OnMessageSpeakerClicked = HandleSpeakerClicked;
             messageContainer.OnMessageSpeakerLongPressed = HandleSpeakerLongPressed;
             messageContainer.OnMessageTranslateClicked = HandleTranslateClicked;

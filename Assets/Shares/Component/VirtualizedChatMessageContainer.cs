@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System;
+using Share.Utils;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -19,6 +20,7 @@ namespace Share.Components
 
 		private const string TranslationSeparator = "---------------------";
 		private const string PinyinLabel = "Pinyin: ";
+		private const int RubyWrapHanCountPerLine = 7;
 
 		[SerializeField]
 		private RectTransform _viewport;
@@ -58,6 +60,18 @@ namespace Share.Components
 
 		[SerializeField]
 		private List<MessageBubbleData> _messages = new();
+
+		[SerializeField]
+		private bool _usePinyinRubyOnTranslate = true;
+
+		/// <summary>
+		/// Enables ruby-style pinyin rendering when translation is toggled.
+		/// </summary>
+		public bool UsePinyinRubyOnTranslate
+		{
+			get => _usePinyinRubyOnTranslate;
+			set => _usePinyinRubyOnTranslate = value;
+		}
 
 		private readonly List<MessageBubble> _characterPool = new();
 		private readonly List<MessageBubble> _userPool = new();
@@ -238,16 +252,43 @@ namespace Share.Components
 					continue;
 				}
 
+				var originalText = string.IsNullOrWhiteSpace(message.OriginalMessage)
+					? (message.Message ?? string.Empty)
+					: message.OriginalMessage;
+				var displayBaseText = BuildDisplayBaseText(message, originalText);
+
+				if (_usePinyinRubyOnTranslate)
+				{
+					if (message.IsTranslationExpanded)
+					{
+						message.Message = displayBaseText;
+						message.IsTranslationExpanded = false;
+					}
+					else
+					{
+						if (string.IsNullOrWhiteSpace(message.Pinyin))
+						{
+							break;
+						}
+
+						message.OriginalMessage = originalText;
+						message.Message = PinyinRichTextUtils.BuildWrappedInlineRuby(
+							displayBaseText,
+							message.Pinyin,
+							RubyWrapHanCountPerLine);
+						message.IsTranslationExpanded = true;
+					}
+
+					updated = true;
+					break;
+				}
+
 				var resolvedTranslation = string.IsNullOrWhiteSpace(translation) ? message.Translation : translation;
 				if (string.IsNullOrWhiteSpace(resolvedTranslation))
 				{
 					break;
 				}
 
-				var originalText = string.IsNullOrWhiteSpace(message.OriginalMessage)
-					? (message.Message ?? string.Empty)
-					: message.OriginalMessage;
-				var displayBaseText = BuildDisplayBaseText(message, originalText);
 				var pinyinLine = BuildPinyinLine(message.Pinyin);
 
 				if (message.IsTranslationExpanded)

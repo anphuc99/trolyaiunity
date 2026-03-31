@@ -181,7 +181,8 @@ namespace Share.Components
 
 			if (_translateButton != null)
 			{
-				_translateButton.interactable = !string.IsNullOrWhiteSpace(data.Translation);
+				_translateButton.interactable = !string.IsNullOrWhiteSpace(data.Translation)
+					|| !string.IsNullOrWhiteSpace(data.Pinyin);
 			}
 
 			ForceRebuild();
