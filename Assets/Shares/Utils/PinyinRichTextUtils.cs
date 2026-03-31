@@ -47,17 +47,6 @@ namespace Share.Utils
 			for (var i = 0; i < hanText.Length; i++)
 			{
 				var ch = hanText[i];
-				if (ch == '<')
-				{
-					var endIdx = hanText.IndexOf('>', i);
-					if (endIdx != -1)
-					{
-						builder.Append(hanText, i, endIdx - i + 1);
-						i = endIdx;
-						continue;
-					}
-				}
-
 				if (IsCjkIdeograph(ch) && syllableIndex < syllables.Length)
 				{
 					builder.Append(Prefix);
@@ -76,8 +65,9 @@ namespace Share.Utils
 
 		/// <summary>
 		/// Builds a two-line ruby block where pinyin is displayed above Han text and wraps every N Han characters.
+		/// Supports **word** vocab markers: characters inside markers are rendered with vocab link tags.
 		/// </summary>
-		/// <param name="hanText">Base Han text.</param>
+		/// <param name="hanText">Base Han text, optionally containing **vocab** markers.</param>
 		/// <param name="pinyin">Pinyin text.</param>
 		/// <param name="hanWrapCount">Maximum Han characters per row before wrapping.</param>
 		/// <returns>TMP rich text with pinyin and Han rows.</returns>
@@ -99,28 +89,19 @@ namespace Share.Utils
 				return hanText;
 			}
 
+			var cleanText = PreprocessVocabMarkers(hanText, out var charVocabMap);
+
 			var safeWrapCount = Math.Max(1, hanWrapCount);
-			var blockBuilder = new StringBuilder(hanText.Length * 16);
+			var blockBuilder = new StringBuilder(cleanText.Length * 16);
 			var pinyinLineBuilder = new StringBuilder();
 			var hanLineBuilder = new StringBuilder();
 			var rowColumnCount = 0;
 			var rowHanCount = 0;
 			var syllableIndex = 0;
 
-			for (var i = 0; i < hanText.Length; i++)
+			for (var i = 0; i < cleanText.Length; i++)
 			{
-				var ch = hanText[i];
-				if (ch == '<')
-				{
-					var endIdx = hanText.IndexOf('>', i);
-					if (endIdx != -1)
-					{
-						hanLineBuilder.Append(hanText, i, endIdx - i + 1);
-						i = endIdx;
-						continue;
-					}
-				}
-
+				var ch = cleanText[i];
 				if (ch == '\r')
 				{
 					continue;
@@ -157,7 +138,24 @@ namespace Share.Utils
 				}
 
 				pinyinLineBuilder.Append("<size=").Append(DefaultPinyinSize).Append('>').Append(ruby).Append("</size>");
-				hanLineBuilder.Append("<size=").Append(DefaultHanSize).Append('>').Append(EscapeTmpText(ch.ToString())).Append("</size>");
+
+				string vocabWord = null;
+				if (charVocabMap != null && i < charVocabMap.Length)
+				{
+					vocabWord = charVocabMap[i];
+				}
+
+				if (!string.IsNullOrEmpty(vocabWord))
+				{
+					hanLineBuilder.Append("<size=").Append(DefaultHanSize).Append("><u><link=\"vocab:")
+						.Append(EscapeTmpText(vocabWord)).Append("\">")
+						.Append(EscapeTmpText(ch.ToString()))
+						.Append("</link></u></size>");
+				}
+				else
+				{
+					hanLineBuilder.Append("<size=").Append(DefaultHanSize).Append('>').Append(EscapeTmpText(ch.ToString())).Append("</size>");
+				}
 
 				rowColumnCount++;
 				if (isHan)
@@ -168,6 +166,59 @@ namespace Share.Utils
 
 			FlushRubyRow(blockBuilder, pinyinLineBuilder, hanLineBuilder);
 			return blockBuilder.ToString();
+		}
+
+		/// <summary>
+		/// Strips **vocab** markers from input text and builds a parallel map of vocab words per character.
+		/// </summary>
+		/// <param name="text">Input text possibly containing **word** markers.</param>
+		/// <param name="charVocabMap">Output array parallel to the cleaned text. Each element is the full vocab word or null.</param>
+		/// <returns>Cleaned text without ** markers.</returns>
+		private static string PreprocessVocabMarkers(string text, out string[] charVocabMap)
+		{
+			charVocabMap = null;
+			if (string.IsNullOrEmpty(text) || !text.Contains("**"))
+			{
+				return text;
+			}
+
+			var clean = new StringBuilder(text.Length);
+			var vocabMap = new List<string>();
+			var inVocab = false;
+			var currentVocabChars = new StringBuilder();
+
+			for (var i = 0; i < text.Length; i++)
+			{
+				if (i + 1 < text.Length && text[i] == '*' && text[i + 1] == '*')
+				{
+					if (inVocab)
+					{
+						var word = currentVocabChars.ToString();
+						var startIdx = vocabMap.Count - word.Length;
+						for (var j = startIdx; j < vocabMap.Count; j++)
+						{
+							vocabMap[j] = word;
+						}
+
+						currentVocabChars.Clear();
+					}
+
+					inVocab = !inVocab;
+					i++;
+					continue;
+				}
+
+				clean.Append(text[i]);
+				vocabMap.Add(null);
+
+				if (inVocab)
+				{
+					currentVocabChars.Append(text[i]);
+				}
+			}
+
+			charVocabMap = vocabMap.ToArray();
+			return clean.ToString();
 		}
 
 		private static void FlushRubyRow(StringBuilder output, StringBuilder pinyinLine, StringBuilder hanLine)

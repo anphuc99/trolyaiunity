@@ -60,6 +60,8 @@ namespace Share.Components
 		[SerializeField]
 		private int _messageIndex = -1;
 
+		private string _rawVocabText;
+
 		/// <summary>
 		/// Unique message identifier.
 		/// </summary>
@@ -175,6 +177,15 @@ namespace Share.Components
 		{
 			get => _messageIndex;
 			set => _messageIndex = value;
+		}
+
+		/// <summary>
+		/// Raw message text with **vocab** markers preserved for ruby vocab link rendering.
+		/// </summary>
+		public string RawVocabText
+		{
+			get => _rawVocabText;
+			set => _rawVocabText = value;
 		}
 	}
 }

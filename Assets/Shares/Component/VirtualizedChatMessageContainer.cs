@@ -370,8 +370,11 @@ namespace Share.Components
 				return originalText ?? string.Empty;
 			}
 
+			var textForRuby = string.IsNullOrWhiteSpace(message.RawVocabText)
+				? (originalText ?? string.Empty)
+				: message.RawVocabText;
 			return PinyinRichTextUtils.BuildWrappedInlineRuby(
-				originalText ?? string.Empty,
+				textForRuby,
 				message.Pinyin,
 				RubyWrapHanCountPerLine);
 		}
