@@ -278,7 +278,8 @@ namespace Share.Components
 					{
 						message.OriginalMessage = originalText;
 						message.Translation = resolvedTranslation;
-						message.Message = resolvedTranslation;
+						var rubyText = BuildDefaultMessageText(message, displayBaseText);
+						message.Message = rubyText + "\n" + TranslationSeparator + "\n" + resolvedTranslation;
 						message.IsTranslationExpanded = true;
 					}
 
