@@ -34,8 +34,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -2.500002, y: 0}
-  m_SizeDelta: {x: -44.999996, y: -32}
+  m_AnchoredPosition: {x: -2.5, y: 0}
+  m_SizeDelta: {x: -45, y: -32}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &5995759063558207305
 CanvasRenderer:
@@ -65,7 +65,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "<voffset=1em><size=50%>n\u01D0</size></voffset>\u4F60 <voffset=1em><size=50%>h\u01CEo</size></voffset>\u597D"
+  m_text: "<size=15>shu\u01CEng</size><pos=0.8em><size=15>zhu\xE0ng</size><pos=1.6em><size=15>xi\xF3ng</size><pos=2.4em><size=15>ku\xE1ng</size><pos=3.2em><size=15>chu\xE0ng</size><pos=4.0em><size=15>shu\u0101ng</size><pos=4.8em><size=15>chu\xE1ng</size>\r\n<size=50>\u723D</size><pos=0.8em><size=50>\u58EE</size><pos=1.6em><size=50>\u718A</size><pos=2.4em><size=50>\u72C2</size><pos=3.2em><size=50>\u521B</size><pos=4.0em><size=50>\u53CC</size><pos=4.8em><size=50>\u5E8A</size>"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 90d0f0aa0083e11468fc51c804270ee9, type: 2}
   m_sharedMaterial: {fileID: 9117342012660586232, guid: 90d0f0aa0083e11468fc51c804270ee9, type: 2}
@@ -92,8 +92,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 50
-  m_fontSizeBase: 50
+  m_fontSize: 70
+  m_fontSizeBase: 70
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -102,7 +102,7 @@ MonoBehaviour:
   m_HorizontalAlignment: 8
   m_VerticalAlignment: 512
   m_textAlignment: 65535
-  m_characterSpacing: 0
+  m_characterSpacing: -6.99
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -665,7 +665,7 @@ RectTransform:
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: -130, y: -67.268005}
-  m_SizeDelta: {x: 243.56, y: 125.41}
+  m_SizeDelta: {x: 431.01, y: 126.12}
   m_Pivot: {x: 1, y: 1}
 --- !u!222 &2141540243989264569
 CanvasRenderer:

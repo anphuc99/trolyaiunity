@@ -1012,6 +1012,7 @@ MonoBehaviour:
   _intputChat: {fileID: 7818494230475252460}
   _recordButton: {fileID: 7841865889779862676}
   _sendButton: {fileID: 6475588344285969042}
+  _vocabPopupView: {fileID: 1083309277263548425}
 --- !u!82 &5874510021806240559
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1446,7 +1447,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 100
+  m_text: 
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 23d4654a79732b643af252b61d09dcb3, type: 2}
   m_sharedMaterial: {fileID: 2100000, guid: 002dd25578a059248a233b41213af979, type: 2}
@@ -1593,6 +1594,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7828023005727935853}
   - component: {fileID: 1153392362612066561}
+  - component: {fileID: 1083309277263548425}
   m_Layer: 5
   m_Name: PopupVocab
   m_TagString: Untagged
@@ -1629,6 +1631,28 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4088041445089977873}
   m_CullTransparentMesh: 1
+--- !u!114 &1083309277263548425
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4088041445089977873}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13813e99f8190824f9f4c3bf3a469d2f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _vocabText: {fileID: 5127546471887302504}
+  _pinyinText: {fileID: 8286789256581365226}
+  _meaningText: {fileID: 4322791608888374321}
+  _ratingAgainButton: {fileID: 5415453706034616804}
+  _ratingHardButton: {fileID: 7560245076362816292}
+  _ratingGoodButton: {fileID: 2537314140186236333}
+  _ratingEasyButton: {fileID: 5051495989746099091}
+  _closeButton: {fileID: 1232131765905518182}
+  _loadingIndicator: {fileID: 0}
+  _contentGroup: {fileID: 0}
 --- !u!1 &4335065415645590662
 GameObject:
   m_ObjectHideFlags: 0

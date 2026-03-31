@@ -60,6 +60,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[SerializeField]
 		private ChatPopupVocabView _vocabPopupView;
 
+		[SerializeField]
+		private TextMeshProUGUI _countVocabText;
+
 		/// <summary>
 		/// Regex to match **word** vocabulary markup in assistant text.
 		/// </summary>
