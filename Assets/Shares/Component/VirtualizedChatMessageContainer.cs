@@ -260,10 +260,10 @@ namespace Share.Components
 					? (message.Message ?? string.Empty)
 					: message.OriginalMessage;
 				var displayBaseText = BuildDisplayBaseText(message, originalText);
+				var resolvedTranslation = string.IsNullOrWhiteSpace(translation) ? message.Translation : translation;
 
 				if (_usePinyinRubyOnTranslate)
 				{
-					var resolvedTranslation = string.IsNullOrWhiteSpace(translation) ? message.Translation : translation;
 					if (string.IsNullOrWhiteSpace(resolvedTranslation))
 					{
 						break;
@@ -286,7 +286,6 @@ namespace Share.Components
 					break;
 				}
 
-				var resolvedTranslation = string.IsNullOrWhiteSpace(translation) ? message.Translation : translation;
 				if (string.IsNullOrWhiteSpace(resolvedTranslation))
 				{
 					break;
