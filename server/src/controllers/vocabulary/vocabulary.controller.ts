@@ -458,6 +458,15 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         return;
       }
 
+      const todayKey = toDateKey(new Date());
+      const nextReviewKey = toDateKey(reviewEntity.nextReviewDate);
+
+      if (nextReviewKey > todayKey) {
+        // Vocabulary is not yet due for review, ignore the rating but return success
+        response.json(serialiseReview(reviewEntity));
+        return;
+      }
+
       let history: ReviewHistoryEntry[] = [];
       try {
         history = JSON.parse(reviewEntity.reviewHistoryJson || "[]") as ReviewHistoryEntry[];
