@@ -95,8 +95,8 @@ const buildStyledPrompt = (text: string, tone?: string): string => {
     return text;
   }
 
-  // Rào trước để model không sinh ra bất kỳ ký tự text nào để phản hồi
-  return`[Tone: ${trimmedTone}]\n ${text}`;
+  console.log(`${trimmedTone}:\n${text}`)
+  return`${trimmedTone}:\n${text}`;
 };
 
 type GeminiInlineData = {
