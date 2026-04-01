@@ -801,31 +801,24 @@ export const createChatController = (
     // Lấy chuỗi ngày giờ hiện tại chuẩn GMT để so sánh
     const nowTime = Date.now();
 
-    // for (const item of remainingVocabulary) {
-    //   const normalizedItem = normalizeForComparison(item);
-    //   const vocabId = koreanToVocabId.get(normalizedItem);
+    for (const item of remainingVocabulary) {
+      const normalizedItem = normalizeForComparison(item);
+      const vocabId = koreanToVocabId.get(normalizedItem);
 
-    //   if (!vocabId) {
-    //     // Word not in vocabulary DB → new word
-    //     newWords.push(item);
-    //     continue;
-    //   }
+      if (!vocabId) {
+        // Word not in vocabulary DB → new word
+        newWords.push(item);
+        continue;
+      }
 
-    //   const review = reviewMap.get(vocabId);
-    //   if (!review) {
-    //     // In vocabulary DB but no review record → treat as due
-    //     dueForReview.push(item);
-    //     continue;
-    //   }
+      const review = reviewMap.get(vocabId);
+      if (!review) {
+        // In vocabulary DB but no review record → treat as due
+        continue;
+      }
 
-    //   // Check if the review date is less than or equal to current time
-    //   const nextReviewTime = new Date(review.nextReviewDate).getTime();
-    //   console.log(`[Review Check] Word: ${item}, NextReviewTime: ${nextReviewTime}, NowTime: ${nowTime}`);
-    //   if (nextReviewTime <= nowTime) {
-    //     dueForReview.push(item);
-    //   }
-    //   // else: not due yet → skip this word entirely to avoid forcing early review
-    // }
+      // else: not due yet → skip this word entirely to avoid forcing early review
+    }
 
     console.log("dueForReviewCount:", dueForReview.length);
     console.log("newWordsCount:", newWords.length);
