@@ -789,6 +789,8 @@ export const createChatController = (
       }
     }
 
+    console.log(`[Vocab] remainingVocabulary: ${remainingVocabulary.length}, vocabIdsInRemaining: ${vocabIdsInRemaining.length}`);
+
     // Batch-load reviews for all matched vocabulary items
     const reviewMap = new Map<string, VocabularyReviewEntity>();
     if (vocabIdsInRemaining.length > 0) {
@@ -826,7 +828,7 @@ export const createChatController = (
 
       // Check if the review date is less than or equal to current time
       const nextReviewTime = new Date(review.nextReviewDate).getTime();
-      console.log(nextReviewTime, nowTime);
+      console.log(`[Review Check] Word: ${item}, NextReviewTime: ${nextReviewTime}, NowTime: ${nowTime}`);
       if (nextReviewTime <= nowTime) {
         dueForReview.push(item);
       }
