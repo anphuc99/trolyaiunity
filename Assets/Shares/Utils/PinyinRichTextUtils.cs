@@ -13,6 +13,7 @@ namespace Share.Utils
 		private const string Prefix = "<voffset=1em><size=50%>";
 		private const string Suffix = "</size></voffset>";
 		private const float DefaultColumnStepEm = 0.8f;
+		private const float DefaultLatinColumnStepEm = 0.45f;
 		private const int DefaultPinyinSize = 25;
 		private const int DefaultHanSize = 50;
 
@@ -95,7 +96,7 @@ namespace Share.Utils
 			var blockBuilder = new StringBuilder(cleanText.Length * 16);
 			var pinyinLineBuilder = new StringBuilder();
 			var hanLineBuilder = new StringBuilder();
-			var rowColumnCount = 0;
+			var currentPositionEm = 0f;
 			var rowHanCount = 0;
 			var syllableIndex = 0;
 
@@ -110,57 +111,106 @@ namespace Share.Utils
 				if (ch == '\n')
 				{
 					FlushRubyRow(blockBuilder, pinyinLineBuilder, hanLineBuilder);
-					rowColumnCount = 0;
+					currentPositionEm = 0f;
 					rowHanCount = 0;
 					continue;
 				}
 
-				var isHan = IsCjkIdeograph(ch);
-				if (isHan && rowHanCount >= safeWrapCount)
+				if (IsCjkIdeograph(ch))
 				{
-					FlushRubyRow(blockBuilder, pinyinLineBuilder, hanLineBuilder);
-					rowColumnCount = 0;
-					rowHanCount = 0;
-				}
+					// Wrap before this Han character if the row is full.
+					if (rowHanCount >= safeWrapCount)
+					{
+						FlushRubyRow(blockBuilder, pinyinLineBuilder, hanLineBuilder);
+						currentPositionEm = 0f;
+						rowHanCount = 0;
+					}
 
-				if (rowColumnCount > 0)
-				{
-					var pos = (rowColumnCount * DefaultColumnStepEm).ToString("0.0", CultureInfo.InvariantCulture);
-					pinyinLineBuilder.Append("<pos=").Append(pos).Append("em>");
-					hanLineBuilder.Append("<pos=").Append(pos).Append("em>");
-				}
+					if (currentPositionEm > 0f)
+					{
+						var pos = currentPositionEm.ToString("0.0", CultureInfo.InvariantCulture);
+						pinyinLineBuilder.Append("<pos=").Append(pos).Append("em>");
+						hanLineBuilder.Append("<pos=").Append(pos).Append("em>");
+					}
 
-				var ruby = string.Empty;
-				if (isHan && syllableIndex < syllables.Length)
-				{
-					ruby = EscapeTmpText(syllables[syllableIndex]);
-					syllableIndex++;
-				}
+					var ruby = string.Empty;
+					if (syllableIndex < syllables.Length)
+					{
+						ruby = EscapeTmpText(syllables[syllableIndex]);
+						syllableIndex++;
+					}
 
-				pinyinLineBuilder.Append("<size=").Append(DefaultPinyinSize).Append('>').Append(ruby).Append("</size>");
+					pinyinLineBuilder.Append("<size=").Append(DefaultPinyinSize).Append('>').Append(ruby).Append("</size>");
 
-				string vocabWord = null;
-				if (charVocabMap != null && i < charVocabMap.Length)
-				{
-					vocabWord = charVocabMap[i];
-				}
+					string vocabWord = null;
+					if (charVocabMap != null && i < charVocabMap.Length)
+					{
+						vocabWord = charVocabMap[i];
+					}
 
-				if (!string.IsNullOrEmpty(vocabWord))
-				{
-					hanLineBuilder.Append("<size=").Append(DefaultHanSize).Append("><u><link=\"vocab:")
-						.Append(EscapeTmpText(vocabWord)).Append("\">")
-						.Append(EscapeTmpText(ch.ToString()))
-						.Append("</link></u></size>");
+					if (!string.IsNullOrEmpty(vocabWord))
+					{
+						hanLineBuilder.Append("<size=").Append(DefaultHanSize).Append("><u><link=\"vocab:")
+							.Append(EscapeTmpText(vocabWord)).Append("\">")
+							.Append(EscapeTmpText(ch.ToString()))
+							.Append("</link></u></size>");
+					}
+					else
+					{
+						hanLineBuilder.Append("<size=").Append(DefaultHanSize).Append('>').Append(EscapeTmpText(ch.ToString())).Append("</size>");
+					}
+
+					currentPositionEm += DefaultColumnStepEm;
+					rowHanCount++;
 				}
 				else
 				{
-					hanLineBuilder.Append("<size=").Append(DefaultHanSize).Append('>').Append(EscapeTmpText(ch.ToString())).Append("</size>");
-				}
+					// Group consecutive non-CJK, non-newline characters (Latin, digits, punctuation).
+					var groupStart = i;
+					while (i + 1 < cleanText.Length && !IsCjkIdeograph(cleanText[i + 1]) && cleanText[i + 1] != '\n' && cleanText[i + 1] != '\r')
+					{
+						i++;
+					}
 
-				rowColumnCount++;
-				if (isHan)
-				{
-					rowHanCount++;
+					var groupText = cleanText.Substring(groupStart, i - groupStart + 1);
+
+					if (currentPositionEm > 0f)
+					{
+						var pos = currentPositionEm.ToString("0.0", CultureInfo.InvariantCulture);
+						pinyinLineBuilder.Append("<pos=").Append(pos).Append("em>");
+						hanLineBuilder.Append("<pos=").Append(pos).Append("em>");
+					}
+
+					// No pinyin above non-CJK text.
+					pinyinLineBuilder.Append("<size=").Append(DefaultPinyinSize).Append("></size>");
+
+					// Check if the group carries a vocab marker.
+					string groupVocabWord = null;
+					if (charVocabMap != null)
+					{
+						for (var j = groupStart; j <= i && j < charVocabMap.Length; j++)
+						{
+							if (!string.IsNullOrEmpty(charVocabMap[j]))
+							{
+								groupVocabWord = charVocabMap[j];
+								break;
+							}
+						}
+					}
+
+					if (!string.IsNullOrEmpty(groupVocabWord))
+					{
+						hanLineBuilder.Append("<size=").Append(DefaultHanSize).Append("><u><link=\"vocab:")
+							.Append(EscapeTmpText(groupVocabWord)).Append("\">")
+							.Append(EscapeTmpText(groupText))
+							.Append("</link></u></size>");
+					}
+					else
+					{
+						hanLineBuilder.Append("<size=").Append(DefaultHanSize).Append('>').Append(EscapeTmpText(groupText)).Append("</size>");
+					}
+
+					currentPositionEm += EstimateNonHanGroupWidth(groupText);
 				}
 			}
 
@@ -304,6 +354,47 @@ namespace Share.Utils
 		private static bool IsPinyinSeparator(char ch)
 		{
 			return ch == '\'' || ch == '’' || ch == '-' || ch == '·';
+		}
+
+		/// <summary>
+		/// Estimates the column width of a group of non-CJK characters.
+		/// Full-width punctuation is counted at Han-character width; narrow characters at a smaller step.
+		/// </summary>
+		private static float EstimateNonHanGroupWidth(string text)
+		{
+			var width = 0f;
+			for (var i = 0; i < text.Length; i++)
+			{
+				width += IsFullWidthNonHanChar(text[i]) ? DefaultColumnStepEm : DefaultLatinColumnStepEm;
+			}
+
+			return width;
+		}
+
+		/// <summary>
+		/// Returns true for full-width non-ideograph characters such as CJK punctuation.
+		/// </summary>
+		private static bool IsFullWidthNonHanChar(char ch)
+		{
+			// CJK Symbols and Punctuation
+			if (ch >= 0x3000 && ch <= 0x303F)
+			{
+				return true;
+			}
+
+			// Fullwidth ASCII variants
+			if (ch >= 0xFF01 && ch <= 0xFF60)
+			{
+				return true;
+			}
+
+			// CJK Compatibility Forms
+			if (ch >= 0xFE30 && ch <= 0xFE4F)
+			{
+				return true;
+			}
+
+			return false;
 		}
 
 		private static bool IsCjkIdeograph(char ch)
