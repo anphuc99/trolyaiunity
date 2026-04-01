@@ -17,6 +17,7 @@ import { createVectorMemoryService, type VectorMemoryService } from "../../servi
 import { extractMemorySidecars, shouldStoreMemory, buildMemoryItemFromCandidate, stripMemorySidecar } from "../../services/memory-extraction.service.js";
 import { createMemoryRetrievalService, type MemoryRetrievalService } from "../../services/memory-retrieval.service.js";
 import { createCheapAIService } from "../../services/cheap-ai.service.js";
+import { VocabularyProducer } from "../../services/VocabularyProducer.js";
 
 interface ChatController {
   sendMessage: (request: Request, response: Response) => Promise<void>;
@@ -129,7 +130,7 @@ export const createChatController = (
   const learningPathRepository = dataSource.getRepository(LearningPathEntity);
   const vocabularyRepository = dataSource.getRepository(VocabularyEntity);
   const vocabularyReviewRepository = dataSource.getRepository(VocabularyReviewEntity);
-  
+
   // OpenAI configuration
   const openAIApiKey = process.env.OPENAI_API_KEY ?? "";
   const openAIModel = process.env.OPENAI_MODEL ?? "gpt-4.1-mini";
@@ -137,13 +138,13 @@ export const createChatController = (
   const openAIClient = openAIApiKey ? createOpenAIClient(openAIApiKey) : null;
   const openAIService =
     deps.openAIService ?? (openAIApiKey ? createOpenAIChatService({ apiKey: openAIApiKey, model: openAIModel, systemPromptPath }) : null);
-  
+
   // Gemini configuration
   const geminiApiKey = process.env.GOOGLE_API_KEY ?? "";
   const geminiModel = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
   const geminiService =
     deps.geminiService ?? (geminiApiKey ? createGeminiChatService({ apiKey: geminiApiKey, model: geminiModel }) : null);
-  
+
   const historyStore = deps.historyStore ?? createChatHistoryStore();
 
   // Long-term memory services (active only when CHROMA_URL is set)
@@ -793,38 +794,38 @@ export const createChatController = (
         reviewMap.set(r.vocabularyId, r);
       }
     }
-
-    const dueForReview: string[] = [];
+    const vocabProducer = new VocabularyProducer(dataSource);
+    const dueForReview: string[] = (await vocabProducer.getDueVocabularies(userId)).map((v) => v.korean);
     const newWords: string[] = [];
 
     // Lấy chuỗi ngày giờ hiện tại chuẩn GMT để so sánh
     const nowTime = Date.now();
 
-    for (const item of remainingVocabulary) {
-      const normalizedItem = normalizeForComparison(item);
-      const vocabId = koreanToVocabId.get(normalizedItem);
+    // for (const item of remainingVocabulary) {
+    //   const normalizedItem = normalizeForComparison(item);
+    //   const vocabId = koreanToVocabId.get(normalizedItem);
 
-      if (!vocabId) {
-        // Word not in vocabulary DB → new word
-        newWords.push(item);
-        continue;
-      }
+    //   if (!vocabId) {
+    //     // Word not in vocabulary DB → new word
+    //     newWords.push(item);
+    //     continue;
+    //   }
 
-      const review = reviewMap.get(vocabId);
-      if (!review) {
-        // In vocabulary DB but no review record → treat as due
-        dueForReview.push(item);
-        continue;
-      }
+    //   const review = reviewMap.get(vocabId);
+    //   if (!review) {
+    //     // In vocabulary DB but no review record → treat as due
+    //     dueForReview.push(item);
+    //     continue;
+    //   }
 
-      // Check if the review date is less than or equal to current time
-      const nextReviewTime = new Date(review.nextReviewDate).getTime();
-      console.log(`[Review Check] Word: ${item}, NextReviewTime: ${nextReviewTime}, NowTime: ${nowTime}`);
-      if (nextReviewTime <= nowTime) {
-        dueForReview.push(item);
-      }
-      // else: not due yet → skip this word entirely to avoid forcing early review
-    }
+    //   // Check if the review date is less than or equal to current time
+    //   const nextReviewTime = new Date(review.nextReviewDate).getTime();
+    //   console.log(`[Review Check] Word: ${item}, NextReviewTime: ${nextReviewTime}, NowTime: ${nowTime}`);
+    //   if (nextReviewTime <= nowTime) {
+    //     dueForReview.push(item);
+    //   }
+    //   // else: not due yet → skip this word entirely to avoid forcing early review
+    // }
 
     console.log("dueForReviewCount:", dueForReview.length);
     console.log("newWordsCount:", newWords.length);
@@ -842,9 +843,9 @@ export const createChatController = (
     // Priority selection: ONLY use new words to fill up the required count if due words are not enough.
     const shuffledDue = shuffleInPlace([...dueForReview]);
     const shuffledNew = shuffleInPlace([...newWords]);
-    
+
     let selected: string[] = [];
-    
+
     // Ưu tiên bốc hết các từ đến hạn (hoặc lấy đủ số lượng pickCount)
     if (shuffledDue.length >= pickCount) {
       selected = shuffledDue.slice(0, pickCount);
@@ -1304,8 +1305,8 @@ export const createChatController = (
       kind === "character_added"
         ? formatCharacterAddedMessage(payload)
         : kind === "character_removed"
-        ? formatCharacterRemovedMessage(payload)
-        : formatContextMessage(payload);
+          ? formatCharacterRemovedMessage(payload)
+          : formatContextMessage(payload);
 
     if (!content) {
       const message = kind === "context_update"
