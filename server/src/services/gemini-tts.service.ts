@@ -8,7 +8,7 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts";
+const GEMINI_TTS_MODEL = "gemini-2.5-pro-preview-tts";
 
 // ---------------------------------------------------------------------------
 // Round-robin key management
