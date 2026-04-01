@@ -13,6 +13,7 @@ using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Share.Components;
 
 namespace Features.GamePlay.SubFeatures.Journal.Controller
@@ -23,6 +24,8 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 	[Core.Infrastructure.Attributes.ControllerScope(Core.Infrastructure.Attributes.ControllerScopeKey.GamePlayGameplay)]
 	public static class JournalController
 	{
+		private static readonly Regex VocabMarkupRegex = new Regex(@"\*\*(.+?)\*\*", RegexOptions.Compiled);
+
 		/// <summary>
 		/// GlobalVariables key shared with JournalOverlay feature for passing selected journal IDs.
 		/// Must match <c>Features.JournalOverlay.Model.JournalOverlayGlobalKeys.SelectedJournalIds</c>.
@@ -143,6 +146,22 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 			_ = RequestMessageAudioInternalAsync(payload);
 		}
 
+		/// <summary>
+		/// Handles vocabulary word lookup from journal detail chat.
+		/// </summary>
+		/// <param name="payload">Lookup request payload with word.</param>
+		[Request(JournalRequests.LookupVocabulary)]
+		public static void HandleLookupVocabulary(JournalVocabLookupRequestPayload payload)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.Word))
+			{
+				PublishError("Missing word for vocabulary lookup.");
+				return;
+			}
+
+			_ = LookupVocabularyInternalAsync(payload);
+		}
+
 		// ==================================================================
 		// Playback handlers
 		// ==================================================================
@@ -245,24 +264,16 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 				for (int i = 0; i < messages.Count; i++)
 				{
 					var message = messages[i];
-					var isUser = message.CharacterName == "User";
-					var rawContent = message.Content ?? string.Empty;
-
-					// Apply vocab markup conversion for character messages so that
-					// **word** patterns are rendered as underlined TMP links in the view,
-					// matching the same rendering behaviour used by the Chat feature.
-					var displayMessage = isUser ? rawContent : VocabMarkupUtils.ConvertToRichText(rawContent);
-					var originalMessage = isUser ? rawContent : VocabMarkupUtils.StripMarkup(rawContent);
-
+					var rawMessage = message.Content ?? string.Empty;
 					messageBubbleDataList.Add(new MessageBubbleData
 					{
 						MessageId = message.Id,
-						Type = isUser ? MessageBubbleType.User : MessageBubbleType.Character,
+						Type = message.CharacterName == "User" ? MessageBubbleType.User : MessageBubbleType.Character,
 						SenderName = message.CharacterName,
-						Message = displayMessage,
-						OriginalMessage = originalMessage,
-						RawVocabText = isUser ? null : rawContent,
-						Avatar = GetAvatar(message.CharacterName),
+						Message = ConvertVocabMarkupToRichText(rawMessage),
+						OriginalMessage = StripVocabMarkup(rawMessage),
+						RawVocabText = rawMessage,
+						Avatar = GetAvatar(message.CharacterName), // Avatar can be set based on sender or other logic
 						Tone = message.Tone,
 						Translation = message.Translation,
 						Pinyin = message.Pinyin,
@@ -337,6 +348,46 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 			catch (Exception exception)
 			{
 				PublishError("Failed to load journal audio: " + exception.Message);
+			}
+		}
+
+		/// <summary>
+		/// Performs vocabulary lookup via API and publishes result to views.
+		/// </summary>
+		/// <param name="payload">Lookup request payload.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task LookupVocabularyInternalAsync(JournalVocabLookupRequestPayload payload)
+		{
+			try
+			{
+				var word = payload.Word.Trim();
+				var endpoint = NetworkEndpoints.VocabularyLookup + "?word=" + Uri.EscapeDataString(word);
+				var responseJson = await HttpClient.GetTaskAsync(endpoint);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					PublishError("Empty vocabulary lookup response.");
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<JournalVocabLookupResponsePayload>(responseJson);
+				if (response == null)
+				{
+					PublishError("Failed to parse vocabulary lookup response.");
+					return;
+				}
+
+				EventBus.Publish(JournalEvents.VocabLookupCompleted, new JournalVocabLookupResultPayload
+				{
+					Id = response.Id,
+					Word = response.Korean,
+					Vietnamese = response.Vietnamese,
+					Pinyin = response.Pinyin,
+					IsNew = response.IsNew,
+				});
+			}
+			catch (Exception exception)
+			{
+				PublishError("Failed to lookup vocabulary: " + exception.Message);
 			}
 		}
 
@@ -659,6 +710,30 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		{
 			var mode = GlobalVariables.GetOrDefault(GlobalModes.JournalApiModeKey, GlobalModes.ModeDefault);
 			return string.Equals(mode, GlobalModes.ModeMyLog, StringComparison.OrdinalIgnoreCase);
+		}
+
+		private static string ConvertVocabMarkupToRichText(string text)
+		{
+			if (string.IsNullOrEmpty(text))
+			{
+				return text;
+			}
+
+			return VocabMarkupRegex.Replace(text, match =>
+			{
+				var word = match.Groups[1].Value;
+				return "<u><link=\"vocab:" + word + "\">" + word + "</link></u>";
+			});
+		}
+
+		private static string StripVocabMarkup(string text)
+		{
+			if (string.IsNullOrEmpty(text))
+			{
+				return text;
+			}
+
+			return VocabMarkupRegex.Replace(text, "$1");
 		}
 	}
 }

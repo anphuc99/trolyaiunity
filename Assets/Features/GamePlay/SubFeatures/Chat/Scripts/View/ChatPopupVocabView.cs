@@ -27,6 +27,8 @@ public class ChatPopupVocabView : MonoBehaviour
     [SerializeField] private GameObject _loadingIndicator;
     [SerializeField] private GameObject _contentGroup;
 
+    [SerializeField] private bool _showRatingButtons = true;
+
     /// <summary>
     /// Stores the current vocabulary ID for review submission.
     /// </summary>
@@ -69,6 +71,8 @@ public class ChatPopupVocabView : MonoBehaviour
         {
             _closeButton.onClick.AddListener(Hide);
         }
+
+        SetRatingButtonsVisible(_showRatingButtons);
 
         gameObject.SetActive(false);
     }
@@ -158,25 +162,71 @@ public class ChatPopupVocabView : MonoBehaviour
             return;
         }
 
-        _currentVocabularyId = result.Id;
+        ShowResult(result.Id, result.Word, result.Pinyin, result.Vietnamese);
+    }
+
+    /// <summary>
+    /// Shows the result once the server lookup completes.
+    /// </summary>
+    /// <param name="id">Vocabulary id.</param>
+    /// <param name="word">Vocabulary word.</param>
+    /// <param name="pinyin">Pinyin value.</param>
+    /// <param name="meaning">Meaning/translation text.</param>
+    public void ShowResult(string id, string word, string pinyin, string meaning)
+    {
+        _currentVocabularyId = id;
 
         if (_vocabText != null)
         {
-            _vocabText.text = result.Word ?? string.Empty;
+            _vocabText.text = word ?? string.Empty;
         }
 
         if (_pinyinText != null)
         {
-            _pinyinText.text = result.Pinyin ?? string.Empty;
+            _pinyinText.text = pinyin ?? string.Empty;
         }
 
         if (_meaningText != null)
         {
-            _meaningText.text = result.Vietnamese ?? string.Empty;
+            _meaningText.text = meaning ?? string.Empty;
         }
 
         SetLoadingState(false);
-        SetRatingButtonsInteractable(true);
+        SetRatingButtonsInteractable(_showRatingButtons);
+    }
+
+    /// <summary>
+    /// Shows or hides the rating section.
+    /// </summary>
+    /// <param name="visible">Whether rating buttons are visible.</param>
+    public void SetRatingButtonsVisible(bool visible)
+    {
+        _showRatingButtons = visible;
+
+        if (_ratingAgainButton != null)
+        {
+            _ratingAgainButton.gameObject.SetActive(visible);
+        }
+
+        if (_ratingHardButton != null)
+        {
+            _ratingHardButton.gameObject.SetActive(visible);
+        }
+
+        if (_ratingGoodButton != null)
+        {
+            _ratingGoodButton.gameObject.SetActive(visible);
+        }
+
+        if (_ratingEasyButton != null)
+        {
+            _ratingEasyButton.gameObject.SetActive(visible);
+        }
+
+        if (!visible)
+        {
+            SetRatingButtonsInteractable(false);
+        }
     }
 
     /// <summary>

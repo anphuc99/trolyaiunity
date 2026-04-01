@@ -28,6 +28,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
         /// </summary>
         public Action<MessageBubbleData> OnSpeakerLongPressed { get; set; }
 
+        /// <summary>
+        /// Fired when a vocabulary link is clicked.
+        /// </summary>
+        public Action<string> OnVocabWordClicked { get; set; }
+
         private void OnEnable()
         {
             BindMessageHandlers();
@@ -97,10 +102,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
                 return;
             }
 
-            messageContainer.UsePinyinRubyOnTranslate = false;
+            messageContainer.UsePinyinRubyOnTranslate = true;
             messageContainer.OnMessageSpeakerClicked = HandleSpeakerClicked;
             messageContainer.OnMessageSpeakerLongPressed = HandleSpeakerLongPressed;
             messageContainer.OnMessageTranslateClicked = HandleTranslateClicked;
+            messageContainer.OnVocabWordClicked = HandleVocabWordClicked;
         }
 
         private void HandleSpeakerClicked(MessageBubbleData messageData)
@@ -126,6 +132,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
             }
 
             messageContainer.ToggleMessageTranslation(messageData);
+        }
+
+        private void HandleVocabWordClicked(string word)
+        {
+            OnVocabWordClicked?.Invoke(word);
         }
     }
 }

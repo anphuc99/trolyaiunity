@@ -623,6 +623,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			if (_vocabPopupView != null)
 			{
+				_vocabPopupView.SetRatingButtonsVisible(true);
 				_vocabPopupView.SetReviewCallback(HandleVocabReviewRequested);
 				_vocabPopupView.SetClosedCallback(HandleVocabPopupClosed);
 			}

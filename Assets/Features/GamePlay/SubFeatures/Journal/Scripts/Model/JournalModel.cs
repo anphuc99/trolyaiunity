@@ -240,6 +240,69 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 		public UnityEngine.AudioClip Clip { get; set; }
 	}
 
+	/// <summary>
+	/// Request payload for one vocabulary lookup.
+	/// </summary>
+	public sealed class JournalVocabLookupRequestPayload
+	{
+		/// <summary>
+		/// Vocabulary word to lookup.
+		/// </summary>
+		public string Word { get; set; }
+	}
+
+	/// <summary>
+	/// Raw response payload returned by the vocabulary lookup API.
+	/// </summary>
+	public sealed class JournalVocabLookupResponsePayload
+	{
+		[JsonProperty("id")]
+		public string Id { get; set; }
+
+		[JsonProperty("korean")]
+		public string Korean { get; set; }
+
+		[JsonProperty("vietnamese")]
+		public string Vietnamese { get; set; }
+
+		[JsonProperty("pinyin")]
+		public string Pinyin { get; set; }
+
+		[JsonProperty("isNew")]
+		public bool IsNew { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload for vocabulary lookup completion.
+	/// </summary>
+	public sealed class JournalVocabLookupResultPayload
+	{
+		/// <summary>
+		/// Vocabulary id.
+		/// </summary>
+		public string Id { get; set; }
+
+		/// <summary>
+		/// Vocabulary word.
+		/// </summary>
+		public string Word { get; set; }
+
+		/// <summary>
+		/// Vietnamese meaning.
+		/// </summary>
+		public string Vietnamese { get; set; }
+
+		/// <summary>
+		/// Pinyin spelling.
+		/// </summary>
+		public string Pinyin { get; set; }
+
+		/// <summary>
+		/// True when this word was newly created by server lookup.
+		/// </summary>
+		public bool IsNew { get; set; }
+	}
+
 	// ================================================================
 	// FSRS Journal Review payloads
 	// ================================================================

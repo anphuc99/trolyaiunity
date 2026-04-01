@@ -66,6 +66,9 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		[SerializeField]
 		private Button _downloadAudioButton;
 
+		[SerializeField]
+		private ChatPopupVocabView _vocabPopupView;
+
 		private readonly List<JournalItemView> _spawnedListItems = new List<JournalItemView>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
 		private const float AutoPlayNextMessageDelaySeconds = 1f;
@@ -202,6 +205,27 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		}
 
 		/// <summary>
+		/// Shows vocabulary lookup result in popup.
+		/// </summary>
+		/// <param name="payload">Lookup result payload.</param>
+		[OnEvent(JournalEvents.VocabLookupCompleted)]
+		private void OnVocabLookupCompleted(object payload)
+		{
+			if (payload is not JournalVocabLookupResultPayload result)
+			{
+				return;
+			}
+
+			EnsureVocabPopupBindings();
+			if (_vocabPopupView == null)
+			{
+				return;
+			}
+
+			_vocabPopupView.ShowResult(result.Id, result.Word, result.Pinyin, result.Vietnamese);
+		}
+
+		/// <summary>
 		/// Plays journal message audio when controller provides audio URL.
 		/// </summary>
 		/// <param name="payload">Audio playback payload.</param>
@@ -270,6 +294,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				_voiceAudioSource.Stop();
 			}
 
+			if (_vocabPopupView != null)
+			{
+				_vocabPopupView.Hide();
+			}
+
 			TryRestoreForegroundPlaybackMode();
 
 			gameObject.SetActive(false);
@@ -328,7 +357,51 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				_chatVariantRoot.callback = Callback;
 				_chatVariantRoot.OnSpeakerClicked = HandleMessageSpeakerClicked;
 				_chatVariantRoot.OnSpeakerLongPressed = HandleMessageSpeakerLongPressed;
+				_chatVariantRoot.OnVocabWordClicked = HandleVocabWordClicked;
 			}
+
+			EnsureVocabPopupBindings();
+		}
+
+		private void EnsureVocabPopupBindings()
+		{
+			if (_vocabPopupView == null && _chatVariantRoot != null)
+			{
+				_vocabPopupView = _chatVariantRoot.GetComponentInChildren<ChatPopupVocabView>(true);
+			}
+
+			if (_vocabPopupView == null)
+			{
+				_vocabPopupView = FindObjectOfType<ChatPopupVocabView>(true);
+			}
+
+			if (_vocabPopupView == null)
+			{
+				return;
+			}
+
+			_vocabPopupView.SetReviewCallback(null);
+			_vocabPopupView.SetClosedCallback(null);
+			_vocabPopupView.SetRatingButtonsVisible(false);
+		}
+
+		private void HandleVocabWordClicked(string word)
+		{
+			if (string.IsNullOrWhiteSpace(word))
+			{
+				return;
+			}
+
+			EnsureVocabPopupBindings();
+			if (_vocabPopupView != null)
+			{
+				_vocabPopupView.ShowLoading(word);
+			}
+
+			SendRequest(JournalRequests.LookupVocabulary, new JournalVocabLookupRequestPayload
+			{
+				Word = word
+			});
 		}
 
 		/// <summary>
