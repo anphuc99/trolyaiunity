@@ -1,5 +1,5 @@
-import { IncludeEnum, type Collection } from "chromadb";
-import { DefaultEmbeddingFunction } from "@chroma-core/default-embed";
+import { IncludeEnum, type Collection, type EmbeddingFunction } from "chromadb";
+import OpenAI from "openai";
 import crypto from "crypto";
 import { createChromaClient } from "./chroma-client.factory.js";
 
@@ -92,6 +92,23 @@ export const buildMemoryId = (userId: number, type: string, text: string): strin
 // Factory
 // ────────────────────────────────────────────────────────────────────────────
 
+class OpenAIEmbeddingFunction implements EmbeddingFunction {
+  private openai: OpenAI;
+  constructor() {
+    this.openai = new OpenAI();
+  }
+
+  public async generate(texts: string[]): Promise<number[][]> {
+    if (!texts || texts.length === 0) return [];
+    
+    const response = await this.openai.embeddings.create({
+      model: "text-embedding-3-small",
+      input: texts
+    });
+    return response.data.map((d) => d.embedding);
+  }
+}
+
 export interface VectorMemoryServiceConfig {
   /** ChromaDB server URL (e.g. "http://localhost:8000"). */
   chromaUrl: string;
@@ -107,9 +124,10 @@ export interface VectorMemoryServiceConfig {
  */
 export const createVectorMemoryService = (config: VectorMemoryServiceConfig): VectorMemoryService => {
   const client = createChromaClient(config.chromaUrl);
-  const collectionName = config.collectionName ?? "troly_memories";
+  // Important: Used a different collection name to avoid dimension mismatch with the old local model (384 vs 1536)
+  const collectionName = config.collectionName ?? "troly_memories_v2";
 
-  const embeddingFunction = new DefaultEmbeddingFunction();
+  const embeddingFunction = new OpenAIEmbeddingFunction();
   let collectionPromise: Promise<Collection> | null = null;
 
   /**
