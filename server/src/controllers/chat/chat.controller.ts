@@ -804,6 +804,9 @@ export const createChatController = (
     const dueForReview: string[] = [];
     const newWords: string[] = [];
 
+    // Lấy chuỗi ngày giờ hiện tại chuẩn GMT để so sánh
+    const nowTime = Date.now();
+
     for (const item of remainingVocabulary) {
       const normalizedItem = normalizeForComparison(item);
       const vocabId = koreanToVocabId.get(normalizedItem);
@@ -821,28 +824,40 @@ export const createChatController = (
         continue;
       }
 
-      // Compare nextReviewDate to current time (real-time, by second)
-      const nextReview = new Date(review.nextReviewDate);
-      if (nextReview.getTime() <= now.getTime()) {
+      // Check if the review date is less than or equal to current time
+      const nextReviewTime = new Date(review.nextReviewDate).getTime();
+      if (nextReviewTime <= nowTime) {
         dueForReview.push(item);
       }
-      // else: not due yet → skip this word
+      // else: not due yet → skip this word entirely to avoid forcing early review
     }
 
-    const eligible = [...dueForReview, ...newWords];
-    if (!eligible.length) {
+    const eligibleCount = dueForReview.length + newWords.length;
+    if (eligibleCount === 0) {
       return false;
     }
 
-    const maxPick = Math.min(5, eligible.length);
+    const maxPick = Math.min(5, eligibleCount);
     const minPick = Math.min(3, maxPick);
     const pickCount = randomIntInRange(minPick, maxPick);
 
-    // Priority selection: pick due-for-review first, then fill with new words
+    // Priority selection: ONLY use new words to fill up the required count if due words are not enough.
     const shuffledDue = shuffleInPlace([...dueForReview]);
     const shuffledNew = shuffleInPlace([...newWords]);
-    const prioritized = [...shuffledDue, ...shuffledNew];
-    const selected = prioritized.slice(0, pickCount);
+    
+    let selected: string[] = [];
+    
+    // Ưu tiên bốc hết các từ đến hạn (hoặc lấy đủ số lượng pickCount)
+    if (shuffledDue.length >= pickCount) {
+      selected = shuffledDue.slice(0, pickCount);
+    } else {
+      // Nếu từ đến hạn không đủ, lấy hết từ đến hạn và bốc bù thêm từ mới
+      const neededNewWords = pickCount - shuffledDue.length;
+      selected = [...shuffledDue, ...shuffledNew.slice(0, neededNewWords)];
+    }
+
+    // Shuffle lại lần cuối để từ mới và từ cũ xen kẽ nhau ngẫu nhiên
+    selected = shuffleInPlace(selected);
 
     const context = buildLearningPathVocabularyReminderContext(selected);
     const developerMessage = formatContextMessage({ context });
