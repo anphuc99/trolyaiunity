@@ -832,6 +832,10 @@ export const createChatController = (
       // else: not due yet → skip this word entirely to avoid forcing early review
     }
 
+    console.log("dueForReviewCount:", dueForReview.length);
+    console.log("newWordsCount:", newWords.length);
+
+
     const eligibleCount = dueForReview.length + newWords.length;
     if (eligibleCount === 0) {
       return false;
