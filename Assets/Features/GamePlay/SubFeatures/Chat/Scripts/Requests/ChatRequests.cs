@@ -23,5 +23,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Requests
 		public const string TranscribeAudio = "game.play.chat.transcribe.audio.request";
 		public const string LookupVocabulary = "game.play.chat.lookup.vocabulary.request";
 		public const string ReviewVocabulary = "game.play.chat.review.vocabulary.request";
+		public const string LoadVocabularyLearnedCount = "game.play.chat.load.vocabulary.learned.count.request";
 	}
 }

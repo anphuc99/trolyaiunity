@@ -339,6 +339,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			_ = ReviewVocabularyInternalAsync(payload);
 		}
 
+		/// <summary>
+		/// Loads learned vocabulary count for chat header display.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[Request(ChatRequests.LoadVocabularyLearnedCount)]
+		public static void HandleLoadVocabularyLearnedCount(object payload)
+		{
+			_ = LoadVocabularyLearnedCountInternalAsync();
+		}
+
 		private static void RegisterAddCharacterMenu()
 		{
 			UnregisterAddCharacterMenu();
@@ -1107,6 +1117,45 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
 				{
 					Message = "Failed to review vocabulary: " + exception.Message
+				});
+			}
+		}
+
+		/// <summary>
+		/// Loads learned vocabulary count via API and publishes result to views.
+		/// </summary>
+		/// <returns>Awaitable task.</returns>
+		private static async Task LoadVocabularyLearnedCountInternalAsync()
+		{
+			try
+			{
+				var responseJson = await HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyLearnedCount);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = "Empty vocabulary learned-count response."
+					});
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<ChatVocabCountPayload>(responseJson);
+				if (response == null)
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = "Failed to parse vocabulary learned-count response."
+					});
+					return;
+				}
+
+				EventBus.Publish(ChatEvents.VocabularyLearnedCountLoaded, response);
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to load learned vocabulary count: " + exception.Message
 				});
 			}
 		}

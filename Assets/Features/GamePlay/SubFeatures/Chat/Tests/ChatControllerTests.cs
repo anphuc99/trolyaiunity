@@ -380,6 +380,32 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 			Assert.IsFalse(resultPayload.IsNew);
 		}
 
+		[UnityTest]
+		public System.Collections.IEnumerator LoadVocabularyLearnedCount_ShouldPublishCount_WhenServerReturnsData()
+		{
+			ChatVocabCountPayload countPayload = null;
+			void Handler(object payload)
+			{
+				countPayload = payload as ChatVocabCountPayload;
+			}
+
+			FakeServer.Register("GET", NetworkEndpoints.VocabularyLearnedCount, _ => "{\"count\":7}");
+
+			EventBus.Subscribe(ChatEvents.VocabularyLearnedCountLoaded, Handler);
+			try
+			{
+				ChatController.HandleLoadVocabularyLearnedCount(null);
+				yield return AwaitTask(Task.Delay(100));
+			}
+			finally
+			{
+				EventBus.Unsubscribe(ChatEvents.VocabularyLearnedCountLoaded, Handler);
+			}
+
+			Assert.IsNotNull(countPayload);
+			Assert.AreEqual(7, countPayload.Count);
+		}
+
 		private static System.Collections.IEnumerator AwaitTask(Task task)
 		{
 			while (!task.IsCompleted)

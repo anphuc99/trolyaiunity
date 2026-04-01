@@ -1039,6 +1039,18 @@ List vocabularies with review + memory.
 }
 ```
 
+### GET /api/vocabulary/learned-count
+
+Count words that were actually reviewed at least once.
+
+- Response `200`:
+
+```json
+{
+  "count": 7
+}
+```
+
 ### GET /api/vocabulary/due
 
 Get vocabularies due today.

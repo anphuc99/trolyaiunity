@@ -38,6 +38,11 @@ public class ChatPopupVocabView : MonoBehaviour
     /// </summary>
     private System.Action<ChatVocabReviewRequestPayload> _onReviewRequested;
 
+    /// <summary>
+    /// Callback invoked whenever popup is closed.
+    /// </summary>
+    private System.Action _onClosed;
+
     private void Awake()
     {
         if (_ratingAgainButton != null)
@@ -106,6 +111,15 @@ public class ChatPopupVocabView : MonoBehaviour
     }
 
     /// <summary>
+    /// Registers callback fired when popup closes.
+    /// </summary>
+    /// <param name="onClosed">Close callback.</param>
+    public void SetClosedCallback(System.Action onClosed)
+    {
+        _onClosed = onClosed;
+    }
+
+    /// <summary>
     /// Shows the popup in a loading state while waiting for server lookup.
     /// </summary>
     /// <param name="word">Chinese word being looked up.</param>
@@ -170,8 +184,14 @@ public class ChatPopupVocabView : MonoBehaviour
     /// </summary>
     public void Hide()
     {
+        var wasVisible = gameObject.activeSelf;
         _currentVocabularyId = null;
         gameObject.SetActive(false);
+
+        if (wasVisible)
+        {
+            _onClosed?.Invoke();
+        }
     }
 
     /// <summary>

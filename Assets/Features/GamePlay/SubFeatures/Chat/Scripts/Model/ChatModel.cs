@@ -641,4 +641,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		public bool IsNew { get; set; }
 	}
+
+	/// <summary>
+	/// Response payload for learned vocabulary count.
+	/// </summary>
+	public sealed class ChatVocabCountPayload
+	{
+		/// <summary>
+		/// Number of words reviewed at least once.
+		/// </summary>
+		[JsonProperty("count")]
+		public int Count { get; set; }
+	}
 }

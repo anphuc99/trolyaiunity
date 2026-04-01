@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import type { DataSource, Repository } from "typeorm";
+import { IsNull, Not, type DataSource, type Repository } from "typeorm";
 import VocabularyEntity from "../../models/vocabulary.entity.js";
 import VocabularyReviewEntity from "../../models/vocabulary-review.entity.js";
 import VocabularyMemoryEntity from "../../models/vocabulary-memory.entity.js";
@@ -20,6 +20,7 @@ interface VocabularyController {
   updateVocabulary: (request: Request, response: Response) => Promise<void>;
   deleteVocabulary: (request: Request, response: Response) => Promise<void>;
   reviewVocabulary: (request: Request, response: Response) => Promise<void>;
+  getLearnedCount: (request: Request, response: Response) => Promise<void>;
   getDueReviews: (request: Request, response: Response) => Promise<void>;
   getStats: (request: Request, response: Response) => Promise<void>;
   saveMemory: (request: Request, response: Response) => Promise<void>;
@@ -499,6 +500,32 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   };
 
   // ──────────────────────────────────────────────────────────────────────────
+  // Count vocabularies that were actually reviewed at least once.
+  // ──────────────────────────────────────────────────────────────────────────
+  const getLearnedCount: VocabularyController["getLearnedCount"] = async (request, response) => {
+    const userId = request.user?.id;
+
+    if (!userId) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    try {
+      const count = await reviewRepo.count({
+        where: {
+          userId,
+          lastReviewDate: Not(IsNull())
+        }
+      });
+
+      response.json({ count });
+    } catch (error) {
+      console.error("Failed to get learned vocabulary count.", error);
+      response.status(500).json({ message: "Failed to get learned vocabulary count" });
+    }
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
   // Get vocabularies due for review today.
   // ──────────────────────────────────────────────────────────────────────────
   const getDueReviews: VocabularyController["getDueReviews"] = async (request, response) => {
@@ -895,6 +922,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     updateVocabulary,
     deleteVocabulary,
     reviewVocabulary,
+    getLearnedCount,
     getDueReviews,
     getStats,
     saveMemory,

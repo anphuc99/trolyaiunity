@@ -204,12 +204,21 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		}
 
 		/// <summary>
+		/// Requests learned vocabulary count from server.
+		/// </summary>
+		public void RefreshVocabularyLearnedCount()
+		{
+			SendRequest(ChatRequests.LoadVocabularyLearnedCount);
+		}
+
+		/// <summary>
 		/// Called when view is enabled and scope is active.
 		/// </summary>
 		protected override void OnEnabled()
 		{
 			EnsureDependencies();
 			RefreshHistory();
+			RefreshVocabularyLearnedCount();
 			BindInputFieldEvents();
 		}
 
@@ -224,6 +233,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			EnsureDependencies();
 			SendRequest(ChatRequests.LoadDeveloperState);
 			RefreshHistory();
+			RefreshVocabularyLearnedCount();
 		}
 
 		/// <summary>
@@ -614,6 +624,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_vocabPopupView != null)
 			{
 				_vocabPopupView.SetReviewCallback(HandleVocabReviewRequested);
+				_vocabPopupView.SetClosedCallback(HandleVocabPopupClosed);
 			}
 
 			if (_recordButton != null)
@@ -1292,6 +1303,31 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				_vocabPopupView.Hide();
 			}
+		}
+
+		/// <summary>
+		/// Handles learned vocabulary count loaded from controller.
+		/// </summary>
+		/// <param name="payload">Count payload.</param>
+		[OnEvent(ChatEvents.VocabularyLearnedCountLoaded)]
+		private void OnVocabularyLearnedCountLoaded(object payload)
+		{
+			var countPayload = payload as ChatVocabCountPayload;
+			if (_countVocabText == null)
+			{
+				return;
+			}
+
+			var count = countPayload != null ? Mathf.Max(0, countPayload.Count) : 0;
+			_countVocabText.text = count.ToString();
+		}
+
+		/// <summary>
+		/// Re-loads learned vocabulary count after popup closes.
+		/// </summary>
+		private void HandleVocabPopupClosed()
+		{
+			RefreshVocabularyLearnedCount();
 		}
 
 		/// <summary>
