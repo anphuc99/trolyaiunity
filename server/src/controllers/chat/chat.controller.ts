@@ -74,6 +74,14 @@ interface JsonReplyResult {
 const MAX_AUDIO_BYTES = 12 * 1024 * 1024;
 const DEFAULT_TRANSCRIBE_LANGUAGE = "zh";
 const LEARNING_PATH_VOCAB_REMINDER_MARKER = "LearningPathVocabularyReminder: true";
+const STOP_VOCAB_REMINDER_MARKER = "LearningPathVocabularyStop: true";
+
+const buildLearningPathVocabularyStopContext = () => {
+  return [
+    STOP_VOCAB_REMINDER_MARKER,
+    "You have successfully used the vocabulary. For the next few turns, please STOP forcing vocabulary words, STOP highlighting words with double asterisks **, and respond completely naturally to the user."
+  ].join("\n");
+};
 
 /**
  * Parses a base64 audio data URL and extracts mime type + binary buffer.
@@ -667,7 +675,7 @@ export const createChatController = (
     return [
       LEARNING_PATH_VOCAB_REMINDER_MARKER,
       "Learning path vocabulary reminder:",
-      "Please try to naturally use these vocabulary items in your next reply.",
+      "Please try to naturally use these vocabulary items in your NEXT reply.",
       "IMPORTANT: When you use any of these vocabulary words in the Text field, wrap ONLY the vocabulary word itself with double asterisks **. For example, if the word is 爱, write 我**爱**你. Do NOT wrap non-vocabulary words.",
       ...vocabularyItems.map((item, index) => `${index + 1}. ${item}`),
       "Keep the dialogue natural and relevant to the current learning path context."
@@ -727,14 +735,20 @@ export const createChatController = (
 
     // Find last vocabulary reminder in history
     let lastReminderIndex = -1;
+    let lastStopIndex = -1;
     for (let i = history.length - 1; i >= 0; i -= 1) {
       const message = history[i];
       if (message.role !== "developer") {
         continue;
       }
 
-      if (message.content.includes(LEARNING_PATH_VOCAB_REMINDER_MARKER)) {
+      if (lastReminderIndex === -1 && message.content.includes(LEARNING_PATH_VOCAB_REMINDER_MARKER)) {
         lastReminderIndex = i;
+      }
+      if (lastStopIndex === -1 && message.content.includes(STOP_VOCAB_REMINDER_MARKER)) {
+        lastStopIndex = i;
+      }
+      if (lastReminderIndex !== -1 && lastStopIndex !== -1) {
         break;
       }
     }
@@ -748,6 +762,14 @@ export const createChatController = (
     }
 
     if (!shouldInjectLearningPathVocabularyReminder(userMessagesSinceLastReminder)) {
+      if (lastReminderIndex > lastStopIndex && userMessagesSinceLastReminder >= 2) {
+        const context = buildLearningPathVocabularyStopContext();
+        const developerMessage = formatContextMessage({ context });
+        if (developerMessage) {
+          await historyStore.append(userId, [{ role: "developer", content: developerMessage }]);
+          return true;
+        }
+      }
       return false;
     }
 
