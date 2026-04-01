@@ -245,14 +245,24 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 				for (int i = 0; i < messages.Count; i++)
 				{
 					var message = messages[i];
+					var isUser = message.CharacterName == "User";
+					var rawContent = message.Content ?? string.Empty;
+
+					// Apply vocab markup conversion for character messages so that
+					// **word** patterns are rendered as underlined TMP links in the view,
+					// matching the same rendering behaviour used by the Chat feature.
+					var displayMessage = isUser ? rawContent : VocabMarkupUtils.ConvertToRichText(rawContent);
+					var originalMessage = isUser ? rawContent : VocabMarkupUtils.StripMarkup(rawContent);
+
 					messageBubbleDataList.Add(new MessageBubbleData
 					{
 						MessageId = message.Id,
-						Type = message.CharacterName == "User" ? MessageBubbleType.User : MessageBubbleType.Character,
+						Type = isUser ? MessageBubbleType.User : MessageBubbleType.Character,
 						SenderName = message.CharacterName,
-						Message = message.Content,
-						OriginalMessage = message.Content,
-						Avatar = GetAvatar(message.CharacterName), // Avatar can be set based on sender or other logic
+						Message = displayMessage,
+						OriginalMessage = originalMessage,
+						RawVocabText = isUser ? null : rawContent,
+						Avatar = GetAvatar(message.CharacterName),
 						Tone = message.Tone,
 						Translation = message.Translation,
 						Pinyin = message.Pinyin,
