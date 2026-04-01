@@ -826,6 +826,7 @@ export const createChatController = (
 
       // Check if the review date is less than or equal to current time
       const nextReviewTime = new Date(review.nextReviewDate).getTime();
+      console.log(nextReviewTime, nowTime);
       if (nextReviewTime <= nowTime) {
         dueForReview.push(item);
       }
