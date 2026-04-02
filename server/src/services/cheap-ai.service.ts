@@ -84,6 +84,22 @@ export interface CheapAIService {
    * @returns Object with pinyin and vietnamese fields.
    */
   translateVocabulary: (word: string) => Promise<VocabularyTranslation>;
+
+  /**
+   * Converts Chinese text into Mandarin pinyin (tone marks).
+   *
+   * @param text - Chinese text to convert.
+   * @returns Pinyin text.
+   */
+  transliterateChineseToPinyin: (text: string) => Promise<string>;
+
+  /**
+   * Converts Chinese text into IPA pronunciation.
+   *
+   * @param text - Chinese text to convert.
+   * @returns IPA text.
+   */
+  transliterateChineseToIpa: (text: string) => Promise<string>;
 }
 
 /** Output of translateVocabulary. */
@@ -244,6 +260,38 @@ Output: {"pinyin": "ài", "vietnamese": "yêu"}
 Example:
 Input: 你好
 Output: {"pinyin": "nǐ hǎo", "vietnamese": "xin chào"}`;
+
+const CHINESE_TO_PINYIN_PROMPT = `You are a Mandarin pronunciation converter.
+
+Convert Chinese text into pinyin with tone marks.
+
+Rules:
+- Output ONLY valid JSON with one field: "text".
+- Convert all Chinese Hanzi into pinyin with tone marks.
+- Keep punctuation and sentence boundaries.
+- Keep non-Chinese tokens unchanged.
+- Separate pinyin syllables with spaces.
+- No markdown, no explanation, no extra fields.
+
+Example:
+Input: 你好，我叫米米。
+Output: {"text": "nǐ hǎo, wǒ jiào mǐ mǐ."}`;
+
+const CHINESE_TO_IPA_PROMPT = `You are a Mandarin IPA converter.
+
+Convert Chinese text into broad IPA pronunciation for Mandarin Chinese.
+
+Rules:
+- Output ONLY valid JSON with one field: "text".
+- Convert all Chinese Hanzi into IPA.
+- Keep punctuation and sentence boundaries.
+- Keep non-Chinese tokens unchanged.
+- Use standard IPA symbols for Mandarin.
+- No markdown, no explanation, no extra fields.
+
+Example:
+Input: 你好，我叫米米。
+Output: {"text": "ni˨˩˦ xɑʊ˨˩˦, wɔ˨˩˦ tɕjɑʊ˥˩ mi˨˩˦ mi˨˩˦."}`;
 
 // ────────────────────────────────────────────────────────────────────────────
 // Factory
@@ -443,12 +491,42 @@ export const createCheapAIService = (config: CheapAIServiceConfig = {}): CheapAI
     };
   };
 
+  /**
+   * Converts Chinese text into pinyin with tone marks.
+   */
+  const transliterateChineseToPinyin: CheapAIService["transliterateChineseToPinyin"] = async (text) => {
+    const generativeModel = genAI.getGenerativeModel({ model });
+    const prompt = `${CHINESE_TO_PINYIN_PROMPT}\n\nInput: ${text}\n\nOutput:`;
+
+    const result = await generativeModel.generateContent(prompt);
+    const rawText = result.response.text().trim();
+    const jsonText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    const parsed = JSON.parse(jsonText) as { text?: string };
+    return typeof parsed.text === "string" ? parsed.text.trim() : "";
+  };
+
+  /**
+   * Converts Chinese text into IPA pronunciation.
+   */
+  const transliterateChineseToIpa: CheapAIService["transliterateChineseToIpa"] = async (text) => {
+    const generativeModel = genAI.getGenerativeModel({ model });
+    const prompt = `${CHINESE_TO_IPA_PROMPT}\n\nInput: ${text}\n\nOutput:`;
+
+    const result = await generativeModel.generateContent(prompt);
+    const rawText = result.response.text().trim();
+    const jsonText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    const parsed = JSON.parse(jsonText) as { text?: string };
+    return typeof parsed.text === "string" ? parsed.text.trim() : "";
+  };
+
   return {
     rewriteRetrievalIntents,
     compressMemoryBrief,
     summarizeSessionImpact,
     generateDecisionQueries,
     evaluateRelationshipUpdate,
-    translateVocabulary
+    translateVocabulary,
+    transliterateChineseToPinyin,
+    transliterateChineseToIpa
   };
 };
