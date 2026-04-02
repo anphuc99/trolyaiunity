@@ -121,6 +121,31 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
+		/// Checks whether current scene has at least one available character.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		/// <returns>True when at least one non-empty character name exists in parent cache.</returns>
+		[Request(ChatRequests.HasAnySceneCharacter)]
+		public static bool HandleHasAnySceneCharacter(object payload)
+		{
+			var names = ChatState.ParentSignals?.GetCharacterNames?.Invoke();
+			if (names == null || names.Count == 0)
+			{
+				return false;
+			}
+
+			for (var i = 0; i < names.Count; i++)
+			{
+				if (!string.IsNullOrWhiteSpace(names[i]))
+				{
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		/// <summary>
 		/// Requests one assistant reply from current history without appending a user message.
 		/// </summary>
 		/// <param name="payload">Optional payload for session/model/story context.</param>

@@ -137,6 +137,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
+			if (!HasAnySceneCharacter())
+			{
+				Debug.LogWarning("[ChatView] Chat is blocked because scene has no characters.", this);
+				return;
+			}
+
 			if (_messageContainer == null)
 			{
 				return;
@@ -694,6 +700,15 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 		}
 
+		/// <summary>
+		/// Checks whether scene currently contains at least one chat character.
+		/// </summary>
+		/// <returns>True when at least one character exists in scene.</returns>
+		private bool HasAnySceneCharacter()
+		{
+			return SendRequest<bool>(ChatRequests.HasAnySceneCharacter);
+		}
+
 		private void BindInputFieldEvents()
 		{
 			if (_inputField == null)
@@ -745,6 +760,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			if (_isCharacterResponding || _isTranscribingVoice)
 			{
+				return;
+			}
+
+			if (!_isRecordingVoice && !HasAnySceneCharacter())
+			{
+				Debug.LogWarning("[ChatView] Voice chat is blocked because scene has no characters.", this);
 				return;
 			}
 
