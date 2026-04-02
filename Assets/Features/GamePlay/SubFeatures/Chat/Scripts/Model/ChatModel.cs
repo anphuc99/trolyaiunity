@@ -328,6 +328,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		public UnityEngine.AudioClip AudioClip { get; set; }
 
 		/// <summary>
+		/// Indicates whether controller has finished attempting TTS preload for this turn.
+		/// </summary>
+		[JsonIgnore]
+		public bool IsAudioPreloadCompleted { get; set; }
+
+		/// <summary>
 		/// Transcription of user audio when an audio recording was sent.
 		/// </summary>
 		[JsonProperty("Transcribe")]

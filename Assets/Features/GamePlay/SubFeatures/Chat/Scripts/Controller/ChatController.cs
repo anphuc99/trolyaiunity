@@ -748,7 +748,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				}
 
 				var turns = ParseAssistantTurns(response.Reply);
-				await PreResolveTtsAudioUrlsAsync(turns);
 
 				EventBus.Publish(ChatEvents.MessageReceived, new ChatAssistantMessagePayload
 				{
@@ -758,6 +757,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					Turns = turns,
 					Transcribe = response.Transcribe,
 				});
+
+				_ = PreResolveTtsAudioUrlsAsync(turns);
 			}
 			catch (Exception exception)
 			{
@@ -798,7 +799,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				}
 
 				var turns = ParseAssistantTurns(response.Reply);
-				await PreResolveTtsAudioUrlsAsync(turns);
 
 				EventBus.Publish(ChatEvents.MessageReceived, new ChatAssistantMessagePayload
 				{
@@ -807,6 +807,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					SessionId = payload?.SessionId,
 					Turns = turns,
 				});
+
+				_ = PreResolveTtsAudioUrlsAsync(turns);
 			}
 			catch (Exception exception)
 			{
@@ -932,20 +934,36 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			for (var i = 0; i < turns.Count; i++)
 			{
 				var turn = turns[i];
-				if (turn == null || string.IsNullOrWhiteSpace(turn.Text))
+				if (turn == null)
 				{
 					continue;
 				}
 
-				var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
-				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? "neutral" : turn.Tone.Trim();
-				var cleanText = VocabMarkupRegex.Replace(turn.Text, "$1");
-				turn.AudioUrl = await ResolveTtsAudioUrlAsync(cleanText, tone, characterName);
-
-				if (!string.IsNullOrWhiteSpace(turn.AudioUrl))
+				try
 				{
-					var audioType = AudioUrlUtils.ResolveAudioType(turn.AudioUrl);
-					turn.AudioClip = await HttpClient.DownloadAudioClipTaskAsync(turn.AudioUrl, audioType);
+					if (string.IsNullOrWhiteSpace(turn.Text))
+					{
+						continue;
+					}
+
+					var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
+					var tone = string.IsNullOrWhiteSpace(turn.Tone) ? "neutral" : turn.Tone.Trim();
+					var cleanText = VocabMarkupRegex.Replace(turn.Text, "$1");
+					turn.AudioUrl = await ResolveTtsAudioUrlAsync(cleanText, tone, characterName);
+
+					if (!string.IsNullOrWhiteSpace(turn.AudioUrl))
+					{
+						var audioType = AudioUrlUtils.ResolveAudioType(turn.AudioUrl);
+						turn.AudioClip = await HttpClient.DownloadAudioClipTaskAsync(turn.AudioUrl, audioType);
+					}
+				}
+				catch (Exception exception)
+				{
+					Debug.LogWarning("[ChatController] Failed to preload turn audio: " + exception.Message);
+				}
+				finally
+				{
+					turn.IsAudioPreloadCompleted = true;
 				}
 			}
 		}

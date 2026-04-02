@@ -520,6 +520,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				});
 				ScrollMessagesToBottom();
 
+				while (turn.AudioClip == null && !turn.IsAudioPreloadCompleted)
+				{
+					yield return null;
+				}
+
 				if (turn.AudioClip != null)
 				{
 					yield return StartCoroutine(PlayCharacterVoiceAsync(turn.AudioClip));
