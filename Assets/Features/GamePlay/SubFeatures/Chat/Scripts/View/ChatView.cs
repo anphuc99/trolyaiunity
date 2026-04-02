@@ -505,6 +505,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? DefaultTtsTone : turn.Tone.Trim();
 
+				// Wait until this turn finishes preload so text is displayed together with ready audio.
+				while (turn.AudioClip == null && !turn.IsAudioPreloadCompleted)
+				{
+					yield return null;
+				}
+
 				_messageContainer.AddNewMessage(new MessageBubbleData
 				{
 					MessageId = string.IsNullOrWhiteSpace(turn.MessageId) ? Guid.NewGuid().ToString("N") : turn.MessageId,
@@ -519,11 +525,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, characterName),
 				});
 				ScrollMessagesToBottom();
-
-				while (turn.AudioClip == null && !turn.IsAudioPreloadCompleted)
-				{
-					yield return null;
-				}
 
 				if (turn.AudioClip != null)
 				{
