@@ -1013,6 +1013,7 @@ MonoBehaviour:
   _recordButton: {fileID: 7841865889779862676}
   _sendButton: {fileID: 6475588344285969042}
   _vocabPopupView: {fileID: 1083309277263548425}
+  _countVocabText: {fileID: 1038474526089680237}
 --- !u!82 &5874510021806240559
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1881,6 +1882,7 @@ MonoBehaviour:
   _contentPaddingBottom: 15
   _maxSpawnedObjects: 12
   _messages: []
+  _usePinyinRubyOnTranslate: 1
 --- !u!222 &7452891467743004282
 CanvasRenderer:
   m_ObjectHideFlags: 0
