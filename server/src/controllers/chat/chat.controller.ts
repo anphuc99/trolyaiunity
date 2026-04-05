@@ -684,16 +684,16 @@ export const createChatController = (
   };
 
   const shouldInjectLearningPathVocabularyReminder = (userMessagesSinceLastReminder: number) => {
-    if (userMessagesSinceLastReminder < 2) {
+    if (userMessagesSinceLastReminder < 3) {
       return false;
     }
 
-    if (userMessagesSinceLastReminder >= 3) {
+    if (userMessagesSinceLastReminder >= 5) {
       return true;
     }
 
-    // userMessagesSinceLastReminder === 2
-    return Math.random() < 1 / 2;
+    const chance = userMessagesSinceLastReminder === 3 ? 1 / 3 : 1 / 2;
+    return Math.random() < chance;
   };
 
   const maybeInjectLearningPathVocabularyReminder = async (
