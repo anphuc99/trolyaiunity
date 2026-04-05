@@ -97,7 +97,7 @@ const buildStyledPrompt = (text: string, tone?: string): string => {
     return text;
   }
 
-  return `Read Pinyin chinese ${trimmedTone}:\n${text}`;
+  return `Say chinese text only with tone ${trimmedTone}` + "\n" + text;
 };
 
 const containsHanzi = (text: string): boolean => HANZI_REGEX.test(text);
