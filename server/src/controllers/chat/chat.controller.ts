@@ -784,15 +784,14 @@ export const createChatController = (
       }
     }
 
-    console.log(`[Vocab] remainingVocabulary: ${remainingVocabulary.length}, vocabIdsInRemaining: ${vocabIdsInRemaining.length}`);
-
+    
     // Batch-load reviews for all matched vocabulary items
     const reviewMap = new Map<string, VocabularyReviewEntity>();
     if (vocabIdsInRemaining.length > 0) {
       const reviews = await vocabularyReviewRepository
-        .createQueryBuilder("r")
-        .where("r.vocabulary_id IN (:...ids)", { ids: vocabIdsInRemaining })
-        .getMany();
+      .createQueryBuilder("r")
+      .where("r.vocabulary_id IN (:...ids)", { ids: vocabIdsInRemaining })
+      .getMany();
       for (const r of reviews) {
         reviewMap.set(r.vocabularyId, r);
       }
@@ -800,7 +799,9 @@ export const createChatController = (
     const vocabProducer = new VocabularyProducer(dataSource);
     const dueForReview: string[] = (await vocabProducer.getDueVocabularies(userId)).map((v) => v.korean);
     const newWords: string[] = [];
-
+    
+    console.log(`[Vocab] remainingVocabulary: ${remainingVocabulary.length}, vocabIdsInRemaining: ${dueForReview.length}`);
+    console.log(`[Vocab] dueForReview: ${dueForReview.join(", ")}`);
     // Lấy chuỗi ngày giờ hiện tại chuẩn GMT để so sánh
     const nowTime = Date.now();
 
