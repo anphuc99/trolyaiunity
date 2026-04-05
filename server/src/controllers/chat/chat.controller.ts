@@ -687,13 +687,7 @@ export const createChatController = (
     if (userMessagesSinceLastReminder < 3) {
       return false;
     }
-
-    if (userMessagesSinceLastReminder >= 5) {
-      return true;
-    }
-
-    const chance = userMessagesSinceLastReminder === 3 ? 1 / 3 : 1 / 2;
-    return Math.random() < chance;
+    return true;
   };
 
   const maybeInjectLearningPathVocabularyReminder = async (
