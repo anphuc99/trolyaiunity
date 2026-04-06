@@ -87,6 +87,34 @@ const isValidVocabId = (id: string | undefined): boolean => {
 };
 
 /**
+ * Normalizes vocabulary text before lookup/save.
+ */
+const normalizeVocabularyWord = (value: string): string => value.trim();
+
+/**
+ * Detects common SQL unique-constraint violations across MySQL/SQLite drivers.
+ */
+const isUniqueConstraintError = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const dbError = error as {
+    code?: string;
+    errno?: number;
+    message?: string;
+    sqlMessage?: string;
+  };
+
+  const message = `${dbError.message ?? ""} ${dbError.sqlMessage ?? ""}`.toLowerCase();
+
+  return dbError.code === "ER_DUP_ENTRY"
+    || dbError.errno === 1062
+    || message.includes("duplicate entry")
+    || message.includes("unique constraint failed");
+};
+
+/**
  * Checks whether a translation contains Han characters.
  */
 const hasHanCharacters = (text: string): boolean => /[\u3400-\u9FFF]/u.test(text);
@@ -250,7 +278,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       difficultyRating?: "very_easy" | "easy" | "medium" | "hard";
     };
 
-    const trimmedKorean = (korean ?? "").trim();
+    const trimmedKorean = normalizeVocabularyWord(korean ?? "");
     const trimmedVietnamese = (vietnamese ?? "").trim();
     const trimmedPinyin = (pinyin ?? "").trim();
     const trimmedLevel = (level ?? "").trim();
@@ -327,6 +355,12 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         memory: savedMemory ? serialiseMemory(savedMemory) : null
       });
     } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        const existing = await vocabRepo.findOne({ where: { korean: trimmedKorean, userId } });
+        response.status(409).json({ message: "Vocabulary already exists", vocabulary: existing ?? null });
+        return;
+      }
+
       console.error("Failed to collect vocabulary.", error);
       response.status(500).json({ message: "Failed to collect vocabulary" });
     }
@@ -350,6 +384,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     }
 
     const { korean, vietnamese, pinyin, level } = request.body as { korean?: string; vietnamese?: string; pinyin?: string; level?: string };
+    const normalizedKorean = typeof korean === "string" ? normalizeVocabularyWord(korean) : null;
 
     try {
       const vocab = await vocabRepo.findOne({ where: { id: vocabId, userId } });
@@ -359,13 +394,33 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         return;
       }
 
-      if (korean?.trim()) {
-        vocab.korean = korean.trim();
+      if (typeof korean === "string") {
+        if (!normalizedKorean) {
+          response.status(400).json({ message: "Korean cannot be empty" });
+          return;
+        }
+
+        if (normalizedKorean !== vocab.korean) {
+          const duplicate = await vocabRepo.findOne({
+            where: {
+              korean: normalizedKorean,
+              userId,
+              id: Not(vocabId)
+            }
+          });
+
+          if (duplicate) {
+            response.status(409).json({ message: "Vocabulary already exists", vocabulary: duplicate });
+            return;
+          }
+        }
+
+        vocab.korean = normalizedKorean;
       }
 
       if (vietnamese?.trim()) {
         const normalizedMeaning = vietnamese.trim();
-        const sourceWord = (korean?.trim() || vocab.korean || "").trim();
+        const sourceWord = ((typeof korean === "string" ? normalizedKorean : vocab.korean) || "").trim();
 
         if (!isValidVietnameseMeaning(sourceWord, normalizedMeaning)) {
           response.status(400).json({ message: "Vietnamese meaning is invalid (cannot be Chinese or same as source word)" });
@@ -388,6 +443,11 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       const updated = await vocabRepo.save(vocab);
       response.json(updated);
     } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        response.status(409).json({ message: "Vocabulary already exists" });
+        return;
+      }
+
       console.error("Failed to update vocabulary.", error);
       response.status(500).json({ message: "Failed to update vocabulary" });
     }
@@ -810,7 +870,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       return;
     }
 
-    const word = String(request.query.word ?? "").trim();
+    const word = normalizeVocabularyWord(String(request.query.word ?? ""));
     if (!word) {
       response.status(400).json({ message: "Query parameter 'word' is required" });
       return;
@@ -919,6 +979,12 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         review: serialiseReview(savedReview)
       });
     } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        const existing = await vocabRepo.findOne({ where: { korean: word, userId } });
+        response.status(409).json({ message: "Vocabulary already exists", vocabulary: existing ?? null });
+        return;
+      }
+
       console.error("Failed to lookup vocabulary word.", error);
       response.status(500).json({ message: "Failed to lookup vocabulary word" });
     }

@@ -1,4 +1,5 @@
 import {
+  Index,
   Column,
   CreateDateColumn,
   Entity,
@@ -15,6 +16,7 @@ import UserEntity from "./user.entity.js";
  * Persists collected vocabulary items for spaced repetition review.
  * Uses string UUID for compatibility with old data migration.
  */
+@Index(["userId", "korean"], { unique: true })
 @Entity({ name: "vocabularies" })
 class VocabularyEntity {
   @PrimaryColumn({ type: "varchar", length: 36 })
