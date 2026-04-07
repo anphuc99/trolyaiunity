@@ -974,7 +974,14 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
 					var tone = string.IsNullOrWhiteSpace(turn.Tone) ? "neutral" : turn.Tone.Trim();
 					var cleanText = VocabMarkupRegex.Replace(turn.Text, "$1");
-					turn.AudioUrl = await ResolveTtsAudioUrlAsync(cleanText, tone, characterName);
+					var recentTurns = BuildRecentTtsContext(turns, i);
+					turn.AudioUrl = await ResolveTtsAudioUrlAsync(
+						cleanText,
+						tone,
+						characterName,
+						false,
+						turn.MessageId,
+						recentTurns);
 
 					if (!string.IsNullOrWhiteSpace(turn.AudioUrl))
 					{
@@ -1018,7 +1025,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					? null
 					: ChatState.ParentSignals?.GetCharacterSpeakingRateByName?.Invoke(characterName);
 
-				var audioUrl = await ResolveTtsAudioUrlAsync(payload.Text, payload.Tone, characterName, payload.ForceReload);
+				var audioUrl = await ResolveTtsAudioUrlAsync(
+					payload.Text,
+					payload.Tone,
+					characterName,
+					payload.ForceReload,
+					payload.MessageId);
 
 				AudioClip audioClip = null;
 				if (!string.IsNullOrWhiteSpace(audioUrl))
@@ -1204,18 +1216,64 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
+		/// Builds up to 5 recent turns (including current turn) for semantic TTS fallback context.
+		/// </summary>
+		/// <param name="turns">Assistant turns in chronological order.</param>
+		/// <param name="turnIndex">Current turn index.</param>
+		/// <returns>Recent dialogue lines formatted as "Character: text".</returns>
+		private static List<string> BuildRecentTtsContext(List<ChatAssistantTurnPayload> turns, int turnIndex)
+		{
+			var contextTurns = new List<string>();
+
+			if (turns == null || turns.Count == 0 || turnIndex < 0)
+			{
+				return contextTurns;
+			}
+
+			var startIndex = Math.Max(0, turnIndex - 4);
+			for (var i = startIndex; i <= turnIndex && i < turns.Count; i++)
+			{
+				var turn = turns[i];
+				if (turn == null || string.IsNullOrWhiteSpace(turn.Text))
+				{
+					continue;
+				}
+
+				var safeCharacterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
+				var safeText = VocabMarkupRegex.Replace(turn.Text, "$1").Trim();
+
+				if (string.IsNullOrWhiteSpace(safeText))
+				{
+					continue;
+				}
+
+				contextTurns.Add(safeCharacterName + ": " + safeText);
+			}
+
+			return contextTurns;
+		}
+
+		/// <summary>
 		/// Calls the TTS endpoint and returns the resolved absolute audio URL.
 		/// </summary>
 		/// <param name="text">Text to synthesize.</param>
 		/// <param name="tone">Tone hint.</param>
 		/// <param name="characterName">Character name.</param>
 		/// <param name="forceReload">Whether to force regeneration.</param>
+		/// <param name="messageId">Optional message id for backend context lookup.</param>
+		/// <param name="recentTurns">Optional recent dialogue lines for semantic fallback context.</param>
 		/// <returns>Absolute audio URL, or null on failure.</returns>
-		private static async Task<string> ResolveTtsAudioUrlAsync(string text, string tone, string characterName, bool forceReload = false)
+		private static async Task<string> ResolveTtsAudioUrlAsync(
+			string text,
+			string tone,
+			string characterName,
+			bool forceReload = false,
+			string messageId = null,
+			IList<string> recentTurns = null)
 		{
 			try
 			{
-				var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload);
+				var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload, messageId, recentTurns);
 				var endpoint = NetworkEndpoints.TextToSpeech + query;
 				var responseJson = await HttpClient.GetTaskAsync(endpoint);
 				if (string.IsNullOrWhiteSpace(responseJson))

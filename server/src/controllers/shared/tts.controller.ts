@@ -11,6 +11,51 @@ interface TtsController {
   getTextToSpeech: (request: Request, response: Response) => Promise<void>;
 }
 
+const MAX_TTS_CONTEXT_TURNS = 5;
+
+const normalizeRecentTurns = (turns: string[]): string[] => {
+  return turns
+    .map((turn) => turn.trim())
+    .filter((turn) => turn.length > 0)
+    .slice(-MAX_TTS_CONTEXT_TURNS);
+};
+
+const formatContextTurn = (characterName: string, content: string): string => {
+  const safeCharacter = characterName?.trim() || "Unknown";
+  const safeContent = content?.trim() || "";
+  return `${safeCharacter}: ${safeContent}`;
+};
+
+const parseRecentTurnsFromQuery = (rawRecentTurns: unknown): string[] => {
+  if (Array.isArray(rawRecentTurns)) {
+    return normalizeRecentTurns(
+      rawRecentTurns
+        .map((item) => (typeof item === "string" ? item : ""))
+        .filter((item) => item.length > 0)
+    );
+  }
+
+  if (typeof rawRecentTurns !== "string") {
+    return [];
+  }
+
+  const trimmed = rawRecentTurns.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (Array.isArray(parsed)) {
+      return normalizeRecentTurns(parsed.map((item) => (typeof item === "string" ? item : "")));
+    }
+  } catch {
+    // Fallback for newline-separated values.
+  }
+
+  return normalizeRecentTurns(trimmed.split(/\r?\n/));
+};
+
 /**
  * Builds the shared TTS controller.
  *
@@ -22,6 +67,62 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
   const messageRepository = dataSource.getRepository(MessageEntity);
   const myLogMessageRepository = dataSource.getRepository(MyLogMessageEntity);
   const userRepository = dataSource.getRepository(UserEntity);
+
+  const resolveRecentTurnsByMessageId = async (userId: number, messageId: string): Promise<string[]> => {
+    const trimmedMessageId = messageId.trim();
+    if (!trimmedMessageId) {
+      return [];
+    }
+
+    const message = await messageRepository.findOne({
+      where: { id: trimmedMessageId, userId }
+    });
+
+    if (message) {
+      const recentMessages = await messageRepository
+        .createQueryBuilder("message")
+        .select(["message.characterName", "message.content", "message.createdAt", "message.id"])
+        .where("message.userId = :userId", { userId })
+        .andWhere("message.journalId = :journalId", { journalId: message.journalId })
+        .andWhere("message.createdAt <= :createdAt", { createdAt: message.createdAt })
+        .orderBy("message.createdAt", "DESC")
+        .addOrderBy("message.id", "DESC")
+        .take(MAX_TTS_CONTEXT_TURNS)
+        .getMany();
+
+      return normalizeRecentTurns(
+        recentMessages
+          .reverse()
+          .map((item) => formatContextTurn(item.characterName, item.content))
+      );
+    }
+
+    const myLogMessage = await myLogMessageRepository.findOne({
+      where: { id: trimmedMessageId, userId }
+    });
+
+    if (!myLogMessage) {
+      return [];
+    }
+
+    const recentMyLogMessages = await myLogMessageRepository
+      .createQueryBuilder("message")
+      .select(["message.characterName", "message.content", "message.createdAt", "message.id"])
+      .where("message.userId = :userId", { userId })
+      .andWhere("message.journalId = :journalId", { journalId: myLogMessage.journalId })
+      .andWhere("message.createdAt <= :createdAt", { createdAt: myLogMessage.createdAt })
+      .andWhere("message.isHidden = :isHidden", { isHidden: false })
+      .orderBy("message.createdAt", "DESC")
+      .addOrderBy("message.id", "DESC")
+      .take(MAX_TTS_CONTEXT_TURNS)
+      .getMany();
+
+    return normalizeRecentTurns(
+      recentMyLogMessages
+        .reverse()
+        .map((item) => formatContextTurn(item.characterName, item.content))
+    );
+  };
 
   const resolveCharacterVoiceSettings = async (userId: number, characterName: string) => {
     if (!characterName) {
@@ -87,6 +188,15 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
     }
 
     const userId = request.user.id;
+    let recentTurns = parseRecentTurnsFromQuery(request.query.recentTurns);
+
+    if (recentTurns.length === 0 && messageId) {
+      try {
+        recentTurns = await resolveRecentTurnsByMessageId(userId, messageId);
+      } catch (contextResolveError) {
+        console.warn(`[TTS] failed to resolve recent turns by messageId: ${String(contextResolveError)}`);
+      }
+    }
 
     const resolvedSettings = await resolveCharacterVoiceSettings(userId, characterName);
     const isGemini = resolvedSettings.voiceModel === "gemini";
@@ -159,7 +269,8 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
           audioId,
           resolvedSettings.voiceName,
           resolvedSettings.pitch,
-          resolvedSettings.speakingRate
+          resolvedSettings.speakingRate,
+          recentTurns
         );
       } else {
         await createTtsAudio(
