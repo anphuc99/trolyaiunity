@@ -89,6 +89,11 @@ const isRetryableGeminiError = (error: unknown): boolean => {
   return RETRYABLE_STATUS_CODES.some((statusCode) => message.includes(`(${statusCode})`));
 };
 
+const isNoAudioGeminiError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.toLowerCase().includes(NO_AUDIO_ERROR_MARKER);
+};
+
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 const buildStyledPrompt = (text: string, tone?: string): string => {
@@ -211,8 +216,10 @@ const wrapPcmInWav = (pcm: Buffer, sampleRate: number): Buffer => {
 export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?: string): Promise<Buffer> => {
   const maxAttempts = getConfiguredGeminiVoiceKeyCount();
 
-  const synthesizeWithPromptText = async (promptTextSource: string): Promise<Buffer> => {
-    const styledPrompt = buildStyledPrompt(promptTextSource, tone);
+  const synthesizeWithPromptText = async (
+    promptTextSource: string,
+    resolveNoAudioFallbackPromptText?: () => Promise<string>
+  ): Promise<Buffer> => {
     let lastError: unknown;
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -222,60 +229,92 @@ export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: GEMINI_TTS_MODEL });
 
-        const buildRequest = (promptText: string) => ({
-          contents: [{ role: "user", parts: [{ text: promptText }] }],
-          generationConfig: {
-            responseModalities: ["AUDIO"],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName }
+        const synthesizeWithModelPrompt = async (requestText: string): Promise<Buffer> => {
+          const styledPrompt = buildStyledPrompt(requestText, tone);
+
+          const buildRequest = (promptText: string) => ({
+            contents: [{ role: "user", parts: [{ text: promptText }] }],
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName }
+                }
+              }
+            }
+          });
+
+          // @ts-expect-error — SDK typings may lag, but request shape is supported by Gemini API.
+          const styledResult = await model.generateContent(buildRequest(styledPrompt));
+          const styledResponse = styledResult.response as unknown as GeminiGenerateResponseShape;
+          let inlineData = extractInlineData(styledResponse);
+
+          // Fallback: when style instruction yields text-only response, retry same key with raw text.
+          if (!inlineData && tone?.trim()) {
+            // @ts-expect-error — SDK typings may lag, but request shape is supported by Gemini API.
+            const plainResult = await model.generateContent(buildRequest(requestText));
+            const plainResponse = plainResult.response as unknown as GeminiGenerateResponseShape;
+            inlineData = extractInlineData(plainResponse);
+
+            if (!inlineData) {
+              throw buildNoAudioError(plainResponse);
+            }
+          }
+
+          if (!inlineData) {
+            throw buildNoAudioError(styledResponse);
+          }
+
+          const base64Audio = inlineData.data;
+          if (!base64Audio) {
+            throw buildNoAudioError(styledResponse);
+          }
+
+          const rawBuffer = Buffer.from(base64Audio, "base64");
+          const mime: string = inlineData.mimeType ?? "";
+
+          // Raw PCM (audio/L16;rate=24000) -> wrap in WAV container.
+          if (mime.startsWith("audio/L16") || mime.startsWith("audio/pcm")) {
+            const rateMatch = mime.match(/rate=(\d+)/);
+            const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+            return wrapPcmInWav(rawBuffer, sampleRate);
+          }
+
+          // Already WAV or another format ffmpeg can handle.
+          return rawBuffer;
+        };
+
+        try {
+          return await synthesizeWithModelPrompt(promptTextSource);
+        } catch (initialError) {
+          let effectiveError: unknown = initialError;
+
+          if (resolveNoAudioFallbackPromptText && isNoAudioGeminiError(initialError)) {
+            let fallbackPromptText = "";
+
+            try {
+              fallbackPromptText = (await resolveNoAudioFallbackPromptText())?.trim() ?? "";
+            } catch (fallbackResolveError) {
+              console.warn(
+                `[GeminiTTS] failed to resolve no-audio fallback prompt: ${String(fallbackResolveError)}`
+              );
+            }
+
+            if (fallbackPromptText && fallbackPromptText !== promptTextSource) {
+              console.warn(`[GeminiTTS] no-audio on key slot ${keySlot}; retrying same key with pinyin fallback.`);
+              try {
+                return await synthesizeWithModelPrompt(fallbackPromptText);
+              } catch (fallbackError) {
+                effectiveError = fallbackError;
               }
             }
           }
-        });
 
-        // @ts-expect-error — SDK typings may lag, but request shape is supported by Gemini API.
-        const styledResult = await model.generateContent(buildRequest(styledPrompt));
-        const styledResponse = styledResult.response as unknown as GeminiGenerateResponseShape;
-        let inlineData = extractInlineData(styledResponse);
-
-        // Fallback: when style instruction yields text-only response, retry same key with raw text.
-        if (!inlineData && tone?.trim()) {
-          // @ts-expect-error — SDK typings may lag, but request shape is supported by Gemini API.
-          const plainResult = await model.generateContent(buildRequest(promptTextSource));
-          const plainResponse = plainResult.response as unknown as GeminiGenerateResponseShape;
-          inlineData = extractInlineData(plainResponse);
-
-          if (!inlineData) {
-            throw buildNoAudioError(plainResponse);
-          }
+          throw effectiveError;
         }
-
-        if (!inlineData) {
-          throw buildNoAudioError(styledResponse);
-        }
-
-        const base64Audio = inlineData.data;
-        if (!base64Audio) {
-          throw buildNoAudioError(styledResponse);
-        }
-
-        const rawBuffer = Buffer.from(base64Audio, "base64");
-        const mime: string = inlineData.mimeType ?? "";
-
-        // Raw PCM (audio/L16;rate=24000) -> wrap in WAV container.
-        if (mime.startsWith("audio/L16") || mime.startsWith("audio/pcm")) {
-          const rateMatch = mime.match(/rate=(\d+)/);
-          const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
-          return wrapPcmInWav(rawBuffer, sampleRate);
-        }
-
-        // Already WAV or another format ffmpeg can handle.
-        return rawBuffer;
       } catch (error) {
         lastError = error;
-        const message = error instanceof Error ? error.message : String(error ?? "");
-        if (message.toLowerCase().includes(NO_AUDIO_ERROR_MARKER)) {
+        if (isNoAudioGeminiError(error)) {
           console.warn(
             `[GeminiTTS] no-audio response on key slot ${keySlot} (attempt ${attempt + 1}/${maxAttempts}).`
           );
@@ -298,20 +337,35 @@ export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?
     throw new Error("Gemini TTS requires non-empty input text");
   }
 
+  let cachedPinyinText: string | null = null;
+  const resolvePinyinText = async (): Promise<string> => {
+    if (cachedPinyinText !== null) {
+      return cachedPinyinText;
+    }
+
+    cachedPinyinText = "";
+    if (!containsHanzi(inputText)) {
+      return cachedPinyinText;
+    }
+
+    try {
+      const cheapAI = createCheapAIService();
+      cachedPinyinText = await cheapAI.transliterateChineseToPinyin(inputText);
+    } catch (pinyinConvertError) {
+      console.warn(`[GeminiTTS] failed to convert Hanzi to pinyin: ${String(pinyinConvertError)}`);
+    }
+
+    return cachedPinyinText;
+  };
+
   try {
-    return await synthesizeWithPromptText(inputText);
+    return await synthesizeWithPromptText(inputText, resolvePinyinText);
   } catch (baseError) {
     if (!containsHanzi(inputText) || !shouldFallbackByError(baseError)) {
       throw baseError instanceof Error ? baseError : new Error("Gemini TTS failed");
     }
 
-    let pinyinText = "";
-    try {
-      const cheapAI = createCheapAIService();
-      pinyinText = await cheapAI.transliterateChineseToPinyin(inputText);
-    } catch (pinyinConvertError) {
-      console.warn(`[GeminiTTS] failed to convert Hanzi to pinyin: ${String(pinyinConvertError)}`);
-    }
+    const pinyinText = await resolvePinyinText();
 
     if (pinyinText && pinyinText !== inputText) {
       try {
