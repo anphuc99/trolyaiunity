@@ -100,6 +100,16 @@ export interface CheapAIService {
    * @returns IPA text.
    */
   transliterateChineseToIpa: (text: string) => Promise<string>;
+
+  /**
+   * Rewrites a line for TTS retry when the original text repeatedly returns no audio.
+   *
+   * @param text - Original text that failed TTS.
+   * @param recentTurns - Recent dialogue turns for context.
+   * @param tone - Optional tone metadata.
+   * @returns Semantically equivalent rewritten line in the same language.
+   */
+  rewriteTextForTtsNoAudio: (text: string, recentTurns: string[], tone?: string) => Promise<string>;
 }
 
 /** Output of translateVocabulary. */
@@ -292,6 +302,18 @@ Rules:
 Example:
 Input: 你好，我叫米米。
 Output: {"text": "ni˨˩˦ xɑʊ˨˩˦, wɔ˨˩˦ tɕjɑʊ˥˩ mi˨˩˦ mi˨˩˦."}`;
+
+const TTS_NO_AUDIO_REWRITE_PROMPT = `You are a dialogue-preserving rewrite assistant for text-to-speech fallback.
+
+Rewrite the current line into a different surface form while preserving meaning, intent, and conversation context.
+
+Rules:
+- Keep the original language.
+- Keep the same intent and emotional meaning.
+- Keep it natural for spoken audio.
+- Do not add new facts.
+- Keep length close to the original (+/- 30%).
+- Output ONLY the rewritten line. No JSON, no markdown, no explanation.`;
 
 // ────────────────────────────────────────────────────────────────────────────
 // Factory
@@ -519,6 +541,34 @@ export const createCheapAIService = (config: CheapAIServiceConfig = {}): CheapAI
     return typeof parsed.text === "string" ? parsed.text.trim() : "";
   };
 
+  /**
+   * Rewrites text for Gemini TTS no-audio fallback while preserving conversation intent.
+   */
+  const rewriteTextForTtsNoAudio: CheapAIService["rewriteTextForTtsNoAudio"] = async (
+    text,
+    recentTurns,
+    tone
+  ) => {
+    const generativeModel = genAI.getGenerativeModel({ model });
+    const trimmedTurns = (recentTurns ?? [])
+      .map((turn) => (typeof turn === "string" ? turn.trim() : ""))
+      .filter((turn) => turn.length > 0)
+      .slice(-5);
+
+    const contextBlock = trimmedTurns.length
+      ? `\nRecent dialogue context (oldest to latest):\n${trimmedTurns
+          .map((turn, index) => `${index + 1}. ${turn}`)
+          .join("\n")}\n`
+      : "";
+    const toneBlock = tone?.trim() ? `\nTone hint: ${tone.trim()}\n` : "";
+
+    const prompt = `${TTS_NO_AUDIO_REWRITE_PROMPT}\n${toneBlock}${contextBlock}\nOriginal line: ${text}\n\nRewritten line:`;
+    const result = await generativeModel.generateContent(prompt);
+    const rewritten = result.response.text().trim();
+
+    return rewritten.replace(/^`+|`+$/g, "").replace(/^"+|"+$/g, "").trim();
+  };
+
   return {
     rewriteRetrievalIntents,
     compressMemoryBrief,
@@ -527,6 +577,7 @@ export const createCheapAIService = (config: CheapAIServiceConfig = {}): CheapAI
     evaluateRelationshipUpdate,
     translateVocabulary,
     transliterateChineseToPinyin,
-    transliterateChineseToIpa
+    transliterateChineseToIpa,
+    rewriteTextForTtsNoAudio
   };
 };

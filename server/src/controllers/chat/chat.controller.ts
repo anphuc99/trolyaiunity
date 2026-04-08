@@ -879,19 +879,22 @@ export const createChatController = (
       return null;
     }
 
-    const englishContentMatch = content.match(/New\s+content:\s*([\s\S]+)/i);
+    const englishCombinedMatch = content.match(/New\s+content:\s*([\s\S]*?)(?:\nNew\s+pinyin:\s*([\s\S]*))?$/i);
     const vietnameseContentMatch = content.match(/Noi\s+dung\s+moi:\s*([\s\S]+)/i);
-    const contentMatch = englishContentMatch ?? vietnameseContentMatch;
-    const updatedText = contentMatch ? contentMatch[1].trim() : "";
+    const updatedText = englishCombinedMatch
+      ? englishCombinedMatch[1].trim()
+      : (vietnameseContentMatch ? vietnameseContentMatch[1].trim() : "");
     if (!updatedText) {
       return null;
     }
 
-    return { messageId, updatedText };
+    const updatedPinyin = englishCombinedMatch ? (englishCombinedMatch[2] ?? "").trim() : undefined;
+
+    return { messageId, updatedText, updatedPinyin };
   };
 
   const applyAssistantEdits = (history: { role: string; content: string }[]) => {
-    const edits = new Map<string, string>();
+    const edits = new Map<string, { text: string; pinyin?: string }>();
 
     for (const message of history) {
       if (message.role !== "developer") {
@@ -900,7 +903,10 @@ export const createChatController = (
 
       const edit = parseAssistantEditNote(message.content);
       if (edit) {
-        edits.set(edit.messageId, edit.updatedText);
+        edits.set(edit.messageId, {
+          text: edit.updatedText,
+          pinyin: edit.updatedPinyin
+        });
       }
     }
 
@@ -921,11 +927,18 @@ export const createChatController = (
       let didUpdate = false;
       const nextTurns = turns.map((turn) => {
         const turnId = typeof turn.MessageId === "string" ? turn.MessageId.trim() : "";
-        const updatedText = turnId ? edits.get(turnId) : null;
+        const updatedEdit = turnId ? edits.get(turnId) : null;
+        const updatedText = updatedEdit?.text ?? "";
 
         if (updatedText) {
           didUpdate = true;
-          return { ...turn, Text: updatedText };
+          const nextTurn: AssistantTurn = { ...turn, Text: updatedText };
+
+          if (updatedEdit && updatedEdit.pinyin !== undefined) {
+            nextTurn.Pinyin = updatedEdit.pinyin;
+          }
+
+          return nextTurn;
         }
 
         return turn;

@@ -6,6 +6,13 @@ import path from "path";
 import { createOpenAIClient } from "./openai.service.js";
 import { synthesizeGeminiTts } from "./gemini-tts.service.js";
 
+export interface GeminiTtsAudioResult {
+  audioId: string;
+  outputText: string;
+  outputPinyin: string;
+  usedRewrittenText: boolean;
+}
+
 const AUDIO_DIR = path.join(process.cwd(), "data", "audio");
 const DEFAULT_MODEL = "gpt-4o-mini-tts-2025-03-20";
 const DEFAULT_VOICE = "alloy";
@@ -237,7 +244,8 @@ export const createTtsAudio = async (
  * @param voiceName - Gemini prebuilt voice name.
  * @param pitch - Optional pitch adjustment.
  * @param speakingRate - Optional playback speed multiplier.
- * @returns The audio file id.
+ * @param recentTurns - Optional recent dialogue turns for no-audio rewrite context.
+ * @returns Audio id and effective spoken text metadata.
  */
 export const createGeminiTtsAudio = async (
   text: string,
@@ -245,16 +253,22 @@ export const createGeminiTtsAudio = async (
   audioId: string,
   voiceName: string,
   pitch?: number,
-  speakingRate?: number
-) => {
+  speakingRate?: number,
+  recentTurns?: string[]
+): Promise<GeminiTtsAudioResult> => {
   await fs.mkdir(AUDIO_DIR, { recursive: true });
 
-  const wavBuffer = await synthesizeGeminiTts(clampText(text), voiceName, tone);
-  const mp3Buffer = await convertWavToMp3(wavBuffer, pitch, speakingRate);
+  const synthesisResult = await synthesizeGeminiTts(clampText(text), voiceName, tone, recentTurns);
+  const mp3Buffer = await convertWavToMp3(synthesisResult.audioBuffer, pitch, speakingRate);
   const filePath = path.join(AUDIO_DIR, `${audioId}.mp3`);
   await fs.writeFile(filePath, mp3Buffer);
 
-  return audioId;
+  return {
+    audioId,
+    outputText: synthesisResult.outputText,
+    outputPinyin: synthesisResult.outputPinyin,
+    usedRewrittenText: synthesisResult.usedRewrittenText
+  };
 };
 
 /**

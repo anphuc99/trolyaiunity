@@ -24,6 +24,7 @@ let keyIndex = 0;
 const RETRYABLE_STATUS_CODES = [400, 429, 500, 502, 503, 504];
 const NO_AUDIO_ERROR_MARKER = "gemini tts returned no audio data";
 const HANZI_REGEX = /[\u3400-\u9FFF\uF900-\uFAFF]/;
+const MAX_NO_AUDIO_CONTEXT_TURNS = 5;
 
 /**
  * Reads GEMINI_API_KEY_VOICE1 … GEMINI_API_KEY_VOICE4 from env once.
@@ -106,6 +107,13 @@ const buildStyledPrompt = (text: string, tone?: string): string => {
 };
 
 const containsHanzi = (text: string): boolean => HANZI_REGEX.test(text);
+
+const normalizeRecentTurns = (recentTurns?: string[]): string[] => {
+  return (recentTurns ?? [])
+    .map((turn) => (typeof turn === "string" ? turn.trim() : ""))
+    .filter((turn) => turn.length > 0)
+    .slice(-MAX_NO_AUDIO_CONTEXT_TURNS);
+};
 
 const hasRetryableStatusCode = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : String(error ?? "");
@@ -202,6 +210,13 @@ const wrapPcmInWav = (pcm: Buffer, sampleRate: number): Buffer => {
 // Public API
 // ---------------------------------------------------------------------------
 
+export interface GeminiTtsSynthesisResult {
+  audioBuffer: Buffer;
+  outputText: string;
+  outputPinyin: string;
+  usedRewrittenText: boolean;
+}
+
 /**
  * Calls the Gemini TTS API via the @google/generative-ai SDK and returns a WAV buffer.
  *
@@ -211,15 +226,20 @@ const wrapPcmInWav = (pcm: Buffer, sampleRate: number): Buffer => {
  * @param text - Text to synthesise.
  * @param voiceName - Gemini prebuilt voice name (e.g. "Kore", "Puck").
  * @param tone - Optional style/tone instruction from client (e.g. "neutral, medium pitch").
- * @returns WAV audio buffer ready for ffmpeg post-processing.
+ * @param recentTurns - Optional recent dialogue turns (max 5) for no-audio rewrite context.
+ * @returns Synthesis result with audio buffer plus effective output text/pinyin metadata.
  */
-export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?: string): Promise<Buffer> => {
+export const synthesizeGeminiTts = async (
+  text: string,
+  voiceName: string,
+  tone?: string,
+  recentTurns?: string[]
+): Promise<GeminiTtsSynthesisResult> => {
   const maxAttempts = getConfiguredGeminiVoiceKeyCount();
 
-  const synthesizeWithPromptText = async (
-    promptTextSource: string,
-    resolveNoAudioFallbackPromptText?: () => Promise<string>
-  ): Promise<Buffer> => {
+  const noAudioContextTurns = normalizeRecentTurns(recentTurns);
+
+  const synthesizeWithPromptText = async (promptTextSource: string): Promise<Buffer> => {
     let lastError: unknown;
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -287,30 +307,7 @@ export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?
         try {
           return await synthesizeWithModelPrompt(promptTextSource);
         } catch (initialError) {
-          let effectiveError: unknown = initialError;
-
-          if (resolveNoAudioFallbackPromptText && isNoAudioGeminiError(initialError)) {
-            let fallbackPromptText = "";
-
-            try {
-              fallbackPromptText = (await resolveNoAudioFallbackPromptText())?.trim() ?? "";
-            } catch (fallbackResolveError) {
-              console.warn(
-                `[GeminiTTS] failed to resolve no-audio fallback prompt: ${String(fallbackResolveError)}`
-              );
-            }
-
-            if (fallbackPromptText && fallbackPromptText !== promptTextSource) {
-              console.warn(`[GeminiTTS] no-audio on key slot ${keySlot}; retrying same key with pinyin fallback.`);
-              try {
-                return await synthesizeWithModelPrompt(fallbackPromptText);
-              } catch (fallbackError) {
-                effectiveError = fallbackError;
-              }
-            }
-          }
-
-          throw effectiveError;
+          throw initialError;
         }
       } catch (error) {
         lastError = error;
@@ -337,6 +334,49 @@ export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?
     throw new Error("Gemini TTS requires non-empty input text");
   }
 
+  let cachedNoAudioRewriteText: string | null = null;
+  const resolveNoAudioRewriteText = async (): Promise<string> => {
+    if (cachedNoAudioRewriteText !== null) {
+      return cachedNoAudioRewriteText;
+    }
+
+    cachedNoAudioRewriteText = "";
+
+    try {
+      const cheapAI = createCheapAIService();
+      const rewrittenText = await cheapAI.rewriteTextForTtsNoAudio(inputText, noAudioContextTurns, tone);
+
+      if (rewrittenText && rewrittenText !== inputText) {
+        cachedNoAudioRewriteText = rewrittenText;
+      }
+    } catch (rewriteError) {
+      console.warn(`[GeminiTTS] failed to rewrite no-audio fallback text: ${String(rewriteError)}`);
+    }
+
+    return cachedNoAudioRewriteText;
+  };
+
+  let cachedNoAudioRewritePinyin: string | null = null;
+  const resolveNoAudioRewritePinyin = async (rewrittenText: string): Promise<string> => {
+    if (cachedNoAudioRewritePinyin !== null) {
+      return cachedNoAudioRewritePinyin;
+    }
+
+    cachedNoAudioRewritePinyin = "";
+    if (!containsHanzi(rewrittenText)) {
+      return cachedNoAudioRewritePinyin;
+    }
+
+    try {
+      const cheapAI = createCheapAIService();
+      cachedNoAudioRewritePinyin = await cheapAI.transliterateChineseToPinyin(rewrittenText);
+    } catch (rewritePinyinError) {
+      console.warn(`[GeminiTTS] failed to convert rewritten text to pinyin: ${String(rewritePinyinError)}`);
+    }
+
+    return cachedNoAudioRewritePinyin;
+  };
+
   let cachedPinyinText: string | null = null;
   const resolvePinyinText = async (): Promise<string> => {
     if (cachedPinyinText !== null) {
@@ -359,17 +399,51 @@ export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?
   };
 
   try {
-    return await synthesizeWithPromptText(inputText, resolvePinyinText);
+    const audioBuffer = await synthesizeWithPromptText(inputText);
+    return {
+      audioBuffer,
+      outputText: inputText,
+      outputPinyin: "",
+      usedRewrittenText: false
+    };
   } catch (baseError) {
-    if (!containsHanzi(inputText) || !shouldFallbackByError(baseError)) {
-      throw baseError instanceof Error ? baseError : new Error("Gemini TTS failed");
+    let effectiveBaseError: unknown = baseError;
+
+    if (isNoAudioGeminiError(baseError)) {
+      const rewrittenText = await resolveNoAudioRewriteText();
+
+      if (rewrittenText && rewrittenText !== inputText) {
+        console.warn("[GeminiTTS] all key attempts returned no-audio; retrying with semantic rewrite text.");
+
+        try {
+          const audioBuffer = await synthesizeWithPromptText(rewrittenText);
+          return {
+            audioBuffer,
+            outputText: rewrittenText,
+            outputPinyin: await resolveNoAudioRewritePinyin(rewrittenText),
+            usedRewrittenText: true
+          };
+        } catch (rewriteError) {
+          effectiveBaseError = rewriteError;
+        }
+      }
+    }
+
+    if (!containsHanzi(inputText) || !shouldFallbackByError(effectiveBaseError)) {
+      throw effectiveBaseError instanceof Error ? effectiveBaseError : new Error("Gemini TTS failed");
     }
 
     const pinyinText = await resolvePinyinText();
 
     if (pinyinText && pinyinText !== inputText) {
       try {
-        return await synthesizeWithPromptText(pinyinText);
+        const audioBuffer = await synthesizeWithPromptText(pinyinText);
+        return {
+          audioBuffer,
+          outputText: inputText,
+          outputPinyin: "",
+          usedRewrittenText: false
+        };
       } catch (pinyinError) {
         if (!shouldFallbackByError(pinyinError)) {
           throw pinyinError instanceof Error ? pinyinError : new Error("Gemini TTS failed");
@@ -386,9 +460,15 @@ export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?
     }
 
     if (ipaText && ipaText !== inputText) {
-      return synthesizeWithPromptText(ipaText);
+      const audioBuffer = await synthesizeWithPromptText(ipaText);
+      return {
+        audioBuffer,
+        outputText: inputText,
+        outputPinyin: "",
+        usedRewrittenText: false
+      };
     }
 
-    throw baseError instanceof Error ? baseError : new Error("Gemini TTS failed");
+    throw effectiveBaseError instanceof Error ? effectiveBaseError : new Error("Gemini TTS failed");
   }
 };

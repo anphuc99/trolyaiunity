@@ -505,6 +505,57 @@ namespace Share.Components
 		}
 
 		/// <summary>
+		/// Updates display/raw text and optional pinyin for a message identified by message id.
+		/// </summary>
+		/// <param name="messageId">Message identifier.</param>
+		/// <param name="displayText">Text rendered in the bubble.</param>
+		/// <param name="originalText">Original plain text used for TTS.</param>
+		/// <param name="rawVocabText">Raw text preserving vocab markers.</param>
+		/// <param name="pinyin">Optional updated pinyin.</param>
+		public void UpdateMessageContent(string messageId, string displayText, string originalText, string rawVocabText, string pinyin = null)
+		{
+			if (string.IsNullOrWhiteSpace(messageId))
+			{
+				return;
+			}
+
+			var updated = false;
+			for (var i = 0; i < _messages.Count; i++)
+			{
+				var message = _messages[i];
+				if (message == null)
+				{
+					continue;
+				}
+
+				if (message.MessageId != messageId)
+				{
+					continue;
+				}
+
+				message.Message = displayText ?? string.Empty;
+				message.OriginalMessage = originalText ?? string.Empty;
+				message.RawVocabText = rawVocabText ?? originalText ?? string.Empty;
+
+				if (pinyin != null)
+				{
+					message.Pinyin = pinyin;
+				}
+
+				message.IsTranslationExpanded = false;
+				ApplyDefaultMessageDisplay(message);
+				updated = true;
+				break;
+			}
+
+			if (updated)
+			{
+				RebuildMetrics();
+				RefreshVisible();
+			}
+		}
+
+		/// <summary>
 		/// Inserts one message at the beginning (older message).
 		/// </summary>
 		/// <param name="message">Message text.</param>

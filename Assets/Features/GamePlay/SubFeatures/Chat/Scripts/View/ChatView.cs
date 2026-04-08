@@ -1170,6 +1170,17 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
+			if (_messageContainer != null && !string.IsNullOrWhiteSpace(playback.MessageId) && !string.IsNullOrWhiteSpace(playback.UpdatedText))
+			{
+				var updatedRawText = playback.UpdatedText.Trim();
+				_messageContainer.UpdateMessageContent(
+					playback.MessageId,
+					ConvertVocabMarkupToRichText(updatedRawText),
+					StripVocabMarkup(updatedRawText),
+					updatedRawText,
+					playback.UpdatedPinyin);
+			}
+
 			StartCoroutine(PlaySingleMessageAudio(playback));
 		}
 
