@@ -1,4 +1,5 @@
 using TMPro;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -29,6 +30,10 @@ namespace Share.Components
 
         [SerializeField] private bool _showRatingButtons = true;
 
+        [Header("Âm thanh")]
+        [SerializeField] private Button _playAudioButton;
+        [SerializeField] private TMP_Dropdown _characterDropdown;
+
         /// <summary>
         /// Stores the current vocabulary ID for review submission.
         /// </summary>
@@ -43,6 +48,16 @@ namespace Share.Components
         /// Callback invoked whenever popup is closed.
         /// </summary>
         private System.Action _onClosed;
+
+        /// <summary>
+        /// Callback for audio playback request: (word, characterName).
+        /// </summary>
+        private System.Action<string, string> _onPlayAudioRequested;
+
+        /// <summary>
+        /// True while lookup data is loading.
+        /// </summary>
+        private bool _isLoading;
 
         private void Awake()
         {
@@ -71,7 +86,13 @@ namespace Share.Components
                 _closeButton.onClick.AddListener(Hide);
             }
 
+            if (_playAudioButton != null)
+            {
+                _playAudioButton.onClick.AddListener(HandlePlayAudio);
+            }
+
             SetRatingButtonsVisible(_showRatingButtons);
+            UpdateAudioControlsState();
 
             gameObject.SetActive(false);
         }
@@ -102,6 +123,11 @@ namespace Share.Components
             {
                 _closeButton.onClick.RemoveListener(Hide);
             }
+
+            if (_playAudioButton != null)
+            {
+                _playAudioButton.onClick.RemoveListener(HandlePlayAudio);
+            }
         }
 
         /// <summary>
@@ -120,6 +146,58 @@ namespace Share.Components
         public void SetClosedCallback(System.Action onClosed)
         {
             _onClosed = onClosed;
+        }
+
+        /// <summary>
+        /// Registers callback fired when play-audio button is clicked.
+        /// </summary>
+        /// <param name="onPlayAudioRequested">Callback signature: (word, characterName).</param>
+        public void SetAudioPlayCallback(System.Action<string, string> onPlayAudioRequested)
+        {
+            _onPlayAudioRequested = onPlayAudioRequested;
+            UpdateAudioControlsState();
+        }
+
+        /// <summary>
+        /// Replaces character dropdown options used for pronunciation playback.
+        /// </summary>
+        /// <param name="characterNames">Character display names.</param>
+        public void SetCharacterOptions(IReadOnlyList<string> characterNames)
+        {
+            if (_characterDropdown == null)
+            {
+                return;
+            }
+
+            _characterDropdown.ClearOptions();
+
+            if (characterNames == null || characterNames.Count == 0)
+            {
+                _characterDropdown.RefreshShownValue();
+                UpdateAudioControlsState();
+                return;
+            }
+
+            var options = new List<string>();
+            for (var i = 0; i < characterNames.Count; i++)
+            {
+                var name = characterNames[i];
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+
+                options.Add(name.Trim());
+            }
+
+            if (options.Count > 0)
+            {
+                _characterDropdown.AddOptions(options);
+                _characterDropdown.value = 0;
+            }
+
+            _characterDropdown.RefreshShownValue();
+            UpdateAudioControlsState();
         }
 
         /// <summary>
@@ -148,6 +226,7 @@ namespace Share.Components
 
             SetLoadingState(true);
             SetRatingButtonsInteractable(false);
+            UpdateAudioControlsState();
         }
 
         /// <summary>
@@ -178,6 +257,7 @@ namespace Share.Components
 
             SetLoadingState(false);
             SetRatingButtonsInteractable(_showRatingButtons);
+            UpdateAudioControlsState();
         }
 
         /// <summary>
@@ -222,6 +302,7 @@ namespace Share.Components
             var wasVisible = gameObject.activeSelf;
             _currentVocabularyId = null;
             gameObject.SetActive(false);
+            UpdateAudioControlsState();
 
             if (wasVisible)
             {
@@ -278,11 +359,53 @@ namespace Share.Components
         }
 
         /// <summary>
+        /// Handles speaker button click by forwarding current word and selected character.
+        /// </summary>
+        private void HandlePlayAudio()
+        {
+            if (_onPlayAudioRequested == null)
+            {
+                return;
+            }
+
+            var word = _vocabText != null ? _vocabText.text : null;
+            if (string.IsNullOrWhiteSpace(word))
+            {
+                return;
+            }
+
+            _onPlayAudioRequested.Invoke(word.Trim(), GetSelectedCharacterName());
+        }
+
+        /// <summary>
+        /// Returns currently selected character name in dropdown.
+        /// </summary>
+        /// <returns>Selected character name or null when unavailable.</returns>
+        private string GetSelectedCharacterName()
+        {
+            if (_characterDropdown == null || _characterDropdown.options == null || _characterDropdown.options.Count == 0)
+            {
+                return null;
+            }
+
+            var optionIndex = _characterDropdown.value;
+            if (optionIndex < 0 || optionIndex >= _characterDropdown.options.Count)
+            {
+                optionIndex = 0;
+            }
+
+            var optionData = _characterDropdown.options[optionIndex];
+            return optionData != null ? optionData.text : null;
+        }
+
+        /// <summary>
         /// Toggles the loading indicator and content group visibility.
         /// </summary>
         /// <param name="isLoading">Whether the popup is in loading state.</param>
         private void SetLoadingState(bool isLoading)
         {
+            _isLoading = isLoading;
+
             if (_loadingIndicator != null)
             {
                 _loadingIndicator.SetActive(isLoading);
@@ -292,6 +415,8 @@ namespace Share.Components
             {
                 _contentGroup.SetActive(!isLoading);
             }
+
+            UpdateAudioControlsState();
         }
 
         /// <summary>
@@ -318,6 +443,28 @@ namespace Share.Components
             if (_ratingEasyButton != null)
             {
                 _ratingEasyButton.interactable = interactable;
+            }
+        }
+
+        /// <summary>
+        /// Syncs speaker and dropdown interactable state with current popup data.
+        /// </summary>
+        private void UpdateAudioControlsState()
+        {
+            var hasWord = _vocabText != null && !string.IsNullOrWhiteSpace(_vocabText.text);
+            var hasCallback = _onPlayAudioRequested != null;
+            var hasCharacterSelection = _characterDropdown == null
+                || (_characterDropdown.options != null && _characterDropdown.options.Count > 0);
+            var canPlay = gameObject.activeSelf && !_isLoading && hasWord && hasCallback && hasCharacterSelection;
+
+            if (_characterDropdown != null)
+            {
+                _characterDropdown.interactable = gameObject.activeSelf && !_isLoading && hasCharacterSelection;
+            }
+
+            if (_playAudioButton != null)
+            {
+                _playAudioButton.interactable = canPlay;
             }
         }
     }

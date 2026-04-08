@@ -383,6 +383,8 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			_vocabPopupView.SetReviewCallback(null);
 			_vocabPopupView.SetClosedCallback(null);
 			_vocabPopupView.SetRatingButtonsVisible(false);
+			_vocabPopupView.SetAudioPlayCallback(HandleVocabAudioPlayRequested);
+			RefreshVocabCharacterOptions();
 		}
 
 		private void HandleVocabWordClicked(string word)
@@ -395,6 +397,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			EnsureVocabPopupBindings();
 			if (_vocabPopupView != null)
 			{
+				RefreshVocabCharacterOptions();
 				_vocabPopupView.ShowLoading(word);
 			}
 
@@ -495,7 +498,112 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			StopChatAutoPlay(true);
 			_currentChatMessages = messageBubbleData ?? new List<MessageBubbleData>();
 			_chatVariantRoot.SetChatHistory(messageBubbleData);
+			RefreshVocabCharacterOptions();
 			UpdateAutoPlayButtonText();
+		}
+
+		/// <summary>
+		/// Refreshes vocab popup dropdown options from current journal chat characters.
+		/// </summary>
+		private void RefreshVocabCharacterOptions()
+		{
+			if (_vocabPopupView == null)
+			{
+				return;
+			}
+
+			_vocabPopupView.SetCharacterOptions(GetVocabCharacterNames());
+		}
+
+		/// <summary>
+		/// Builds distinct character names from loaded journal conversation messages.
+		/// </summary>
+		/// <returns>Distinct non-empty character names.</returns>
+		private List<string> GetVocabCharacterNames()
+		{
+			var characterNames = new List<string>();
+			if (_currentChatMessages == null || _currentChatMessages.Count == 0)
+			{
+				return characterNames;
+			}
+
+			for (var i = 0; i < _currentChatMessages.Count; i++)
+			{
+				var messageData = _currentChatMessages[i];
+				if (messageData == null || messageData.Type == MessageBubbleType.User || string.IsNullOrWhiteSpace(messageData.SenderName))
+				{
+					continue;
+				}
+
+				var characterName = messageData.SenderName.Trim();
+				var alreadyAdded = false;
+				for (var j = 0; j < characterNames.Count; j++)
+				{
+					if (!string.Equals(characterNames[j], characterName, StringComparison.Ordinal))
+					{
+						continue;
+					}
+
+					alreadyAdded = true;
+					break;
+				}
+
+				if (!alreadyAdded)
+				{
+					characterNames.Add(characterName);
+				}
+			}
+
+			return characterNames;
+		}
+
+		/// <summary>
+		/// Plays vocab pronunciation using selected character voice.
+		/// </summary>
+		/// <param name="word">Vocabulary word to pronounce.</param>
+		/// <param name="characterName">Selected character name from dropdown.</param>
+		private void HandleVocabAudioPlayRequested(string word, string characterName)
+		{
+			if (string.IsNullOrWhiteSpace(word))
+			{
+				return;
+			}
+
+			var selectedCharacterName = ResolveVocabAudioCharacterName(characterName);
+			if (string.IsNullOrWhiteSpace(selectedCharacterName))
+			{
+				Debug.LogWarning("[JournalView] Cannot play vocab audio because no character is available.", this);
+				return;
+			}
+
+			SendRequest(JournalRequests.PlayMessageAudio, new JournalPlayMessageAudioRequestPayload
+			{
+				MessageIndex = -1,
+				CharacterName = selectedCharacterName,
+				Text = word.Trim(),
+				ForceReload = false,
+			});
+		}
+
+		/// <summary>
+		/// Resolves selected character name with fallback to first available journal character.
+		/// </summary>
+		/// <param name="selectedCharacterName">Character name selected in dropdown.</param>
+		/// <returns>Character name for TTS request, or null when unavailable.</returns>
+		private string ResolveVocabAudioCharacterName(string selectedCharacterName)
+		{
+			if (!string.IsNullOrWhiteSpace(selectedCharacterName))
+			{
+				return selectedCharacterName.Trim();
+			}
+
+			var characterNames = GetVocabCharacterNames();
+			if (characterNames.Count > 0)
+			{
+				return characterNames[0];
+			}
+
+			return null;
 		}
 
 		private void HandleMessageSpeakerClicked(MessageBubbleData messageData)

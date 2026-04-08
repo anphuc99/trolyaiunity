@@ -146,6 +146,51 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
+		/// Gets normalized character names from parent signals for view dropdown binding.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		/// <returns>Distinct non-empty character names in original order.</returns>
+		[Request(ChatRequests.GetSceneCharacterNames)]
+		public static List<string> HandleGetSceneCharacterNames(object payload)
+		{
+			var names = ChatState.ParentSignals?.GetCharacterNames?.Invoke();
+			var result = new List<string>();
+			if (names == null || names.Count == 0)
+			{
+				return result;
+			}
+
+			for (var i = 0; i < names.Count; i++)
+			{
+				var name = names[i];
+				if (string.IsNullOrWhiteSpace(name))
+				{
+					continue;
+				}
+
+				var normalizedName = name.Trim();
+				var alreadyAdded = false;
+				for (var j = 0; j < result.Count; j++)
+				{
+					if (!string.Equals(result[j], normalizedName, StringComparison.Ordinal))
+					{
+						continue;
+					}
+
+					alreadyAdded = true;
+					break;
+				}
+
+				if (!alreadyAdded)
+				{
+					result.Add(normalizedName);
+				}
+			}
+
+			return result;
+		}
+
+		/// <summary>
 		/// Requests one assistant reply from current history without appending a user message.
 		/// </summary>
 		/// <param name="payload">Optional payload for session/model/story context.</param>

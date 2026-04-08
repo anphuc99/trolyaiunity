@@ -638,6 +638,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_vocabPopupView.SetRatingButtonsVisible(true);
 				_vocabPopupView.SetReviewCallback(HandleVocabReviewRequested);
 				_vocabPopupView.SetClosedCallback(HandleVocabPopupClosed);
+				_vocabPopupView.SetAudioPlayCallback(HandleVocabAudioPlayRequested);
+				RefreshVocabCharacterOptions();
 			}
 
 			if (_recordButton != null)
@@ -707,6 +709,46 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private bool HasAnySceneCharacter()
 		{
 			return SendRequest<bool>(ChatRequests.HasAnySceneCharacter);
+		}
+
+		/// <summary>
+		/// Loads current scene character names used by vocab pronunciation dropdown.
+		/// </summary>
+		/// <returns>Distinct non-empty character names.</returns>
+		private List<string> GetSceneCharacterNamesForVocab()
+		{
+			var names = SendRequest<List<string>>(ChatRequests.GetSceneCharacterNames);
+			var result = new List<string>();
+			if (names == null || names.Count == 0)
+			{
+				return result;
+			}
+
+			for (var i = 0; i < names.Count; i++)
+			{
+				var name = names[i];
+				if (string.IsNullOrWhiteSpace(name))
+				{
+					continue;
+				}
+
+				result.Add(name.Trim());
+			}
+
+			return result;
+		}
+
+		/// <summary>
+		/// Refreshes character dropdown options in vocab popup.
+		/// </summary>
+		private void RefreshVocabCharacterOptions()
+		{
+			if (_vocabPopupView == null)
+			{
+				return;
+			}
+
+			_vocabPopupView.SetCharacterOptions(GetSceneCharacterNamesForVocab());
 		}
 
 		private void BindInputFieldEvents()
@@ -1303,6 +1345,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			if (_vocabPopupView != null)
 			{
+				RefreshVocabCharacterOptions();
 				_vocabPopupView.ShowLoading(word);
 			}
 
@@ -1386,6 +1429,54 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				VocabularyId = vocabularyId,
 				Rating = rating
 			});
+		}
+
+		/// <summary>
+		/// Plays pronunciation for the selected vocabulary word using selected character voice.
+		/// </summary>
+		/// <param name="word">Vocabulary word to pronounce.</param>
+		/// <param name="characterName">Selected character name from dropdown.</param>
+		private void HandleVocabAudioPlayRequested(string word, string characterName)
+		{
+			if (string.IsNullOrWhiteSpace(word))
+			{
+				return;
+			}
+
+			var selectedCharacterName = ResolveVocabAudioCharacterName(characterName);
+			if (string.IsNullOrWhiteSpace(selectedCharacterName))
+			{
+				Debug.LogWarning("[ChatView] Cannot play vocab audio because no character is available.", this);
+				return;
+			}
+
+			SendRequest(ChatRequests.PlayMessageAudio, new ChatPlayMessageAudioRequestPayload
+			{
+				CharacterName = selectedCharacterName,
+				Text = StripVocabMarkup(word.Trim()),
+				Tone = DefaultTtsTone,
+			});
+		}
+
+		/// <summary>
+		/// Resolves selected character name, with fallback to first available scene character.
+		/// </summary>
+		/// <param name="selectedCharacterName">Character name selected in dropdown.</param>
+		/// <returns>Character name for TTS request, or null when unavailable.</returns>
+		private string ResolveVocabAudioCharacterName(string selectedCharacterName)
+		{
+			if (!string.IsNullOrWhiteSpace(selectedCharacterName))
+			{
+				return selectedCharacterName.Trim();
+			}
+
+			var availableNames = GetSceneCharacterNamesForVocab();
+			if (availableNames.Count > 0)
+			{
+				return availableNames[0];
+			}
+
+			return null;
 		}
 
 		/// <summary>
