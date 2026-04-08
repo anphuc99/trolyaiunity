@@ -264,6 +264,7 @@ namespace Features.GamePlay.Controller
 			});
 			JournalController.SetParentSignals(new JournalParentSignals { 
 				OnEchoed = OnSubControllerEchoed,
+				GetCharacterNames = GetChatCharacterNames,
 				GetAvatar = GetChatCharacterAvatar, 
 			});
 			MyLogController.SetParentSignals(new MyLogParentSignals

@@ -13,6 +13,7 @@ namespace Features.GamePlay.SubFeatures.Journal.Requests
 		public const string LoadJournalDetail = "game.play.journal.load.detail.request";
 		public const string ShowJournalList = "game.play.journal.show.list.request";
 		public const string PlayMessageAudio = "game.play.journal.play.message.audio.request";
+		public const string GetAllCharacterNames = "game.play.journal.get.all.character.names.request";
 		public const string LookupVocabulary = "game.play.journal.lookup.vocabulary.request";
 
 		/// <summary>

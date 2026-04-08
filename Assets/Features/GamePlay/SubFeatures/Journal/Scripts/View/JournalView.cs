@@ -516,10 +516,26 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		}
 
 		/// <summary>
-		/// Builds distinct character names from loaded journal conversation messages.
+		/// Builds distinct character names for vocab audio dropdown.
 		/// </summary>
 		/// <returns>Distinct non-empty character names.</returns>
 		private List<string> GetVocabCharacterNames()
+		{
+			var allCharacterNames = SendRequest<List<string>>(JournalRequests.GetAllCharacterNames);
+			if (allCharacterNames != null && allCharacterNames.Count > 0)
+			{
+				return NormalizeCharacterNames(allCharacterNames);
+			}
+
+			// Fallback for cases where global character cache is temporarily unavailable.
+			return GetConversationCharacterNames();
+		}
+
+		/// <summary>
+		/// Builds distinct character names from loaded journal conversation messages.
+		/// </summary>
+		/// <returns>Distinct non-empty character names.</returns>
+		private List<string> GetConversationCharacterNames()
 		{
 			var characterNames = new List<string>();
 			if (_currentChatMessages == null || _currentChatMessages.Count == 0)
@@ -555,6 +571,49 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			}
 
 			return characterNames;
+		}
+
+		/// <summary>
+		/// Normalizes and deduplicates character names while preserving order.
+		/// </summary>
+		/// <param name="rawCharacterNames">Raw character name list.</param>
+		/// <returns>Distinct non-empty trimmed names.</returns>
+		private static List<string> NormalizeCharacterNames(List<string> rawCharacterNames)
+		{
+			var result = new List<string>();
+			if (rawCharacterNames == null || rawCharacterNames.Count == 0)
+			{
+				return result;
+			}
+
+			for (var i = 0; i < rawCharacterNames.Count; i++)
+			{
+				var name = rawCharacterNames[i];
+				if (string.IsNullOrWhiteSpace(name))
+				{
+					continue;
+				}
+
+				var normalized = name.Trim();
+				var alreadyAdded = false;
+				for (var j = 0; j < result.Count; j++)
+				{
+					if (!string.Equals(result[j], normalized, StringComparison.Ordinal))
+					{
+						continue;
+					}
+
+					alreadyAdded = true;
+					break;
+				}
+
+				if (!alreadyAdded)
+				{
+					result.Add(normalized);
+				}
+			}
+
+			return result;
 		}
 
 		/// <summary>

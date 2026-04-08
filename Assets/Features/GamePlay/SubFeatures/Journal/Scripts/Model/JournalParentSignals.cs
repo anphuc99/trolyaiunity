@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Features.GamePlay.SubFeatures.Journal.Model
@@ -17,6 +18,11 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 		/// Optional callback for retrieving data from the parent.
 		/// </summary>
 		public Func<string> GetParentStatus { get; set; }
+
+		/// <summary>
+		/// Optional callback for getting all cached character names from parent scope.
+		/// </summary>
+		public Func<List<string>> GetCharacterNames { get; set; }
 
 		public Func<string, Sprite> GetAvatar { get; set; }
 	}

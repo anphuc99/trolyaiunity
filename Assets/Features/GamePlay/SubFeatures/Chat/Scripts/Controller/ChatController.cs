@@ -146,12 +146,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
-		/// Gets normalized character names from parent signals for view dropdown binding.
+		/// Gets normalized character names from parent cache for view dropdown binding.
 		/// </summary>
 		/// <param name="payload">Unused payload.</param>
 		/// <returns>Distinct non-empty character names in original order.</returns>
-		[Request(ChatRequests.GetSceneCharacterNames)]
-		public static List<string> HandleGetSceneCharacterNames(object payload)
+		[Request(ChatRequests.GetAllCharacterNames)]
+		public static List<string> HandleGetAllCharacterNames(object payload)
 		{
 			var names = ChatState.ParentSignals?.GetCharacterNames?.Invoke();
 			var result = new List<string>();

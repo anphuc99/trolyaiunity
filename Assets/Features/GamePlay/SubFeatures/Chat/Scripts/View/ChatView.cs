@@ -712,12 +712,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		}
 
 		/// <summary>
-		/// Loads current scene character names used by vocab pronunciation dropdown.
+		/// Loads all cached character names used by vocab pronunciation dropdown.
 		/// </summary>
 		/// <returns>Distinct non-empty character names.</returns>
-		private List<string> GetSceneCharacterNamesForVocab()
+		private List<string> GetAllCharacterNamesForVocab()
 		{
-			var names = SendRequest<List<string>>(ChatRequests.GetSceneCharacterNames);
+			var names = SendRequest<List<string>>(ChatRequests.GetAllCharacterNames);
 			var result = new List<string>();
 			if (names == null || names.Count == 0)
 			{
@@ -748,7 +748,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			_vocabPopupView.SetCharacterOptions(GetSceneCharacterNamesForVocab());
+			_vocabPopupView.SetCharacterOptions(GetAllCharacterNamesForVocab());
 		}
 
 		private void BindInputFieldEvents()
@@ -1470,7 +1470,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return selectedCharacterName.Trim();
 			}
 
-			var availableNames = GetSceneCharacterNamesForVocab();
+			var availableNames = GetAllCharacterNamesForVocab();
 			if (availableNames.Count > 0)
 			{
 				return availableNames[0];

@@ -147,6 +147,51 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		}
 
 		/// <summary>
+		/// Gets normalized character names from parent cache for view dropdown binding.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		/// <returns>Distinct non-empty character names in original order.</returns>
+		[Request(JournalRequests.GetAllCharacterNames)]
+		public static List<string> HandleGetAllCharacterNames(object payload)
+		{
+			var names = JournalState.ParentSignals?.GetCharacterNames?.Invoke();
+			var result = new List<string>();
+			if (names == null || names.Count == 0)
+			{
+				return result;
+			}
+
+			for (var i = 0; i < names.Count; i++)
+			{
+				var name = names[i];
+				if (string.IsNullOrWhiteSpace(name))
+				{
+					continue;
+				}
+
+				var normalizedName = name.Trim();
+				var alreadyAdded = false;
+				for (var j = 0; j < result.Count; j++)
+				{
+					if (!string.Equals(result[j], normalizedName, StringComparison.Ordinal))
+					{
+						continue;
+					}
+
+					alreadyAdded = true;
+					break;
+				}
+
+				if (!alreadyAdded)
+				{
+					result.Add(normalizedName);
+				}
+			}
+
+			return result;
+		}
+
+		/// <summary>
 		/// Handles vocabulary word lookup from journal detail chat.
 		/// </summary>
 		/// <param name="payload">Lookup request payload with word.</param>
