@@ -237,7 +237,6 @@ export const createTtsAudio = async (
  * @param voiceName - Gemini prebuilt voice name.
  * @param pitch - Optional pitch adjustment.
  * @param speakingRate - Optional playback speed multiplier.
- * @param recentTurns - Optional recent dialogue lines (max 5) for no-audio rewrite fallback context.
  * @returns The audio file id.
  */
 export const createGeminiTtsAudio = async (
@@ -246,12 +245,11 @@ export const createGeminiTtsAudio = async (
   audioId: string,
   voiceName: string,
   pitch?: number,
-  speakingRate?: number,
-  recentTurns?: string[]
+  speakingRate?: number
 ) => {
   await fs.mkdir(AUDIO_DIR, { recursive: true });
 
-  const wavBuffer = await synthesizeGeminiTts(clampText(text), voiceName, tone, recentTurns);
+  const wavBuffer = await synthesizeGeminiTts(clampText(text), voiceName, tone);
   const mp3Buffer = await convertWavToMp3(wavBuffer, pitch, speakingRate);
   const filePath = path.join(AUDIO_DIR, `${audioId}.mp3`);
   await fs.writeFile(filePath, mp3Buffer);

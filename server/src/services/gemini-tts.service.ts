@@ -24,7 +24,6 @@ let keyIndex = 0;
 const RETRYABLE_STATUS_CODES = [400, 429, 500, 502, 503, 504];
 const NO_AUDIO_ERROR_MARKER = "gemini tts returned no audio data";
 const HANZI_REGEX = /[\u3400-\u9FFF\uF900-\uFAFF]/;
-const MAX_NO_AUDIO_CONTEXT_TURNS = 5;
 
 /**
  * Reads GEMINI_API_KEY_VOICE1 … GEMINI_API_KEY_VOICE4 from env once.
@@ -107,13 +106,6 @@ const buildStyledPrompt = (text: string, tone?: string): string => {
 };
 
 const containsHanzi = (text: string): boolean => HANZI_REGEX.test(text);
-
-const normalizeRecentTurns = (recentTurns?: string[]): string[] => {
-  return (recentTurns ?? [])
-    .map((turn) => (typeof turn === "string" ? turn.trim() : ""))
-    .filter((turn) => turn.length > 0)
-    .slice(-MAX_NO_AUDIO_CONTEXT_TURNS);
-};
 
 const hasRetryableStatusCode = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : String(error ?? "");
@@ -219,15 +211,9 @@ const wrapPcmInWav = (pcm: Buffer, sampleRate: number): Buffer => {
  * @param text - Text to synthesise.
  * @param voiceName - Gemini prebuilt voice name (e.g. "Kore", "Puck").
  * @param tone - Optional style/tone instruction from client (e.g. "neutral, medium pitch").
- * @param recentTurns - Optional recent dialogue turns (max 5) used for no-audio rewrite fallback.
  * @returns WAV audio buffer ready for ffmpeg post-processing.
  */
-export const synthesizeGeminiTts = async (
-  text: string,
-  voiceName: string,
-  tone?: string,
-  recentTurns?: string[]
-): Promise<Buffer> => {
+export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?: string): Promise<Buffer> => {
   const maxAttempts = getConfiguredGeminiVoiceKeyCount();
 
   const synthesizeWithPromptText = async (
@@ -315,9 +301,7 @@ export const synthesizeGeminiTts = async (
             }
 
             if (fallbackPromptText && fallbackPromptText !== promptTextSource) {
-              console.warn(
-                `[GeminiTTS] no-audio on key slot ${keySlot}; retrying same key with semantic fallback prompt.`
-              );
+              console.warn(`[GeminiTTS] no-audio on key slot ${keySlot}; retrying same key with pinyin fallback.`);
               try {
                 return await synthesizeWithModelPrompt(fallbackPromptText);
               } catch (fallbackError) {
@@ -353,30 +337,6 @@ export const synthesizeGeminiTts = async (
     throw new Error("Gemini TTS requires non-empty input text");
   }
 
-  const noAudioContextTurns = normalizeRecentTurns(recentTurns);
-
-  let cachedNoAudioRewriteText: string | null = null;
-  const resolveNoAudioRewriteText = async (): Promise<string> => {
-    if (cachedNoAudioRewriteText !== null) {
-      return cachedNoAudioRewriteText;
-    }
-
-    cachedNoAudioRewriteText = "";
-
-    try {
-      const cheapAI = createCheapAIService();
-      const rewritten = await cheapAI.rewriteTextForTtsNoAudio(inputText, noAudioContextTurns, tone);
-
-      if (rewritten && rewritten !== inputText) {
-        cachedNoAudioRewriteText = rewritten;
-      }
-    } catch (rewriteError) {
-      console.warn(`[GeminiTTS] failed to rewrite no-audio fallback text: ${String(rewriteError)}`);
-    }
-
-    return cachedNoAudioRewriteText;
-  };
-
   let cachedPinyinText: string | null = null;
   const resolvePinyinText = async (): Promise<string> => {
     if (cachedPinyinText !== null) {
@@ -399,7 +359,7 @@ export const synthesizeGeminiTts = async (
   };
 
   try {
-    return await synthesizeWithPromptText(inputText, resolveNoAudioRewriteText);
+    return await synthesizeWithPromptText(inputText, resolvePinyinText);
   } catch (baseError) {
     if (!containsHanzi(inputText) || !shouldFallbackByError(baseError)) {
       throw baseError instanceof Error ? baseError : new Error("Gemini TTS failed");

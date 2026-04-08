@@ -89,16 +89,8 @@ namespace Share.Utils
 		/// <param name="tone">Tone hint (defaults to neutral).</param>
 		/// <param name="characterName">Character name (defaults to Mimi).</param>
 		/// <param name="forceReload">Whether to force regeneration.</param>
-		/// <param name="messageId">Optional message id for backend context lookup.</param>
-		/// <param name="recentTurns">Optional recent dialogue lines for semantic TTS fallback context.</param>
 		/// <returns>Query string starting with '?'.</returns>
-		public static string BuildTextToSpeechQuery(
-			string text,
-			string tone,
-			string characterName,
-			bool forceReload = false,
-			string messageId = null,
-			IList<string> recentTurns = null)
+		public static string BuildTextToSpeechQuery(string text, string tone, string characterName, bool forceReload = false)
 		{
 			var queryParts = new List<string>
 			{
@@ -110,37 +102,6 @@ namespace Share.Utils
 			if (forceReload)
 			{
 				queryParts.Add("force=true");
-			}
-
-			if (!string.IsNullOrWhiteSpace(messageId))
-			{
-				queryParts.Add("messageId=" + Uri.EscapeDataString(messageId.Trim()));
-			}
-
-			if (recentTurns != null && recentTurns.Count > 0)
-			{
-				var normalizedTurns = new List<string>();
-
-				for (var i = 0; i < recentTurns.Count; i++)
-				{
-					var turn = recentTurns[i];
-					if (string.IsNullOrWhiteSpace(turn))
-					{
-						continue;
-					}
-
-					normalizedTurns.Add(turn.Trim());
-				}
-
-				if (normalizedTurns.Count > 5)
-				{
-					normalizedTurns.RemoveRange(0, normalizedTurns.Count - 5);
-				}
-
-				if (normalizedTurns.Count > 0)
-				{
-					queryParts.Add("recentTurns=" + Uri.EscapeDataString(string.Join("\n", normalizedTurns)));
-				}
 			}
 
 			return "?" + string.Join("&", queryParts);
