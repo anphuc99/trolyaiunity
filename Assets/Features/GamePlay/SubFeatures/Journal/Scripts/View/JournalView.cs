@@ -67,7 +67,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		private Button _downloadAudioButton;
 
 		[SerializeField]
-		private ChatPopupVocabView _vocabPopupView;
+		private SharedVocabularyPopupView _vocabPopupView;
 
 		private readonly List<JournalItemView> _spawnedListItems = new List<JournalItemView>();
 		private readonly HashSet<int> _reloadingTtsMessageIndices = new HashSet<int>();
@@ -367,12 +367,12 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		{
 			if (_vocabPopupView == null && _chatVariantRoot != null)
 			{
-				_vocabPopupView = _chatVariantRoot.GetComponentInChildren<ChatPopupVocabView>(true);
+				_vocabPopupView = _chatVariantRoot.GetComponentInChildren<SharedVocabularyPopupView>(true);
 			}
 
 			if (_vocabPopupView == null)
 			{
-				_vocabPopupView = FindObjectOfType<ChatPopupVocabView>(true);
+				_vocabPopupView = FindFirstObjectByType<SharedVocabularyPopupView>(FindObjectsInactive.Include);
 			}
 
 			if (_vocabPopupView == null)

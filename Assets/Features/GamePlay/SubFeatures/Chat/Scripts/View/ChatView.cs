@@ -58,7 +58,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private Button _sendButton;
 
 		[SerializeField]
-		private ChatPopupVocabView _vocabPopupView;
+		private SharedVocabularyPopupView _vocabPopupView;
 
 		[SerializeField]
 		private TextMeshProUGUI _countVocabText;
@@ -1327,7 +1327,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			if (_vocabPopupView != null)
 			{
-				_vocabPopupView.ShowResult(result);
+				_vocabPopupView.ShowResult(result.Id, result.Word, result.Pinyin, result.Vietnamese);
 			}
 		}
 
@@ -1372,15 +1372,20 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		/// <summary>
 		/// Handles vocab review rating from the popup and forwards to controller.
 		/// </summary>
-		/// <param name="payload">Review request payload from popup.</param>
-		private void HandleVocabReviewRequested(ChatVocabReviewRequestPayload payload)
+		/// <param name="vocabularyId">Reviewed vocabulary id.</param>
+		/// <param name="rating">FSRS rating value.</param>
+		private void HandleVocabReviewRequested(string vocabularyId, int rating)
 		{
-			if (payload == null)
+			if (string.IsNullOrWhiteSpace(vocabularyId))
 			{
 				return;
 			}
 
-			SendRequest(ChatRequests.ReviewVocabulary, payload);
+			SendRequest(ChatRequests.ReviewVocabulary, new ChatVocabReviewRequestPayload
+			{
+				VocabularyId = vocabularyId,
+				Rating = rating
+			});
 		}
 
 		/// <summary>
