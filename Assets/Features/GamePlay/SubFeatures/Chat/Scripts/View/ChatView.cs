@@ -76,6 +76,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private bool _isContextPopupInitialized;
 		private bool _isRecordingVoice;
 		private bool _isTranscribingVoice;
+		private bool _isVocabAudioRequestInProgress;
 		private string _recordingDeviceName;
 		private AudioClip _recordingAudioClip;
 		private Image _recordButtonImage;
@@ -1206,6 +1207,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[OnEvent(ChatEvents.MessageAudioPlayRequested)]
 		private void OnMessageAudioPlayRequested(object payload)
 		{
+			if (_isVocabAudioRequestInProgress)
+			{
+				SetVocabAudioRequestInProgress(false);
+			}
+
 			var playback = payload as ChatPlayMessageAudioPayload;
 			if (playback == null || string.IsNullOrWhiteSpace(playback.Text))
 			{
@@ -1345,6 +1351,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			if (_vocabPopupView != null)
 			{
+				SetVocabAudioRequestInProgress(false);
 				RefreshVocabCharacterOptions();
 				_vocabPopupView.ShowLoading(word);
 			}
@@ -1370,6 +1377,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			if (_vocabPopupView != null)
 			{
+				SetVocabAudioRequestInProgress(false);
 				_vocabPopupView.ShowResult(result.Id, result.Word, result.Pinyin, result.Vietnamese);
 			}
 		}
@@ -1450,6 +1458,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
+			SetVocabAudioRequestInProgress(true);
+
 			SendRequest(ChatRequests.PlayMessageAudio, new ChatPlayMessageAudioRequestPayload
 			{
 				CharacterName = selectedCharacterName,
@@ -1486,8 +1496,26 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[OnEvent(ChatEvents.RequestFailed)]
 		private void OnRequestFailed(object payload)
 		{
+			if (_isVocabAudioRequestInProgress)
+			{
+				SetVocabAudioRequestInProgress(false);
+			}
+
 			var error = payload as ChatErrorPayload;
 			Debug.LogWarning("[ChatView] Chat request failed: " + (error?.Message ?? "Unknown error"), this);
+		}
+
+		/// <summary>
+		/// Updates vocab-audio request progress state in popup UI.
+		/// </summary>
+		/// <param name="isInProgress">True while waiting for server TTS response.</param>
+		private void SetVocabAudioRequestInProgress(bool isInProgress)
+		{
+			_isVocabAudioRequestInProgress = isInProgress;
+			if (_vocabPopupView != null)
+			{
+				_vocabPopupView.SetAudioRequestInProgress(isInProgress);
+			}
 		}
 	}
 }

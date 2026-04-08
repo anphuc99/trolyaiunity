@@ -59,6 +59,11 @@ namespace Share.Components
         /// </summary>
         private bool _isLoading;
 
+        /// <summary>
+        /// True while waiting for vocabulary audio response from server.
+        /// </summary>
+        private bool _isAudioRequestInProgress;
+
         private void Awake()
         {
             if (_ratingAgainButton != null)
@@ -159,6 +164,17 @@ namespace Share.Components
         }
 
         /// <summary>
+        /// Updates vocab-audio request progress state.
+        /// While true, speaker button is hidden until server response arrives.
+        /// </summary>
+        /// <param name="isInProgress">True when waiting for server audio generation.</param>
+        public void SetAudioRequestInProgress(bool isInProgress)
+        {
+            _isAudioRequestInProgress = isInProgress;
+            UpdateAudioControlsState();
+        }
+
+        /// <summary>
         /// Replaces character dropdown options used for pronunciation playback.
         /// </summary>
         /// <param name="characterNames">Character display names.</param>
@@ -207,6 +223,7 @@ namespace Share.Components
         public void ShowLoading(string word)
         {
             _currentVocabularyId = null;
+            _isAudioRequestInProgress = false;
             gameObject.SetActive(true);
 
             if (_vocabText != null)
@@ -239,6 +256,7 @@ namespace Share.Components
         public void ShowResult(string id, string word, string pinyin, string meaning)
         {
             _currentVocabularyId = id;
+            _isAudioRequestInProgress = false;
 
             if (_vocabText != null)
             {
@@ -301,6 +319,7 @@ namespace Share.Components
         {
             var wasVisible = gameObject.activeSelf;
             _currentVocabularyId = null;
+            _isAudioRequestInProgress = false;
             gameObject.SetActive(false);
             UpdateAudioControlsState();
 
@@ -455,15 +474,16 @@ namespace Share.Components
             var hasCallback = _onPlayAudioRequested != null;
             var hasCharacterSelection = _characterDropdown == null
                 || (_characterDropdown.options != null && _characterDropdown.options.Count > 0);
-            var canPlay = gameObject.activeSelf && !_isLoading && hasWord && hasCallback && hasCharacterSelection;
+            var canPlay = gameObject.activeSelf && !_isLoading && !_isAudioRequestInProgress && hasWord && hasCallback && hasCharacterSelection;
 
             if (_characterDropdown != null)
             {
-                _characterDropdown.interactable = gameObject.activeSelf && !_isLoading && hasCharacterSelection;
+                _characterDropdown.interactable = gameObject.activeSelf && !_isLoading && !_isAudioRequestInProgress && hasCharacterSelection;
             }
 
             if (_playAudioButton != null)
             {
+                _playAudioButton.gameObject.SetActive(!_isAudioRequestInProgress);
                 _playAudioButton.interactable = canPlay;
             }
         }

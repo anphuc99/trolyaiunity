@@ -99,6 +99,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		/// True while an audio download is in progress.
 		/// </summary>
 		private bool _isDownloadingAudio;
+		private bool _isVocabAudioRequestInProgress;
 
 		/// <summary>
 		/// Requests journal list from API.
@@ -181,6 +182,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		[OnEvent(JournalEvents.RequestFailed)]
 		private void OnRequestFailed(object payload)
 		{
+			if (_isVocabAudioRequestInProgress)
+			{
+				SetVocabAudioRequestInProgress(false);
+			}
+
 			var message = (payload as JournalErrorPayload)?.Message;
 			if (string.IsNullOrWhiteSpace(message))
 			{
@@ -222,6 +228,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				return;
 			}
 
+			SetVocabAudioRequestInProgress(false);
 			_vocabPopupView.ShowResult(result.Id, result.Word, result.Pinyin, result.Vietnamese);
 		}
 
@@ -232,6 +239,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		[OnEvent(JournalEvents.MessageAudioPlayRequested)]
 		private void OnMessageAudioPlayRequested(object payload)
 		{
+			if (_isVocabAudioRequestInProgress)
+			{
+				SetVocabAudioRequestInProgress(false);
+			}
+
 			if (payload is not JournalPlayMessageAudioPayload audioPayload)
 			{
 				return;
@@ -397,6 +409,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			EnsureVocabPopupBindings();
 			if (_vocabPopupView != null)
 			{
+				SetVocabAudioRequestInProgress(false);
 				RefreshVocabCharacterOptions();
 				_vocabPopupView.ShowLoading(word);
 			}
@@ -635,6 +648,8 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				return;
 			}
 
+			SetVocabAudioRequestInProgress(true);
+
 			SendRequest(JournalRequests.PlayMessageAudio, new JournalPlayMessageAudioRequestPayload
 			{
 				MessageIndex = -1,
@@ -663,6 +678,19 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 			}
 
 			return null;
+		}
+
+		/// <summary>
+		/// Updates vocab-audio request progress state in popup UI.
+		/// </summary>
+		/// <param name="isInProgress">True while waiting for server TTS response.</param>
+		private void SetVocabAudioRequestInProgress(bool isInProgress)
+		{
+			_isVocabAudioRequestInProgress = isInProgress;
+			if (_vocabPopupView != null)
+			{
+				_vocabPopupView.SetAudioRequestInProgress(isInProgress);
+			}
 		}
 
 		private void HandleMessageSpeakerClicked(MessageBubbleData messageData)
