@@ -14,7 +14,8 @@
         "Unity.TextMeshPro",
         "GamePlay.Setting",
         "GamePlay.MyLog",
-        "GamePlay.LearningPath"
+        "GamePlay.LearningPath",
+        "GamePlay.PracticeVocabulary"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -50,6 +50,7 @@ namespace Core.Infrastructure.Network
 		public const string CharacterRelationshipsEvaluateSession = "/api/character-relationships/evaluate-session";
 		public const string VocabularyLookup = "/api/vocabulary/lookup";
 		public const string VocabularyLearnedCount = "/api/vocabulary/learned-count";
+		public const string VocabularyDue = "/api/vocabulary/due";
 		public const string VocabularyReview = "/api/vocabulary";
 	}
 }

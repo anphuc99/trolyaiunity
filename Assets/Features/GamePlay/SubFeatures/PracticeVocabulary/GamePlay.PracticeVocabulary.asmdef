@@ -1,0 +1,17 @@
+{
+    "name": "GamePlay.PracticeVocabulary",
+    "rootNamespace": "",
+    "references": [
+        "Core",
+        "Share"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
