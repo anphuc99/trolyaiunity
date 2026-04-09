@@ -9,15 +9,11 @@ import StoryEntity from "../../models/story.entity.js";
 import UserEntity from "../../models/user.entity.js";
 import CharacterEntity from "../../models/character.entity.js";
 import CharacterRelationshipEntity from "../../models/character-relationship.entity.js";
-import LearningPathEntity from "../../models/learning-path.entity.js";
-import VocabularyEntity from "../../models/vocabulary.entity.js";
-import VocabularyReviewEntity from "../../models/vocabulary-review.entity.js";
 import { createChatHistoryStore, type ChatHistoryMessage, type ChatHistoryStore } from "../../services/chat-history.service.js";
 import { createVectorMemoryService, type VectorMemoryService } from "../../services/vector-memory.service.js";
 import { extractMemorySidecars, shouldStoreMemory, buildMemoryItemFromCandidate, stripMemorySidecar } from "../../services/memory-extraction.service.js";
 import { createMemoryRetrievalService, type MemoryRetrievalService } from "../../services/memory-retrieval.service.js";
 import { createCheapAIService } from "../../services/cheap-ai.service.js";
-import { VocabularyProducer } from "../../services/VocabularyProducer.js";
 
 interface ChatController {
   sendMessage: (request: Request, response: Response) => Promise<void>;
@@ -74,15 +70,6 @@ interface JsonReplyResult {
 
 const MAX_AUDIO_BYTES = 12 * 1024 * 1024;
 const DEFAULT_TRANSCRIBE_LANGUAGE = "zh";
-const LEARNING_PATH_VOCAB_REMINDER_MARKER = "LearningPathVocabularyReminder: true";
-const STOP_VOCAB_REMINDER_MARKER = "LearningPathVocabularyStop: true";
-
-const buildLearningPathVocabularyStopContext = () => {
-  return [
-    STOP_VOCAB_REMINDER_MARKER,
-    "You have successfully used the vocabulary. For the next few turns, please STOP forcing vocabulary words, STOP highlighting words with double asterisks **, and respond completely naturally to the user."
-  ].join("\n");
-};
 
 /**
  * Parses a base64 audio data URL and extracts mime type + binary buffer.
@@ -127,9 +114,6 @@ export const createChatController = (
   const storyRepository = dataSource.getRepository(StoryEntity);
   const characterRepository = dataSource.getRepository(CharacterEntity);
   const relationshipRepository = dataSource.getRepository(CharacterRelationshipEntity);
-  const learningPathRepository = dataSource.getRepository(LearningPathEntity);
-  const vocabularyRepository = dataSource.getRepository(VocabularyEntity);
-  const vocabularyReviewRepository = dataSource.getRepository(VocabularyReviewEntity);
 
   // OpenAI configuration
   const openAIApiKey = process.env.OPENAI_API_KEY ?? "";
@@ -622,249 +606,6 @@ export const createChatController = (
     return null;
   };
 
-  const normalizeForComparison = (value: string) => value.trim().toLowerCase();
-
-  const shuffleInPlace = <T,>(items: T[]) => {
-    for (let i = items.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [items[i], items[j]] = [items[j], items[i]];
-    }
-    return items;
-  };
-
-  const randomIntInRange = (min: number, max: number) => {
-    const lower = Math.ceil(min);
-    const upper = Math.floor(max);
-    return Math.floor(Math.random() * (upper - lower + 1)) + lower;
-  };
-
-  const parseLearningPathVocabularyItems = (rawVocabulary: string) => {
-    return rawVocabulary
-      .split(/\r?\n|,|;|\u30fb|\u3001|\uFF0C/g)
-      .map((item) => item.trim())
-      .filter((item) => Boolean(item));
-  };
-
-  const getAssistantUtterances = (history: { role: string; content: string }[]) => {
-    const utterances: string[] = [];
-
-    for (const message of history) {
-      if (message.role !== "assistant") {
-        continue;
-      }
-
-      const turns = parseAssistantReply(message.content);
-      if (!turns.length) {
-        if (message.content.trim()) {
-          utterances.push(message.content.trim());
-        }
-        continue;
-      }
-
-      for (const turn of turns) {
-        const text = typeof turn.Text === "string" ? turn.Text.trim() : "";
-        if (text) {
-          utterances.push(text);
-        }
-      }
-    }
-
-    return utterances;
-  };
-
-  const buildLearningPathVocabularyReminderContext = (vocabularyItems: string[]) => {
-    return [
-      LEARNING_PATH_VOCAB_REMINDER_MARKER,
-      "Learning path vocabulary reminder:",
-      "Please try to naturally use these vocabulary items in your NEXT reply.",
-      "IMPORTANT: When you use any of these vocabulary words in the Text field, wrap ONLY the vocabulary word itself with double asterisks **. For example, if the word is 爱, write 我**爱**你. Do NOT wrap non-vocabulary words.",
-      ...vocabularyItems.map((item, index) => `${index + 1}. ${item}`),
-      "Keep the dialogue natural and relevant to the current learning path context."
-    ].join("\n");
-  };
-
-  const shouldInjectLearningPathVocabularyReminder = (userMessagesSinceLastReminder: number) => {
-    if (userMessagesSinceLastReminder < 3) {
-      return false;
-    }
-    return true;
-  };
-
-  const maybeInjectLearningPathVocabularyReminder = async (
-    userId: number,
-    history: ChatHistoryMessage[]
-  ) => {
-    // Load all learning paths for the user from DB
-    const learningPaths = await learningPathRepository.find({ where: { userId } });
-    if (!learningPaths.length) {
-      return false;
-    }
-
-    // Collect all vocabulary items from all learning paths
-    const allVocabulary: string[] = [];
-    for (const lp of learningPaths) {
-      const items = parseLearningPathVocabularyItems(lp.vocabulary);
-      allVocabulary.push(...items);
-    }
-
-    if (!allVocabulary.length) {
-      return false;
-    }
-
-    // Check which vocabulary has already been used in assistant utterances
-    const assistantUtterances = getAssistantUtterances(history)
-      .map((line) => normalizeForComparison(line))
-      .filter((line) => Boolean(line));
-
-    const remainingVocabulary = allVocabulary.filter((item) => {
-      const normalizedItem = normalizeForComparison(item);
-      if (!normalizedItem) {
-        return false;
-      }
-      return !assistantUtterances.some((line) => line.includes(normalizedItem));
-    });
-
-    if (!remainingVocabulary.length) {
-      return false;
-    }
-
-    // Find last vocabulary reminder in history
-    let lastReminderIndex = -1;
-    let lastStopIndex = -1;
-    for (let i = history.length - 1; i >= 0; i -= 1) {
-      const message = history[i];
-      if (message.role !== "developer") {
-        continue;
-      }
-
-      if (lastReminderIndex === -1 && message.content.includes(LEARNING_PATH_VOCAB_REMINDER_MARKER)) {
-        lastReminderIndex = i;
-      }
-      if (lastStopIndex === -1 && message.content.includes(STOP_VOCAB_REMINDER_MARKER)) {
-        lastStopIndex = i;
-      }
-      if (lastReminderIndex !== -1 && lastStopIndex !== -1) {
-        break;
-      }
-    }
-
-    // Count user messages since last reminder (or from start if no reminder yet)
-    let userMessagesSinceLastReminder = 1;
-    for (let i = lastReminderIndex + 1; i < history.length; i += 1) {
-      if (history[i].role === "user") {
-        userMessagesSinceLastReminder += 1;
-      }
-    }
-
-    if (!shouldInjectLearningPathVocabularyReminder(userMessagesSinceLastReminder)) {
-      if (lastReminderIndex > lastStopIndex && userMessagesSinceLastReminder >= 2) {
-        const context = buildLearningPathVocabularyStopContext();
-        const developerMessage = formatContextMessage({ context });
-        if (developerMessage) {
-          await historyStore.append(userId, [{ role: "developer", content: developerMessage }]);
-          return true;
-        }
-      }
-      return false;
-    }
-
-    // Categorize vocabulary: due-for-review vs new (not in DB) vs not-due (skip)
-    const now = new Date();
-    const userVocabularies = await vocabularyRepository.find({ where: { userId } });
-    const koreanToVocabId = new Map<string, string>();
-    for (const v of userVocabularies) {
-      koreanToVocabId.set(normalizeForComparison(v.korean), v.id);
-    }
-
-    const vocabIdsInRemaining: string[] = [];
-    for (const item of remainingVocabulary) {
-      const vocabId = koreanToVocabId.get(normalizeForComparison(item));
-      if (vocabId) {
-        vocabIdsInRemaining.push(vocabId);
-      }
-    }
-
-    
-    // Batch-load reviews for all matched vocabulary items
-    const reviewMap = new Map<string, VocabularyReviewEntity>();
-    if (vocabIdsInRemaining.length > 0) {
-      const reviews = await vocabularyReviewRepository
-      .createQueryBuilder("r")
-      .where("r.vocabulary_id IN (:...ids)", { ids: vocabIdsInRemaining })
-      .getMany();
-      for (const r of reviews) {
-        reviewMap.set(r.vocabularyId, r);
-      }
-    }
-    const vocabProducer = new VocabularyProducer(dataSource);
-    const dueForReview: string[] = (await vocabProducer.getDueVocabularies(userId)).map((v) => v.korean);
-    const newWords: string[] = [];
-    
-    console.log(`[Vocab] remainingVocabulary: ${remainingVocabulary.length}, vocabIdsInRemaining: ${dueForReview.length}`);
-    console.log(`[Vocab] dueForReview: ${dueForReview.join(", ")}`);
-    // Lấy chuỗi ngày giờ hiện tại chuẩn GMT để so sánh
-    const nowTime = Date.now();
-
-    for (const item of remainingVocabulary) {
-      const normalizedItem = normalizeForComparison(item);
-      const vocabId = koreanToVocabId.get(normalizedItem);
-
-      if (!vocabId) {
-        // Word not in vocabulary DB → new word
-        newWords.push(item);
-        continue;
-      }
-
-      const review = reviewMap.get(vocabId);
-      if (!review) {
-        // In vocabulary DB but no review record → treat as due
-        continue;
-      }
-
-      // else: not due yet → skip this word entirely to avoid forcing early review
-    }
-
-    console.log("dueForReviewCount:", dueForReview.length);
-    console.log("newWordsCount:", newWords.length);
-
-
-    const eligibleCount = dueForReview.length + newWords.length;
-    if (eligibleCount === 0) {
-      return false;
-    }
-
-    const maxPick = Math.min(5, eligibleCount);
-    const minPick = Math.min(3, maxPick);
-    const pickCount = randomIntInRange(minPick, maxPick);
-
-    // Priority selection: ONLY use new words to fill up the required count if due words are not enough.
-    const shuffledDue = shuffleInPlace([...dueForReview]);
-    const shuffledNew = shuffleInPlace([...newWords]);
-
-    let selected: string[] = [];
-
-    // Ưu tiên bốc hết các từ đến hạn (hoặc lấy đủ số lượng pickCount)
-    if (shuffledDue.length >= pickCount) {
-      selected = shuffledDue.slice(0, pickCount);
-    } else {
-      // Nếu từ đến hạn không đủ, lấy hết từ đến hạn và bốc bù thêm từ mới
-      const neededNewWords = pickCount - shuffledDue.length;
-      selected = [...shuffledDue, ...shuffledNew.slice(0, neededNewWords)];
-    }
-
-    // Shuffle lại lần cuối để từ mới và từ cũ xen kẽ nhau ngẫu nhiên
-    selected = shuffleInPlace(selected);
-
-    const context = buildLearningPathVocabularyReminderContext(selected);
-    const developerMessage = formatContextMessage({ context });
-    if (!developerMessage) {
-      return false;
-    }
-
-    await historyStore.append(userId, [{ role: "developer", content: developerMessage }]);
-    return true;
-  };
-
   const parseAssistantEditNote = (content: string) => {
     const englishMatch = content.match(/^Assistant\s+message\s+edited:\s+([^\.\n]+)\./i);
     const vietnameseMatch = content.match(/^Chat\s+co\s+messageID\s+duoc\s+sua\s+thanh\s+([^\.\n]+)\./i);
@@ -1095,11 +836,7 @@ export const createChatController = (
 
       const systemPrompt = await buildSystemPrompt(request.user.id, request.body, message);
       await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
-      let history = await historyStore.load(request.user.id);
-      const injectedLearningPathContext = await maybeInjectLearningPathVocabularyReminder(request.user.id, history);
-      if (injectedLearningPathContext) {
-        history = await historyStore.load(request.user.id);
-      }
+      const history = await historyStore.load(request.user.id);
       console.log("[Chat] Sending to AI — model:", modelOverride || openAIModel, "| message:", effectiveMessage.slice(0, 300));
 
       const result = await requestJsonReplyWithRetry(

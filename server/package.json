@@ -11,6 +11,7 @@
     "db:sync": "tsx src/scripts/db-sync.ts",
     "db:reset": "tsx src/scripts/db-reset.ts",
     "db:seed:levels": "tsx src/scripts/seed-levels.ts",
+    "db:cleanup:vocab-markers": "tsx src/scripts/cleanup-vocab-markers.ts",
     "dbserver:sync": "node dist/scripts/db-sync.js",
     "dbserver:reset": "node dist/scripts/db-reset.js",
     "dbserver:seed:levels": "node dist/scripts/seed-levels.js",
