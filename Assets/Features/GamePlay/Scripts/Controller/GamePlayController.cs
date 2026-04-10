@@ -281,7 +281,14 @@ namespace Features.GamePlay.Controller
 				OpenJournal = OpenMyLogJournal,
 			});
 			PracticeController.SetParentSignals(new PracticeParentSignals { OnEchoed = OnSubControllerEchoed });
-			PracticeVocabularyController.SetParentSignals(new PracticeVocabularyParentSignals { OnEchoed = OnSubControllerEchoed });
+			PracticeVocabularyController.SetParentSignals(new PracticeVocabularyParentSignals
+			{
+				OnEchoed = OnSubControllerEchoed,
+				GetCharacterNames = GetChatCharacterNames,
+				GetCharacterVoiceNameByName = GetChatCharacterVoiceName,
+				GetCharacterPitchByName = GetChatCharacterPitch,
+				GetCharacterSpeakingRateByName = GetChatCharacterSpeakingRate,
+			});
 			StoryController.SetParentSignals(new StoryParentSignals { OnEchoed = OnSubControllerEchoed });
 			TaskController.SetParentSignals(new TaskParentSignals { OnEchoed = OnSubControllerEchoed });
 			SettingController.SetParentSignals(new SettingParentSignals

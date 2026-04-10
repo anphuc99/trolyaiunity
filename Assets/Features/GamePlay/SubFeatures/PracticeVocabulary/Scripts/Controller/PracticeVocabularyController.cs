@@ -5,9 +5,11 @@ using Features.GamePlay.SubFeatures.PracticeVocabulary.Model;
 using Features.GamePlay.SubFeatures.PracticeVocabulary.Requests;
 using Core.Infrastructure.Network;
 using Newtonsoft.Json;
+using Share.Utils;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Controller
 {
@@ -108,6 +110,67 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Controller
 		}
 
 		/// <summary>
+		/// Gets all cached character names from parent scope for pronunciation dropdown.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		/// <returns>Distinct non-empty character names.</returns>
+		[Request(PracticeVocabularyRequests.GetAllCharacterNames)]
+		public static List<string> HandleGetAllCharacterNames(object payload)
+		{
+			var names = PracticeVocabularyState.ParentSignals?.GetCharacterNames?.Invoke();
+			if (names == null || names.Count == 0)
+			{
+				return new List<string>();
+			}
+
+			var normalized = new List<string>();
+			var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			for (var i = 0; i < names.Count; i++)
+			{
+				var name = names[i];
+				if (string.IsNullOrWhiteSpace(name))
+				{
+					continue;
+				}
+
+				var safeName = name.Trim();
+				if (!seen.Add(safeName))
+				{
+					continue;
+				}
+
+				normalized.Add(safeName);
+			}
+
+			normalized.Sort(StringComparer.OrdinalIgnoreCase);
+			return normalized;
+		}
+
+		/// <summary>
+		/// Handles vocab audio playback requests from the view.
+		/// </summary>
+		/// <param name="payload">Audio request payload.</param>
+		[Request(PracticeVocabularyRequests.PlayVocabularyAudio)]
+		public static void HandlePlayVocabularyAudio(PracticeVocabularyPlayAudioRequestPayload payload)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.Text))
+			{
+				PublishError("Missing vocabulary content for audio playback.");
+				return;
+			}
+
+			_ = PlayVocabularyAudioInternalAsync(payload);
+		}
+
+		private sealed class ResolvedTtsPayload
+		{
+			public string Url;
+			public string Text;
+			public string Pinyin;
+			public bool Rewritten;
+		}
+
+		/// <summary>
 		/// Calls server due endpoint and publishes parsed response.
 		/// </summary>
 		/// <returns>Awaitable task.</returns>
@@ -180,6 +243,115 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Controller
 			catch (Exception exception)
 			{
 				PublishError("Failed to submit vocabulary review: " + exception.Message);
+			}
+		}
+
+		/// <summary>
+		/// Resolves vocabulary TTS URL, downloads audio clip and publishes playback event.
+		/// </summary>
+		/// <param name="payload">Audio request payload.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task PlayVocabularyAudioInternalAsync(PracticeVocabularyPlayAudioRequestPayload payload)
+		{
+			try
+			{
+				var safeText = payload.Text.Trim();
+				var characterName = string.IsNullOrWhiteSpace(payload.CharacterName)
+					? string.Empty
+					: payload.CharacterName.Trim();
+
+				var voiceName = string.IsNullOrWhiteSpace(characterName)
+					? null
+					: PracticeVocabularyState.ParentSignals?.GetCharacterVoiceNameByName?.Invoke(characterName);
+
+				var pitch = string.IsNullOrWhiteSpace(characterName)
+					? null
+					: PracticeVocabularyState.ParentSignals?.GetCharacterPitchByName?.Invoke(characterName);
+
+				var speakingRate = string.IsNullOrWhiteSpace(characterName)
+					? null
+					: PracticeVocabularyState.ParentSignals?.GetCharacterSpeakingRateByName?.Invoke(characterName);
+
+				var resolvedTts = await ResolveTtsAudioUrlAsync(
+					safeText,
+					payload.Tone,
+					characterName,
+					payload.ForceReload);
+				var audioUrl = resolvedTts != null ? resolvedTts.Url : null;
+
+				AudioClip audioClip = null;
+				if (!string.IsNullOrWhiteSpace(audioUrl))
+				{
+					var audioType = AudioUrlUtils.ResolveAudioType(audioUrl);
+					audioClip = await HttpClient.DownloadAudioClipTaskAsync(audioUrl, audioType);
+				}
+
+				EventBus.Publish(PracticeVocabularyEvents.VocabularyAudioPlayRequested, new PracticeVocabularyPlayAudioPayload
+				{
+					CharacterName = characterName,
+					Text = safeText,
+					UpdatedText = resolvedTts != null ? resolvedTts.Text : null,
+					UpdatedPinyin = resolvedTts != null ? resolvedTts.Pinyin : null,
+					Tone = payload.Tone,
+					VoiceName = voiceName,
+					Pitch = pitch,
+					SpeakingRate = speakingRate,
+					AudioUrl = audioUrl,
+					AudioClip = audioClip,
+					ForceReload = payload.ForceReload,
+				});
+			}
+			catch (Exception exception)
+			{
+				PublishError("Failed to resolve vocabulary audio: " + exception.Message);
+			}
+		}
+
+		/// <summary>
+		/// Calls the TTS endpoint and returns resolved audio URL plus rewrite metadata.
+		/// </summary>
+		/// <param name="text">Text to synthesize.</param>
+		/// <param name="tone">Tone hint.</param>
+		/// <param name="characterName">Character name.</param>
+		/// <param name="forceReload">Whether to force regeneration.</param>
+		/// <returns>Resolved TTS payload, or null on failure.</returns>
+		private static async Task<ResolvedTtsPayload> ResolveTtsAudioUrlAsync(
+			string text,
+			string tone,
+			string characterName,
+			bool forceReload = false)
+		{
+			try
+			{
+				var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload);
+				var endpoint = NetworkEndpoints.TextToSpeech + query;
+				var responseJson = await HttpClient.GetTaskAsync(endpoint);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					return null;
+				}
+
+				var ttsResponse = JsonConvert.DeserializeObject<PracticeVocabularyTextToSpeechResponsePayload>(responseJson);
+				var rawUrl = ttsResponse?.Url;
+				if (string.IsNullOrWhiteSpace(rawUrl))
+				{
+					return null;
+				}
+
+				var settings = Resources.Load<NetworkSettings>("NetworkSettings");
+				var baseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settings != null ? settings.BaseUrl : null);
+				return new ResolvedTtsPayload
+				{
+					Url = AudioUrlUtils.ResolveAudioUrl(rawUrl, baseUrl),
+					Text = ttsResponse.Text,
+					Pinyin = ttsResponse.Pinyin,
+					Rewritten = ttsResponse.Rewritten,
+				};
+			}
+			catch (Exception exception)
+			{
+				Debug.LogWarning("[PracticeVocabularyController] TTS resolution failed: " + exception.Message);
+				return null;
 			}
 		}
 

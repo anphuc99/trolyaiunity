@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Model
 {
@@ -11,6 +12,20 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Model
 		public string VocabularyId { get; set; }
 
 		public int Rating { get; set; }
+	}
+
+	/// <summary>
+	/// Request payload from view to controller for playing vocabulary audio.
+	/// </summary>
+	public sealed class PracticeVocabularyPlayAudioRequestPayload
+	{
+		public string CharacterName { get; set; }
+
+		public string Text { get; set; }
+
+		public string Tone { get; set; }
+
+		public bool ForceReload { get; set; }
 	}
 
 	/// <summary>
@@ -71,6 +86,56 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Model
 		public int Rating { get; set; }
 
 		public PracticeVocabularyReviewPayload Review { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload from controller to view for vocabulary audio playback.
+	/// </summary>
+	public sealed class PracticeVocabularyPlayAudioPayload
+	{
+		public string CharacterName { get; set; }
+
+		public string Text { get; set; }
+
+		public string UpdatedText { get; set; }
+
+		public string UpdatedPinyin { get; set; }
+
+		public string Tone { get; set; }
+
+		public string VoiceName { get; set; }
+
+		public float? Pitch { get; set; }
+
+		public float? SpeakingRate { get; set; }
+
+		public string AudioUrl { get; set; }
+
+		[JsonIgnore]
+		public AudioClip AudioClip { get; set; }
+
+		public bool ForceReload { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload for /api/text-to-speech.
+	/// </summary>
+	public sealed class PracticeVocabularyTextToSpeechResponsePayload
+	{
+		[JsonProperty("output")]
+		public string Output { get; set; }
+
+		[JsonProperty("url")]
+		public string Url { get; set; }
+
+		[JsonProperty("text")]
+		public string Text { get; set; }
+
+		[JsonProperty("pinyin")]
+		public string Pinyin { get; set; }
+
+		[JsonProperty("rewritten")]
+		public bool Rewritten { get; set; }
 	}
 
 	/// <summary>

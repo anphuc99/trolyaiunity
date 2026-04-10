@@ -3,6 +3,7 @@ using Features.GamePlay.SubFeatures.PracticeVocabulary.Events;
 using Features.GamePlay.SubFeatures.PracticeVocabulary.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.PracticeVocabulary.Model;
 using Features.GamePlay.SubFeatures.PracticeVocabulary.Requests;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Share.Components;
@@ -14,12 +15,18 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 	/// </summary>
 	public sealed class PracticeVocabularyView : BaseView
 	{
+		private const string DefaultTtsTone = "neutral";
+
 		[SerializeField]
 		private SharedVocabularyPopupView _vocabularyPopupView;
+
+		[SerializeField]
+		private AudioSource _characterVoiceAudioSource;
 
 		private readonly List<PracticeVocabularyItemPayload> _dueVocabularies = new List<PracticeVocabularyItemPayload>();
 
 		private int _currentDueIndex;
+		private bool _isAudioRequestInProgress;
 
 		/// <summary>
 		/// Shows this subfeature view when controller is installed.
@@ -40,6 +47,14 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 		[OnEvent(PracticeVocabularyEvents.Uninstalled)]
 		private void OnUninstalled(object payload)
 		{
+			StopAllCoroutines();
+			SetAudioRequestInProgress(false);
+
+			if (_characterVoiceAudioSource != null)
+			{
+				_characterVoiceAudioSource.Stop();
+			}
+
 			ResetQueue();
 			HidePopup();
 			gameObject.SetActive(false);
@@ -56,6 +71,13 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 			if (_vocabularyPopupView != null)
 			{
 				_vocabularyPopupView.SetReviewCallback(null);
+				_vocabularyPopupView.SetAudioPlayCallback(null);
+			}
+
+			SetAudioRequestInProgress(false);
+			if (_characterVoiceAudioSource != null)
+			{
+				_characterVoiceAudioSource.Stop();
 			}
 		}
 
@@ -106,14 +128,69 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 		[OnEvent(PracticeVocabularyEvents.RequestFailed)]
 		private void OnRequestFailed(object payload)
 		{
+			var wasAudioInProgress = _isAudioRequestInProgress;
+			if (wasAudioInProgress)
+			{
+				SetAudioRequestInProgress(false);
+			}
+
 			var error = payload as PracticeVocabularyErrorPayload;
 			if (error != null && !string.IsNullOrWhiteSpace(error.Message))
 			{
 				Debug.LogWarning("[PracticeVocabularyView] " + error.Message, this);
 			}
 
+			if (wasAudioInProgress)
+			{
+				return;
+			}
+
 			// Re-show current item to unlock rating buttons when a submit fails.
 			ShowCurrentVocabularyOrHide();
+		}
+
+		/// <summary>
+		/// Handles controller-approved vocabulary audio playback.
+		/// </summary>
+		/// <param name="payload">Playback payload.</param>
+		[OnEvent(PracticeVocabularyEvents.VocabularyAudioPlayRequested)]
+		private void OnVocabularyAudioPlayRequested(object payload)
+		{
+			if (_isAudioRequestInProgress)
+			{
+				SetAudioRequestInProgress(false);
+			}
+
+			var playback = payload as PracticeVocabularyPlayAudioPayload;
+			if (playback == null || string.IsNullOrWhiteSpace(playback.Text))
+			{
+				return;
+			}
+
+			StartCoroutine(PlayVocabularyAudio(playback));
+		}
+
+		private IEnumerator PlayVocabularyAudio(PracticeVocabularyPlayAudioPayload playback)
+		{
+			if (playback.AudioClip == null)
+			{
+				yield break;
+			}
+
+			EnsureAudioSource();
+			if (_characterVoiceAudioSource == null)
+			{
+				yield break;
+			}
+
+			_characterVoiceAudioSource.Stop();
+			_characterVoiceAudioSource.clip = playback.AudioClip;
+			_characterVoiceAudioSource.Play();
+
+			while (_characterVoiceAudioSource.isPlaying)
+			{
+				yield return null;
+			}
 		}
 
 		/// <summary>
@@ -136,10 +213,102 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 		}
 
 		/// <summary>
+		/// Handles speaker button clicks from vocabulary popup.
+		/// </summary>
+		/// <param name="word">Vocabulary word to synthesize.</param>
+		/// <param name="characterName">Selected character name from dropdown.</param>
+		private void HandleVocabularyAudioPlayRequested(string word, string characterName)
+		{
+			if (string.IsNullOrWhiteSpace(word))
+			{
+				return;
+			}
+
+			var selectedCharacterName = ResolveVocabularyAudioCharacterName(characterName);
+			if (string.IsNullOrWhiteSpace(selectedCharacterName))
+			{
+				Debug.LogWarning("[PracticeVocabularyView] Cannot play vocabulary audio because no character is available.", this);
+				return;
+			}
+
+			SetAudioRequestInProgress(true);
+
+			SendRequest(PracticeVocabularyRequests.PlayVocabularyAudio, new PracticeVocabularyPlayAudioRequestPayload
+			{
+				CharacterName = selectedCharacterName,
+				Text = word.Trim(),
+				Tone = DefaultTtsTone,
+			});
+		}
+
+		/// <summary>
+		/// Resolves selected character name, with fallback to the first available scene character.
+		/// </summary>
+		/// <param name="selectedCharacterName">Character name selected in dropdown.</param>
+		/// <returns>Character name for TTS request, or null when unavailable.</returns>
+		private string ResolveVocabularyAudioCharacterName(string selectedCharacterName)
+		{
+			if (!string.IsNullOrWhiteSpace(selectedCharacterName))
+			{
+				return selectedCharacterName.Trim();
+			}
+
+			var availableNames = GetAllCharacterNamesForVocabularyAudio();
+			if (availableNames.Count > 0)
+			{
+				return availableNames[0];
+			}
+
+			return null;
+		}
+
+		/// <summary>
+		/// Loads cached character names used by vocabulary pronunciation dropdown.
+		/// </summary>
+		/// <returns>Distinct non-empty character names.</returns>
+		private List<string> GetAllCharacterNamesForVocabularyAudio()
+		{
+			var names = SendRequest<List<string>>(PracticeVocabularyRequests.GetAllCharacterNames);
+			var result = new List<string>();
+			if (names == null || names.Count == 0)
+			{
+				return result;
+			}
+
+			for (var i = 0; i < names.Count; i++)
+			{
+				var name = names[i];
+				if (string.IsNullOrWhiteSpace(name))
+				{
+					continue;
+				}
+
+				result.Add(name.Trim());
+			}
+
+			return result;
+		}
+
+		/// <summary>
+		/// Refreshes character dropdown options in vocabulary popup.
+		/// </summary>
+		private void RefreshVocabularyCharacterOptions()
+		{
+			if (_vocabularyPopupView == null)
+			{
+				return;
+			}
+
+			_vocabularyPopupView.SetCharacterOptions(GetAllCharacterNamesForVocabularyAudio());
+		}
+
+		/// <summary>
 		/// Ensures popup reference and callback wiring are valid.
 		/// </summary>
 		private void EnsurePopupBinding()
 		{
+			EnsureAudioSource();
+
 			if (_vocabularyPopupView == null)
 			{
 #if UNITY_2023_1_OR_NEWER
@@ -156,7 +325,8 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 
 			_vocabularyPopupView.SetRatingButtonsVisible(true);
 			_vocabularyPopupView.SetReviewCallback(HandleReviewRequested);
-			_vocabularyPopupView.SetAudioPlayCallback(null);
+			_vocabularyPopupView.SetAudioPlayCallback(HandleVocabularyAudioPlayRequested);
+			RefreshVocabularyCharacterOptions();
 		}
 
 		/// <summary>
@@ -233,6 +403,9 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 				return;
 			}
 
+			SetAudioRequestInProgress(false);
+			RefreshVocabularyCharacterOptions();
+
 			var safeWord = string.IsNullOrWhiteSpace(vocabulary.Korean) ? string.Empty : vocabulary.Korean.Trim();
 			_vocabularyPopupView.ShowLoading(safeWord);
 			_vocabularyPopupView.ShowResult(vocabulary.Id, safeWord, vocabulary.Pinyin, vocabulary.Vietnamese);
@@ -243,6 +416,8 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 		/// </summary>
 		private void HidePopup()
 		{
+			SetAudioRequestInProgress(false);
+
 			if (_vocabularyPopupView != null)
 			{
 				_vocabularyPopupView.Hide();
@@ -256,6 +431,34 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 		{
 			_dueVocabularies.Clear();
 			_currentDueIndex = 0;
+		}
+
+		/// <summary>
+		/// Ensures the view has an AudioSource for pronunciation playback.
+		/// </summary>
+		private void EnsureAudioSource()
+		{
+			if (_characterVoiceAudioSource == null)
+			{
+				_characterVoiceAudioSource = GetComponent<AudioSource>();
+				if (_characterVoiceAudioSource == null)
+				{
+					_characterVoiceAudioSource = gameObject.AddComponent<AudioSource>();
+				}
+			}
+		}
+
+		/// <summary>
+		/// Updates popup state while waiting for vocabulary audio response.
+		/// </summary>
+		/// <param name="isInProgress">True while waiting for server response.</param>
+		private void SetAudioRequestInProgress(bool isInProgress)
+		{
+			_isAudioRequestInProgress = isInProgress;
+			if (_vocabularyPopupView != null)
+			{
+				_vocabularyPopupView.SetAudioRequestInProgress(isInProgress);
+			}
 		}
 	}
 }
