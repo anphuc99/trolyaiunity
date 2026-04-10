@@ -15,6 +15,7 @@ namespace Share.Components
         [SerializeField] private TMP_Text _vocabText;
         [SerializeField] private TMP_Text _pinyinText;
         [SerializeField] private TMP_Text _meaningText;
+        [SerializeField] private Button _showMeaningButton;
 
         [Header("Đánh giá")]
         [SerializeField] private Button _ratingAgainButton;
@@ -94,6 +95,11 @@ namespace Share.Components
             if (_playAudioButton != null)
             {
                 _playAudioButton.onClick.AddListener(HandlePlayAudio);
+            }
+
+            if (_showMeaningButton != null)
+            {
+                _showMeaningButton.onClick.AddListener(ShowMeaning);
             }
 
             SetRatingButtonsVisible(_showRatingButtons);
@@ -272,7 +278,8 @@ namespace Share.Components
             {
                 _meaningText.text = meaning ?? string.Empty;
             }
-
+            
+            _meaningText.gameObject.SetActive(false);
             SetLoadingState(false);
             SetRatingButtonsInteractable(_showRatingButtons);
             UpdateAudioControlsState();
@@ -485,6 +492,14 @@ namespace Share.Components
             {
                 _playAudioButton.gameObject.SetActive(!_isAudioRequestInProgress);
                 _playAudioButton.interactable = canPlay;
+            }
+        }
+
+        private void ShowMeaning()
+        {
+            if (_meaningText != null)
+            {
+                _meaningText.gameObject.SetActive(true);
             }
         }
     }
