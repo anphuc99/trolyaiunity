@@ -1,13 +1,15 @@
 /**
- * Migration Script: remove legacy vocabulary markers from stored message content.
+ * Migration Script: remove legacy vocabulary markers from stored content and pinyin.
  *
  * Old chat logic could wrap vocabulary items in double asterisks (example: 我**爱**你).
  * This script removes those marker characters from persisted database content.
  *
  * Targets:
  * - messages.content
+ * - messages.pinyin
  * - my_log_messages.content
  * - translation_cards.content
+ * - vocabularies.pinyin
  *
  * User-authored rows (characterName = "User") are skipped to avoid rewriting user input.
  *
@@ -21,6 +23,7 @@ import { AppDataSource } from "../data-source.js";
 import MessageEntity from "../models/message.entity.js";
 import MyLogMessageEntity from "../models/my-log-message.entity.js";
 import TranslationCardEntity from "../models/translation-card.entity.js";
+import VocabularyEntity from "../models/vocabulary.entity.js";
 
 interface CleanupStats {
   candidates: number;
@@ -33,10 +36,26 @@ interface MessageLikeEntity {
   characterName: string;
 }
 
+interface PinyinLikeEntity {
+  pinyin?: string | null;
+}
+
+interface SpeakerLikeEntity {
+  characterName: string;
+}
+
 const USER_SPEAKER = "user";
 const MARKER = "**";
 
 const normalizeSpeaker = (value: string) => value.trim().toLowerCase();
+
+const hasCharacterName = (value: unknown): value is SpeakerLikeEntity => {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as SpeakerLikeEntity).characterName === "string"
+  );
+};
 
 const stripVocabularyMarkers = (value: string) => {
   if (!value.includes(MARKER)) {
@@ -93,6 +112,55 @@ const cleanupRepository = async <T extends MessageLikeEntity>(
   };
 };
 
+const cleanupPinyinRepository = async <T extends PinyinLikeEntity>(
+  repository: Repository<T>,
+  label: string,
+  dryRun: boolean,
+  skipUserRows: boolean
+): Promise<CleanupStats> => {
+  const candidates = await repository
+    .createQueryBuilder("row")
+    .where("row.pinyin LIKE :pattern", { pattern: `%${MARKER}%` })
+    .getMany();
+
+  let skippedUserRows = 0;
+  let updatedRows = 0;
+  const rowsToPersist: T[] = [];
+
+  for (const row of candidates) {
+    if (skipUserRows && hasCharacterName(row) && normalizeSpeaker(row.characterName) === USER_SPEAKER) {
+      skippedUserRows += 1;
+      continue;
+    }
+
+    const originalPinyin = row.pinyin ?? "";
+    const cleanedPinyin = stripVocabularyMarkers(originalPinyin);
+    if (cleanedPinyin === originalPinyin) {
+      continue;
+    }
+
+    updatedRows += 1;
+    if (!dryRun) {
+      row.pinyin = cleanedPinyin;
+      rowsToPersist.push(row);
+    }
+  }
+
+  if (!dryRun && rowsToPersist.length > 0) {
+    await repository.save(rowsToPersist, { chunk: 200 });
+  }
+
+  console.log(
+    `[${label}] candidates=${candidates.length}, skippedUserRows=${skippedUserRows}, ${dryRun ? "wouldUpdate" : "updated"}=${updatedRows}`
+  );
+
+  return {
+    candidates: candidates.length,
+    skippedUserRows,
+    updatedRows
+  };
+};
+
 const main = async () => {
   const dryRun = process.argv.includes("--dry-run");
 
@@ -108,11 +176,37 @@ const main = async () => {
       "translation_cards",
       dryRun
     );
+    const messagePinyinStats = await cleanupPinyinRepository(
+      AppDataSource.getRepository(MessageEntity),
+      "messages.pinyin",
+      dryRun,
+      true
+    );
+    const vocabularyPinyinStats = await cleanupPinyinRepository(
+      AppDataSource.getRepository(VocabularyEntity),
+      "vocabularies.pinyin",
+      dryRun,
+      false
+    );
 
-    const totalCandidates = messageStats.candidates + myLogMessageStats.candidates + translationCardStats.candidates;
+    const totalCandidates =
+      messageStats.candidates +
+      myLogMessageStats.candidates +
+      translationCardStats.candidates +
+      messagePinyinStats.candidates +
+      vocabularyPinyinStats.candidates;
     const totalSkippedUserRows =
-      messageStats.skippedUserRows + myLogMessageStats.skippedUserRows + translationCardStats.skippedUserRows;
-    const totalUpdatedRows = messageStats.updatedRows + myLogMessageStats.updatedRows + translationCardStats.updatedRows;
+      messageStats.skippedUserRows +
+      myLogMessageStats.skippedUserRows +
+      translationCardStats.skippedUserRows +
+      messagePinyinStats.skippedUserRows +
+      vocabularyPinyinStats.skippedUserRows;
+    const totalUpdatedRows =
+      messageStats.updatedRows +
+      myLogMessageStats.updatedRows +
+      translationCardStats.updatedRows +
+      messagePinyinStats.updatedRows +
+      vocabularyPinyinStats.updatedRows;
 
     console.log("Cleanup summary:");
     console.log(`- totalCandidates=${totalCandidates}`);
