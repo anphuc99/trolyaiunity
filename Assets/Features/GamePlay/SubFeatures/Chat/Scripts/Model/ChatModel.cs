@@ -687,4 +687,45 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		[JsonProperty("count")]
 		public int Count { get; set; }
 	}
+
+	/// <summary>
+	/// One learning path item used to build vocabulary marker candidates.
+	/// </summary>
+	public sealed class ChatLearningPathPayload
+	{
+		[JsonProperty("id")]
+		public int Id { get; set; }
+
+		[JsonProperty("vocabulary")]
+		public string Vocabulary { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload for /api/learning-paths.
+	/// </summary>
+	public sealed class ChatLearningPathListResponsePayload
+	{
+		[JsonProperty("learningPaths")]
+		public System.Collections.Generic.List<ChatLearningPathPayload> LearningPaths { get; set; }
+			= new System.Collections.Generic.List<ChatLearningPathPayload>();
+	}
+
+	/// <summary>
+	/// Minimal vocabulary item payload for /api/vocabulary list endpoint.
+	/// </summary>
+	public sealed class ChatVocabularyListItemPayload
+	{
+		[JsonProperty("korean")]
+		public string Korean { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload for /api/vocabulary.
+	/// </summary>
+	public sealed class ChatVocabularyListResponsePayload
+	{
+		[JsonProperty("vocabularies")]
+		public System.Collections.Generic.List<ChatVocabularyListItemPayload> Vocabularies { get; set; }
+			= new System.Collections.Generic.List<ChatVocabularyListItemPayload>();
+	}
 }
