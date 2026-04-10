@@ -13,6 +13,7 @@ namespace Features.GamePlay.SubFeatures.Home.Requests
 		public const string OpenStory = "game.play.home.open.story.request";
 		public const string OpenCreateCharacter = "game.play.home.open.create.character.request";
 		public const string OpenCharacter = "game.play.home.open.character.request";
+		public const string OpenPracticeVocabulary = "game.play.home.open.practice.vocabulary.request";
 		public const string OpenPractice = "game.play.home.open.practice.request";
 		public const string OpenTask = "game.play.home.open.task.request";
 		public const string OpenLearningPath = "game.play.home.open.learning.path.request";

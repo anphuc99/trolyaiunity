@@ -10,6 +10,7 @@ namespace Features.GamePlay.Model
 		Chat,
 		Journal,
 		Practice,
+		PracticeVocabulary,
 		Story,
 		Task,
 		Setting,

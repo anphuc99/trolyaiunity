@@ -17,6 +17,8 @@ using Features.GamePlay.SubFeatures.MyLog.Controller;
 using Features.GamePlay.SubFeatures.MyLog.Model;
 using Features.GamePlay.SubFeatures.Practice.Controller;
 using Features.GamePlay.SubFeatures.Practice.Model;
+using Features.GamePlay.SubFeatures.PracticeVocabulary.Controller;
+using Features.GamePlay.SubFeatures.PracticeVocabulary.Model;
 using Features.GamePlay.SubFeatures.Story.Controller;
 using Features.GamePlay.SubFeatures.Story.Model;
 using Features.GamePlay.SubFeatures.Task.Controller;
@@ -209,6 +211,9 @@ namespace Features.GamePlay.Controller
 				case GamePlaySubControllerType.Practice:
 					PracticeController.Install();
 					break;
+				case GamePlaySubControllerType.PracticeVocabulary:
+					PracticeVocabularyController.Install();
+					break;
 				case GamePlaySubControllerType.Story:
 					StoryController.Install();
 					break;
@@ -237,7 +242,7 @@ namespace Features.GamePlay.Controller
 				OpenStory = () => HandleOpenSubController(GamePlaySubControllerType.Story),
 				OpenCreateCharacter = HandleOpenCreateCharacter,
 				OpenCharacter = () => HandleOpenSubController(GamePlaySubControllerType.Character),
-				OpenPractice = () => HandleOpenSubController(GamePlaySubControllerType.Practice),
+				OpenPractice = () => HandleOpenSubController(GamePlaySubControllerType.PracticeVocabulary),
 				OpenTask = () => HandleOpenSubController(GamePlaySubControllerType.Task),
 				OpenLearningPath = () => HandleOpenSubController(GamePlaySubControllerType.LearningPath),
 			});
@@ -276,6 +281,7 @@ namespace Features.GamePlay.Controller
 				OpenJournal = OpenMyLogJournal,
 			});
 			PracticeController.SetParentSignals(new PracticeParentSignals { OnEchoed = OnSubControllerEchoed });
+			PracticeVocabularyController.SetParentSignals(new PracticeVocabularyParentSignals { OnEchoed = OnSubControllerEchoed });
 			StoryController.SetParentSignals(new StoryParentSignals { OnEchoed = OnSubControllerEchoed });
 			TaskController.SetParentSignals(new TaskParentSignals { OnEchoed = OnSubControllerEchoed });
 			SettingController.SetParentSignals(new SettingParentSignals
@@ -711,6 +717,7 @@ namespace Features.GamePlay.Controller
 			JournalController.SetParentSignals(null);
 			MyLogController.SetParentSignals(null);
 			PracticeController.SetParentSignals(null);
+			PracticeVocabularyController.SetParentSignals(null);
 			StoryController.SetParentSignals(null);
 			TaskController.SetParentSignals(null);
 			SettingController.SetParentSignals(null);
@@ -742,6 +749,9 @@ namespace Features.GamePlay.Controller
 					break;
 				case GamePlaySubControllerType.Practice:
 					PracticeController.Uninstall();
+					break;
+				case GamePlaySubControllerType.PracticeVocabulary:
+					PracticeVocabularyController.Uninstall();
 					break;
 				case GamePlaySubControllerType.Story:
 					StoryController.Uninstall();

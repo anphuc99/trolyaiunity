@@ -97,6 +97,12 @@ namespace Features.GamePlay.SubFeatures.Home.Controller
 		[Request(HomeRequests.OpenPractice)]
 		public static void HandleOpenPractice()
 		{
+			HandleOpenPracticeVocabulary();
+		}
+
+		[Request(HomeRequests.OpenPracticeVocabulary)]
+		public static void HandleOpenPracticeVocabulary()
+		{
 			HomeState.ParentSignals?.OpenPractice?.Invoke();
 		}
 
