@@ -90,15 +90,13 @@ namespace Share.Utils
 		/// <param name="characterName">Character name (defaults to Mimi).</param>
 		/// <param name="forceReload">Whether to force regeneration.</param>
 		/// <param name="messageId">Optional message id used for server-side history lookup.</param>
-		/// <param name="recentTurns">Optional recent turns for no-audio semantic rewrite context.</param>
 		/// <returns>Query string starting with '?'.</returns>
 		public static string BuildTextToSpeechQuery(
 			string text,
 			string tone,
 			string characterName,
 			bool forceReload = false,
-			string messageId = null,
-			IList<string> recentTurns = null)
+			string messageId = null)
 		{
 			var queryParts = new List<string>
 			{
@@ -115,32 +113,6 @@ namespace Share.Utils
 			if (!string.IsNullOrWhiteSpace(messageId))
 			{
 				queryParts.Add("messageId=" + Uri.EscapeDataString(messageId.Trim()));
-			}
-
-			if (recentTurns != null && recentTurns.Count > 0)
-			{
-				var normalizedTurns = new List<string>();
-
-				for (var i = 0; i < recentTurns.Count; i++)
-				{
-					var turn = recentTurns[i];
-					if (string.IsNullOrWhiteSpace(turn))
-					{
-						continue;
-					}
-
-					normalizedTurns.Add(turn.Trim());
-				}
-
-				if (normalizedTurns.Count > 5)
-				{
-					normalizedTurns.RemoveRange(0, normalizedTurns.Count - 5);
-				}
-
-				if (normalizedTurns.Count > 0)
-				{
-					queryParts.Add("recentTurns=" + Uri.EscapeDataString(string.Join("\n", normalizedTurns)));
-				}
 			}
 
 			return "?" + string.Join("&", queryParts);

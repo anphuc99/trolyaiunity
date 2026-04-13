@@ -112,16 +112,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		public string Text { get; set; }
 
 		/// <summary>
-		/// Updated message text returned by TTS fallback flow.
-		/// </summary>
-		public string UpdatedText { get; set; }
-
-		/// <summary>
-		/// Updated pinyin returned by TTS fallback flow.
-		/// </summary>
-		public string UpdatedPinyin { get; set; }
-
-		/// <summary>
 		/// Tone hint used for TTS.
 		/// </summary>
 		public string Tone { get; set; }
@@ -264,24 +254,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		[JsonProperty("url")]
 		public string Url { get; set; }
-
-		/// <summary>
-		/// Effective text used by TTS after fallback handling.
-		/// </summary>
-		[JsonProperty("text")]
-		public string Text { get; set; }
-
-		/// <summary>
-		/// Effective pinyin for the rewritten text, if any.
-		/// </summary>
-		[JsonProperty("pinyin")]
-		public string Pinyin { get; set; }
-
-		/// <summary>
-		/// Indicates whether text was rewritten for no-audio recovery.
-		/// </summary>
-		[JsonProperty("rewritten")]
-		public bool Rewritten { get; set; }
 	}
 
 	/// <summary>
