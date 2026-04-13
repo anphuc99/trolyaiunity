@@ -109,11 +109,13 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
   };
 
   /**
-   * Persists rewritten content/pinyin back to the message database record and
-   * appends a developer note to the chat history file.
+   * Persists rewritten content/pinyin to the appropriate storage:
+   * - During active chat: updates the assistant turn in the chat history file by AI-generated MessageId.
+   * - After conversation is saved: updates the message DB record if found.
+   * Always appends a developer rewrite note to chat history for the AI context.
    *
    * @param userId - Current user id.
-   * @param messageId - Target message id to update.
+   * @param messageId - AI-generated MessageId from the assistant turn.
    * @param rewrittenText - New text content.
    * @param rewrittenPinyin - New pinyin (may be empty for non-Hanzi text).
    * @param newAudioId - Audio id for the rewritten audio file.
@@ -125,6 +127,20 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
     rewrittenPinyin: string,
     newAudioId: string
   ): Promise<void> => {
+    // Try updating the assistant turn in the active chat history file.
+    const historyUpdated = await chatHistoryStore.updateAssistantTurn(userId, messageId, {
+      text: rewrittenText,
+      pinyin: rewrittenPinyin || undefined
+    });
+
+    if (historyUpdated) {
+      // Append a developer rewrite note so the AI knows about the change.
+      await chatHistoryStore.append(userId, [
+        { role: "developer", content: buildAssistantRewriteNote(messageId, rewrittenText, rewrittenPinyin) }
+      ]);
+    }
+
+    // Also try updating the DB message if the conversation was already saved.
     const message = await messageRepository.findOne({
       where: { id: messageId, userId }
     });
@@ -136,10 +152,6 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
       }
       message.audio = newAudioId;
       await messageRepository.save(message);
-
-      await chatHistoryStore.append(userId, [
-        { role: "developer", content: buildAssistantRewriteNote(messageId, rewrittenText, rewrittenPinyin) }
-      ]);
       return;
     }
 

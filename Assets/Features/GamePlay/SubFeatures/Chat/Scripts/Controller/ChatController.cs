@@ -1041,7 +1041,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
 					var tone = string.IsNullOrWhiteSpace(turn.Tone) ? "neutral" : turn.Tone.Trim();
 					var cleanText = VocabMarkupRegex.Replace(turn.Text, "$1");
-					turn.AudioUrl = await ResolveTtsAudioUrlAsync(cleanText, tone, characterName);
+					turn.AudioUrl = await ResolveTtsAudioUrlAsync(cleanText, tone, characterName, false, turn.MessageId);
 
 					if (!string.IsNullOrWhiteSpace(turn.AudioUrl))
 					{
@@ -1085,7 +1085,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					? null
 					: ChatState.ParentSignals?.GetCharacterSpeakingRateByName?.Invoke(characterName);
 
-				var audioUrl = await ResolveTtsAudioUrlAsync(payload.Text, payload.Tone, characterName, payload.ForceReload);
+				var audioUrl = await ResolveTtsAudioUrlAsync(payload.Text, payload.Tone, characterName, payload.ForceReload, payload.MessageId);
 
 				AudioClip audioClip = null;
 				if (!string.IsNullOrWhiteSpace(audioUrl))
@@ -1563,12 +1563,13 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		/// <param name="tone">Tone hint.</param>
 		/// <param name="characterName">Character name.</param>
 		/// <param name="forceReload">Whether to force regeneration.</param>
+		/// <param name="messageId">Optional AI-generated message id for server-side rewrite tracking.</param>
 		/// <returns>Absolute audio URL, or null on failure.</returns>
-		private static async Task<string> ResolveTtsAudioUrlAsync(string text, string tone, string characterName, bool forceReload = false)
+		private static async Task<string> ResolveTtsAudioUrlAsync(string text, string tone, string characterName, bool forceReload = false, string messageId = null)
 		{
 			try
 			{
-				var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload);
+				var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload, messageId);
 				var endpoint = NetworkEndpoints.TextToSpeech + query;
 				var responseJson = await HttpClient.GetTaskAsync(endpoint);
 				if (string.IsNullOrWhiteSpace(responseJson))
@@ -1577,6 +1578,19 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				}
 
 				var ttsResponse = JsonConvert.DeserializeObject<ChatTextToSpeechResponsePayload>(responseJson);
+
+				// When the server rewrites the text for TTS compatibility, notify the view
+				// so it can update the displayed message content.
+				if (ttsResponse?.Rewritten == true && !string.IsNullOrWhiteSpace(messageId))
+				{
+					EventBus.Publish(ChatEvents.MessageContentUpdated, new ChatMessageContentUpdatedPayload
+					{
+						MessageId = messageId,
+						Text = ttsResponse.Text,
+						Pinyin = ttsResponse.Pinyin,
+					});
+				}
+
 				var rawUrl = ttsResponse?.Url;
 				if (string.IsNullOrWhiteSpace(rawUrl))
 				{

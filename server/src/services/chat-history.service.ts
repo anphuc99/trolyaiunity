@@ -15,6 +15,19 @@ export interface ChatHistoryStore {
   append: (userId: number, messages: ChatHistoryMessage[]) => Promise<void>;
   ensureSystemMessage: (userId: number, content: string) => Promise<void>;
   clear: (userId: number) => Promise<void>;
+  /**
+   * Updates an assistant turn's Text and Pinyin by MessageId in the history file.
+   *
+   * @param userId - Authenticated user id.
+   * @param messageId - AI-generated MessageId to find.
+   * @param updates - Fields to update on the matched turn.
+   * @returns True if a matching turn was found and updated.
+   */
+  updateAssistantTurn: (
+    userId: number,
+    messageId: string,
+    updates: { text?: string; pinyin?: string }
+  ) => Promise<boolean>;
 }
 
 const DEFAULT_DIR = path.join(process.cwd(), "data", "chat-history");
@@ -212,10 +225,96 @@ export const createChatHistoryStore = (dir: string = process.env.CHAT_HISTORY_DI
     }
   };
 
+  /**
+   * Updates an assistant turn by MessageId in the persisted history.
+   * Parses each assistant message's JSON content to find the matching turn.
+   *
+   * @param userId - Authenticated user id.
+   * @param messageId - AI-generated MessageId of the turn to update.
+   * @param updates - Fields to overwrite (Text, Pinyin).
+   * @returns True if the turn was found and updated.
+   */
+  const updateAssistantTurn: ChatHistoryStore["updateAssistantTurn"] = async (userId, messageId, updates) => {
+    const filePath = toHistoryPath(dir, userId);
+    const trimmedId = messageId.trim();
+    if (!trimmedId) {
+      return false;
+    }
+
+    let raw: string;
+    try {
+      raw = await fs.readFile(filePath, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === "ENOENT") {
+        return false;
+      }
+      throw error;
+    }
+
+    const lines = raw.split(/\r?\n/);
+    let found = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) {
+        continue;
+      }
+
+      let parsed: { role?: string; content?: string };
+      try {
+        parsed = JSON.parse(line) as { role?: string; content?: string };
+      } catch {
+        continue;
+      }
+
+      if (parsed.role !== "assistant" || typeof parsed.content !== "string") {
+        continue;
+      }
+
+      let turns: Array<{ MessageId?: string; Text?: string; Pinyin?: string; [key: string]: unknown }>;
+      try {
+        const parsedContent = JSON.parse(parsed.content) as unknown;
+        turns = Array.isArray(parsedContent) ? parsedContent : [parsedContent as typeof turns[0]];
+      } catch {
+        continue;
+      }
+
+      let turnUpdated = false;
+      for (const turn of turns) {
+        if ((turn.MessageId ?? "").trim() !== trimmedId) {
+          continue;
+        }
+
+        if (updates.text !== undefined) {
+          turn.Text = updates.text;
+        }
+        if (updates.pinyin !== undefined) {
+          turn.Pinyin = updates.pinyin;
+        }
+        turnUpdated = true;
+        break;
+      }
+
+      if (turnUpdated) {
+        parsed.content = JSON.stringify(turns);
+        lines[i] = JSON.stringify(parsed);
+        found = true;
+        break;
+      }
+    }
+
+    if (found) {
+      await fs.writeFile(filePath, lines.join("\n"), "utf8");
+    }
+
+    return found;
+  };
+
   return {
     load,
     append,
     ensureSystemMessage,
-    clear
+    clear,
+    updateAssistantTurn
   };
 };

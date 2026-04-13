@@ -1053,6 +1053,30 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 		}
 
+		/// <summary>
+		/// Called when the TTS service rewrites a message's text for audio compatibility.
+		/// Updates the displayed message content to match the rewritten text.
+		/// </summary>
+		[OnEvent(ChatEvents.MessageContentUpdated)]
+		private void OnMessageContentUpdated(object payload)
+		{
+			var updated = payload as ChatMessageContentUpdatedPayload;
+			if (updated == null || string.IsNullOrWhiteSpace(updated.MessageId))
+			{
+				return;
+			}
+
+			if (_messageContainer == null)
+			{
+				return;
+			}
+
+			if (!string.IsNullOrWhiteSpace(updated.Text))
+			{
+				_messageContainer.UpdateMessageText(updated.MessageId, updated.Text);
+			}
+		}
+
 		private void UpdateRecordButtonVisualState()
 		{
 			if (_recordButtonImage == null)

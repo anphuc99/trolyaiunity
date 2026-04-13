@@ -254,6 +254,45 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		[JsonProperty("url")]
 		public string Url { get; set; }
+
+		/// <summary>
+		/// Whether the text was rewritten by the server for TTS compatibility.
+		/// </summary>
+		[JsonProperty("rewritten")]
+		public bool Rewritten { get; set; }
+
+		/// <summary>
+		/// Rewritten text (only present when <see cref="Rewritten"/> is true).
+		/// </summary>
+		[JsonProperty("text")]
+		public string Text { get; set; }
+
+		/// <summary>
+		/// Rewritten pinyin (only present when <see cref="Rewritten"/> is true).
+		/// </summary>
+		[JsonProperty("pinyin")]
+		public string Pinyin { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload for notifying views that a message's content was rewritten by the TTS service.
+	/// </summary>
+	public sealed class ChatMessageContentUpdatedPayload
+	{
+		/// <summary>
+		/// Identifier of the message whose content was updated.
+		/// </summary>
+		public string MessageId { get; set; }
+
+		/// <summary>
+		/// New text after rewrite.
+		/// </summary>
+		public string Text { get; set; }
+
+		/// <summary>
+		/// New pinyin after rewrite.
+		/// </summary>
+		public string Pinyin { get; set; }
 	}
 
 	/// <summary>
