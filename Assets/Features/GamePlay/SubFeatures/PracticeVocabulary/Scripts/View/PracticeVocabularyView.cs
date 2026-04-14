@@ -7,6 +7,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Share.Components;
+using UnityEngine.UI;
 
 namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 {
@@ -19,6 +20,8 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 
 		[SerializeField]
 		private SharedVocabularyPopupView _vocabularyPopupView;
+		[SerializeField]
+		private Button _ignoreVocabularyButton;
 
 		[SerializeField]
 		private AudioSource _characterVoiceAudioSource;
@@ -63,11 +66,14 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 		protected override void OnEnabled()
 		{
 			EnsurePopupBinding();
+			BindIgnoreButton();
 			RequestDueVocabularies();
 		}
 
 		protected override void OnDisabled()
 		{
+			UnbindIgnoreButton();
+
 			if (_vocabularyPopupView != null)
 			{
 				_vocabularyPopupView.SetReviewCallback(null);
@@ -95,6 +101,29 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 
 			ApplyDueList(response.Vocabularies);
 			ShowCurrentVocabularyOrHide();
+		}
+
+		/// <summary>
+		/// Handles vocabulary ignored event — advances to next item in queue.
+		/// </summary>
+		/// <param name="payload">Ignored payload.</param>
+		[OnEvent(PracticeVocabularyEvents.VocabularyIgnored)]
+		private void OnVocabularyIgnored(object payload)
+		{
+			if (_dueVocabularies.Count == 0)
+			{
+				RequestDueVocabularies();
+				return;
+			}
+
+			_currentDueIndex += 1;
+			if (_currentDueIndex < _dueVocabularies.Count)
+			{
+				ShowCurrentVocabularyOrHide();
+				return;
+			}
+
+			RequestDueVocabularies();
 		}
 
 		/// <summary>
@@ -446,6 +475,45 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 					_characterVoiceAudioSource = gameObject.AddComponent<AudioSource>();
 				}
 			}
+		}
+
+		/// <summary>
+		/// Binds the ignore button click listener.
+		/// </summary>
+		private void BindIgnoreButton()
+		{
+			if (_ignoreVocabularyButton != null)
+			{
+				_ignoreVocabularyButton.onClick.AddListener(HandleIgnoreVocabularyClicked);
+			}
+		}
+
+		/// <summary>
+		/// Unbinds the ignore button click listener.
+		/// </summary>
+		private void UnbindIgnoreButton()
+		{
+			if (_ignoreVocabularyButton != null)
+			{
+				_ignoreVocabularyButton.onClick.RemoveListener(HandleIgnoreVocabularyClicked);
+			}
+		}
+
+		/// <summary>
+		/// Handles ignore button click — sends ignore request for the current vocabulary.
+		/// </summary>
+		private void HandleIgnoreVocabularyClicked()
+		{
+			var current = GetCurrentVocabulary();
+			if (current == null || string.IsNullOrWhiteSpace(current.Id))
+			{
+				return;
+			}
+
+			SendRequest(PracticeVocabularyRequests.IgnoreVocabulary, new PracticeVocabularyIgnoreRequestPayload
+			{
+				VocabularyId = current.Id
+			});
 		}
 
 		/// <summary>

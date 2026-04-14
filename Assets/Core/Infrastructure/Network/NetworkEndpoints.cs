@@ -52,5 +52,6 @@ namespace Core.Infrastructure.Network
 		public const string VocabularyLearnedCount = "/api/vocabulary/learned-count";
 		public const string VocabularyDue = "/api/vocabulary/due";
 		public const string VocabularyReview = "/api/vocabulary";
+		public const string VocabularyIgnore = "/api/vocabulary";
 	}
 }

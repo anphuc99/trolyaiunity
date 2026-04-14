@@ -162,6 +162,28 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Controller
 			_ = PlayVocabularyAudioInternalAsync(payload);
 		}
 
+		/// <summary>
+		/// Ignores a vocabulary item so it never appears in reviews again.
+		/// </summary>
+		/// <param name="payload">Ignore request payload.</param>
+		[Request(PracticeVocabularyRequests.IgnoreVocabulary)]
+		public static void HandleIgnoreVocabulary(PracticeVocabularyIgnoreRequestPayload payload)
+		{
+			if (payload == null)
+			{
+				PublishError("Missing vocabulary ignore payload.");
+				return;
+			}
+
+			if (string.IsNullOrWhiteSpace(payload.VocabularyId))
+			{
+				PublishError("Vocabulary id is required to ignore.");
+				return;
+			}
+
+			_ = IgnoreVocabularyInternalAsync(payload);
+		}
+
 		private sealed class ResolvedTtsPayload
 		{
 			public string Url;
@@ -243,6 +265,37 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Controller
 			catch (Exception exception)
 			{
 				PublishError("Failed to submit vocabulary review: " + exception.Message);
+			}
+		}
+
+		/// <summary>
+		/// Calls server ignore endpoint and publishes completion event.
+		/// </summary>
+		/// <param name="payload">Validated ignore payload.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task IgnoreVocabularyInternalAsync(PracticeVocabularyIgnoreRequestPayload payload)
+		{
+			try
+			{
+				var safeVocabularyId = payload.VocabularyId.Trim();
+				var endpoint = NetworkEndpoints.VocabularyIgnore + "/" + Uri.EscapeDataString(safeVocabularyId) + "/ignore";
+				var body = new { };
+
+				var responseJson = await HttpClient.PutJsonTaskAsync(endpoint, body);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					PublishError("Empty vocabulary ignore response from server.");
+					return;
+				}
+
+				EventBus.Publish(PracticeVocabularyEvents.VocabularyIgnored, new PracticeVocabularyIgnoredPayload
+				{
+					VocabularyId = safeVocabularyId
+				});
+			}
+			catch (Exception exception)
+			{
+				PublishError("Failed to ignore vocabulary: " + exception.Message);
 			}
 		}
 

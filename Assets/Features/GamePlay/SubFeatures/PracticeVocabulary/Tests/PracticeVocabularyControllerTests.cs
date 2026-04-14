@@ -172,6 +172,70 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Tests
 			Assert.AreEqual("r1", responsePayload.Review.Id);
 		}
 
+		[Test]
+		public void HandleIgnoreVocabulary_ShouldPublishError_WhenPayloadIsNull()
+		{
+			PracticeVocabularyErrorPayload errorPayload = null;
+			EventBus.Subscribe(PracticeVocabularyEvents.RequestFailed, payload =>
+			{
+				errorPayload = payload as PracticeVocabularyErrorPayload;
+			});
+
+			PracticeVocabularyController.HandleIgnoreVocabulary(null);
+
+			Assert.IsNotNull(errorPayload);
+			Assert.AreEqual("Missing vocabulary ignore payload.", errorPayload.Message);
+		}
+
+		[Test]
+		public void HandleIgnoreVocabulary_ShouldPublishError_WhenVocabularyIdMissing()
+		{
+			PracticeVocabularyErrorPayload errorPayload = null;
+			EventBus.Subscribe(PracticeVocabularyEvents.RequestFailed, payload =>
+			{
+				errorPayload = payload as PracticeVocabularyErrorPayload;
+			});
+
+			PracticeVocabularyController.HandleIgnoreVocabulary(new PracticeVocabularyIgnoreRequestPayload
+			{
+				VocabularyId = " "
+			});
+
+			Assert.IsNotNull(errorPayload);
+			Assert.AreEqual("Vocabulary id is required to ignore.", errorPayload.Message);
+		}
+
+		[UnityTest]
+		public System.Collections.IEnumerator HandleIgnoreVocabulary_ShouldPublishIgnored_WhenServerReturnsSuccess()
+		{
+			PracticeVocabularyIgnoredPayload responsePayload = null;
+			void Handler(object payload)
+			{
+				responsePayload = payload as PracticeVocabularyIgnoredPayload;
+			}
+
+			FakeServer.Register("PUT", NetworkEndpoints.VocabularyIgnore + "/v1/ignore",
+				_ => "{\"message\":\"Vocabulary ignored\",\"id\":\"v1\"}"
+			);
+
+			EventBus.Subscribe(PracticeVocabularyEvents.VocabularyIgnored, Handler);
+			try
+			{
+				PracticeVocabularyController.HandleIgnoreVocabulary(new PracticeVocabularyIgnoreRequestPayload
+				{
+					VocabularyId = "v1"
+				});
+				yield return AwaitTask(Task.Delay(100));
+			}
+			finally
+			{
+				EventBus.Unsubscribe(PracticeVocabularyEvents.VocabularyIgnored, Handler);
+			}
+
+			Assert.IsNotNull(responsePayload);
+			Assert.AreEqual("v1", responsePayload.VocabularyId);
+		}
+
 		private static System.Collections.IEnumerator AwaitTask(Task task)
 		{
 			while (!task.IsCompleted)

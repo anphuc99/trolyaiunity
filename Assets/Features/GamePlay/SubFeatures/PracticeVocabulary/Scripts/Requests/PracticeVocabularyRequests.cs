@@ -12,5 +12,6 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Requests
 		public const string SubmitReview = "game.play.practice.vocabulary.submit.review.request";
 		public const string GetAllCharacterNames = "game.play.practice.vocabulary.get.all.character.names.request";
 		public const string PlayVocabularyAudio = "game.play.practice.vocabulary.play.vocabulary.audio.request";
+		public const string IgnoreVocabulary = "game.play.practice.vocabulary.ignore.vocabulary.request";
 	}
 }

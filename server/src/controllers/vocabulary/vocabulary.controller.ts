@@ -27,6 +27,7 @@ interface VocabularyController {
   toggleStar: (request: Request, response: Response) => Promise<void>;
   setCardDirection: (request: Request, response: Response) => Promise<void>;
   lookupWord: (request: Request, response: Response) => Promise<void>;
+  ignoreVocabulary: (request: Request, response: Response) => Promise<void>;
 }
 
 /**
@@ -616,6 +617,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
             .createQueryBuilder("v")
             .where("v.id IN (:...ids)", { ids: vocabIds })
             .andWhere("v.user_id = :userId", { userId })
+            .andWhere("v.is_ignored = :isIgnored", { isIgnored: false })
             .getMany()
         : [];
 
@@ -858,6 +860,40 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   };
 
   // ──────────────────────────────────────────────────────────────────────────
+  // Ignore a vocabulary — marks it as ignored so it never appears in reviews.
+  // ──────────────────────────────────────────────────────────────────────────
+  const ignoreVocabulary: VocabularyController["ignoreVocabulary"] = async (request, response) => {
+    const userId = request.user?.id;
+    const vocabId = String(request.params.id);
+
+    if (!userId) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    if (!isValidVocabId(vocabId)) {
+      response.status(400).json({ message: "Invalid vocabulary ID" });
+      return;
+    }
+
+    try {
+      const vocab = await vocabRepo.findOne({ where: { id: vocabId, userId } });
+
+      if (!vocab) {
+        response.status(404).json({ message: "Vocabulary not found" });
+        return;
+      }
+
+      vocab.isIgnored = true;
+      const saved = await vocabRepo.save(vocab);
+      response.json({ message: "Vocabulary ignored", id: saved.id });
+    } catch (error) {
+      console.error("Failed to ignore vocabulary.", error);
+      response.status(500).json({ message: "Failed to ignore vocabulary" });
+    }
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
   // Lookup a vocabulary by its Chinese word text.
   // Returns existing DB data or uses cheap AI to translate on the fly.
   // If the word is new, automatically creates the vocabulary entry.
@@ -1003,6 +1039,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     saveMemory,
     toggleStar,
     setCardDirection,
-    lookupWord
+    lookupWord,
+    ignoreVocabulary
   };
 };

@@ -28,6 +28,7 @@ export const createVocabularyRoutes = (dataSource: DataSource) => {
   router.put("/:id/memory", controller.saveMemory);
   router.put("/:id/star", controller.toggleStar);
   router.put("/:id/direction", controller.setCardDirection);
+  router.put("/:id/ignore", controller.ignoreVocabulary);
 
   return router;
 };

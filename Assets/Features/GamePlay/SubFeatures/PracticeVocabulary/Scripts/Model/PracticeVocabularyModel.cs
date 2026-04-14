@@ -139,6 +139,22 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Model
 	}
 
 	/// <summary>
+	/// Request payload for ignoring a vocabulary item.
+	/// </summary>
+	public sealed class PracticeVocabularyIgnoreRequestPayload
+	{
+		public string VocabularyId { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload published after a vocabulary is ignored.
+	/// </summary>
+	public sealed class PracticeVocabularyIgnoredPayload
+	{
+		public string VocabularyId { get; set; }
+	}
+
+	/// <summary>
 	/// Error payload for request failures.
 	/// </summary>
 	public sealed class PracticeVocabularyErrorPayload

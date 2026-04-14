@@ -49,6 +49,10 @@ class VocabularyEntity {
   @Column({ name: "is_manually_added", type: "boolean", default: false })
   isManuallyAdded!: boolean;
 
+  /** Whether this vocabulary is ignored and excluded from practice reviews. */
+  @Column({ name: "is_ignored", type: "boolean", default: false })
+  isIgnored!: boolean;
+
   @Column({ name: "user_id", type: "int" })
   userId!: number;
 
