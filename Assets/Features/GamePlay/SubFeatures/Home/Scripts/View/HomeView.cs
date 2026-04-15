@@ -11,16 +11,6 @@ namespace Features.GamePlay.SubFeatures.Home.View
 	/// </summary>
 	public sealed class HomeView : BaseView
 	{
-		[SerializeField]
-		private string _message = "Hello";
-
-		/// <summary>
-		/// Example method to send a request.
-		/// </summary>
-		public void SendEcho()
-		{
-			SendRequest(HomeRequests.Echo, _message);
-		}
 
 		/// <summary>
 		/// Example event handler (auto-bound).
