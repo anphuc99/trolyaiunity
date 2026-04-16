@@ -81,6 +81,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private AudioClip _recordingAudioClip;
 		private Image _recordButtonImage;
 		private Color _recordButtonIdleColor = Color.white;
+		private bool _hasCapturedRunInBackground;
+		private bool _previousRunInBackground;
+		private bool _isBackgroundRuntimeActive;
+		private bool _hasCapturedVoiceIgnoreListenerPause;
+		private bool _previousVoiceIgnoreListenerPause;
 
 		/// <summary>
 		/// Rich text marker shown in the input field when a voice recording is pending.
@@ -123,6 +128,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			UnbindInputFieldEvents();
 			UnbindRecordButtonEvents();
 			UnbindAudioInputGuard();
+			RestoreForegroundRuntimeMode();
 		}
 
 		/// <summary>
@@ -224,6 +230,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		protected override void OnEnabled()
 		{
 			EnsureDependencies();
+			EnableBackgroundRuntimeMode();
 			RefreshHistory();
 			RefreshVocabularyLearnedCount();
 			BindInputFieldEvents();
@@ -238,6 +245,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			gameObject.SetActive(true);
 			EnsureDependencies();
+			EnableBackgroundRuntimeMode();
 			SendRequest(ChatRequests.LoadDeveloperState);
 			RefreshHistory();
 			RefreshVocabularyLearnedCount();
@@ -280,7 +288,28 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				_contextPopupView.HideImmediate();
 			}
+			RestoreForegroundRuntimeMode();
 			gameObject.SetActive(false);
+		}
+
+		private void OnApplicationFocus(bool hasFocus)
+		{
+			if (hasFocus || !_isBackgroundRuntimeActive)
+			{
+				return;
+			}
+
+			AudioListener.pause = false;
+		}
+
+		private void OnApplicationPause(bool pauseStatus)
+		{
+			if (!pauseStatus || !_isBackgroundRuntimeActive)
+			{
+				return;
+			}
+
+			AudioListener.pause = false;
 		}
 
 		/// <summary>
@@ -577,6 +606,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				}
 			}
 
+			if (_isBackgroundRuntimeActive && _characterVoiceAudioSource != null)
+			{
+				_characterVoiceAudioSource.ignoreListenerPause = true;
+			}
+
 			if (_selectCharacterPopupView == null)
 			{
 				var popupTransform = TransformUtils.FindChildByName(transform, "PopupSelectCharacter");
@@ -660,6 +694,59 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			_isCharacterResponding = isResponding;
 			SetChatInputInteractable(!isResponding);
+		}
+
+		/// <summary>
+		/// Keeps chat/network/audio running while app is unfocused when ChatView is active.
+		/// </summary>
+		private void EnableBackgroundRuntimeMode()
+		{
+			if (!_hasCapturedRunInBackground)
+			{
+				_previousRunInBackground = Application.runInBackground;
+				_hasCapturedRunInBackground = true;
+			}
+
+			Application.runInBackground = true;
+			_isBackgroundRuntimeActive = true;
+
+			if (_characterVoiceAudioSource != null)
+			{
+				if (!_hasCapturedVoiceIgnoreListenerPause)
+				{
+					_previousVoiceIgnoreListenerPause = _characterVoiceAudioSource.ignoreListenerPause;
+					_hasCapturedVoiceIgnoreListenerPause = true;
+				}
+
+				_characterVoiceAudioSource.ignoreListenerPause = true;
+			}
+
+			AudioListener.pause = false;
+		}
+
+		/// <summary>
+		/// Restores runtime/audio behavior captured before ChatView enabled background mode.
+		/// </summary>
+		private void RestoreForegroundRuntimeMode()
+		{
+			if (!_isBackgroundRuntimeActive)
+			{
+				return;
+			}
+
+			if (_hasCapturedRunInBackground)
+			{
+				Application.runInBackground = _previousRunInBackground;
+			}
+
+			if (_characterVoiceAudioSource != null && _hasCapturedVoiceIgnoreListenerPause)
+			{
+				_characterVoiceAudioSource.ignoreListenerPause = _previousVoiceIgnoreListenerPause;
+			}
+
+			_isBackgroundRuntimeActive = false;
+			_hasCapturedRunInBackground = false;
+			_hasCapturedVoiceIgnoreListenerPause = false;
 		}
 
 		private void ScrollMessagesToBottom()
