@@ -9,7 +9,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createCheapAIService } from "./cheap-ai.service.js";
 
-const GEMINI_TTS_MODEL = "gemini-2.5-pro-preview-tts";
+const GEMINI_TTS_MODEL = "gemini-3.1-flash-tts-preview";
 
 // ---------------------------------------------------------------------------
 // Round-robin key management
@@ -102,7 +102,11 @@ const buildStyledPrompt = (text: string, tone?: string): string => {
     return text;
   }
 
-  return `Say chinese text only with tone ${trimmedTone}` + "\n" + text;
+  return `## Scene:
+Say chinese text only with tone ${trimmedTone}
+
+## Transcript:
+${text}`;
 };
 
 const containsHanzi = (text: string): boolean => HANZI_REGEX.test(text);
