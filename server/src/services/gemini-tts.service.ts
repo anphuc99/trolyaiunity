@@ -277,14 +277,28 @@ export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?
           const rawBuffer = Buffer.from(base64Audio, "base64");
           const mime: string = inlineData.mimeType ?? "";
 
-          // Raw PCM (audio/L16;rate=24000) -> wrap in WAV container.
+          // Extract sample rate from mimeType if present (e.g. "audio/L16;rate=24000").
+          const rateMatch = mime.match(/rate=(\d+)/);
+          const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+
+          // Raw PCM by explicit mimeType -> wrap in WAV container.
           if (mime.startsWith("audio/L16") || mime.startsWith("audio/pcm")) {
-            const rateMatch = mime.match(/rate=(\d+)/);
-            const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
             return wrapPcmInWav(rawBuffer, sampleRate);
           }
 
-          // Already WAV or another format ffmpeg can handle.
+          // Detect raw PCM by checking for missing RIFF/WAV header.
+          // Gemini 3.1 Flash TTS returns raw PCM without a recognisable mimeType;
+          // ffmpeg cannot process headerless PCM, so wrap it in a WAV container.
+          const hasRiffHeader =
+            rawBuffer.length >= 12 &&
+            rawBuffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+            rawBuffer.subarray(8, 12).toString("ascii") === "WAVE";
+
+          if (!hasRiffHeader) {
+            return wrapPcmInWav(rawBuffer, sampleRate);
+          }
+
+          // Already a valid WAV (or another RIFF-based format ffmpeg can handle).
           return rawBuffer;
         };
 
