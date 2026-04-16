@@ -220,7 +220,7 @@ async function main() {
       repo,
       token,
     });
-    await gitpull();
+    await gitfetch();
     console.log('Server response:', result);
   } finally {
     await cleanupTempDir(tempDir).catch((error) => {
@@ -234,6 +234,6 @@ main().catch((error) => {
   process.exit(1);
 });
 
-function gitpull(){
-  return runGit(['pull']);
+function gitfetch(){
+  return runGit(['fetch']);
 }
