@@ -313,6 +313,38 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		}
 
 		/// <summary>
+		/// Handles keyboard shortcuts for chat actions.
+		/// Ctrl+O opens context popup, Ctrl+E ends the conversation.
+		/// </summary>
+		private void Update()
+		{
+			if (!IsControlPressed())
+			{
+				return;
+			}
+
+			if (Input.GetKeyDown(KeyCode.O))
+			{
+				OnContextInputRequested(null);
+				return;
+			}
+
+			if (Input.GetKeyDown(KeyCode.E))
+			{
+				OnEndConversationRequested(null);
+			}
+		}
+
+		/// <summary>
+		/// Returns true when either left or right Control key is pressed.
+		/// </summary>
+		/// <returns>True when Control is currently held down.</returns>
+		private static bool IsControlPressed()
+		{
+			return Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+		}
+
+		/// <summary>
 		/// Displays add-character popup with character list from controller.
 		/// </summary>
 		/// <param name="payload">Character list payload.</param>
