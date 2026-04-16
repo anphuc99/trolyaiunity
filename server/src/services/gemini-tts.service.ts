@@ -102,7 +102,7 @@ const buildStyledPrompt = (text: string, tone?: string): string => {
     return text;
   }
 
-  return `## Scene:
+  return `## Sample Context:
 Say chinese text only with tone ${trimmedTone}
 
 ## Transcript:
