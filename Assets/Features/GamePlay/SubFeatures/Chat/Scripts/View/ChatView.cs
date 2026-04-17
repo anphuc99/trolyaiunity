@@ -314,12 +314,19 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		/// <summary>
 		/// Handles keyboard shortcuts for chat actions.
-		/// Ctrl+O opens context popup, Ctrl+E ends the conversation.
+		/// Ctrl+A opens add-character popup, Ctrl+O opens context popup,
+		/// Ctrl+E ends the conversation.
 		/// </summary>
 		private void Update()
 		{
 			if (!IsControlPressed())
 			{
+				return;
+			}
+
+			if (Input.GetKeyDown(KeyCode.A))
+			{
+				SendRequest(ChatRequests.OpenAddCharacterPopup);
 				return;
 			}
 

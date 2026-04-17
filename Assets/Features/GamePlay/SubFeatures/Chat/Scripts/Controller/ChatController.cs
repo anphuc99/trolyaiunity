@@ -294,6 +294,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
+		/// Opens add-character popup by loading selectable characters and publishing CharactersLoaded.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[Request(ChatRequests.OpenAddCharacterPopup)]
+		public static void HandleOpenAddCharacterPopup(object payload)
+		{
+			HandleOpenAddCharacterMenu();
+		}
+
+		/// <summary>
 		/// Handles speech-to-text transcription requests from the view.
 		/// </summary>
 		/// <param name="payload">Transcription request payload.</param>
