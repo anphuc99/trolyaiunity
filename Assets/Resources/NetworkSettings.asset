@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: NetworkSettings
   m_EditorClassIdentifier: 
   UseFakeUrl: 0
-  BaseUrl: http://14.225.222.181:4000
+  BaseUrl: https://chat.mimichat.io.vn
