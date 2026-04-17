@@ -783,7 +783,7 @@ export const createChatController = (
 
     const message = typeof request.body?.message === "string" ? request.body.message.trim() : "";
     const sessionId = getSessionId(request.body?.sessionId);
-    const modelOverride = "gemini-3.1-flash-lite-preview";
+    const modelOverride = "gemini-3-flash-preview";
     const audioBase64 = typeof request.body?.audio === "string" ? request.body.audio.trim() : "";
     const hasAudio = Boolean(audioBase64);
 
@@ -930,7 +930,7 @@ export const createChatController = (
       return;
     }
 
-    const modelOverride = "gemini-3.1-flash-lite-preview";
+    const modelOverride = "gemini-3-flash-preview";
 
     const useGemini = isGeminiModel(modelOverride || openAIModel);
     const selectedService = useGemini ? geminiService : openAIService;
