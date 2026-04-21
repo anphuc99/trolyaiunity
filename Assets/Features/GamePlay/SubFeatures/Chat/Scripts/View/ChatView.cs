@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using Share.Components;
 using UnityEngine.UI;
 
@@ -322,6 +323,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		/// </summary>
 		private void Update()
 		{
+			if (!_hasSceneCharacters)
+			{
+				ClearBlockedInputSelection();
+			}
+
 			if (!IsControlPressed())
 			{
 				return;
@@ -823,22 +829,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		private void SetChatInputInteractable(bool isInteractable)
 		{
-			if (_inputField != null)
-			{
-				_inputField.interactable = isInteractable;
-				if (!isInteractable)
-				{
-					_inputField.DeactivateInputField();
-				}
-			}
+			SetInputFieldInteractable(_inputField, isInteractable);
+			SetInputFieldInteractable(_intputChat, isInteractable);
 
-			if (_intputChat != null)
+			if (!isInteractable)
 			{
-				_intputChat.interactable = isInteractable;
-				if (!isInteractable)
-				{
-					_intputChat.DeactivateInputField();
-				}
+				ClearBlockedInputSelection();
 			}
 
 			if (_sendButton != null)
@@ -849,6 +845,51 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_recordButton != null)
 			{
 				_recordButton.interactable = isInteractable && !_isTranscribingVoice;
+			}
+		}
+
+		/// <summary>
+		/// Applies interactable state to a TMP input field and immediately removes focus when disabled.
+		/// </summary>
+		/// <param name="inputField">Input field to update.</param>
+		/// <param name="isInteractable">True to allow focus/input; otherwise force disabled.</param>
+		private static void SetInputFieldInteractable(TMP_InputField inputField, bool isInteractable)
+		{
+			if (inputField == null)
+			{
+				return;
+			}
+
+			inputField.interactable = isInteractable;
+			if (!isInteractable)
+			{
+				inputField.DeactivateInputField();
+			}
+		}
+
+		/// <summary>
+		/// Clears EventSystem selection when one of the chat input fields is selected while chat is blocked.
+		/// </summary>
+		private void ClearBlockedInputSelection()
+		{
+			var eventSystem = EventSystem.current;
+			if (eventSystem == null)
+			{
+				return;
+			}
+
+			var selectedObject = eventSystem.currentSelectedGameObject;
+			if (selectedObject == null)
+			{
+				return;
+			}
+
+			var isInputSelected = (_inputField != null && selectedObject == _inputField.gameObject)
+				|| (_intputChat != null && selectedObject == _intputChat.gameObject);
+
+			if (isInputSelected)
+			{
+				eventSystem.SetSelectedGameObject(null);
 			}
 		}
 
