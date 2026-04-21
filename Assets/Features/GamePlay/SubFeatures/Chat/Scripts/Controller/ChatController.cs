@@ -34,6 +34,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			ChatState.LearningPathVocabularyCandidates = new List<string>();
 			ChatState.LearnedVocabularySet = new HashSet<string>(StringComparer.Ordinal);
 			ChatState.IsVocabularyMarkerSourceLoaded = false;
+			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		}
 
 		/// <summary>
@@ -45,6 +46,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			ChatState.LearningPathVocabularyCandidates = new List<string>();
 			ChatState.LearnedVocabularySet = new HashSet<string>(StringComparer.Ordinal);
 			ChatState.IsVocabularyMarkerSourceLoaded = false;
+			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		}
 
 		/// <summary>
@@ -71,6 +73,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			UnregisterAddCharacterMenu();
 			UnregisterContextMenu();
 			UnregisterEndConversationMenu();
+			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			// Clear API mode so the next chat session starts fresh (default mode).
 			GlobalVariables.Remove(CoreGlobalModes.ChatApiModeKey);
 			EventBus.Publish(ChatEvents.Uninstalled, null);
@@ -127,6 +130,15 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				return;
 			}
 
+			if (!HandleHasAnySceneCharacter(null))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Chat is blocked because no active character exists in scene."
+				});
+				return;
+			}
+
 			_ = SendMessageInternalAsync(payload);
 		}
 
@@ -134,19 +146,18 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		/// Checks whether current scene has at least one available character.
 		/// </summary>
 		/// <param name="payload">Unused payload.</param>
-		/// <returns>True when at least one non-empty character name exists in parent cache.</returns>
+		/// <returns>True when at least one active character exists in current chat scene.</returns>
 		[Request(ChatRequests.HasAnySceneCharacter)]
 		public static bool HandleHasAnySceneCharacter(object payload)
 		{
-			var names = ChatState.ParentSignals?.GetCharacterNames?.Invoke();
-			if (names == null || names.Count == 0)
+			if (ChatState.ActiveCharacterNames == null || ChatState.ActiveCharacterNames.Count == 0)
 			{
 				return false;
 			}
 
-			for (var i = 0; i < names.Count; i++)
+			foreach (var name in ChatState.ActiveCharacterNames)
 			{
-				if (!string.IsNullOrWhiteSpace(names[i]))
+				if (!string.IsNullOrWhiteSpace(name))
 				{
 					return true;
 				}
@@ -207,6 +218,15 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		[Request(ChatRequests.GenerateReplyFromHistory)]
 		public static void HandleGenerateReplyFromHistory(ChatSendRequestPayload payload)
 		{
+			if (!HandleHasAnySceneCharacter(null))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Chat is blocked because no active character exists in scene."
+				});
+				return;
+			}
+
 			_ = GenerateReplyFromHistoryInternalAsync(payload ?? new ChatSendRequestPayload());
 		}
 
@@ -540,18 +560,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 
 			var state = await LoadDeveloperStatePayloadAsync();
-			var activeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-			if (state?.ActiveCharacterNames != null)
-			{
-				for (var i = 0; i < state.ActiveCharacterNames.Count; i++)
-				{
-					var n = state.ActiveCharacterNames[i];
-					if (!string.IsNullOrWhiteSpace(n))
-					{
-						activeNames.Add(n.Trim());
-					}
-				}
-			}
+			UpdateActiveCharacterNamesCache(state);
 
 			for (var i = 0; i < names.Count; i++)
 			{
@@ -566,7 +575,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				{
 					Name = normalizedName,
 					Avatar = ChatState.ParentSignals?.GetCharacterAvatarByName?.Invoke(normalizedName),
-					IsActive = activeNames.Contains(normalizedName),
+					IsActive = ChatState.ActiveCharacterNames.Contains(normalizedName),
 				});
 			}
 
@@ -597,7 +606,26 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		private static async Task LoadDeveloperStateInternalAsync()
 		{
 			var state = await LoadDeveloperStatePayloadAsync();
+			UpdateActiveCharacterNamesCache(state);
 			EventBus.Publish(ChatEvents.DeveloperStateLoaded, state ?? new ChatDeveloperStatePayload());
+		}
+
+		private static void UpdateActiveCharacterNamesCache(ChatDeveloperStatePayload state)
+		{
+			var activeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			if (state?.ActiveCharacterNames != null)
+			{
+				for (var i = 0; i < state.ActiveCharacterNames.Count; i++)
+				{
+					var name = state.ActiveCharacterNames[i];
+					if (!string.IsNullOrWhiteSpace(name))
+					{
+						activeNames.Add(name.Trim());
+					}
+				}
+			}
+
+			ChatState.ActiveCharacterNames = activeNames;
 		}
 
 		/// <summary>

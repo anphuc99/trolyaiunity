@@ -42,6 +42,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 			ChatState.AddCharacterMenuId = null;
 			ChatState.ContextMenuId = null;
 			ChatState.EndConversationMenuId = null;
+			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		}
 
 		[TearDown]
@@ -54,6 +55,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 			ChatState.AddCharacterMenuId = null;
 			ChatState.ContextMenuId = null;
 			ChatState.EndConversationMenuId = null;
+			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		}
 
 		[Test]
@@ -212,6 +214,29 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 		}
 
 		[Test]
+		public void HandleHasAnySceneCharacter_ShouldReturnFalse_WhenNoActiveCharacterExists()
+		{
+			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+			var result = ChatController.HandleHasAnySceneCharacter(null);
+
+			Assert.IsFalse(result);
+		}
+
+		[Test]
+		public void HandleHasAnySceneCharacter_ShouldReturnTrue_WhenAtLeastOneActiveCharacterExists()
+		{
+			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+			{
+				"Mimi",
+			};
+
+			var result = ChatController.HandleHasAnySceneCharacter(null);
+
+			Assert.IsTrue(result);
+		}
+
+		[Test]
 		public void SetCharacterActive_ShouldPublishError_WhenCharacterNameMissing()
 		{
 			ChatErrorPayload errorPayload = null;
@@ -229,6 +254,43 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 
 			Assert.IsNotNull(errorPayload);
 			Assert.AreEqual("Character name is required when changing active state.", errorPayload.Message);
+		}
+
+		[Test]
+		public void HandleSendMessage_ShouldPublishError_WhenNoActiveCharacterExists()
+		{
+			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+			ChatErrorPayload errorPayload = null;
+			EventBus.Subscribe(ChatEvents.RequestFailed, payload =>
+			{
+				errorPayload = payload as ChatErrorPayload;
+			});
+
+			ChatController.HandleSendMessage(new ChatSendRequestPayload
+			{
+				Message = "hello"
+			});
+
+			Assert.IsNotNull(errorPayload);
+			Assert.AreEqual("Chat is blocked because no active character exists in scene.", errorPayload.Message);
+		}
+
+		[Test]
+		public void HandleGenerateReplyFromHistory_ShouldPublishError_WhenNoActiveCharacterExists()
+		{
+			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+			ChatErrorPayload errorPayload = null;
+			EventBus.Subscribe(ChatEvents.RequestFailed, payload =>
+			{
+				errorPayload = payload as ChatErrorPayload;
+			});
+
+			ChatController.HandleGenerateReplyFromHistory(new ChatSendRequestPayload());
+
+			Assert.IsNotNull(errorPayload);
+			Assert.AreEqual("Chat is blocked because no active character exists in scene.", errorPayload.Message);
 		}
 
 		[Test]

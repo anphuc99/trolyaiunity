@@ -29,5 +29,10 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// True when vocabulary marker sources were loaded successfully at least once.
 		/// </summary>
 		public static bool IsVocabularyMarkerSourceLoaded { get; set; }
+
+		/// <summary>
+		/// Active character names in the current chat scene, synchronized from developer state.
+		/// </summary>
+		public static HashSet<string> ActiveCharacterNames { get; set; } = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
 	}
 }
