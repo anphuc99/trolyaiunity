@@ -56,6 +56,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			RegisterAddCharacterMenu();
 			RegisterContextMenu();
+			RegisterAutoChatMenu();
 			RegisterEndConversationMenu();
 			_ = LoadDeveloperStateInternalAsync();
 			_ = LoadVocabularyMarkerSourcesInternalAsync();
@@ -72,6 +73,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 			UnregisterAddCharacterMenu();
 			UnregisterContextMenu();
+			UnregisterAutoChatMenu();
 			UnregisterEndConversationMenu();
 			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			// Clear API mode so the next chat session starts fresh (default mode).
@@ -89,6 +91,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			{
 				UnregisterAddCharacterMenu();
 				UnregisterContextMenu();
+				UnregisterAutoChatMenu();
 				UnregisterEndConversationMenu();
 			}
 
@@ -510,6 +513,19 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			ChatState.EndConversationMenuId = menuId;
 		}
 
+		private static void RegisterAutoChatMenu()
+		{
+			UnregisterAutoChatMenu();
+
+			var menuId = ChatState.ParentSignals?.AddMenu?.Invoke("Chat tự động", HandleToggleAutoChatMenu);
+			if (string.IsNullOrWhiteSpace(menuId))
+			{
+				return;
+			}
+
+			ChatState.AutoChatMenuId = menuId;
+		}
+
 		private static void UnregisterContextMenu()
 		{
 			if (string.IsNullOrWhiteSpace(ChatState.ContextMenuId))
@@ -534,6 +550,18 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			ChatState.EndConversationMenuId = null;
 		}
 
+		private static void UnregisterAutoChatMenu()
+		{
+			if (string.IsNullOrWhiteSpace(ChatState.AutoChatMenuId))
+			{
+				ChatState.AutoChatMenuId = null;
+				return;
+			}
+
+			ChatState.ParentSignals?.RemoveMenu?.Invoke(ChatState.AutoChatMenuId);
+			ChatState.AutoChatMenuId = null;
+		}
+
 		private static async void HandleOpenAddCharacterMenu()
 		{
 			var payload = await BuildSelectableCharactersAsync();
@@ -548,6 +576,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		private static void HandleOpenEndConversationMenu()
 		{
 			EventBus.Publish(ChatEvents.EndConversationRequested, null);
+		}
+
+		private static void HandleToggleAutoChatMenu()
+		{
+			EventBus.Publish(ChatEvents.AutoChatToggleRequested, null);
 		}
 
 		private static async Task<List<ChatSelectableCharacterPayload>> BuildSelectableCharactersAsync()

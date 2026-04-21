@@ -15,6 +15,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Events
 		public const string MessageAudioPlayRequested = "game.play.chat.message.audio.play.requested.event";
 		public const string CharactersLoaded = "game.play.chat.characters.loaded.event";
 		public const string ContextInputRequested = "game.play.chat.context.input.requested.event";
+		public const string AutoChatToggleRequested = "game.play.chat.auto.chat.toggle.requested.event";
 		public const string DeveloperStateLoaded = "game.play.chat.developer.state.loaded.event";
 		public const string EndConversationRequested = "game.play.chat.end.conversation.requested.event";
 		public const string ConversationEnded = "game.play.chat.conversation.ended.event";

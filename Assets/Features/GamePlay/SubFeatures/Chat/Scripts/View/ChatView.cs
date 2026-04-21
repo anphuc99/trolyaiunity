@@ -27,6 +27,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private const int RecordingFrequencyHz = 16000;
 		private const int MaxRecordingSeconds = 60;
 		private const string DefaultSpeechLanguage = "zh";
+		private const string AutoChatContext = "AI tự nói chuyện";
 
 		[SerializeField]
 		private TMP_InputField _inputField;
@@ -88,6 +89,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private bool _hasCapturedVoiceIgnoreListenerPause;
 		private bool _previousVoiceIgnoreListenerPause;
 		private bool _hasSceneCharacters;
+		private bool _isAutoChatEnabled;
+		private bool _isAutoChatAwaitingReply;
+		private bool _hasSentAutoChatContext;
 
 		/// <summary>
 		/// Rich text marker shown in the input field when a voice recording is pending.
@@ -126,6 +130,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		protected override void OnDisabled()
 		{
+			StopAutoChatMode();
 			StopRecordingIfNeeded();
 			UnbindInputFieldEvents();
 			UnbindRecordButtonEvents();
@@ -263,6 +268,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private void OnUninstalled(object payload)
 		{
 			StopAllCoroutines();
+			StopAutoChatMode();
 			StopRecordingIfNeeded();
 			UnbindAudioInputGuard();
 			_pendingAudioBase64 = null;
@@ -319,7 +325,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		/// <summary>
 		/// Handles keyboard shortcuts for chat actions.
 		/// Ctrl+A opens add-character popup, Ctrl+O opens context popup,
-		/// Ctrl+E ends the conversation.
+		/// Ctrl+E ends the conversation, Ctrl+R toggles auto chat mode.
 		/// </summary>
 		private void Update()
 		{
@@ -348,6 +354,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (Input.GetKeyDown(KeyCode.E))
 			{
 				OnEndConversationRequested(null);
+				return;
+			}
+
+			if (Input.GetKeyDown(KeyCode.R))
+			{
+				ToggleAutoChatMode();
 			}
 		}
 
@@ -399,12 +411,23 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		}
 
 		/// <summary>
+		/// Toggles auto-chat mode when the parent menu item is clicked.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[OnEvent(ChatEvents.AutoChatToggleRequested)]
+		private void OnAutoChatToggleRequested(object payload)
+		{
+			ToggleAutoChatMode();
+		}
+
+		/// <summary>
 		/// Handles request from controller to end conversation.
 		/// </summary>
 		/// <param name="payload">Unused payload.</param>
 		[OnEvent(ChatEvents.EndConversationRequested)]
 		private void OnEndConversationRequested(object payload)
 		{
+			StopAutoChatMode();
 			SendRequest(ChatRequests.EndConversation);
 		}
 
@@ -526,6 +549,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
+			_isAutoChatAwaitingReply = false;
+
 			var turns = response.Turns != null && response.Turns.Count > 0 ? response.Turns : new List<ChatAssistantTurnPayload>();
 			if (turns.Count == 0)
 			{
@@ -540,6 +565,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, DefaultCharacterDisplayName),
 				});
 				ScrollMessagesToBottom();
+				TryTriggerNextAutoChatTurn();
 				return;
 			}
 
@@ -618,6 +644,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			_isProcessingCharacterTurns = false;
 			SetCharacterRespondingState(false);
+			TryTriggerNextAutoChatTurn();
 		}
 
 		private IEnumerator PlayCharacterVoiceAsync(AudioClip clip)
@@ -751,6 +778,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private void RefreshSceneCharacterState()
 		{
 			_hasSceneCharacters = HasAnySceneCharacter();
+			if (!_hasSceneCharacters && _isAutoChatEnabled)
+			{
+				StopAutoChatMode();
+			}
 			SetChatInputInteractable(!_isCharacterResponding && _hasSceneCharacters);
 		}
 
@@ -1397,6 +1428,90 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			SendChatMessage(messageToSend);
 		}
 
+		/// <summary>
+		/// Toggles auto-chat mode. When enabled, AI keeps responding from history
+		/// until the user toggles the mode off.
+		/// </summary>
+		private void ToggleAutoChatMode()
+		{
+			if (_isAutoChatEnabled)
+			{
+				StopAutoChatMode();
+				return;
+			}
+
+			StartAutoChatMode();
+		}
+
+		/// <summary>
+		/// Starts auto-chat mode and triggers the first turn using SaveAndSend
+		/// with the fixed context "AI tự nói chuyện".
+		/// </summary>
+		private void StartAutoChatMode()
+		{
+			if (_isAutoChatEnabled)
+			{
+				return;
+			}
+
+			if (!HasAnySceneCharacter())
+			{
+				Debug.LogWarning("[ChatView] Auto chat is blocked because scene has no characters.", this);
+				return;
+			}
+
+			_isAutoChatEnabled = true;
+			_isAutoChatAwaitingReply = false;
+			_hasSentAutoChatContext = false;
+			TryTriggerNextAutoChatTurn();
+		}
+
+		/// <summary>
+		/// Stops auto-chat mode. In-flight reply requests are not cancelled,
+		/// but no further turns will be requested.
+		/// </summary>
+		private void StopAutoChatMode()
+		{
+			_isAutoChatEnabled = false;
+			_isAutoChatAwaitingReply = false;
+			_hasSentAutoChatContext = false;
+		}
+
+		/// <summary>
+		/// Requests the next auto-chat turn when mode is enabled and idle.
+		/// The first turn is triggered by SaveAndSend with auto-chat context.
+		/// Subsequent turns use GenerateReplyFromHistory.
+		/// </summary>
+		private void TryTriggerNextAutoChatTurn()
+		{
+			if (!_isAutoChatEnabled || _isAutoChatAwaitingReply || _isCharacterResponding)
+			{
+				return;
+			}
+
+			if (!HasAnySceneCharacter())
+			{
+				Debug.LogWarning("[ChatView] Auto chat stopped because scene has no characters.", this);
+				StopAutoChatMode();
+				return;
+			}
+
+			_isAutoChatAwaitingReply = true;
+
+			if (!_hasSentAutoChatContext)
+			{
+				_hasSentAutoChatContext = true;
+				HandleSaveAndSendContextClicked(AutoChatContext);
+				return;
+			}
+
+			SendRequest(ChatRequests.GenerateReplyFromHistory, new ChatSendRequestPayload
+			{
+				SessionId = string.IsNullOrWhiteSpace(_sessionId) ? null : _sessionId,
+				Model = string.IsNullOrWhiteSpace(_modelOverride) ? null : _modelOverride,
+			});
+		}
+
 		private string ResolveCurrentInputMessage()
 		{
 			var primaryText = _inputField != null ? _inputField.text : null;
@@ -1473,6 +1588,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private void ClearConversationState()
 		{
 			StopAllCoroutines();
+			StopAutoChatMode();
 			StopRecordingIfNeeded();
 			UnbindAudioInputGuard();
 			_pendingAudioBase64 = null;
@@ -1702,6 +1818,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (_isVocabAudioRequestInProgress)
 			{
 				SetVocabAudioRequestInProgress(false);
+			}
+
+			if (_isAutoChatEnabled && _isAutoChatAwaitingReply)
+			{
+				Debug.LogWarning("[ChatView] Auto chat stopped because request failed.", this);
+				StopAutoChatMode();
 			}
 
 			var error = payload as ChatErrorPayload;

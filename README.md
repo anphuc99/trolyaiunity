@@ -119,3 +119,13 @@ The chat server supports optional long-term AI memory backed by ChromaDB. When e
 - `server/src/services/memory-extraction.service.ts` — Parse/strip memory sidecar from AI reply
 - `server/src/services/cheap-ai.service.ts` — Gemini Flash Lite for intent rewriting + compression
 - `server/src/services/memory-retrieval.service.ts` — Orchestrates retrieve + compress pipeline
+
+## Chat: Auto Talk Mode (Client)
+
+The GamePlay Chat client supports an auto-conversation mode controlled from parent menu and keyboard shortcut.
+
+- Menu: `Chat tự động` (toggle on/off)
+- Shortcut: `Ctrl+R` (same toggle behavior)
+- First auto turn: sends context `AI tự nói chuyện` through the same Save + Send flow used by context popup
+- Follow-up turns: repeatedly requests `GenerateReplyFromHistory`
+- Auto mode stops when user toggles off, chat ends/uninstalls, no active scene characters remain, or an in-flight auto request fails

@@ -41,6 +41,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 			ChatState.ParentSignals = null;
 			ChatState.AddCharacterMenuId = null;
 			ChatState.ContextMenuId = null;
+			ChatState.AutoChatMenuId = null;
 			ChatState.EndConversationMenuId = null;
 			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		}
@@ -54,6 +55,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 			ChatState.ParentSignals = null;
 			ChatState.AddCharacterMenuId = null;
 			ChatState.ContextMenuId = null;
+			ChatState.AutoChatMenuId = null;
 			ChatState.EndConversationMenuId = null;
 			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		}
@@ -85,6 +87,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 						return "menu-chat-end";
 					}
 
+					if (string.Equals(text, "Chat tự động", StringComparison.Ordinal))
+					{
+						return "menu-chat-auto";
+					}
+
 					return null;
 				}
 			});
@@ -93,10 +100,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 
 			CollectionAssert.Contains(requestedMenuTexts, "Thêm nhân vật");
 			CollectionAssert.Contains(requestedMenuTexts, "Nhập bối cảnh");
+			CollectionAssert.Contains(requestedMenuTexts, "Chat tự động");
 			CollectionAssert.Contains(requestedMenuTexts, "Kết thúc hội thoại");
 			Assert.IsNotNull(requestedCharacterMenuAction);
 			Assert.AreEqual("menu-chat-add-character", ChatState.AddCharacterMenuId);
 			Assert.AreEqual("menu-chat-context", ChatState.ContextMenuId);
+			Assert.AreEqual("menu-chat-auto", ChatState.AutoChatMenuId);
 			Assert.AreEqual("menu-chat-end", ChatState.EndConversationMenuId);
 		}
 
@@ -119,6 +128,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 						return "menu-chat-end";
 					}
 
+					if (string.Equals(text, "Chat tự động", StringComparison.Ordinal))
+					{
+						return "menu-chat-auto";
+					}
+
 					return "menu-chat-add-character";
 				},
 				RemoveMenu = menuId => removedMenuIds.Add(menuId),
@@ -129,9 +143,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 
 			CollectionAssert.Contains(removedMenuIds, "menu-chat-add-character");
 			CollectionAssert.Contains(removedMenuIds, "menu-chat-context");
+			CollectionAssert.Contains(removedMenuIds, "menu-chat-auto");
 			CollectionAssert.Contains(removedMenuIds, "menu-chat-end");
 			Assert.IsNull(ChatState.AddCharacterMenuId);
 			Assert.IsNull(ChatState.ContextMenuId);
+			Assert.IsNull(ChatState.AutoChatMenuId);
 			Assert.IsNull(ChatState.EndConversationMenuId);
 		}
 
@@ -179,6 +195,37 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 
 			ChatController.Install();
 			contextMenuAction?.Invoke();
+
+			Assert.IsTrue(isEventPublished);
+		}
+
+		[Test]
+		public void AutoChatMenuClick_ShouldPublishAutoChatToggleRequestedEvent()
+		{
+			Action autoChatMenuAction = null;
+			var isEventPublished = false;
+
+			EventBus.Subscribe(ChatEvents.AutoChatToggleRequested, _ =>
+			{
+				isEventPublished = true;
+			});
+
+			ChatController.SetParentSignals(new ChatParentSignals
+			{
+				AddMenu = (text, onClick) =>
+				{
+					if (!string.Equals(text, "Chat tự động", StringComparison.Ordinal))
+					{
+						return "menu-chat-other";
+					}
+
+					autoChatMenuAction = onClick;
+					return "menu-chat-auto";
+				},
+			});
+
+			ChatController.Install();
+			autoChatMenuAction?.Invoke();
 
 			Assert.IsTrue(isEventPublished);
 		}
