@@ -173,7 +173,7 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
     }
 
     const text = typeof request.query.text === "string" ? request.query.text.trim() : "";
-    const tone = typeof request.query.tone === "string" ? request.query.tone.trim() : "neutral, medium pitch";
+    const tone = typeof request.query.tone === "string" ? request.query.tone.trim() : "Neutral and calm, natural conversational tone, medium pace";
     const characterName =
       typeof request.query.characterName === "string" ? request.query.characterName.trim() : "";
     const messageId = typeof request.query.messageId === "string" ? request.query.messageId.trim() : "";

@@ -102,10 +102,10 @@ const buildStyledPrompt = (text: string, tone?: string): string => {
     return text;
   }
 
-  return `## Sample Context:
-Say with tone ${trimmedTone}
+  return `### DIRECTOR'S NOTES
+Style: ${trimmedTone}
 
-## Transcript:
+### TRANSCRIPT
 ${text}`;
 };
 

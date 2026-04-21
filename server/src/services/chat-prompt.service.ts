@@ -278,12 +278,44 @@ Serious: .
 Neutral: unchanged
 
 ====================================
-TONE FIELD FORMAT (APPLY TO Tone FIELD ONLY)
+TONE FIELD FORMAT (APPLY TO Tone FIELD ONLY — Gemini TTS Director's Notes)
 ====================================
-- Tone must be English-only metadata and must never contain Chinese characters.
-- Recommended format: "<emotion>, <pitch>" (optional: ", <speed>").
-- Allowed emotion words: angry, shouting, disgusted, sad, scared, surprised, shy, affectionate, happy, excited, serious, neutral.
-- Valid examples: "happy, medium pitch", "sad, low pitch", "angry, high pitch, fast".
+The Tone field is used as TTS director's notes for Gemini TTS. Write it as a rich, descriptive English instruction that tells the TTS engine exactly HOW to deliver the line.
+
+- Tone must be English-only metadata and must never contain Chinese characters or Vietnamese.
+- Describe the full vocal performance: emotion, intensity, pacing, volume, vocal quality, and any acting direction.
+- Think like a voice director giving notes to an actor. Be specific and vivid.
+- Keep it to 1-2 concise sentences.
+
+Structure (combine as needed):
+  Style/Emotion: the core feeling (e.g., "frustrated", "gently teasing", "warmly encouraging", "coldly dismissive")
+  Pacing: delivery speed (e.g., "slow and deliberate", "rapid excited pace", "drawn out and dreamy")
+  Volume/Intensity: how loud or soft (e.g., "soft whisper", "loud and assertive", "quiet and intimate")
+  Vocal quality: texture of voice (e.g., "breathy", "gravelly", "bright and cheerful", "trembling", "with a vocal smile")
+  Acting direction: physical/situational cues (e.g., "as if holding back tears", "like revealing a surprise", "sighing before speaking")
+
+Allowed emotion palette (use these or combine creatively):
+  angry, shouting, disgusted, sad, scared, surprised, shy, affectionate, happy, excited, serious, neutral,
+  teasing, sarcastic, worried, confused, proud, relieved, nostalgic, mischievous, tired, panicked, curious,
+  annoyed, gentle, playful, stern, hesitant, confident, disappointed, amused, tender, dramatic
+
+Examples of GOOD Tone values:
+  "Cheerful and bright with a vocal smile, medium pace"
+  "Angry and frustrated, speaking fast with rising intensity"
+  "Soft and gentle whisper, slow and intimate, as if telling a secret"
+  "Surprised and excited, gasping slightly before speaking, fast pace"
+  "Sad and quiet, slow pace, voice trembling slightly as if holding back tears"
+  "Playfully teasing, light and bouncy pace with a mischievous grin"
+  "Serious and firm, measured pace, low and authoritative"
+  "Shy and hesitant, quiet voice, pausing between words"
+  "Warmly encouraging, like a kind teacher praising a student"
+  "Sarcastically amused, deadpan delivery, painfully slow"
+
+Examples of BAD Tone values (DO NOT do these):
+  "happy, medium pitch" — too vague, not descriptive enough
+  "neutral" — gives TTS no direction at all
+  "你好!!!" — contains Chinese characters
+  "angry, high pitch, fast" — too mechanical, describe the feeling instead
 
 Example (Text/Tone separation):
 [
@@ -292,7 +324,7 @@ Example (Text/Tone separation):
     "CharacterName": "Mimi",
     "Text": "你怎么这样!!!",
     "Pinyin": "Nǐ zěn me zhè yàng!!!",
-    "Tone": "angry, high pitch",
+    "Tone": "Angry and hurt, voice rising with frustration, fast and sharp delivery",
     "Translation": "Sao bạn lại như vậy!"
   }
 ]
@@ -304,7 +336,7 @@ Example (normal reply — no important memory):
     "CharacterName": "Mimi",
     "Text": "你好！",
     "Pinyin": "Nǐ hǎo!",
-    "Tone": "Happy, medium pitch",
+    "Tone": "Cheerful and friendly with a bright vocal smile, medium pace",
     "Translation": "Xin chào."
   }
 ]
@@ -316,7 +348,7 @@ Example (GLOBAL memory on first item — objective fact, GlobalMemory* fields):
     "CharacterName": "Mimi",
     "Text": "好的，我们这周末去公园！",
     "Pinyin": "Hǎo de, wǒ men zhè zhōu mò qù gōng yuán!",
-    "Tone": "Happy, medium pitch",
+    "Tone": "Excited and happy, bright voice with a big smile, upbeat pace",
     "Translation": "Được rồi, chúng ta sẽ đi công viên cuối tuần này!",
     "GlobalMemoryEn": "The group decided to visit the park this weekend.",
     "GlobalMemoryType": "plan",
@@ -331,7 +363,7 @@ Example (CHARACTER memory on first item — subjective first-person, ImportantMe
     "CharacterName": "Mimi",
     "Text": "那我们去吃炸鸡吧！",
     "Pinyin": "Nà wǒ men qù chī zhá jī ba!",
-    "Tone": "Happy, medium pitch",
+    "Tone": "Enthusiastic and eager, playful suggestion with a cheerful lilt",
     "Translation": "Vậy chúng ta đi ăn gà rán nhé!",
     "ImportantMemoryEn": "I love fried chicken the most.",
     "ImportantMemoryType": "preference",
@@ -347,7 +379,7 @@ Example (BOTH on first item — global fact + character memory coexist, differen
     "CharacterName": "Mimi",
     "Text": "好！我们这周末去公园吧！",
     "Pinyin": "Hǎo! Wǒ men zhè zhōu mò qù gōng yuán ba!",
-    "Tone": "Happy, medium pitch",
+    "Tone": "Delighted and enthusiastic, bright upbeat voice bursting with energy",
     "Translation": "Tuyệt! Chúng ta đi công viên cuối tuần này nhé!",
     "GlobalMemoryEn": "The group decided to visit the park this weekend.",
     "GlobalMemoryType": "plan",
@@ -366,7 +398,7 @@ Example (two characters each storing their own memory):
     "CharacterName": "Mimi",
     "Text": "我喜欢吃炸鸡！",
     "Pinyin": "Wǒ xǐ huan chī zhá jī!",
-    "Tone": "Happy, medium pitch",
+    "Tone": "Happy and passionate, voice lighting up with genuine excitement",
     "Translation": "Tôi thích ăn gà rán!",
     "ImportantMemoryEn": "I love fried chicken the most.",
     "ImportantMemoryType": "preference",
@@ -378,7 +410,7 @@ Example (two characters each storing their own memory):
     "CharacterName": "Lisa",
     "Text": "我更喜欢披萨！",
     "Pinyin": "Wǒ gèng xǐ huan pī sà!",
-    "Tone": "Happy, medium pitch",
+    "Tone": "Playfully competitive, cheerful and assertive with a teasing grin",
     "Translation": "Tôi thích pizza hơn!",
     "ImportantMemoryEn": "I prefer pizza over other food.",
     "ImportantMemoryType": "preference",
