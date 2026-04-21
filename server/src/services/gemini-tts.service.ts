@@ -25,6 +25,10 @@ const RETRYABLE_STATUS_CODES = [400, 429, 500, 502, 503, 504];
 const NO_AUDIO_ERROR_MARKER = "gemini tts returned no audio data";
 const HANZI_REGEX = /[\u3400-\u9FFF\uF900-\uFAFF]/;
 
+const normalizeTtsInputText = (text: string): string => {
+  return text.replace(/[()（）]/g, "。");
+};
+
 /**
  * Reads GEMINI_API_KEY_VOICE1 … GEMINI_API_KEY_VOICE4 from env once.
  */
@@ -351,10 +355,11 @@ export const synthesizeGeminiTts = async (text: string, voiceName: string, tone?
     throw lastError instanceof Error ? lastError : new Error("Gemini TTS failed");
   };
 
-  const inputText = text?.trim() ?? "";
-  if (!inputText) {
+  const rawInputText = text?.trim() ?? "";
+  if (!rawInputText) {
     throw new Error("Gemini TTS requires non-empty input text");
   }
+  const inputText = normalizeTtsInputText(rawInputText);
 
   let cachedPinyinText: string | null = null;
   const resolvePinyinText = async (): Promise<string> => {
