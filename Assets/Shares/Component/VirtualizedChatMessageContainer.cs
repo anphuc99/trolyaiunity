@@ -21,6 +21,7 @@ namespace Share.Components
 		private const string TranslationSeparator = "---------------------";
 		private const string PinyinLabel = "Pinyin: ";
 		private const int RubyWrapHanCountPerLine = 7;
+		private const int TranslationTextSize = 30;
 
 		[SerializeField]
 		private RectTransform _viewport;
@@ -261,6 +262,7 @@ namespace Share.Components
 					: message.OriginalMessage;
 				var displayBaseText = BuildDisplayBaseText(message, originalText);
 				var resolvedTranslation = string.IsNullOrWhiteSpace(translation) ? message.Translation : translation;
+				var translationDisplayText = BuildTranslationDisplayText(resolvedTranslation);
 
 				if (_usePinyinRubyOnTranslate)
 				{
@@ -279,7 +281,7 @@ namespace Share.Components
 						message.OriginalMessage = originalText;
 						message.Translation = resolvedTranslation;
 						var rubyText = BuildDefaultMessageText(message, displayBaseText);
-						message.Message = rubyText + "\n" + TranslationSeparator + "\n" + resolvedTranslation;
+						message.Message = rubyText + "\n" + TranslationSeparator + "\n" + translationDisplayText;
 						message.IsTranslationExpanded = true;
 					}
 
@@ -305,11 +307,11 @@ namespace Share.Components
 					message.Translation = resolvedTranslation;
 					if (string.IsNullOrWhiteSpace(pinyinLine))
 					{
-						message.Message = displayBaseText + "\n" + TranslationSeparator + "\n" + resolvedTranslation;
+						message.Message = displayBaseText + "\n" + TranslationSeparator + "\n" + translationDisplayText;
 					}
 					else
 					{
-						message.Message = displayBaseText + "\n" + pinyinLine + "\n" + TranslationSeparator + "\n" + resolvedTranslation;
+						message.Message = displayBaseText + "\n" + pinyinLine + "\n" + TranslationSeparator + "\n" + translationDisplayText;
 					}
 					message.IsTranslationExpanded = true;
 				}
@@ -342,6 +344,16 @@ namespace Share.Components
 			}
 
 			return PinyinLabel + pinyin.Trim();
+		}
+
+		private static string BuildTranslationDisplayText(string translation)
+		{
+			if (string.IsNullOrWhiteSpace(translation))
+			{
+				return string.Empty;
+			}
+
+			return "<size=" + TranslationTextSize + ">" + translation.Trim() + "</size>";
 		}
 
 		private void ApplyDefaultMessageDisplay(MessageBubbleData message)
