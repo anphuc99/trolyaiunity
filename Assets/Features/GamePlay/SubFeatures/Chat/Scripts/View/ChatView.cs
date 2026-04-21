@@ -86,6 +86,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private bool _isBackgroundRuntimeActive;
 		private bool _hasCapturedVoiceIgnoreListenerPause;
 		private bool _previousVoiceIgnoreListenerPause;
+		private bool _hasSceneCharacters;
 
 		/// <summary>
 		/// Rich text marker shown in the input field when a voice recording is pending.
@@ -231,6 +232,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		{
 			EnsureDependencies();
 			EnableBackgroundRuntimeMode();
+			RefreshSceneCharacterState();
 			RefreshHistory();
 			RefreshVocabularyLearnedCount();
 			BindInputFieldEvents();
@@ -246,6 +248,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			gameObject.SetActive(true);
 			EnsureDependencies();
 			EnableBackgroundRuntimeMode();
+			RefreshSceneCharacterState();
 			SendRequest(ChatRequests.LoadDeveloperState);
 			RefreshHistory();
 			RefreshVocabularyLearnedCount();
@@ -724,7 +727,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			BindRecordButtonEvents();
 			UpdateRecordButtonVisualState();
 
-			SetChatInputInteractable(!_isCharacterResponding);
+			SetChatInputInteractable(!_isCharacterResponding && _hasSceneCharacters);
 
 			BindInputFieldEvents();
 		}
@@ -732,7 +735,27 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private void SetCharacterRespondingState(bool isResponding)
 		{
 			_isCharacterResponding = isResponding;
-			SetChatInputInteractable(!isResponding);
+			SetChatInputInteractable(!isResponding && _hasSceneCharacters);
+		}
+
+		/// <summary>
+		/// Re-checks whether the scene has at least one character and updates chat input state.
+		/// Called on enable, install, and after character toggle.
+		/// </summary>
+		private void RefreshSceneCharacterState()
+		{
+			_hasSceneCharacters = HasAnySceneCharacter();
+			SetChatInputInteractable(!_isCharacterResponding && _hasSceneCharacters);
+		}
+
+		/// <summary>
+		/// Re-evaluates chat input state after a character is added or removed from the scene.
+		/// </summary>
+		/// <param name="payload">Developer state payload.</param>
+		[OnEvent(ChatEvents.DeveloperStateLoaded)]
+		private void OnDeveloperStateLoaded(object payload)
+		{
+			RefreshSceneCharacterState();
 		}
 
 		/// <summary>
@@ -1132,7 +1155,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private void OnTranscriptionCompleted(object payload)
 		{
 			_isTranscribingVoice = false;
-			SetChatInputInteractable(!_isCharacterResponding);
+			SetChatInputInteractable(!_isCharacterResponding && _hasSceneCharacters);
 			UpdateRecordButtonVisualState();
 
 			var transcript = payload as string;
