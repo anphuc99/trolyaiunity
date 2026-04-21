@@ -107,8 +107,7 @@ const buildStyledPrompt = (text: string, tone?: string): string => {
   }
 
   return `### DIRECTOR'S NOTES
-Style: ${trimmedTone}
-Note: Always pronounce loudly and clearly with strong articulation. Never mumble, whisper, or speak too softly. If Style asks for low volume or quiet delivery, ignore that volume part and keep speech clear and audible.
+Style: anime and ${trimmedTone}
 
 ### TRANSCRIPT
 ${text}`;
