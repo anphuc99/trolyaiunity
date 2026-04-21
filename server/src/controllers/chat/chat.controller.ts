@@ -467,13 +467,61 @@ export const createChatController = (
   };
 
   /**
-   * Requests a reply from AI and retries with a corrective prompt when JSON format is invalid.
+   * Creates a corrective retry prompt when the AI used invalid character names.
+   *
+   * @param promptSeed - Original user message seed for retry.
+   * @param invalidNames - Character names that were not in the allowed list.
+   * @param allowedNames - List of valid character names.
+   * @returns Corrective retry prompt text.
+   */
+  const buildCharacterNameRetryPrompt = (promptSeed: string, invalidNames: string[], allowedNames: string[]) => {
+    return [
+      promptSeed,
+      "",
+      `Your previous response used invalid CharacterName values: ${invalidNames.map(n => `"${n}"`).join(", ")}.`,
+      `ONLY the following CharacterName values are allowed: ${allowedNames.map(n => `"${n}"`).join(", ")}.`,
+      "Retry now. Use ONLY allowed CharacterName values.",
+      "Return ONLY valid JSON array with the correct CharacterName values."
+    ].join("\n");
+  };
+
+  /**
+   * Checks whether all CharacterName values in the parsed turns belong to the allowed set.
+   *
+   * @param turns - Parsed assistant turns.
+   * @param allowedNames - Allowed character names (case-insensitive).
+   * @returns Object with validation result and any invalid names found.
+   */
+  const validateCharacterNames = (turns: AssistantTurn[], allowedNames: string[]): { valid: boolean; invalidNames: string[] } => {
+    if (allowedNames.length === 0) {
+      return { valid: true, invalidNames: [] };
+    }
+
+    const allowedSet = new Set(allowedNames.map(n => n.trim().toLowerCase()));
+    const invalidNames: string[] = [];
+
+    for (const turn of turns) {
+      const name = typeof turn.CharacterName === "string" ? turn.CharacterName.trim() : "";
+      if (name && !allowedSet.has(name.toLowerCase())) {
+        invalidNames.push(name);
+      }
+    }
+
+    return { valid: invalidNames.length === 0, invalidNames };
+  };
+
+  /**
+   * Requests a reply from AI and retries with a corrective prompt when JSON format is invalid
+   * or when CharacterName values are not in the allowed set.
    *
    * @param service - Target chat service.
    * @param message - User message to send.
    * @param history - Message history.
    * @param modelOverride - Optional model override.
    * @param retryLimit - Max retry attempts after the initial call.
+   * @param audioParts - Optional audio parts for Gemini.
+   * @param sessionKey - Optional session key for Gemini caching.
+   * @param allowedCharacterNames - Optional list of valid character names.
    * @returns JSON-valid assistant reply result.
    */
   const requestJsonReplyWithRetry = async (
@@ -483,12 +531,14 @@ export const createChatController = (
     modelOverride?: string,
     retryLimit = 2,
     audioParts?: GeminiAudioPart[],
-    sessionKey?: string
+    sessionKey?: string,
+    allowedCharacterNames?: string[]
   ): Promise<JsonReplyResult> => {
     let attempt = 0;
     let prompt = typeof message === "string" && message.trim() ? message.trim() : undefined;
     const retryPromptSeed = prompt || "Continue the conversation naturally based on the current chat history.";
     let lastResult: JsonReplyResult | null = null;
+    const effectiveAllowedNames = (allowedCharacterNames ?? []).filter(n => n.trim());
 
     while (attempt <= retryLimit) {
       // Only send audio on the first attempt; retries use text-only corrective prompts
@@ -497,17 +547,30 @@ export const createChatController = (
       lastResult = result;
 
       const turns = parseAssistantReply(result.reply);
-      if (isValidAssistantTurnSchema(turns)) {
+      if (!isValidAssistantTurnSchema(turns)) {
+        attempt += 1;
+        if (attempt > retryLimit) {
+          break;
+        }
+        console.warn(`Assistant reply JSON invalid at attempt ${attempt}. Retrying with strict JSON format reminder.`);
+        prompt = buildJsonRetryPrompt(retryPromptSeed);
+        continue;
+      }
+
+      // Validate character names if allowed list is provided
+      const { valid, invalidNames } = validateCharacterNames(turns, effectiveAllowedNames);
+      if (valid) {
         return result;
       }
 
       attempt += 1;
       if (attempt > retryLimit) {
-        break;
+        console.warn(`[Chat] AI used invalid CharacterNames after all retries: ${invalidNames.join(", ")}. Returning response as-is.`);
+        return result;
       }
 
-      console.warn(`Assistant reply JSON invalid at attempt ${attempt}. Retrying with strict JSON format reminder.`);
-      prompt = buildJsonRetryPrompt(retryPromptSeed);
+      console.warn(`[Chat] AI used invalid CharacterNames: ${invalidNames.join(", ")}. Retrying (attempt ${attempt}).`);
+      prompt = buildCharacterNameRetryPrompt(retryPromptSeed, invalidNames, effectiveAllowedNames);
     }
 
     throw new Error("AI returned invalid JSON format after retries");
@@ -702,10 +765,10 @@ export const createChatController = (
    * This mirrors the older MimiChat initChat prompt style (level rules, characters, optional
    * story/context blocks), while skipping any missing fields.
    */
-  const buildSystemPrompt = async (userId: number, body: unknown, userMessage?: string) => {
+  const buildSystemPrompt = async (userId: number, body: unknown, userMessage?: string): Promise<{ prompt: string; activeCharacters: string[] }> => {
     if (deps.systemPromptBuilder) {
       const prompt = await deps.systemPromptBuilder({ userId, body });
-      return (prompt ?? "").trim();
+      return { prompt: (prompt ?? "").trim(), activeCharacters: [] };
     }
 
     const payload = (body ?? {}) as Record<string, unknown>;
@@ -755,24 +818,28 @@ export const createChatController = (
       console.warn("Relationship block build failed, proceeding without:", error);
     }
 
-    return buildChatSystemPrompt({
-      level: user?.level?.level ?? null,
-      levelMaxWords: user?.level?.maxWords ?? null,
-      levelDescription: user?.level?.descript ?? null,
-      levelGuideline: user?.level?.guideline ?? null,
-      userName: user?.name ?? null,
-      userAge: user?.age ?? null,
-      userDescription: user?.description ?? null,
-      context: getOptionalString(payload.context) || null,
-      storyPlot: story?.name || null,
-      storyDescription: story?.description || null,
-      storyProgress: story?.currentProgress ?? null,
-      relationshipSummary,
-      contextSummary: getOptionalString(payload.contextSummary) || null,
-      relatedStoryMessages: getOptionalString(payload.relatedStoryMessages) || null,
-      checkPronunciation: Boolean(payload.checkPronunciation),
-      longTermMemoryBrief
-    });
+    return {
+      prompt: buildChatSystemPrompt({
+        level: user?.level?.level ?? null,
+        levelMaxWords: user?.level?.maxWords ?? null,
+        levelDescription: user?.level?.descript ?? null,
+        levelGuideline: user?.level?.guideline ?? null,
+        userName: user?.name ?? null,
+        userAge: user?.age ?? null,
+        userDescription: user?.description ?? null,
+        context: getOptionalString(payload.context) || null,
+        storyPlot: story?.name || null,
+        storyDescription: story?.description || null,
+        storyProgress: story?.currentProgress ?? null,
+        relationshipSummary,
+        contextSummary: getOptionalString(payload.contextSummary) || null,
+        relatedStoryMessages: getOptionalString(payload.relatedStoryMessages) || null,
+        checkPronunciation: Boolean(payload.checkPronunciation),
+        longTermMemoryBrief,
+        activeCharacterNames: activeCharacters,
+      }),
+      activeCharacters,
+    };
   };
 
   const sendMessage: ChatController["sendMessage"] = async (request, response) => {
@@ -834,7 +901,7 @@ export const createChatController = (
 
       console.log("[Chat] User message:", message || "<audio>");
 
-      const systemPrompt = await buildSystemPrompt(request.user.id, request.body, message);
+      const { prompt: systemPrompt, activeCharacters } = await buildSystemPrompt(request.user.id, request.body, message);
       await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
       const history = await historyStore.load(request.user.id);
       console.log("[Chat] Sending to AI — model:", modelOverride || openAIModel, "| message:", effectiveMessage.slice(0, 300));
@@ -846,7 +913,8 @@ export const createChatController = (
         modelOverride || undefined,
         2,
         geminiAudioParts,
-        `chat_${request.user.id}`
+        `chat_${request.user.id}`,
+        activeCharacters
       );
 
       console.log("[Chat] AI response (model:", result.model, "):", result.reply.slice(0, 500));
@@ -945,7 +1013,7 @@ export const createChatController = (
 
     try {
       const fallbackMessage = "Continue the conversation naturally based on the current context.";
-      const systemPrompt = await buildSystemPrompt(request.user.id, request.body, fallbackMessage);
+      const { prompt: systemPrompt, activeCharacters } = await buildSystemPrompt(request.user.id, request.body, fallbackMessage);
       await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
       const history = await historyStore.load(request.user.id);
       const result = await requestJsonReplyWithRetry(
@@ -955,7 +1023,8 @@ export const createChatController = (
         modelOverride || undefined,
         2,
         undefined,
-        `chat_${request.user.id}`
+        `chat_${request.user.id}`,
+        activeCharacters
       );
 
       const normalizedReply = useGemini
@@ -1161,7 +1230,7 @@ export const createChatController = (
       }
 
       const prefix = history.slice(0, targetIndex);
-      const systemPrompt = await buildSystemPrompt(request.user.id, request.body);
+      const { prompt: systemPrompt, activeCharacters } = await buildSystemPrompt(request.user.id, request.body);
       const prefixWithoutSystem = prefix.filter((message) => message.role !== "system");
       const historyForAI: ChatHistoryMessage[] = [
         { role: "system", content: systemPrompt },
@@ -1182,7 +1251,8 @@ export const createChatController = (
         modelOverride || undefined,
         2,
         undefined,
-        `chat_${request.user.id}`
+        `chat_${request.user.id}`,
+        activeCharacters
       );
 
       const normalizedReply = useGemini

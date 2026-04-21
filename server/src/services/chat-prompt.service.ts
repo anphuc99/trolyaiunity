@@ -71,6 +71,11 @@ export interface ChatPromptParams {
    * Injected by the memory retrieval service before building the prompt.
    */
   longTermMemoryBrief?: string | null;
+  /**
+   * Names of characters currently active in the chat scene.
+   * Used to constrain AI CharacterName output to valid characters only.
+   */
+  activeCharacterNames?: string[] | null;
 }
 
 const LEVEL_CONFIG: Record<string, ChatPromptLevelConfig> = {
@@ -170,7 +175,10 @@ export const buildChatSystemPrompt = (params: ChatPromptParams): string => {
     ? `\n====================================\nPRONUNCIATION CHECK\n====================================\n- If the user asks for pronunciation help, reply with a short correction and a short example sentence at the current level.\n- Ask one short clarifying question if the user intent is unclear.\n`
     : "";
 
-  const characterRules = "";
+  const activeNames = (params.activeCharacterNames ?? []).filter(n => n.trim());
+  const characterRules = activeNames.length > 0
+    ? `\n====================================\nACTIVE CHARACTERS IN SCENE\n====================================\nOnly the following characters are currently in the scene: ${activeNames.map(n => `"${n}"`).join(", ")}.\n- You MUST only use CharacterName values from this list.\n- Do NOT invent, fabricate, or use any character name that is not listed above.\n- If the list has only one character, all replies must use that character's name.\n`
+    : "";
 
   const longTermMemoryBrief = (params.longTermMemoryBrief ?? "").trim();
   const longTermMemoryBlock = longTermMemoryBrief
@@ -219,7 +227,7 @@ RESPONSE FORMAT (JSON ARRAY)
 - Return a JSON array of 1-10 objects.
 - Each object must include: MessageId, CharacterName, Text, Pinyin, Tone, Translation.
 - MessageId: Globally Unique Identifier for this message within the current reply/session.
-- CharacterName: speaker name. Use "Mimi" if no character is specified.
+- CharacterName: speaker name. MUST be one of the active characters listed in the ACTIVE CHARACTERS IN SCENE section. Do NOT use any name not in that list.
 - Text: Chinese characters only (Simplified).
 - Pinyin: Pinyin reading of the Text. MUST SEPARATE EVERY SINGLE SYLLABLE WITH A SPACE to map 1:1 with Chinese characters (include tone marks, e.g., "Nǐ hǎo", write "wǒ men" instead of "wǒmen").
 - Tone: short English description for TTS only (e.g. "neutral, medium pitch"). Use English letters/words only; do not use Chinese characters.
