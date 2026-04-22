@@ -233,6 +233,39 @@ namespace Share.Components
 			ToggleMessageTranslationInternal(messageData, messageData.MessageIndex, messageData.Translation);
 		}
 
+		/// <summary>
+		/// Expands or collapses translation for all character messages that have translation text.
+		/// </summary>
+		/// <param name="isExpanded">True to expand translations, false to collapse.</param>
+		public void SetCharacterTranslationsExpanded(bool isExpanded)
+		{
+			if (_messages.Count == 0)
+			{
+				return;
+			}
+
+			for (var i = 0; i < _messages.Count; i++)
+			{
+				var message = _messages[i];
+				if (message == null || message.Type != MessageBubbleType.Character)
+				{
+					continue;
+				}
+
+				if (string.IsNullOrWhiteSpace(message.Translation))
+				{
+					continue;
+				}
+
+				if (message.IsTranslationExpanded == isExpanded)
+				{
+					continue;
+				}
+
+				ToggleMessageTranslationInternal(message, message.MessageIndex, message.Translation);
+			}
+		}
+
 		private void ToggleMessageTranslationInternal(MessageBubbleData targetMessage, int messageIndex, string translation)
 		{
 			if (targetMessage == null && messageIndex < 0)

@@ -528,6 +528,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			_messageContainer.SetMessages(mapped);
+			EnsureAutoChatTranslationsVisible();
 			ScrollMessagesToBottom();
 		}
 
@@ -621,7 +622,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					yield return null;
 				}
 
-				_messageContainer.AddNewMessage(new MessageBubbleData
+				var characterMessage = new MessageBubbleData
 				{
 					MessageId = string.IsNullOrWhiteSpace(turn.MessageId) ? Guid.NewGuid().ToString("N") : turn.MessageId,
 					Type = MessageBubbleType.Character,
@@ -633,7 +634,13 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					Pinyin = turn.Pinyin,
 					Tone = tone,
 					Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, characterName),
-				});
+				};
+
+				_messageContainer.AddNewMessage(characterMessage);
+				if (_isAutoChatEnabled && !characterMessage.IsTranslationExpanded && !string.IsNullOrWhiteSpace(characterMessage.Translation))
+				{
+					_messageContainer.ToggleMessageTranslation(characterMessage);
+				}
 				ScrollMessagesToBottom();
 
 				if (turn.AudioClip != null)
@@ -1378,6 +1385,16 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
+			if (_isAutoChatEnabled)
+			{
+				if (!messageData.IsTranslationExpanded && !string.IsNullOrWhiteSpace(messageData.Translation))
+				{
+					_messageContainer.ToggleMessageTranslation(messageData);
+				}
+
+				return;
+			}
+
 			if (messageData.MessageIndex < 0 && string.IsNullOrWhiteSpace(messageData.Translation))
 			{
 				return;
@@ -1463,7 +1480,18 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_isAutoChatEnabled = true;
 			_isAutoChatAwaitingReply = false;
 			_hasSentAutoChatContext = false;
+			EnsureAutoChatTranslationsVisible();
 			TryTriggerNextAutoChatTurn();
+		}
+
+		private void EnsureAutoChatTranslationsVisible()
+		{
+			if (!_isAutoChatEnabled || _messageContainer == null)
+			{
+				return;
+			}
+
+			_messageContainer.SetCharacterTranslationsExpanded(true);
 		}
 
 		/// <summary>
