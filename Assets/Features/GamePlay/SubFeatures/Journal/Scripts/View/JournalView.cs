@@ -951,6 +951,11 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				return;
 			}
 
+			if (_chatVariantRoot != null)
+			{
+				_chatVariantRoot.SetCharacterTranslationsExpanded(true);
+			}
+
 			_isChatAutoPlaying = true;
 			UpdateAutoPlayButtonText();
 

@@ -83,6 +83,20 @@ namespace Features.GamePlay.SubFeatures.Journal.View
         }
 
         /// <summary>
+        /// Expands or collapses translation for all character messages in current history.
+        /// </summary>
+        /// <param name="isExpanded">True to expand translations, false to collapse.</param>
+        public void SetCharacterTranslationsExpanded(bool isExpanded)
+        {
+            if (messageContainer == null)
+            {
+                return;
+            }
+
+            messageContainer.SetCharacterTranslationsExpanded(isExpanded);
+        }
+
+        /// <summary>
         /// Clears all pooled objects and invokes the back callback.
         /// </summary>
         public void Callback()
