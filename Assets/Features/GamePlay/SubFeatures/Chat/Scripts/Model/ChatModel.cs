@@ -739,4 +739,134 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		public System.Collections.Generic.List<ChatVocabularyListItemPayload> Vocabularies { get; set; }
 			= new System.Collections.Generic.List<ChatVocabularyListItemPayload>();
 	}
+
+	/// <summary>
+	/// Response payload from /api/chat/prepare-local.
+	/// Contains the system prompt and history for local AI generation.
+	/// </summary>
+	public sealed class ChatPrepareLocalResponsePayload
+	{
+		/// <summary>
+		/// Server-built system instruction prompt.
+		/// </summary>
+		[JsonProperty("systemPrompt")]
+		public string SystemPrompt { get; set; }
+
+		/// <summary>
+		/// Chat history excluding developer messages.
+		/// </summary>
+		[JsonProperty("history")]
+		public System.Collections.Generic.List<ChatHistoryMessagePayload> History { get; set; }
+			= new System.Collections.Generic.List<ChatHistoryMessagePayload>();
+
+		/// <summary>
+		/// Active character names in the current scene.
+		/// </summary>
+		[JsonProperty("activeCharacters")]
+		public System.Collections.Generic.List<string> ActiveCharacters { get; set; }
+			= new System.Collections.Generic.List<string>();
+	}
+
+	/// <summary>
+	/// Request payload for saving a locally-generated AI reply to server history.
+	/// </summary>
+	public sealed class ChatSaveLocalRequestPayload
+	{
+		/// <summary>
+		/// User message text (may be empty for respond-from-history).
+		/// </summary>
+		[JsonProperty("message")]
+		public string Message { get; set; }
+
+		/// <summary>
+		/// AI-generated reply JSON string from local Ollama.
+		/// </summary>
+		[JsonProperty("reply")]
+		public string Reply { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload from /api/chat/save-local.
+	/// </summary>
+	public sealed class ChatSaveLocalResponsePayload
+	{
+		/// <summary>
+		/// True when history was saved successfully.
+		/// </summary>
+		[JsonProperty("ok")]
+		public bool Ok { get; set; }
+
+		/// <summary>
+		/// Cleaned reply with memory sidecars stripped.
+		/// </summary>
+		[JsonProperty("reply")]
+		public string Reply { get; set; }
+	}
+
+	/// <summary>
+	/// Single message object for Ollama chat API.
+	/// </summary>
+	public sealed class OllamaChatMessage
+	{
+		/// <summary>
+		/// Role: system, user, or assistant.
+		/// </summary>
+		[JsonProperty("role")]
+		public string Role { get; set; }
+
+		/// <summary>
+		/// Message content.
+		/// </summary>
+		[JsonProperty("content")]
+		public string Content { get; set; }
+	}
+
+	/// <summary>
+	/// Request payload for Ollama /api/chat endpoint.
+	/// </summary>
+	public sealed class OllamaChatRequestPayload
+	{
+		/// <summary>
+		/// Model name (e.g. gemma3:4b).
+		/// </summary>
+		[JsonProperty("model")]
+		public string Model { get; set; }
+
+		/// <summary>
+		/// Conversation messages including system prompt.
+		/// </summary>
+		[JsonProperty("messages")]
+		public System.Collections.Generic.List<OllamaChatMessage> Messages { get; set; }
+			= new System.Collections.Generic.List<OllamaChatMessage>();
+
+		/// <summary>
+		/// Whether to stream the response. Always false for this integration.
+		/// </summary>
+		[JsonProperty("stream")]
+		public bool Stream { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload from Ollama /api/chat endpoint (non-streaming).
+	/// </summary>
+	public sealed class OllamaChatResponsePayload
+	{
+		/// <summary>
+		/// Model that generated the response.
+		/// </summary>
+		[JsonProperty("model")]
+		public string Model { get; set; }
+
+		/// <summary>
+		/// Assistant message from Ollama.
+		/// </summary>
+		[JsonProperty("message")]
+		public OllamaChatMessage Message { get; set; }
+
+		/// <summary>
+		/// Whether the response generation is complete.
+		/// </summary>
+		[JsonProperty("done")]
+		public bool Done { get; set; }
+	}
 }

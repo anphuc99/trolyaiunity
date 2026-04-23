@@ -20,6 +20,8 @@ export const createChatRoutes = (dataSource: DataSource) => {
   router.post("/send", requireAuth, controller.sendMessage);
   router.post("/respond", requireAuth, controller.respondFromHistory);
   router.post("/transcribe", requireAuth, controller.transcribeAudio);
+  router.post("/prepare-local", requireAuth, controller.prepareLocalPrompt);
+  router.post("/save-local", requireAuth, controller.saveLocalReply);
 
   return router;
 };
