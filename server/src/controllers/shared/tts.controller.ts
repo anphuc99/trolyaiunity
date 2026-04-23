@@ -167,12 +167,6 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
   };
 
   const getTextToSpeech: TtsController["getTextToSpeech"] = async (request, response) => {
-    // TTS disabled via env var (for local AI testing)
-    if (process.env.TTS_ENABLED === "false") {
-      response.status(503).json({ message: "TTS is disabled (TTS_ENABLED=false)" });
-      return;
-    }
-
     if (!request.user) {
       response.status(401).json({ message: "Unauthorized" });
       return;
