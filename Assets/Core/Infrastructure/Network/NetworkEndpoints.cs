@@ -20,8 +20,6 @@ namespace Core.Infrastructure.Network
 		public const string ChatTranscribe = "/api/chat/transcribe";
 		public const string ChatDeveloperState = "/api/chat/developer-state";
 		public const string ChatDeveloper = "/api/chat/developer";
-		public const string ChatPrepareLocal = "/api/chat/prepare-local";
-		public const string ChatSaveLocal = "/api/chat/save-local";
 		public const string Journals = "/api/journals";
 		public const string JournalsEnd = "/api/journals/end";
 		public const string JournalReviewDue = "/api/journals/review/due";
