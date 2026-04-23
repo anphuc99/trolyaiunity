@@ -689,6 +689,21 @@ namespace Share.Components
                     if (vowelPositions.Count == 0) return firstVPos; // only 'u' after 'q', fallback
                     if (vowelPositions.Count == 1) return vowelPositions[0];
                 }
+
+                // Special rule: "gi" at the start of a word is treated as a consonant
+                // cluster when another vowel follows. The 'i' is not the tone target.
+                // e.g. "gia" -> "giả" (tone on 'a'), not "gỉa" (tone on 'i').
+                var gPos = firstVPos - 1;
+                var isGiAtWordStart = gPos >= 0 &&
+                                      char.ToLowerInvariant(text[gPos]) == 'g' &&
+                                      vowelPositions.Count >= 2 &&
+                                      (gPos == 0 || !char.IsLetter(text[gPos - 1]));
+                if (firstVLower == 'i' && isGiAtWordStart)
+                {
+                    vowelPositions.RemoveAt(0);
+                    if (vowelPositions.Count == 0) return firstVPos;
+                    if (vowelPositions.Count == 1) return vowelPositions[0];
+                }
             }
 
             // Priority 1: if there is a special/modified vowel (â, ă, ê, ô, ơ, ư),
