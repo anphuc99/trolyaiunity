@@ -4,6 +4,7 @@ import type { DataSource } from "typeorm";
 import { toFile, type Uploadable } from "openai/uploads";
 import { createOpenAIChatService, createOpenAIClient, type OpenAIChatService } from "../../services/openai.service.js";
 import { createGeminiChatService, isGeminiModel, type GeminiChatService, type GeminiAudioPart } from "../../services/gemini.service.js";
+import { createOllamaChatService, type OllamaChatService } from "../../services/ollama.service.js";
 import { buildChatSystemPrompt } from "../../services/chat-prompt.service.js";
 import StoryEntity from "../../models/story.entity.js";
 import UserEntity from "../../models/user.entity.js";
@@ -28,6 +29,7 @@ interface ChatController {
 interface ChatControllerDeps {
   openAIService?: OpenAIChatService;
   geminiService?: GeminiChatService;
+  ollamaService?: OllamaChatService;
   historyStore?: ChatHistoryStore;
   transcribeWithOpenAI?: (file: Uploadable, language?: string) => Promise<string>;
   /**
@@ -61,7 +63,7 @@ interface AssistantTurn {
   [key: string]: unknown;
 }
 
-type ChatReplyService = OpenAIChatService | GeminiChatService;
+type ChatReplyService = OpenAIChatService | GeminiChatService | OllamaChatService;
 
 interface JsonReplyResult {
   reply: string;
@@ -128,6 +130,15 @@ export const createChatController = (
   const geminiModel = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
   const geminiService =
     deps.geminiService ?? (geminiApiKey ? createGeminiChatService({ apiKey: geminiApiKey, model: geminiModel }) : null);
+
+  // Ollama configuration (local AI)
+  const ollamaUrl = process.env.OLLAMA_URL ?? "";
+  const ollamaModel = process.env.OLLAMA_MODEL ?? "";
+  const ollamaService: OllamaChatService | null =
+    deps.ollamaService ?? (ollamaUrl && ollamaModel ? createOllamaChatService({ baseUrl: ollamaUrl, model: ollamaModel }) : null);
+  if (ollamaService) {
+    console.log(`[Chat] Ollama enabled — model: ${ollamaModel}, url: ${ollamaUrl}`);
+  }
 
   const historyStore = deps.historyStore ?? createChatHistoryStore();
 
@@ -850,7 +861,7 @@ export const createChatController = (
 
     const message = typeof request.body?.message === "string" ? request.body.message.trim() : "";
     const sessionId = getSessionId(request.body?.sessionId);
-    const modelOverride = "gemini-3.1-flash-lite-preview";
+    const modelOverride = ollamaService ? (ollamaModel || "gemma4:e4b") : "gemini-3.1-flash-lite-preview";
     const audioBase64 = typeof request.body?.audio === "string" ? request.body.audio.trim() : "";
     const hasAudio = Boolean(audioBase64);
 
@@ -861,10 +872,11 @@ export const createChatController = (
       return;
     }
 
-    // Determine which AI service to use based on model
-    const useGemini = isGeminiModel(modelOverride || openAIModel);
-    const selectedService = useGemini ? geminiService : openAIService;
-    const serviceName = useGemini ? "Gemini" : "OpenAI";
+    // Determine which AI service to use — Ollama takes priority when configured
+    const useOllama = Boolean(ollamaService);
+    const useGemini = !useOllama && isGeminiModel(modelOverride || openAIModel);
+    const selectedService = useOllama ? ollamaService : useGemini ? geminiService : openAIService;
+    const serviceName = useOllama ? "Ollama" : useGemini ? "Gemini" : "OpenAI";
 
     if (!selectedService) {
       response.status(500).json({
@@ -919,7 +931,7 @@ export const createChatController = (
 
       console.log("[Chat] AI response (model:", result.model, "):", result.reply.slice(0, 500));
 
-      const normalizedReply = useGemini
+      const normalizedReply = (useGemini || useOllama)
         ? normalizeAssistantReplyMessageIds(result.reply, collectAssistantMessageIds(history))
         : result.reply;
 
@@ -998,11 +1010,13 @@ export const createChatController = (
       return;
     }
 
-    const modelOverride = "gemini-3.1-flash-lite-preview";
+    const modelOverride = ollamaService ? (ollamaModel || "gemma4:e4b") : "gemini-3.1-flash-lite-preview";
 
-    const useGemini = isGeminiModel(modelOverride || openAIModel);
-    const selectedService = useGemini ? geminiService : openAIService;
-    const serviceName = useGemini ? "Gemini" : "OpenAI";
+    // Determine which AI service to use — Ollama takes priority when configured
+    const useOllama = Boolean(ollamaService);
+    const useGemini = !useOllama && isGeminiModel(modelOverride || openAIModel);
+    const selectedService = useOllama ? ollamaService : useGemini ? geminiService : openAIService;
+    const serviceName = useOllama ? "Ollama" : useGemini ? "Gemini" : "OpenAI";
 
     if (!selectedService) {
       response.status(500).json({
@@ -1027,7 +1041,7 @@ export const createChatController = (
         activeCharacters
       );
 
-      const normalizedReply = useGemini
+      const normalizedReply = (useGemini || useOllama)
         ? normalizeAssistantReplyMessageIds(result.reply, collectAssistantMessageIds(history))
         : result.reply;
 
