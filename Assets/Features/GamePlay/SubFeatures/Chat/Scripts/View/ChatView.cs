@@ -27,7 +27,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private const int RecordingFrequencyHz = 16000;
 		private const int MaxRecordingSeconds = 60;
 		private const string DefaultSpeechLanguage = "zh";
-		private const string AutoChatContext = "AI tự nói chuyện";
+		private const string AutoChatContext = "AI tự nói chuyện ít nhất 10 tin nhắn mỗi lượt. Các nhân vật không được phép ngủ";
 
 		[SerializeField]
 		private TMP_InputField _inputField;
