@@ -58,7 +58,16 @@ namespace Share.Utils
 					continue;
 				}
 
-				builder.Append(ch);
+				// Group consecutive non-CJK characters and skip matching pinyin syllables.
+				var groupStart = i;
+				while (i + 1 < hanText.Length && !IsCjkIdeograph(hanText[i + 1]))
+				{
+					i++;
+				}
+
+				var group = hanText.Substring(groupStart, i - groupStart + 1);
+				syllableIndex = SkipLatinPinyinSyllables(syllables, syllableIndex, group);
+				builder.Append(group);
 			}
 
 			return builder.ToString();
@@ -173,6 +182,9 @@ namespace Share.Utils
 					}
 
 					var groupText = cleanText.Substring(groupStart, i - groupStart + 1);
+
+					// Skip pinyin syllables that correspond to Latin text in this group.
+					syllableIndex = SkipLatinPinyinSyllables(syllables, syllableIndex, groupText);
 
 					if (currentPositionEm > 0f)
 					{
@@ -395,6 +407,51 @@ namespace Share.Utils
 			}
 
 			return false;
+		}
+
+		/// <summary>
+		/// Advances syllableIndex past pinyin syllables that correspond to Latin letters
+		/// in a non-CJK text group (e.g., a name like "Hugh" echoed in the pinyin stream).
+		/// </summary>
+		private static int SkipLatinPinyinSyllables(string[] syllables, int syllableIndex, string nonCjkGroup)
+		{
+			// Extract only Latin letters from the group.
+			var latinBuilder = new StringBuilder();
+			for (var i = 0; i < nonCjkGroup.Length; i++)
+			{
+				if (IsLatinLetter(nonCjkGroup[i]))
+				{
+					latinBuilder.Append(nonCjkGroup[i]);
+				}
+			}
+
+			if (latinBuilder.Length == 0)
+			{
+				return syllableIndex;
+			}
+
+			var latinText = latinBuilder.ToString();
+
+			// Try to match consecutive syllables against the Latin text.
+			var matched = new StringBuilder();
+			var tempIndex = syllableIndex;
+			while (tempIndex < syllables.Length)
+			{
+				matched.Append(syllables[tempIndex]);
+				tempIndex++;
+
+				if (string.Equals(matched.ToString(), latinText, StringComparison.OrdinalIgnoreCase))
+				{
+					return tempIndex;
+				}
+
+				if (matched.Length >= latinText.Length)
+				{
+					break;
+				}
+			}
+
+			return syllableIndex;
 		}
 
 		private static bool IsCjkIdeograph(char ch)
