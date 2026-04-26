@@ -67,10 +67,9 @@ export interface ChatPromptParams {
    */
   checkPronunciation?: boolean;
   /**
-   * Optional long-term memory brief retrieved from ChromaDB.
-   * Injected by the memory retrieval service before building the prompt.
+   * Whether the RECALL_MEMORY command is available (ChromaDB + memory services configured).
    */
-  longTermMemoryBrief?: string | null;
+  memoryRecallEnabled?: boolean;
   /**
    * Names of characters currently active in the chat scene.
    * Used to constrain AI CharacterName output to valid characters only.
@@ -180,9 +179,8 @@ export const buildChatSystemPrompt = (params: ChatPromptParams): string => {
     ? `\n====================================\nACTIVE CHARACTERS IN SCENE\n====================================\nOnly the following characters are currently in the scene: ${activeNames.map(n => `"${n}"`).join(", ")}.\n- You MUST only use CharacterName values from this list.\n- Do NOT invent, fabricate, or use any character name that is not listed above.\n- If the list has only one character, all replies must use that character's name.\n`
     : "";
 
-  const longTermMemoryBrief = (params.longTermMemoryBrief ?? "").trim();
-  const longTermMemoryBlock = longTermMemoryBrief
-    ? `\n====================================\nLONG-TERM MEMORY (from previous conversations)\n====================================\n${longTermMemoryBrief}\nUse this memory naturally in your responses. Do not mention that you "retrieved" or "looked up" this information.\n`
+  const recallMemoryBlock = params.memoryRecallEnabled
+    ? `\n====================================\nMEMORY RECALL COMMAND\n====================================\nYou have access to a long-term memory database from previous conversations.\nWhen you need specific information from past interactions to answer the user properly\n(e.g., their preferences, past events, character backstory details, promises, plans),\nyou can request a memory recall.\n\nTo recall memories, respond with ONLY this JSON format (instead of the normal JSON array):\n{"recall_memory": ["question 1 in English", "question 2 in English", ...]}\n\nRules:\n- Only use when you genuinely need past information that is NOT in the current conversation context.\n- Do NOT use for greetings, simple questions, or when the answer is obvious from context.\n- Write 2-6 questions in English, each 5-15 words.\n- Questions should target specific information you need.\n- After the system provides memory recall results (as a developer message), respond normally using the standard JSON array format.\n- Never mention the recall process to the user. Use recalled information naturally.\n- You may only use recall_memory once per conversation turn.\n\nExample:\nUser says: "我们上次说好要去哪里来着？"\nYou respond: {"recall_memory": ["previous trip plans discussed with user", "promises about outings or activities", "recent locations mentioned in conversations"]}\n`
     : "";
 
   const relationshipBlock = params.relationshipSummary?.trim()
@@ -211,7 +209,7 @@ ${userInfoBlock}
 SCENE / CONTEXT
 ====================================
 ${context}
-${maybe("STORY PLOT", params.storyPlot)}${maybe("STORY DESCRIPTION", params.storyDescription)}${maybe("STORY PROGRESS", params.storyProgress)}${relationshipBlock}${maybe("PREVIOUS SUMMARY", params.contextSummary)}${relatedStoryBlock}${characterRules}${pronunciationBlock}${longTermMemoryBlock}
+${maybe("STORY PLOT", params.storyPlot)}${maybe("STORY DESCRIPTION", params.storyDescription)}${maybe("STORY PROGRESS", params.storyProgress)}${relationshipBlock}${maybe("PREVIOUS SUMMARY", params.contextSummary)}${relatedStoryBlock}${characterRules}${pronunciationBlock}${recallMemoryBlock}
 ====================================
 DIALOGUE RULES
 ====================================

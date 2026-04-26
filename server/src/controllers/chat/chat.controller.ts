@@ -98,6 +98,57 @@ const resolveAudioExtension = (mime: string) => {
   return "webm";
 };
 
+// ──── Recall Memory Helpers ───────────────────────────────────────────────────────
+
+/**
+ * Checks if an AI reply is a RECALL_MEMORY request.
+ *
+ * @param reply - Raw AI response string.
+ * @returns True when the reply is a valid recall_memory JSON object.
+ */
+const isRecallMemoryRequest = (reply: string): boolean => {
+  try {
+    const parsed = JSON.parse(reply.trim()) as unknown;
+    return (
+      parsed !== null &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed) &&
+      Array.isArray((parsed as Record<string, unknown>).recall_memory)
+    );
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Extracts recall queries from a RECALL_MEMORY response.
+ *
+ * @param reply - Raw AI response containing recall_memory JSON.
+ * @returns Array of English query strings (max 6).
+ */
+const extractRecallQueries = (reply: string): string[] => {
+  try {
+    const parsed = JSON.parse(reply.trim()) as { recall_memory?: unknown };
+    if (Array.isArray(parsed.recall_memory)) {
+      return parsed.recall_memory
+        .filter((q: unknown): q is string => typeof q === "string" && q.trim().length > 0)
+        .map((q: string) => q.trim())
+        .slice(0, 6);
+    }
+  } catch { /* ignore */ }
+  return [];
+};
+
+/**
+ * Checks if a message content is a recall_memory JSON (for filtering from client responses).
+ *
+ * @param content - Message content string.
+ * @returns True when the content is a recall_memory request.
+ */
+const isRecallMemoryContent = (content: string): boolean => {
+  return isRecallMemoryRequest(content);
+};
+
 /**
  * Builds the Chat controller with injected data source dependencies.
  *
@@ -532,7 +583,8 @@ export const createChatController = (
     retryLimit = 2,
     audioParts?: GeminiAudioPart[],
     sessionKey?: string,
-    allowedCharacterNames?: string[]
+    allowedCharacterNames?: string[],
+    allowRecallMemory = false
   ): Promise<JsonReplyResult> => {
     let attempt = 0;
     let prompt = typeof message === "string" && message.trim() ? message.trim() : undefined;
@@ -545,6 +597,12 @@ export const createChatController = (
       const audioForAttempt = attempt === 0 ? audioParts : undefined;
       const result = await service.createReply(prompt, history, modelOverride || undefined, audioForAttempt, sessionKey);
       lastResult = result;
+
+      // If the AI returned a RECALL_MEMORY request and recall is allowed, return immediately
+      // so the caller can handle the recall flow. Do NOT retry as invalid JSON.
+      if (allowRecallMemory && isRecallMemoryRequest(result.reply)) {
+        return result;
+      }
 
       const turns = parseAssistantReply(result.reply);
       if (!isValidAssistantTurnSchema(turns)) {
@@ -781,11 +839,8 @@ export const createChatController = (
     const story = await loadStoryForPrompt(userId);
     console.log("Loaded story for prompt:", story);
 
-    // Retrieve long-term memory brief if memory services are available
-    let longTermMemoryBrief: string | null = null;
-
     // Extract active character names from developer messages in history
-    // (needed for both memory retrieval and relationship block)
+    // (needed for relationship block and RECALL_MEMORY scope)
     const history = await historyStore.load(userId);
     const activeCharMap = new Map<string, boolean>();
     for (const msg of history) {
@@ -796,19 +851,6 @@ export const createChatController = (
     const activeCharacters = Array.from(activeCharMap.entries())
       .filter(([, active]) => active)
       .map(([name]) => name);
-
-    if (memoryRetrievalService && userMessage) {
-      try {
-        longTermMemoryBrief = await memoryRetrievalService.retrieveMemoryBrief(
-          userId,
-          userMessage,
-          history,
-          { storyId: story?.id ?? null, activeCharacters }
-        ) || null;
-      } catch (error) {
-        console.warn("Memory retrieval failed, proceeding without long-term memory:", error);
-      }
-    }
 
     // Build structured relationship block from DB for active characters
     let relationshipSummary: string | null = null;
@@ -835,7 +877,7 @@ export const createChatController = (
         contextSummary: getOptionalString(payload.contextSummary) || null,
         relatedStoryMessages: getOptionalString(payload.relatedStoryMessages) || null,
         checkPronunciation: Boolean(payload.checkPronunciation),
-        longTermMemoryBrief,
+        memoryRecallEnabled: Boolean(memoryRetrievalService),
         activeCharacterNames: activeCharacters,
       }),
       activeCharacters,
@@ -914,10 +956,90 @@ export const createChatController = (
         2,
         geminiAudioParts,
         `chat_${request.user.id}`,
-        activeCharacters
+        activeCharacters,
+        Boolean(memoryRetrievalService) // allowRecallMemory
       );
 
       console.log("[Chat] AI response (model:", result.model, "):", result.reply.slice(0, 500));
+
+      // ── RECALL MEMORY FLOW ──────────────────────────────────────────────
+      if (isRecallMemoryRequest(result.reply) && memoryRetrievalService) {
+        console.log("[Chat] AI requested memory recall:", result.reply.slice(0, 300));
+
+        // Save user message + recall response to history
+        await historyStore.append(request.user.id, [
+          { role: "user", content: message || "(audio message)" },
+          { role: "assistant", content: result.reply }
+        ]);
+
+        // Extract queries and search memory
+        const recallQueries = extractRecallQueries(result.reply);
+        const userEntity = await userRepository.findOne({ where: { id: request.user!.id } });
+        const storyId = userEntity?.currentStoryId ?? null;
+
+        let memoryBrief: string;
+        try {
+          memoryBrief = await memoryRetrievalService.retrieveMemoryBriefFromQueries(
+            request.user.id,
+            recallQueries,
+            { storyId, activeCharacters }
+          );
+        } catch (memError) {
+          console.warn("[Chat] Memory recall search failed:", memError);
+          memoryBrief = "";
+        }
+
+        const devContent = `MEMORY RECALL RESULTS:\n${memoryBrief || "No relevant memories found."}\n\nNow respond to the user's message naturally using the standard JSON array format. Use recalled memories naturally. Do not mention the recall process.`;
+
+        // Call AI again on SAME session with memory context (allowRecallMemory = false to prevent loop)
+        const finalResult = await requestJsonReplyWithRetry(
+          selectedService,
+          devContent,
+          history, // Pass ORIGINAL history to avoid trailing dev message interference
+          modelOverride || undefined,
+          2,
+          undefined, // No audio on follow-up
+          `chat_${request.user.id}`,
+          activeCharacters,
+          false // allowRecallMemory = false
+        );
+
+        console.log("[Chat] AI final response after recall:", finalResult.reply.slice(0, 500));
+
+        // Normalize message IDs using updated history
+        const updatedHistory = await historyStore.load(request.user.id);
+        const normalizedFinalReply = useGemini
+          ? normalizeAssistantReplyMessageIds(finalResult.reply, collectAssistantMessageIds(updatedHistory))
+          : finalResult.reply;
+
+        // Extract and store memory sidecars from final reply
+        let cleanFinalReply = normalizedFinalReply;
+        if (vectorMemoryService) {
+          const turns = parseAssistantReply(normalizedFinalReply);
+          const candidates = extractMemorySidecars(turns);
+          const itemsToStore = candidates.filter(shouldStoreMemory);
+          if (itemsToStore.length) {
+            const items = itemsToStore.map((c) => buildMemoryItemFromCandidate(c, request.user!.id, storyId, message));
+            vectorMemoryService
+              .upsert(request.user!.id, items)
+              .then(() => console.log("[Memory] Chroma upsert success (recall flow):", { userId: request.user!.id, itemCount: items.length }))
+              .catch((err) => console.warn("[Memory] Chroma upsert failed (recall flow):", err instanceof Error ? err.message : String(err)));
+          }
+          cleanFinalReply = stripMemorySidecar(normalizedFinalReply);
+        }
+
+        // Save developer memory + final reply to history
+        await historyStore.append(request.user.id, [
+          { role: "developer", content: devContent },
+          { role: "assistant", content: cleanFinalReply }
+        ]);
+
+        response.json({
+          reply: cleanFinalReply,
+          model: finalResult.model
+        });
+        return;
+      }
 
       const normalizedReply = useGemini
         ? normalizeAssistantReplyMessageIds(result.reply, collectAssistantMessageIds(history))
@@ -1024,8 +1146,82 @@ export const createChatController = (
         2,
         undefined,
         `chat_${request.user.id}`,
-        activeCharacters
+        activeCharacters,
+        Boolean(memoryRetrievalService) // allowRecallMemory
       );
+
+      // ── RECALL MEMORY FLOW (respondFromHistory) ────────────────────────
+      if (isRecallMemoryRequest(result.reply) && memoryRetrievalService) {
+        console.log("[Chat] AI requested memory recall (respondFromHistory):", result.reply.slice(0, 300));
+
+        // Save recall response to history (no user message for respondFromHistory)
+        await historyStore.append(request.user.id, [
+          { role: "assistant", content: result.reply }
+        ]);
+
+        // Extract queries and search memory
+        const recallQueries = extractRecallQueries(result.reply);
+        const user = await userRepository.findOne({ where: { id: request.user!.id } });
+        const storyId = user?.currentStoryId ?? null;
+
+        let memoryBrief: string;
+        try {
+          memoryBrief = await memoryRetrievalService.retrieveMemoryBriefFromQueries(
+            request.user.id,
+            recallQueries,
+            { storyId, activeCharacters }
+          );
+        } catch (memError) {
+          console.warn("[Chat] Memory recall search failed (respondFromHistory):", memError);
+          memoryBrief = "";
+        }
+
+        const devContent = `MEMORY RECALL RESULTS:\n${memoryBrief || "No relevant memories found."}\n\nNow respond naturally using the standard JSON array format. Use recalled memories naturally. Do not mention the recall process.`;
+
+        const finalResult = await requestJsonReplyWithRetry(
+          selectedService,
+          devContent,
+          history,
+          modelOverride || undefined,
+          2,
+          undefined,
+          `chat_${request.user.id}`,
+          activeCharacters,
+          false
+        );
+
+        console.log("[Chat] AI final response after recall (respondFromHistory):", finalResult.reply.slice(0, 500));
+
+        const normalizedFinalReply = useGemini
+          ? normalizeAssistantReplyMessageIds(finalResult.reply, collectAssistantMessageIds(await historyStore.load(request.user.id)))
+          : finalResult.reply;
+
+        let cleanFinalReply = normalizedFinalReply;
+        if (vectorMemoryService) {
+          const turns = parseAssistantReply(normalizedFinalReply);
+          const candidates = extractMemorySidecars(turns);
+          const itemsToStore = candidates.filter(shouldStoreMemory);
+          if (itemsToStore.length) {
+            const items = itemsToStore.map((c) => buildMemoryItemFromCandidate(c, request.user!.id, storyId));
+            vectorMemoryService
+              .upsert(request.user!.id, items)
+              .then(() => console.log("[Memory] Chroma upsert success (recall/respondFromHistory):", { userId: request.user!.id, itemCount: items.length }))
+              .catch((err) => console.warn("[Memory] Chroma upsert failed (recall/respondFromHistory):", err instanceof Error ? err.message : String(err)));
+          }
+          cleanFinalReply = stripMemorySidecar(normalizedFinalReply);
+        }
+
+        await historyStore.append(request.user.id, [
+          { role: "developer", content: devContent },
+          { role: "assistant", content: cleanFinalReply }
+        ]);
+
+        response.json({
+          reply: cleanFinalReply,
+          model: finalResult.model
+        });
+        return;
+      }
 
       const normalizedReply = useGemini
         ? normalizeAssistantReplyMessageIds(result.reply, collectAssistantMessageIds(history))
@@ -1091,7 +1287,7 @@ export const createChatController = (
       const messages = await historyStore.load(request.user.id);
       const adjustedMessages = applyAssistantEdits(messages);
       response.json({
-        messages: adjustedMessages.filter((message) => message.role !== "system" && message.role !== "developer")
+        messages: adjustedMessages.filter((message) => message.role !== "system" && message.role !== "developer" && !isRecallMemoryContent(message.content))
       });
     } catch (error) {
       console.error("Error in getHistory:", error);

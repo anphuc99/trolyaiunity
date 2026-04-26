@@ -23,6 +23,22 @@ export interface MemoryRetrievalService {
     recentHistory: Array<{ role: string; content: string }>,
     options?: { storyId?: number | null; topK?: number; activeCharacters?: string[] }
   ) => Promise<string>;
+
+  /**
+   * Retrieves and compresses long-term memories using explicit search queries
+   * provided by the main AI (via RECALL_MEMORY command).
+   * Skips the intent rewrite step — uses queries directly for ChromaDB search.
+   *
+   * @param userId - Authenticated user id.
+   * @param queries - English search queries from the main AI.
+   * @param options - Optional filters.
+   * @returns Compressed English memory brief string, or empty string if nothing relevant.
+   */
+  retrieveMemoryBriefFromQueries: (
+    userId: number,
+    queries: string[],
+    options?: { storyId?: number | null; topK?: number; activeCharacters?: string[] }
+  ) => Promise<string>;
 }
 
 export interface MemoryRetrievalServiceConfig {
@@ -154,5 +170,91 @@ export const createMemoryRetrievalService = (
     }
   };
 
-  return { retrieveMemoryBrief };
+  /**
+   * Retrieves memories using explicit queries (from RECALL_MEMORY command).
+   * Skips intent rewrite — queries are already in English from the main AI.
+   */
+  const retrieveMemoryBriefFromQueries: MemoryRetrievalService["retrieveMemoryBriefFromQueries"] = async (
+    userId,
+    queries,
+    options
+  ) => {
+    if (!queries.length) return "";
+
+    const topK = options?.topK ?? 3;
+    const seenIds = new Set<string>();
+    const allResults: MemoryQueryResult[] = [];
+
+    for (const query of queries) {
+      try {
+        // Round A: global-only query
+        const globalResults = await vectorMemory.query(userId, query, {
+          storyId: options?.storyId,
+          topK,
+          excludeActorMemories: true
+        });
+
+        for (const result of globalResults) {
+          if (!seenIds.has(result.id)) {
+            seenIds.add(result.id);
+            allResults.push(result);
+          }
+        }
+
+        // Round B: per-actor queries for active characters
+        const activeChars = options?.activeCharacters ?? [];
+        for (const charName of activeChars) {
+          try {
+            const actorResults = await vectorMemory.query(userId, query, {
+              storyId: options?.storyId,
+              topK,
+              actor: charName
+            });
+
+            for (const result of actorResults) {
+              if (!seenIds.has(result.id)) {
+                seenIds.add(result.id);
+                allResults.push(result);
+              }
+            }
+          } catch (actorError) {
+            console.warn(`Memory recall: actor query failed for "${charName}" / query "${query}".`, actorError);
+          }
+        }
+      } catch (error) {
+        console.warn(`Memory recall: query failed for "${query}".`, error);
+      }
+    }
+
+    if (!allResults.length) return "";
+
+    // Sort by distance (lower = more relevant) and take top results
+    allResults.sort((a, b) => a.distance - b.distance);
+    const topResults = allResults.slice(0, topK * 2);
+
+    console.log(
+      `[Memory Recall] ChromaDB results (${topResults.length}):`,
+      topResults.map((r) => `[${r.metadata?.type ?? "?"} | ${r.metadata?.actor ?? "global"} | dist:${r.distance.toFixed(3)}] ${r.text.slice(0, 100)}`)
+    );
+
+    // Compress with Cheap AI
+    const docs = topResults.map((r) => ({
+      text: r.text,
+      type: r.metadata?.type ?? "unknown",
+      importance: r.metadata?.importance ?? "medium"
+    }));
+
+    try {
+      const brief = await cheapAI.compressMemoryBrief(docs, queries.join(", "));
+      console.log("[Memory Recall] Compressed brief:", brief.slice(0, 300));
+      return brief === "No relevant memories." ? "" : brief;
+    } catch (error) {
+      console.warn("Memory recall: compression failed, using raw results.", error);
+      return topResults
+        .map((r) => `- ${r.text}`)
+        .join("\n");
+    }
+  };
+
+  return { retrieveMemoryBrief, retrieveMemoryBriefFromQueries };
 };
