@@ -307,6 +307,12 @@ namespace Features.EditCharacter.View
 				yield break;
 			}
 
+			imageBytes = Share.Utils.ImageCompressionUtils.CompressImageUnderSize(imageBytes, 1048576, out var changedToJpeg);
+			if (changedToJpeg)
+			{
+				selectedPath = Path.ChangeExtension(selectedPath, ".jpg");
+			}
+
 			var dataUrl = DataUrlUtils.BuildImageDataUrl(selectedPath, imageBytes);
 			if (string.IsNullOrWhiteSpace(dataUrl))
 			{
