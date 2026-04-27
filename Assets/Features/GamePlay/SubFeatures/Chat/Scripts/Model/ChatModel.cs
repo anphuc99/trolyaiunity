@@ -827,7 +827,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 	public sealed class OllamaChatRequestPayload
 	{
 		/// <summary>
-		/// Model name (e.g. gemma3:4b).
+		/// Model name (e.g. gemma4:e4b).
 		/// </summary>
 		[JsonProperty("model")]
 		public string Model { get; set; }

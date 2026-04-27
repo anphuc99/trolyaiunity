@@ -606,7 +606,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 		{
 			var payload = new OllamaChatRequestPayload
 			{
-				Model = "gemma3:4b",
+				Model = "gemma4:e4b",
 				Messages = new List<OllamaChatMessage>
 				{
 					new OllamaChatMessage { Role = "system", Content = "test prompt" },
@@ -615,7 +615,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 				Stream = false,
 			};
 
-			Assert.AreEqual("gemma3:4b", payload.Model);
+			Assert.AreEqual("gemma4:e4b", payload.Model);
 			Assert.IsFalse(payload.Stream);
 			Assert.AreEqual(2, payload.Messages.Count);
 			Assert.AreEqual("system", payload.Messages[0].Role);
@@ -629,12 +629,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 		{
 			var payload = new OllamaChatResponsePayload
 			{
-				Model = "gemma3:4b",
+				Model = "gemma4:e4b",
 				Message = new OllamaChatMessage { Role = "assistant", Content = "hello world" },
 				Done = true,
 			};
 
-			Assert.AreEqual("gemma3:4b", payload.Model);
+			Assert.AreEqual("gemma4:e4b", payload.Model);
 			Assert.IsNotNull(payload.Message);
 			Assert.AreEqual("assistant", payload.Message.Role);
 			Assert.AreEqual("hello world", payload.Message.Content);

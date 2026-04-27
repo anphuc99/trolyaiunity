@@ -1291,7 +1291,7 @@ export const createChatController = (
       const messages = await historyStore.load(request.user.id);
       const adjustedMessages = applyAssistantEdits(messages);
       response.json({
-        messages: adjustedMessages.filter((message) => message.role !== "system" && message.role !== "developer" && !isRecallMemoryContent(message.content))
+        messages: adjustedMessages
       });
     } catch (error) {
       console.error("Error in getHistory:", error);
@@ -1577,7 +1577,7 @@ export const createChatController = (
 
       response.json({
         systemPrompt,
-        history: history.filter(m => m.role !== "developer"),
+        history,
         activeCharacters
       });
     } catch (error) {

@@ -132,7 +132,7 @@ The GamePlay Chat client supports an auto-conversation mode controlled from pare
 
 ## Chat: Local AI via Ollama (PC Desktop)
 
-On desktop platforms (Windows, macOS, Linux), the Chat client uses a local Ollama instance (`gemma3:4b`) instead of sending messages to the server's cloud AI (Gemini). This eliminates cloud API costs for PC users and provides faster response times.
+On desktop platforms (Windows, macOS, Linux), the Chat client uses a local Ollama instance (`gemma4:e4b`) instead of sending messages to the server's cloud AI (Gemini). This eliminates cloud API costs for PC users and provides faster response times.
 
 ### How It Works
 
@@ -145,7 +145,7 @@ On desktop platforms (Windows, macOS, Linux), the Chat client uses a local Ollam
 ### Prerequisites
 
 - **Ollama** must be installed and running locally: https://ollama.com
-- Pull the model: `ollama pull gemma3:4b`
+- Pull the model: `ollama pull gemma4:e4b`
 - Ollama runs on `http://localhost:11434` by default.
 
 ### Audio Messages

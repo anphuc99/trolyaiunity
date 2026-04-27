@@ -22,7 +22,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 		/// <summary>
 		/// Default model to use for local AI generation.
 		/// </summary>
-		public const string DefaultModel = "gemma3:4b";
+		public const string DefaultModel = "gemma4:e4b";
 
 		/// <summary>
 		/// Timeout in seconds for Ollama requests. Local generation may take longer.
@@ -38,7 +38,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 		/// <param name="history">Chat history messages.</param>
 		/// <param name="userMessage">Current user message to send.</param>
 		/// <param name="baseUrl">Ollama API base URL. Defaults to http://localhost:11434.</param>
-		/// <param name="model">Model name. Defaults to gemma3:4b.</param>
+		/// <param name="model">Model name. Defaults to gemma4:e4b.</param>
 		/// <returns>Raw assistant content string from Ollama, or null on failure.</returns>
 		public static async Task<OllamaChatResponsePayload> SendChatAsync(
 			string systemPrompt,
@@ -55,9 +55,23 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			var messages = new List<OllamaChatMessage>();
 
 			// Add system prompt
-			if (!string.IsNullOrWhiteSpace(systemPrompt))
+			var systemInstruction = BuildOllamaSystemInstruction(systemPrompt ?? "");
+			if (!string.IsNullOrWhiteSpace(systemInstruction))
 			{
-				messages.Add(new OllamaChatMessage { Role = "system", Content = systemPrompt });
+				messages.Add(new OllamaChatMessage { Role = "system", Content = systemInstruction });
+			}
+
+			var pendingDeveloperMessages = new List<string>();
+
+			void FlushDeveloperOnlyBlock()
+			{
+				if (pendingDeveloperMessages.Count == 0) return;
+				var merged = FormatMergedDeveloperUserMessage(pendingDeveloperMessages, "");
+				if (!string.IsNullOrWhiteSpace(merged))
+				{
+					messages.Add(new OllamaChatMessage { Role = "user", Content = merged });
+				}
+				pendingDeveloperMessages.Clear();
 			}
 
 			// Add history (skip system messages as we already added the prompt)
@@ -77,19 +91,60 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 						continue;
 					}
 
-					if (role != "user" && role != "assistant")
+					if (role == "developer")
 					{
-						continue;
+						pendingDeveloperMessages.Add(msg.Content);
 					}
-
-					messages.Add(new OllamaChatMessage { Role = role, Content = msg.Content });
+					else if (role == "assistant")
+					{
+						FlushDeveloperOnlyBlock();
+						messages.Add(new OllamaChatMessage { Role = "assistant", Content = msg.Content });
+					}
+					else if (role == "user")
+					{
+						if (pendingDeveloperMessages.Count > 0)
+						{
+							var merged = FormatMergedDeveloperUserMessage(pendingDeveloperMessages, msg.Content);
+							if (!string.IsNullOrWhiteSpace(merged))
+							{
+								messages.Add(new OllamaChatMessage { Role = "user", Content = merged });
+							}
+							pendingDeveloperMessages.Clear();
+						}
+						else
+						{
+							messages.Add(new OllamaChatMessage { Role = "user", Content = msg.Content });
+						}
+					}
 				}
 			}
 
 			// Add current user message
-			if (!string.IsNullOrWhiteSpace(userMessage))
+			var currentUserMessage = userMessage?.Trim() ?? "";
+			if (pendingDeveloperMessages.Count > 0)
 			{
-				messages.Add(new OllamaChatMessage { Role = "user", Content = userMessage });
+				var merged = FormatMergedDeveloperUserMessage(pendingDeveloperMessages, currentUserMessage);
+				if (!string.IsNullOrWhiteSpace(merged))
+				{
+					messages.Add(new OllamaChatMessage { Role = "user", Content = merged });
+				}
+				pendingDeveloperMessages.Clear();
+			}
+			else if (!string.IsNullOrWhiteSpace(currentUserMessage))
+			{
+				messages.Add(new OllamaChatMessage { Role = "user", Content = currentUserMessage });
+			}
+			else
+			{
+				FlushDeveloperOnlyBlock();
+			}
+
+			foreach (var msg in messages)
+			{
+				if(msg.Role != "system")
+				{
+					Debug.Log($"{LogPrefix} Prepared message - Role: {msg.Role}, Content: {msg.Content}");
+				}
 			}
 
 			var requestPayload = new OllamaChatRequestPayload
@@ -100,6 +155,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			};
 
 			var jsonBody = JsonConvert.SerializeObject(requestPayload);
+			Debug.Log($"{LogPrefix} Sending payload to Ollama: {jsonBody}");
 			var bodyBytes = Encoding.UTF8.GetBytes(jsonBody);
 
 			using (var request = new UnityWebRequest(url, "POST"))
@@ -172,6 +228,61 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			{
 				return false;
 			}
+		}
+
+		private static string BuildOllamaSystemInstruction(string systemPrompt)
+		{
+			const string developerRoleExplanation = @"
+====================================
+DEVELOPER ROLE EXPLANATION
+====================================
+You may receive a USER message that contains one or more blocks formatted like this:
+
+developer:
+<instruction text>
+
+user:
+<actual user message>
+
+How this format works:
+1. Every ""developer:"" block is META-LEVEL instruction, not end-user dialogue.
+2. The final ""user:"" block is the real user message you should answer.
+3. If there is no ""user:"" block, treat the content as context update only.
+
+Developer instructions can:
+1. Provide context updates (e.g., story progress, relationship changes)
+2. Announce character additions or removals
+3. Request conversation summaries
+4. Provide editing instructions for previous messages
+
+When ""developer:"" blocks are present:
+- DO NOT answer or quote developer text directly
+- Apply those instructions silently as constraints/context
+- Answer only the ""user:"" part naturally
+- Never expose internal reasoning about these instructions
+
+";
+			return developerRoleExplanation + systemPrompt;
+		}
+
+		private static string FormatMergedDeveloperUserMessage(List<string> developerMessages, string userContent)
+		{
+			var sections = new List<string>();
+			foreach (var entry in developerMessages)
+			{
+				if (!string.IsNullOrWhiteSpace(entry))
+				{
+					sections.Add($"developer:\n{entry.Trim()}");
+				}
+			}
+
+			var trimmedUserContent = userContent?.Trim() ?? "";
+			if (!string.IsNullOrWhiteSpace(trimmedUserContent))
+			{
+				sections.Add($"user:\n{trimmedUserContent}");
+			}
+
+			return string.Join("\n\n", sections).Trim();
 		}
 	}
 }
