@@ -428,6 +428,15 @@ namespace Features.CreateCharater.View
 		{
 			var selectedPath = string.Empty;
 
+#if UNITY_EDITOR
+			selectedPath = UnityEditor.EditorUtility.OpenFilePanel("Chọn avatar", string.Empty, "png,jpg,jpeg,webp");
+			onPicked?.Invoke(selectedPath);
+			yield break;
+#elif UNITY_STANDALONE_WIN
+			selectedPath = FileBrowserUtils.OpenWindowsFileExplorer("Chọn avatar");
+			onPicked?.Invoke(selectedPath);
+			yield break;
+#else
 			var fileBrowserType = FileBrowserUtils.FindSimpleFileBrowserType();
 			if (fileBrowserType != null)
 			{
@@ -436,10 +445,6 @@ namespace Features.CreateCharater.View
 				yield break;
 			}
 
-#if UNITY_EDITOR
-			selectedPath = UnityEditor.EditorUtility.OpenFilePanel("Chọn avatar", string.Empty, "png,jpg,jpeg,webp");
-			onPicked?.Invoke(selectedPath);
-#else
 			EventBus.Publish(CreateCharaterEvents.AvatarUploadFailed,
 				"Thiết bị chưa có file picker runtime. Vui lòng bật package SimpleFileBrowser cho Android/iOS/PC.");
 			onPicked?.Invoke(string.Empty);
