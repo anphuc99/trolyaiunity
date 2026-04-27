@@ -951,9 +951,9 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				return;
 			}
 
-			if (_chatVariantRoot != null)
+			if (_chatVariantRoot != null && _currentChatMessages != null && _currentChatMessages.Count > 0)
 			{
-				_chatVariantRoot.SetCharacterTranslationsExpanded(true);
+				// _chatVariantRoot.SetCharacterTranslationsExpanded(true);
 			}
 
 			_isChatAutoPlaying = true;
@@ -1116,6 +1116,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				if (_chatVariantRoot != null)
 				{
 					_chatVariantRoot.ScrollToMessage(messageData.MessageIndex);
+					_chatVariantRoot.ExpandMessageTranslation(messageData);
 				}
 
 				RequestMessageAudio(messageData, false);

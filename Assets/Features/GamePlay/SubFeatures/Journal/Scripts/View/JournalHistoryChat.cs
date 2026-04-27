@@ -96,6 +96,19 @@ namespace Features.GamePlay.SubFeatures.Journal.View
             messageContainer.SetCharacterTranslationsExpanded(isExpanded);
         }
 
+        public void ExpandMessageTranslation(MessageBubbleData messageData)
+        {
+            if (messageContainer == null || messageData == null)
+            {
+                return;
+            }
+
+            if (!messageData.IsTranslationExpanded)
+            {
+                messageContainer.ToggleMessageTranslation(messageData);
+            }
+        }
+
         /// <summary>
         /// Clears all pooled objects and invokes the back callback.
         /// </summary>
