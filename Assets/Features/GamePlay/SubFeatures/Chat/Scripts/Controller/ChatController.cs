@@ -865,6 +865,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 		/// <summary>
 		/// Performs send API call and publishes assistant reply.
+		/// On desktop platforms, uses local Ollama AI and saves history to server.
 		/// </summary>
 		/// <param name="payload">Send payload.</param>
 		/// <returns>Awaitable task.</returns>
@@ -873,6 +874,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			try
 			{
 				await EnsureVocabularyMarkerSourcesLoadedAsync();
+
+				if (IsDesktopPlatform() && !HasAudioPayload(payload))
+				{
+					await SendMessageViaLocalAIAsync(payload);
+					return;
+				}
 
 				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatSendEndpoint(), payload);
 				if (string.IsNullOrWhiteSpace(responseJson))
@@ -929,6 +936,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 		/// <summary>
 		/// Performs respond API call and publishes assistant reply without user turn.
+		/// On desktop platforms, uses local Ollama AI and saves history to server.
 		/// </summary>
 		/// <param name="payload">Optional payload for session/model/story context.</param>
 		/// <returns>Awaitable task.</returns>
@@ -937,6 +945,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			try
 			{
 				await EnsureVocabularyMarkerSourcesLoadedAsync();
+
+				if (IsDesktopPlatform())
+				{
+					await GenerateReplyFromHistoryViaLocalAIAsync(payload);
+					return;
+				}
 
 				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatRespondEndpoint(), payload);
 				if (string.IsNullOrWhiteSpace(responseJson))
@@ -978,6 +992,195 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					Message = "Failed to generate chat reply from history: " + exception.Message
 				});
 			}
+		}
+
+		/// <summary>
+		/// Checks whether the current platform is a desktop PC (Windows, macOS, Linux).
+		/// When true, local Ollama AI is preferred over server-side cloud AI.
+		/// </summary>
+		/// <returns>True on desktop editor or standalone builds.</returns>
+		private static bool IsDesktopPlatform()
+		{
+			var platform = Application.platform;
+			return platform == RuntimePlatform.WindowsEditor
+				|| platform == RuntimePlatform.WindowsPlayer
+				|| platform == RuntimePlatform.OSXEditor
+				|| platform == RuntimePlatform.OSXPlayer
+				|| platform == RuntimePlatform.LinuxEditor
+				|| platform == RuntimePlatform.LinuxPlayer;
+		}
+
+		/// <summary>
+		/// Checks whether the send payload contains audio data (audio requires server-side processing).
+		/// </summary>
+		/// <param name="payload">Send request payload.</param>
+		/// <returns>True when audio is present.</returns>
+		private static bool HasAudioPayload(ChatSendRequestPayload payload)
+		{
+			return payload != null && !string.IsNullOrWhiteSpace(payload.Audio);
+		}
+
+		/// <summary>
+		/// Sends a user message using local Ollama AI on desktop platforms.
+		/// 1. Requests system prompt + history from server via /api/chat/prepare-local.
+		/// 2. Sends conversation to local Ollama to generate a reply.
+		/// 3. Saves the user message + AI reply to server via /api/chat/save-local.
+		/// 4. Publishes the result to views.
+		/// </summary>
+		/// <param name="payload">Send payload with user message.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task SendMessageViaLocalAIAsync(ChatSendRequestPayload payload)
+		{
+			// Step 1: Get system prompt and history from server
+			var preparePayload = new { message = payload.Message ?? "" };
+			var prepareJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatPrepareLocal, preparePayload);
+			if (string.IsNullOrWhiteSpace(prepareJson))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to prepare local AI prompt from server."
+				});
+				return;
+			}
+
+			var prepareResponse = JsonConvert.DeserializeObject<ChatPrepareLocalResponsePayload>(prepareJson);
+			if (prepareResponse == null || string.IsNullOrWhiteSpace(prepareResponse.SystemPrompt))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Server returned invalid preparation data for local AI."
+				});
+				return;
+			}
+
+			// Step 2: Generate reply via local Ollama
+			var ollamaResponse = await OllamaService.SendChatAsync(
+				prepareResponse.SystemPrompt,
+				prepareResponse.History,
+				payload.Message
+			);
+
+			if (ollamaResponse?.Message == null || string.IsNullOrWhiteSpace(ollamaResponse.Message.Content))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Local AI (Ollama) did not return a reply. Make sure Ollama is running."
+				});
+				return;
+			}
+
+			var rawReply = ollamaResponse.Message.Content;
+
+			// Step 3: Save to server history
+			var savePayload = new ChatSaveLocalRequestPayload
+			{
+				Message = payload.Message ?? "",
+				Reply = rawReply,
+			};
+
+			var saveJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatSaveLocal, savePayload);
+			var saveResponse = string.IsNullOrWhiteSpace(saveJson)
+				? null
+				: JsonConvert.DeserializeObject<ChatSaveLocalResponsePayload>(saveJson);
+
+			// Use cleaned reply from server if available (memory sidecars stripped)
+			var effectiveReply = saveResponse != null && !string.IsNullOrWhiteSpace(saveResponse.Reply)
+				? saveResponse.Reply
+				: rawReply;
+
+			// Step 4: Publish to views
+			var turns = ParseAssistantTurns(effectiveReply);
+			ApplyVocabularyMarkersToTurns(turns);
+
+			EventBus.Publish(ChatEvents.MessageReceived, new ChatAssistantMessagePayload
+			{
+				Reply = effectiveReply,
+				Model = "ollama/" + OllamaService.DefaultModel,
+				SessionId = payload.SessionId,
+				Turns = turns,
+			});
+
+			_ = PreResolveTtsAudioUrlsAsync(turns);
+		}
+
+		/// <summary>
+		/// Generates a reply from history using local Ollama AI on desktop platforms.
+		/// Similar to SendMessageViaLocalAIAsync but without a new user message.
+		/// </summary>
+		/// <param name="payload">Optional payload for session context.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task GenerateReplyFromHistoryViaLocalAIAsync(ChatSendRequestPayload payload)
+		{
+			// Step 1: Get system prompt and history from server
+			var preparePayload = new { message = "" };
+			var prepareJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatPrepareLocal, preparePayload);
+			if (string.IsNullOrWhiteSpace(prepareJson))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to prepare local AI prompt from server."
+				});
+				return;
+			}
+
+			var prepareResponse = JsonConvert.DeserializeObject<ChatPrepareLocalResponsePayload>(prepareJson);
+			if (prepareResponse == null || string.IsNullOrWhiteSpace(prepareResponse.SystemPrompt))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Server returned invalid preparation data for local AI."
+				});
+				return;
+			}
+
+			// Step 2: Generate reply via local Ollama (no user message, just continue from history)
+			var continuePrompt = "Continue the conversation naturally based on the current context.";
+			var ollamaResponse = await OllamaService.SendChatAsync(
+				prepareResponse.SystemPrompt,
+				prepareResponse.History,
+				continuePrompt
+			);
+
+			if (ollamaResponse?.Message == null || string.IsNullOrWhiteSpace(ollamaResponse.Message.Content))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Local AI (Ollama) did not return a reply. Make sure Ollama is running."
+				});
+				return;
+			}
+
+			var rawReply = ollamaResponse.Message.Content;
+
+			// Step 3: Save to server history (no user message for respond-from-history)
+			var savePayload = new ChatSaveLocalRequestPayload
+			{
+				Message = "",
+				Reply = rawReply,
+			};
+
+			var saveJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatSaveLocal, savePayload);
+			var saveResponse = string.IsNullOrWhiteSpace(saveJson)
+				? null
+				: JsonConvert.DeserializeObject<ChatSaveLocalResponsePayload>(saveJson);
+
+			var effectiveReply = saveResponse != null && !string.IsNullOrWhiteSpace(saveResponse.Reply)
+				? saveResponse.Reply
+				: rawReply;
+
+			// Step 4: Publish to views
+			var turns = ParseAssistantTurns(effectiveReply);
+			ApplyVocabularyMarkersToTurns(turns);
+
+			EventBus.Publish(ChatEvents.MessageReceived, new ChatAssistantMessagePayload
+			{
+				Reply = effectiveReply,
+				Model = "ollama/" + OllamaService.DefaultModel,
+				SessionId = payload?.SessionId,
+				Turns = turns,
+			});
+
+			_ = PreResolveTtsAudioUrlsAsync(turns);
 		}
 
 		/// <summary>
