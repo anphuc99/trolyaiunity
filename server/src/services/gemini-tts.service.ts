@@ -9,7 +9,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createCheapAIService } from "./cheap-ai.service.js";
 
-const GEMINI_TTS_MODEL = "gemini-3.1-flash-tts-preview";
+const GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts";
 
 // ---------------------------------------------------------------------------
 // Round-robin key management
