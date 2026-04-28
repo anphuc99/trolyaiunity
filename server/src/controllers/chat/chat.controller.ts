@@ -19,6 +19,8 @@ interface ChatController {
   sendMessage: (request: Request, response: Response) => Promise<void>;
   respondFromHistory: (request: Request, response: Response) => Promise<void>;
   getHistory: (request: Request, response: Response) => Promise<void>;
+  /** Returns full history (including system/developer/recall entries) for local Ollama analysis. */
+  getOllamaHistory: (request: Request, response: Response) => Promise<void>;
   appendDeveloperMessage: (request: Request, response: Response) => Promise<void>;
   editMessage: (request: Request, response: Response) => Promise<void>;
   getDeveloperState: (request: Request, response: Response) => Promise<void>;
@@ -1302,6 +1304,33 @@ export const createChatController = (
     }
   };
 
+  /**
+   * Returns full chat history for local Ollama clients.
+   * Unlike getHistory, this endpoint does NOT filter out system/developer/recall messages.
+   */
+  const getOllamaHistory: ChatController["getOllamaHistory"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const sessionId = getSessionId(request.query?.sessionId);
+
+    try {
+      const messages = await historyStore.load(request.user.id);
+      const adjustedMessages = applyAssistantEdits(messages);
+      response.json({
+        messages: adjustedMessages
+      });
+    } catch (error) {
+      console.error("Error in getOllamaHistory:", error);
+      response.status(500).json({
+        message: "Failed to load full chat history for Ollama",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
   const appendDeveloperMessage: ChatController["appendDeveloperMessage"] = async (request, response) => {
     if (!request.user) {
       response.status(401).json({ message: "Unauthorized" });
@@ -1663,6 +1692,7 @@ export const createChatController = (
     sendMessage,
     respondFromHistory,
     getHistory,
+    getOllamaHistory,
     appendDeveloperMessage,
     editMessage,
     getDeveloperState,

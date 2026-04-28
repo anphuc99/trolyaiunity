@@ -15,6 +15,7 @@ namespace Core.Infrastructure.Network
 		public const string Voices = "/api/voices";
 		public const string Levels = "/api/levels";
 		public const string ChatHistory = "/api/chat/history";
+		public const string ChatHistoryLocal = "/api/chat/history-local";
 		public const string ChatSend = "/api/chat/send";
 		public const string ChatRespond = "/api/chat/respond";
 		public const string ChatTranscribe = "/api/chat/transcribe";

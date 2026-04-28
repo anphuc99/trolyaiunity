@@ -1257,10 +1257,21 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				return;
 			}
 
+			// Step 1.5: Load full history for Ollama analysis (includes system/developer messages)
+			var fullHistory = await LoadOllamaFullHistoryAsync();
+			if (fullHistory == null)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to load full history for local Ollama analysis."
+				});
+				return;
+			}
+
 			// Step 2: Generate reply via local Ollama
 			var ollamaResponse = await OllamaService.SendChatAsync(
 				prepareResponse.SystemPrompt,
-				prepareResponse.History,
+				fullHistory,
 				payload.Message
 			);
 
@@ -1356,11 +1367,22 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				return;
 			}
 
+			// Step 1.5: Load full history for Ollama analysis (includes system/developer messages)
+			var fullHistory = await LoadOllamaFullHistoryAsync();
+			if (fullHistory == null)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to load full history for local Ollama analysis."
+				});
+				return;
+			}
+
 			// Step 2: Generate reply via local Ollama (no user message, just continue from history)
 			var continuePrompt = "Continue the conversation naturally based on the current context.";
 			var ollamaResponse = await OllamaService.SendChatAsync(
 				prepareResponse.SystemPrompt,
-				prepareResponse.History,
+				fullHistory,
 				continuePrompt
 			);
 
@@ -1463,6 +1485,30 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 
 			return null;
+		}
+
+		/// <summary>
+		/// Loads full unfiltered chat history from the dedicated local endpoint for Ollama.
+		/// Returns null when request/parse fails.
+		/// </summary>
+		/// <returns>Full history list, or null on failure.</returns>
+		private static async Task<List<ChatHistoryMessagePayload>> LoadOllamaFullHistoryAsync()
+		{
+			var historyJson = await HttpClient.GetTaskAsync(NetworkEndpoints.ChatHistoryLocal);
+			if (string.IsNullOrWhiteSpace(historyJson))
+			{
+				return null;
+			}
+
+			try
+			{
+				var response = JsonConvert.DeserializeObject<ChatHistoryResponsePayload>(historyJson);
+				return response?.Messages ?? new List<ChatHistoryMessagePayload>();
+			}
+			catch
+			{
+				return null;
+			}
 		}
 
 		/// <summary>
