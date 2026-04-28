@@ -14,9 +14,16 @@
  *   node fsrs_sim.js --r=0.85 "0 0 1 2 2 2"   ← tỉ lệ nhớ 85%
  *   node fsrs_sim.js --r=0.95 "2 2 2 2 2"     ← tỉ lệ nhớ 95%
  *
- * --r  : tỉ lệ nhớ mục tiêu (request_retention), 0.70–0.99, mặc định 0.90
- *        Cao hơn  → interval ngắn hơn (ôn nhiều hơn để chắc chắn nhớ)
- *        Thấp hơn → interval dài hơn  (chấp nhận quên nhiều hơn)
+ * --r      : tỉ lệ nhớ mục tiêu (request_retention), 0.70–0.99, mặc định 0.90
+ *            Cao hơn → interval ngắn hơn  |  Thấp hơn → interval dài hơn
+ *
+ * Workload simulation (số từ cần ôn mỗi ngày):
+ *   node fsrs_sim.js --days=180 --words=20 --rating=2
+ *   node fsrs_sim.js --days=180 --words=20 --rating=2 --r=0.85
+ *
+ * --days   : số ngày mô phỏng (mặc định 180)
+ * --words  : số từ mới học mỗi ngày (mặc định 20)
+ * --rating : mức đánh giá nhất quán  0–3 (mặc định 2 = Good)
  */
 
 import { FSRS, Rating, createEmptyCard, State } from "ts-fsrs";
@@ -109,6 +116,135 @@ function simulate(ratings, retention = 0.90) {
   return { intervals, rows };
 }
 
+// ─── Workload Simulator ───────────────────────────────────────────────────────
+
+/**
+ * Simulate one card's full review schedule starting from day 0,
+ * always rated with `rating`, stopping once the next due day > maxDays.
+ * @param {number} retention   - request_retention 0.70–0.99
+ * @param {number} rating      - user grade 0–3
+ * @param {number} maxDays     - simulation window in days
+ * @returns {Array<{relDay:number, reps:number}>}
+ *   relDay = days from card creation, reps = repetitions done that day
+ */
+function getSingleCardSchedule(retention, rating, maxDays) {
+  const f       = new FSRS({ request_retention: retention });
+  const tsRating = GRADE_TO_RATING[rating];
+  let card = createEmptyCard();
+  let now  = new Date(0);         // epoch = day 0
+  const schedule  = [];
+  let sameDayReps = 0;
+  let currentAbsDay = 0;
+
+  while (true) {
+    const result  = f.next(card, now, tsRating);
+    const next    = result.card;
+    sameDayReps++;
+
+    const dueDayAbs = Math.floor(next.due.getTime() / 86_400_000);
+
+    if (dueDayAbs <= currentAbsDay) {
+      // Same-day learning step — advance clock but stay on this day.
+      now  = next.due;
+      card = next;
+    } else {
+      // Flush the current day's reps.
+      schedule.push({ relDay: currentAbsDay, reps: sameDayReps });
+      sameDayReps = 0;
+
+      if (dueDayAbs > maxDays) break;
+
+      currentAbsDay = dueDayAbs;
+      now  = next.due;
+      card = next;
+    }
+  }
+
+  return schedule;
+}
+
+/**
+ * Build a per-day workload table for learning `newPerDay` new cards every day
+ * over `totalDays`, all rated consistently with `rating`.
+ * @returns {Array<{new:number, reviews:number, totalCards:number, totalReps:number}>}
+ *   Index 1 = day 1, index totalDays = last day (index 0 unused).
+ */
+function buildWorkload(newPerDay, rating, totalDays, retention) {
+  const relSched = getSingleCardSchedule(retention, rating, totalDays);
+
+  const work = Array.from({ length: totalDays + 1 }, () => ({
+    new: 0, reviews: 0, totalCards: 0, totalReps: 0,
+  }));
+
+  // Each day `startDay` introduces `newPerDay` cards.
+  // Their future reviews land on startDay + relDay.
+  for (let startDay = 1; startDay <= totalDays; startDay++) {
+    for (const { relDay, reps } of relSched) {
+      const absDay = startDay + relDay;
+      if (absDay < 1 || absDay > totalDays) continue;
+
+      if (relDay === 0) {
+        // Introduction day (includes same-day learning steps).
+        work[absDay].new      += newPerDay;
+        work[absDay].totalReps += newPerDay * reps;
+      } else {
+        // Future scheduled review.
+        work[absDay].reviews   += newPerDay;
+        work[absDay].totalReps += newPerDay * reps;
+      }
+    }
+  }
+
+  for (let d = 1; d <= totalDays; d++) {
+    work[d].totalCards = work[d].new + work[d].reviews;
+  }
+
+  return work;
+}
+
+/**
+ * Print the workload table with bar chart and summary.
+ */
+function printWorkloadResult(work, { newPerDay, rating, totalDays, retention }) {
+  const days     = work.slice(1);   // strip unused index 0
+  const maxCards = Math.max(...days.map((d) => d.totalCards));
+  const BAR_MAX  = 40;
+  const scale    = Math.max(1, Math.ceil(maxCards / BAR_MAX));
+
+  console.log();
+  console.log(`  ── Workload Simulation ${'─'.repeat(43)}`);
+  console.log(`  Words/day : ${newPerDay}  |  Days: ${totalDays}  |  Rating: ${GRADE_NAMES[rating]} (${rating})  |  Retention: ${(retention * 100).toFixed(0)}%`);
+  console.log(`  1█ = ${scale} card${scale > 1 ? 's' : ''}`);
+  console.log();
+  console.log(`  ${'Day'.padStart(4)} │ ${'New'.padStart(4)} │ ${'Reviews'.padStart(7)} │ ${'Total'.padStart(5)} │ Chart`);
+  console.log('  ' + '─'.repeat(4) + '─┼─' + '─'.repeat(4) + '─┼─' + '─'.repeat(7) + '─┼─' + '─'.repeat(5) + '─┼─' + '─'.repeat(BAR_MAX + 2));
+
+  for (let d = 1; d <= totalDays; d++) {
+    const { new: n, reviews: r, totalCards: t } = work[d];
+    const bar = '█'.repeat(Math.max(0, Math.round(t / scale)));
+    console.log(
+      `  ${String(d).padStart(4)} │ ${String(n).padStart(4)} │ ${String(r).padStart(7)} │ ${String(t).padStart(5)} │ ${bar}`
+    );
+  }
+
+  // ── Summary
+  const totalNew     = days.reduce((s, d) => s + d.new,        0);
+  const totalReviews = days.reduce((s, d) => s + d.reviews,    0);
+  const totalCards   = days.reduce((s, d) => s + d.totalCards, 0);
+  const totalReps    = days.reduce((s, d) => s + d.totalReps,  0);
+  const avgCards     = (totalCards / totalDays).toFixed(1);
+  const peakDay      = days.reduce((best, d, i) => d.totalCards > best.v ? { v: d.totalCards, d: i + 1 } : best, { v: 0, d: 1 });
+
+  console.log();
+  console.log('  ── Summary ' + '─'.repeat(50));
+  console.log(`  Từ mới giới thiệu      : ${totalNew.toLocaleString()}`);
+  console.log(`  Lượt ôn tập (scheduled): ${totalReviews.toLocaleString()}`);
+  console.log(`  Tổng thẻ gặp mỗi ngày  : ${totalCards.toLocaleString()} (avg ${avgCards}/ngày)`);
+  console.log(`  Tổng reps (incl. learn): ${totalReps.toLocaleString()}`);
+  console.log(`  Ngày bận nhất          : ngày ${peakDay.d} → ${peakDay.v} thẻ`);
+  console.log();
+}
+
 // ─── CLI helpers ─────────────────────────────────────────────────────────────
 
 /**
@@ -117,20 +253,32 @@ function simulate(ratings, retention = 0.90) {
  */
 function parseArgs(argv) {
   let retention = 0.90;
-  const rest = [];
+  let words     = 20;
+  let days      = null;   // null = not specified (per-card mode)
+  let rating    = 2;
+  const rest    = [];
+
   for (const arg of argv) {
-    const m = arg.match(/^--r=(.+)$/);
-    if (m) {
+    let m;
+    if ((m = arg.match(/^--r=(.+)$/))) {
       const v = parseFloat(m[1]);
-      if (isNaN(v) || v < 0.70 || v > 0.99) {
+      if (isNaN(v) || v < 0.70 || v > 0.99)
         throw new Error("--r phải là số từ 0.70 đến 0.99 (ví dụ: --r=0.85)");
-      }
       retention = v;
+    } else if ((m = arg.match(/^--words=(\d+)$/))) {
+      words = parseInt(m[1], 10);
+      if (words < 1) throw new Error("--words phải >= 1");
+    } else if ((m = arg.match(/^--days=(\d+)$/))) {
+      days = parseInt(m[1], 10);
+      if (days < 1) throw new Error("--days phải >= 1");
+    } else if ((m = arg.match(/^--rating=([0-3])$/))) {
+      rating = parseInt(m[1], 10);
     } else {
       rest.push(arg);
     }
   }
-  return { retention, rest };
+
+  return { retention, words, days, rating, rest };
 }
 
 function parseRatings(text) {
@@ -158,31 +306,41 @@ function printResult(ratings, intervals, rows, retention) {
 }
 
 const BANNER = `
-╔══════════════════════════════════════════════════════════╗
-║         FSRS v5 Spaced Repetition Simulator (ts-fsrs)   ║
-║                                                          ║
-║  Grades:  0 = Again   1 = Hard   2 = Good   3 = Easy    ║
-║                                                          ║
-║  --r=<0.70–0.99>  tỉ lệ nhớ mục tiêu (mặc định 0.90)   ║
-║  Learning/Relearning phase  → interval tính bằng phút   ║
-║  Review phase               → interval tính bằng ngày   ║
-╚══════════════════════════════════════════════════════════╝`;
+╔════════════════════════════════════════════════════════════════╗
+║           FSRS v5 Spaced Repetition Simulator (ts-fsrs)       ║
+║                                                                ║
+║  Per-card mode:                                                ║
+║    node fsrs_sim.js [--r=0.9] "0 0 1 2 2 2"                   ║
+║                                                                ║
+║  Workload mode (từ cần ôn mỗi ngày):                           ║
+║    node fsrs_sim.js --days=180 --words=20 --rating=2 [--r=0.9] ║
+║                                                                ║
+║  Grades: 0=Again  1=Hard  2=Good  3=Easy                       ║
+║  --r     tỉ lệ nhớ 0.70–0.99  (mặc định 0.90)                 ║
+╚════════════════════════════════════════════════════════════════╝`;
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 function main() {
   console.log(BANNER);
 
-  // Parse --r flag and remaining args
-  let retention, rest;
+  // Parse all flags and remaining args
+  let retention, words, days, rating, rest;
   try {
-    ({ retention, rest } = parseArgs(process.argv.slice(2)));
+    ({ retention, words, days, rating, rest } = parseArgs(process.argv.slice(2)));
   } catch (e) {
     console.error(`  Lỗi: ${e.message}`);
     process.exit(1);
   }
 
-  // CLI argument mode
+  // ── Workload mode: triggered when --days is specified
+  if (days !== null) {
+    const work = buildWorkload(words, rating, days, retention);
+    printWorkloadResult(work, { newPerDay: words, rating, totalDays: days, retention });
+    return;
+  }
+
+  // ── Per-card mode (CLI)
   if (rest.length > 0) {
     const raw = rest.join(" ");
     try {
@@ -196,10 +354,10 @@ function main() {
     return;
   }
 
-  // Interactive mode
-  console.log("\n  Nhập ratings để mô phỏng, hoặc Enter / Ctrl+C để thoát.");
-  console.log(`  Tỉ lệ nhớ hiện tại: ${(retention * 100).toFixed(0)}% (thay đổi bằng --r=0.85 v.v.)`);
-  console.log("  Ví dụ:  0 0 1 2 2 2   hoặc   [0,0,1,2,2,2]\n");
+  // ── Interactive mode (per-card)
+  console.log("\n  Per-card mode: nhập ratings, hoặc Enter / Ctrl+C để thoát.");
+  console.log("  Workload mode: dùng --days=180 --words=20 --rating=2 (xem banner trên).");
+  console.log(`  Tỉ lệ nhớ: ${(retention * 100).toFixed(0)}%  |  Ví dụ: 0 0 1 2 2 2\n`);
 
   const rl = readline.createInterface({
     input: process.stdin,
