@@ -1273,12 +1273,21 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 
 			var rawReply = ollamaResponse.Message.Content;
+			var jsonReply = await EnsureValidOllamaReplyJsonAsync(rawReply);
+			if (string.IsNullOrWhiteSpace(jsonReply))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Local AI returned invalid JSON reply format and could not repair it. History was not saved."
+				});
+				return;
+			}
 
 			// Step 3: Save to server history
 			var savePayload = new ChatSaveLocalRequestPayload
 			{
 				Message = payload.Message ?? "",
-				Reply = rawReply,
+				Reply = jsonReply,
 			};
 
 			var saveJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatSaveLocal, savePayload);
@@ -1289,7 +1298,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			// Use cleaned reply from server if available (memory sidecars stripped)
 			var effectiveReply = saveResponse != null && !string.IsNullOrWhiteSpace(saveResponse.Reply)
 				? saveResponse.Reply
-				: rawReply;
+				: jsonReply;
 
 			// Step 4: Publish to views
 			var turns = ParseAssistantTurns(effectiveReply);
@@ -1354,12 +1363,21 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 
 			var rawReply = ollamaResponse.Message.Content;
+			var jsonReply = await EnsureValidOllamaReplyJsonAsync(rawReply);
+			if (string.IsNullOrWhiteSpace(jsonReply))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Local AI returned invalid JSON reply format and could not repair it. History was not saved."
+				});
+				return;
+			}
 
 			// Step 3: Save to server history (no user message for respond-from-history)
 			var savePayload = new ChatSaveLocalRequestPayload
 			{
 				Message = "",
-				Reply = rawReply,
+				Reply = jsonReply,
 			};
 
 			var saveJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatSaveLocal, savePayload);
@@ -1369,7 +1387,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 			var effectiveReply = saveResponse != null && !string.IsNullOrWhiteSpace(saveResponse.Reply)
 				? saveResponse.Reply
-				: rawReply;
+				: jsonReply;
 
 			// Step 4: Publish to views
 			var turns = ParseAssistantTurns(effectiveReply);
@@ -1384,6 +1402,88 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			});
 
 			_ = PreResolveTtsAudioUrlsAsync(turns);
+		}
+
+		/// <summary>
+		/// Ensures a local Ollama reply is valid assistant-turn JSON.
+		/// If invalid, requests Ollama to reformat into the required JSON shape.
+		/// Returns null when repair fails.
+		/// </summary>
+		/// <param name="reply">Raw Ollama assistant reply.</param>
+		/// <returns>Valid assistant-turn JSON, or null when unrecoverable.</returns>
+		private static async Task<string> EnsureValidOllamaReplyJsonAsync(string reply)
+		{
+			var current = reply?.Trim() ?? "";
+			if (IsValidAssistantReplyJson(current))
+			{
+				return current;
+			}
+
+			const int maxRepairAttempts = 2;
+			for (var attempt = 1; attempt <= maxRepairAttempts; attempt++)
+			{
+				Debug.Log("[ChatController] Ollama reply JSON invalid. Requesting repair attempt " + attempt + ".");
+
+				var repaired = await OllamaService.RepairReplyJsonAsync(current);
+				var repairedContent = repaired?.Message?.Content?.Trim() ?? "";
+				if (string.IsNullOrWhiteSpace(repairedContent))
+				{
+					break;
+				}
+
+				if (IsValidAssistantReplyJson(repairedContent))
+				{
+					Debug.Log("[ChatController] Ollama reply JSON repaired successfully.");
+					return repairedContent;
+				}
+
+				current = repairedContent;
+			}
+
+			return null;
+		}
+
+		/// <summary>
+		/// Validates whether a reply can be parsed as assistant-turn JSON.
+		/// Requires at least one turn with non-empty Text.
+		/// </summary>
+		/// <param name="reply">Reply text to validate.</param>
+		/// <returns>True when JSON structure is valid for chat turns.</returns>
+		private static bool IsValidAssistantReplyJson(string reply)
+		{
+			if (string.IsNullOrWhiteSpace(reply))
+			{
+				return false;
+			}
+
+			try
+			{
+				var parsedList = JsonConvert.DeserializeObject<List<ChatAssistantTurnPayload>>(reply);
+				if (parsedList != null)
+				{
+					for (var i = 0; i < parsedList.Count; i++)
+					{
+						if (parsedList[i] != null && !string.IsNullOrWhiteSpace(parsedList[i].Text))
+						{
+							return true;
+						}
+					}
+				}
+			}
+			catch
+			{
+			}
+
+			try
+			{
+				var single = JsonConvert.DeserializeObject<ChatAssistantTurnPayload>(reply);
+				return single != null && !string.IsNullOrWhiteSpace(single.Text);
+			}
+			catch
+			{
+			}
+
+			return false;
 		}
 
 		/// <summary>

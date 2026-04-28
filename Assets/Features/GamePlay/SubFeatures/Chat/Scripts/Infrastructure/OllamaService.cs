@@ -135,6 +135,97 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 		}
 
 		/// <summary>
+		/// Requests Ollama to rewrite an invalid reply into valid assistant-turn JSON.
+		/// Used as a safety gate before saving local replies to server history.
+		/// </summary>
+		/// <param name="invalidReply">Invalid non-JSON or malformed JSON reply.</param>
+		/// <param name="baseUrl">Ollama API base URL.</param>
+		/// <param name="model">Model name.</param>
+		/// <returns>Ollama response payload containing repaired JSON content, or null on failure.</returns>
+		public static async Task<OllamaChatResponsePayload> RepairReplyJsonAsync(
+			string invalidReply,
+			string baseUrl = null,
+			string model = null)
+		{
+			if (string.IsNullOrWhiteSpace(invalidReply))
+			{
+				return null;
+			}
+
+			var resolvedBaseUrl = string.IsNullOrWhiteSpace(baseUrl) ? DefaultBaseUrl : baseUrl.TrimEnd('/');
+			var resolvedModel = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
+			var url = resolvedBaseUrl + "/api/chat";
+
+			var repairInstruction = @"You must transform the following assistant response into STRICT JSON for chat turns.
+
+Output rules:
+1) Return ONLY valid JSON (no markdown, no code fences, no explanation).
+2) JSON must be either:
+   - an array of objects, or
+   - a single object.
+3) Each object must contain at least:
+   - ""CharacterName"": string
+   - ""Text"": string
+4) Keep the original meaning and language.
+
+Invalid assistant response:
+" + invalidReply;
+
+			var messages = new List<OllamaChatMessage>
+			{
+				new OllamaChatMessage { Role = "system", Content = "You are a strict JSON formatter." },
+				new OllamaChatMessage { Role = "user", Content = repairInstruction },
+			};
+
+			var requestPayload = new OllamaChatRequestPayload
+			{
+				Model = resolvedModel,
+				Messages = messages,
+				Stream = false,
+			};
+
+			var jsonBody = JsonConvert.SerializeObject(requestPayload);
+			var bodyBytes = Encoding.UTF8.GetBytes(jsonBody);
+
+			using (var request = new UnityWebRequest(url, "POST"))
+			{
+				request.uploadHandler = new UploadHandlerRaw(bodyBytes);
+				request.downloadHandler = new DownloadHandlerBuffer();
+				request.SetRequestHeader("Content-Type", "application/json");
+				request.timeout = TimeoutSeconds;
+
+				var operation = request.SendWebRequest();
+				while (!operation.isDone)
+				{
+					await Task.Yield();
+				}
+
+				if (request.result != UnityWebRequest.Result.Success)
+				{
+					Debug.LogError($"{LogPrefix} JSON repair request failed: {request.error} (URL: {url})");
+					return null;
+				}
+
+				var responseText = request.downloadHandler.text;
+				if (string.IsNullOrWhiteSpace(responseText))
+				{
+					Debug.LogError($"{LogPrefix} Empty JSON repair response from Ollama.");
+					return null;
+				}
+
+				try
+				{
+					return JsonConvert.DeserializeObject<OllamaChatResponsePayload>(responseText);
+				}
+				catch (System.Exception ex)
+				{
+					Debug.LogError($"{LogPrefix} Failed to parse Ollama JSON repair response: {ex.Message}");
+					return null;
+				}
+			}
+		}
+
+		/// <summary>
 		/// Checks whether the local Ollama instance is reachable.
 		/// </summary>
 		/// <param name="baseUrl">Ollama API base URL.</param>
