@@ -208,6 +208,98 @@ function buildWorkload(newPerDay, ratings, totalDays, retention) {
 }
 
 /**
+ * Print a step-by-step review schedule for one card over `maxDays`,
+ * using `ratings` array (last element repeated once exhausted).
+ * Each row = one f.next() call (same-day learning steps visible too).
+ * @param {number}   retention
+ * @param {number[]} ratings
+ * @param {number}   maxDays
+ */
+function printSingleCardSchedule(retention, ratings, maxDays) {
+  const f   = new FSRS({ request_retention: retention });
+  let card  = createEmptyCard();
+  let now   = new Date(0);     // epoch day 0
+  let reviewIndex = 0;
+  let step  = 0;
+  const rows = [];
+
+  while (true) {
+    const grade    = ratings[Math.min(reviewIndex, ratings.length - 1)];
+    const tsRating = GRADE_TO_RATING[grade];
+    reviewIndex++;
+    step++;
+
+    const result = f.next(card, now, tsRating);
+    const next   = result.card;
+
+    const relDay    = Math.floor(now.getTime() / 86_400_000);
+    const dueDayAbs = Math.floor(next.due.getTime() / 86_400_000);
+    const ms        = next.due - now;
+    const mins      = Math.round(ms / 60_000);
+
+    let intervalStr;
+    if (next.state === State.Review && next.scheduled_days >= 1) {
+      intervalStr = `${next.scheduled_days}d`;
+    } else {
+      intervalStr = `${mins}m`;
+    }
+
+    const outOfWindow = dueDayAbs > maxDays;
+    rows.push({ step, relDay, grade, gradeName: GRADE_NAMES[grade],
+      stability: next.stability, difficulty: next.difficulty,
+      state: State[next.state], intervalStr, outOfWindow });
+
+    if (outOfWindow) break;
+    now  = next.due;
+    card = next;
+  }
+
+  // ── Header
+  const ratingLabel = ratings.length === 1
+    ? `${GRADE_NAMES[ratings[0]]} (${ratings[0]})`
+    : `[${ratings.join(",")}]`;
+  console.log();
+  console.log(`  ── Lịch ôn 1 từ ${'─'.repeat(47)}`);
+  console.log(`  Retention: ${(retention * 100).toFixed(0)}%  |  Ratings: ${ratingLabel}  |  Window: ${maxDays} ngày`);
+  console.log();
+  console.log(
+    `  ${'#'.padStart(3)} │ ${'Ngày'.padStart(4)} │ ${'Rating'.padEnd(6)} │` +
+    ` ${'S'.padStart(7)} │ ${'D'.padStart(7)} │ ${'State'.padEnd(11)} │ Tiếp theo`
+  );
+  console.log(
+    '  ' + '─'.repeat(3) + '─┼─' + '─'.repeat(4) + '─┼─' + '─'.repeat(6) +
+    '─┼─' + '─'.repeat(7) + '─┼─' + '─'.repeat(7) + '─┼─' + '─'.repeat(11) + '─┼──────────'
+  );
+
+  for (const r of rows) {
+    const tag = r.outOfWindow ? '  ← ngoài cửa sổ' : '';
+    console.log(
+      `  ${String(r.step).padStart(3)} │ ${String(r.relDay).padStart(4)} │` +
+      ` ${r.gradeName.padEnd(6)} │ ${r.stability.toFixed(3).padStart(7)} │` +
+      ` ${r.difficulty.toFixed(3).padStart(7)} │ ${r.state.padEnd(11)} │` +
+      ` ${r.intervalStr.padStart(6)}${tag}`
+    );
+  }
+
+  // ── Stats
+  const inWindow    = rows.filter((r) => !r.outOfWindow);
+  const totalSteps  = inWindow.length;
+  const uniqueDays  = new Set(inWindow.map((r) => r.relDay)).size;
+  const lastDay     = inWindow.length ? inWindow[inWindow.length - 1].relDay : 0;
+  const avgInterval = totalSteps > 1
+    ? (lastDay / (totalSteps - 1)).toFixed(1)
+    : '—';
+
+  console.log();
+  console.log(
+    `  Tổng lần ôn trong cửa sổ : ${totalSteps} lần` +
+    `  |  Số ngày có ôn: ${uniqueDays}` +
+    `  |  Interval trung bình: ${avgInterval} ngày`
+  );
+  console.log();
+}
+
+/**
  * Print the workload table with bar chart and summary.
  */
 function printWorkloadResult(work, { newPerDay, ratings, totalDays, retention }) {
@@ -350,6 +442,7 @@ function main() {
 
   // ── Workload mode: triggered when --days is specified
   if (days !== null) {
+    printSingleCardSchedule(retention, rating, days);
     const work = buildWorkload(words, rating, days, retention);
     printWorkloadResult(work, { newPerDay: words, ratings: rating, totalDays: days, retention });
     return;
