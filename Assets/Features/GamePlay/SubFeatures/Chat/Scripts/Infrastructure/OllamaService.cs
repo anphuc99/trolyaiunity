@@ -33,13 +33,15 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 
 		/// <summary>
 		/// Sends a chat request to the local Ollama instance and returns the assistant reply.
+		/// History is compressed into CharacterName:Text lines and embedded in the system prompt
+		/// so Ollama treats it as context only and never tries to continue or mimic the format.
 		/// </summary>
 		/// <param name="systemPrompt">System instruction prompt from server.</param>
 		/// <param name="history">Chat history messages.</param>
 		/// <param name="userMessage">Current user message to send.</param>
 		/// <param name="baseUrl">Ollama API base URL. Defaults to http://localhost:11434.</param>
 		/// <param name="model">Model name. Defaults to gemma4:e4b.</param>
-		/// <returns>Raw assistant content string from Ollama, or null on failure.</returns>
+		/// <returns>Ollama response payload, or null on failure.</returns>
 		public static async Task<OllamaChatResponsePayload> SendChatAsync(
 			string systemPrompt,
 			List<ChatHistoryMessagePayload> history,
@@ -51,55 +53,33 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			var resolvedModel = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
 			var url = resolvedBaseUrl + "/api/chat";
 
-			// Build Ollama messages array
-			// Build compact message array using CharacterName:Text format to minimise token usage.
-			var messages = new List<OllamaChatMessage>();
-
-			// System prompt (sent as-is; no extra wrapper needed with the compact history format)
+			// Build a single system message that contains both the original system prompt and the
+			// full compressed chat history. Embedding history in the system role prevents Ollama
+			// from mistaking the CharacterName:Text lines as a format it should continue producing.
+			var systemBuilder = new StringBuilder();
 			if (!string.IsNullOrWhiteSpace(systemPrompt))
 			{
-				messages.Add(new OllamaChatMessage { Role = "system", Content = systemPrompt.Trim() });
+				systemBuilder.AppendLine(systemPrompt.Trim());
 			}
 
-			// Compressed history: user → "User:<text>", developer → "developer:<text>",
-			// assistant → "<CharacterName>:<Text>" lines (JSON stripped).
-			if (history != null)
+			var compressedHistory = BuildCompressedHistory(history);
+			if (!string.IsNullOrWhiteSpace(compressedHistory))
 			{
-				foreach (var msg in history)
-				{
-					if (msg == null || string.IsNullOrWhiteSpace(msg.Content))
-					{
-						continue;
-					}
-
-					var role = (msg.Role ?? "").ToLowerInvariant();
-					if (role == "system")
-					{
-						continue;
-					}
-
-					if (role == "assistant")
-					{
-						var compressed = CompressAssistantContent(msg.Content);
-						if (!string.IsNullOrWhiteSpace(compressed))
-						{
-							messages.Add(new OllamaChatMessage { Role = "assistant", Content = compressed });
-						}
-					}
-					else
-					{
-						// user → "User:<text>", developer → "developer:<text>"
-						var label = role == "developer" ? "developer" : "User";
-						messages.Add(new OllamaChatMessage { Role = "user", Content = label + ":" + msg.Content.Trim() });
-					}
-				}
+				systemBuilder.AppendLine();
+				systemBuilder.AppendLine("Lịch sử chat (chỉ để tham khảo ngữ cảnh, không phải định dạng trả lời):");
+				systemBuilder.AppendLine(compressedHistory);
 			}
 
-			// Current user message
+			var messages = new List<OllamaChatMessage>
+			{
+				new OllamaChatMessage { Role = "system", Content = systemBuilder.ToString().Trim() },
+			};
+
+			// Only the current user message goes as a real turn.
 			var currentUserMessage = userMessage?.Trim() ?? "";
 			if (!string.IsNullOrWhiteSpace(currentUserMessage))
 			{
-				messages.Add(new OllamaChatMessage { Role = "user", Content = "User:" + currentUserMessage });
+				messages.Add(new OllamaChatMessage { Role = "user", Content = currentUserMessage });
 			}
 
 			Debug.Log($"{LogPrefix} Sending {messages.Count} messages to Ollama (model: {resolvedModel}).");
@@ -264,6 +244,50 @@ Only return the JSON object, no extra text.";
 					return null;
 				}
 			}
+		}
+
+		/// <summary>
+		/// Builds a compact text block from the full chat history for embedding in the system prompt.
+		/// Format per line: "User:<text>", "developer:<text>", or "<CharacterName>:<text>".
+		/// Developer and system messages are included so the model has full context.
+		/// </summary>
+		private static string BuildCompressedHistory(List<ChatHistoryMessagePayload> history)
+		{
+			if (history == null || history.Count == 0)
+			{
+				return "";
+			}
+
+			var sb = new StringBuilder();
+			foreach (var msg in history)
+			{
+				if (msg == null || string.IsNullOrWhiteSpace(msg.Content))
+				{
+					continue;
+				}
+
+				var role = (msg.Role ?? "").ToLowerInvariant();
+				if (role == "system")
+				{
+					continue;
+				}
+
+				if (role == "assistant")
+				{
+					var compressed = CompressAssistantContent(msg.Content);
+					if (!string.IsNullOrWhiteSpace(compressed))
+					{
+						sb.AppendLine(compressed);
+					}
+				}
+				else
+				{
+					var label = role == "developer" ? "developer" : "User";
+					sb.AppendLine(label + ":" + msg.Content.Trim());
+				}
+			}
+
+			return sb.ToString().TrimEnd();
 		}
 
 		/// <summary>
