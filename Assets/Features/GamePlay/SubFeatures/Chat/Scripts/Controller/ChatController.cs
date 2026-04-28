@@ -6,6 +6,7 @@ using Features.GamePlay.SubFeatures.Chat.Requests;
 using Core.Infrastructure.Network;
 using Core.Infrastructure.State;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Share.Utils;
 using CoreGlobalModes = Core.Infrastructure.State.GlobalModes;
 using System;
@@ -1283,11 +1284,21 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				return;
 			}
 
+			var normalizedMessageIdReply = ReplaceAssistantMessageIdsWithSystemGuids(jsonReply);
+			if (string.IsNullOrWhiteSpace(normalizedMessageIdReply))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to normalize assistant MessageId before saving history."
+				});
+				return;
+			}
+
 			// Step 3: Save to server history
 			var savePayload = new ChatSaveLocalRequestPayload
 			{
 				Message = payload.Message ?? "",
-				Reply = jsonReply,
+				Reply = normalizedMessageIdReply,
 			};
 
 			var saveJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatSaveLocal, savePayload);
@@ -1298,7 +1309,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			// Use cleaned reply from server if available (memory sidecars stripped)
 			var effectiveReply = saveResponse != null && !string.IsNullOrWhiteSpace(saveResponse.Reply)
 				? saveResponse.Reply
-				: jsonReply;
+				: normalizedMessageIdReply;
 
 			// Step 4: Publish to views
 			var turns = ParseAssistantTurns(effectiveReply);
@@ -1373,11 +1384,21 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				return;
 			}
 
+			var normalizedMessageIdReply = ReplaceAssistantMessageIdsWithSystemGuids(jsonReply);
+			if (string.IsNullOrWhiteSpace(normalizedMessageIdReply))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to normalize assistant MessageId before saving history."
+				});
+				return;
+			}
+
 			// Step 3: Save to server history (no user message for respond-from-history)
 			var savePayload = new ChatSaveLocalRequestPayload
 			{
 				Message = "",
-				Reply = jsonReply,
+				Reply = normalizedMessageIdReply,
 			};
 
 			var saveJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatSaveLocal, savePayload);
@@ -1387,7 +1408,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 			var effectiveReply = saveResponse != null && !string.IsNullOrWhiteSpace(saveResponse.Reply)
 				? saveResponse.Reply
-				: jsonReply;
+				: normalizedMessageIdReply;
 
 			// Step 4: Publish to views
 			var turns = ParseAssistantTurns(effectiveReply);
@@ -1503,6 +1524,51 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				&& !string.IsNullOrWhiteSpace(turn.Pinyin)
 				&& !string.IsNullOrWhiteSpace(turn.Tone)
 				&& !string.IsNullOrWhiteSpace(turn.Translation);
+		}
+
+		/// <summary>
+		/// Replaces all assistant MessageId values with system-generated GUIDs.
+		/// Preserves all other fields (including optional memory sidecar fields).
+		/// </summary>
+		/// <param name="replyJson">Validated assistant reply JSON (array or single object).</param>
+		/// <returns>JSON with new MessageId values, or null when parsing fails.</returns>
+		private static string ReplaceAssistantMessageIdsWithSystemGuids(string replyJson)
+		{
+			if (string.IsNullOrWhiteSpace(replyJson))
+			{
+				return null;
+			}
+
+			try
+			{
+				var token = JToken.Parse(replyJson);
+
+				if (token is JArray array)
+				{
+					for (var i = 0; i < array.Count; i++)
+					{
+						if (!(array[i] is JObject obj))
+						{
+							return null;
+						}
+
+						obj["MessageId"] = Guid.NewGuid().ToString();
+					}
+
+					return array.ToString(Formatting.None);
+				}
+
+				if (token is JObject single)
+				{
+					single["MessageId"] = Guid.NewGuid().ToString();
+					return single.ToString(Formatting.None);
+				}
+			}
+			catch
+			{
+			}
+
+			return null;
 		}
 
 		/// <summary>
