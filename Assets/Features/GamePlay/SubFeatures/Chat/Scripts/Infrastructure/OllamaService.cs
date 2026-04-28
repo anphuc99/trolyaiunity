@@ -139,11 +139,13 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 		/// Used as a safety gate before saving local replies to server history.
 		/// </summary>
 		/// <param name="invalidReply">Invalid non-JSON or malformed JSON reply.</param>
+		/// <param name="originalSystemPrompt">Original generation system prompt to mirror output rules.</param>
 		/// <param name="baseUrl">Ollama API base URL.</param>
 		/// <param name="model">Model name.</param>
 		/// <returns>Ollama response payload containing repaired JSON content, or null on failure.</returns>
 		public static async Task<OllamaChatResponsePayload> RepairReplyJsonAsync(
 			string invalidReply,
+			string originalSystemPrompt = null,
 			string baseUrl = null,
 			string model = null)
 		{
@@ -156,24 +158,36 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			var resolvedModel = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
 			var url = resolvedBaseUrl + "/api/chat";
 
-			var repairInstruction = @"You must transform the following assistant response into STRICT JSON for chat turns.
+			var repairInstructionBuilder = new StringBuilder();
+			repairInstructionBuilder.AppendLine("Rewrite the assistant response into a STRICT valid JSON reply.");
+			repairInstructionBuilder.AppendLine("You must follow the same response rules as the original chat prompt.");
+			repairInstructionBuilder.AppendLine();
 
-Output rules:
-1) Return ONLY valid JSON (no markdown, no code fences, no explanation).
-2) JSON must be either:
-   - an array of objects, or
-   - a single object.
-3) Each object must contain at least:
-   - ""CharacterName"": string
-   - ""Text"": string
-4) Keep the original meaning and language.
+			if (!string.IsNullOrWhiteSpace(originalSystemPrompt))
+			{
+				repairInstructionBuilder.AppendLine("ORIGINAL SYSTEM PROMPT (follow these rules exactly):");
+				repairInstructionBuilder.AppendLine(originalSystemPrompt.Trim());
+				repairInstructionBuilder.AppendLine();
+			}
 
-Invalid assistant response:
-" + invalidReply;
+			repairInstructionBuilder.AppendLine("STRICT OUTPUT RULES:");
+			repairInstructionBuilder.AppendLine("1) Return ONLY valid JSON (no markdown, no code fences, no explanation).");
+			repairInstructionBuilder.AppendLine("2) Output must be a JSON array with 1-10 objects.");
+			repairInstructionBuilder.AppendLine("3) Each object MUST include: MessageId, CharacterName, Text, Pinyin, Tone, Translation.");
+			repairInstructionBuilder.AppendLine("4) MessageId should be a UUID string.");
+			repairInstructionBuilder.AppendLine("5) Text must stay Chinese (Simplified) and keep original meaning.");
+			repairInstructionBuilder.AppendLine("6) Translation must be Vietnamese.");
+			repairInstructionBuilder.AppendLine("7) Tone must be English words only.");
+			repairInstructionBuilder.AppendLine("8) Preserve optional memory sidecar fields if they already exist and remain valid.");
+			repairInstructionBuilder.AppendLine();
+			repairInstructionBuilder.AppendLine("INVALID ASSISTANT RESPONSE TO FIX:");
+			repairInstructionBuilder.AppendLine(invalidReply.Trim());
+
+			var repairInstruction = repairInstructionBuilder.ToString();
 
 			var messages = new List<OllamaChatMessage>
 			{
-				new OllamaChatMessage { Role = "system", Content = "You are a strict JSON formatter." },
+				new OllamaChatMessage { Role = "system", Content = "You are a strict JSON formatter for chat assistant replies." },
 				new OllamaChatMessage { Role = "user", Content = repairInstruction },
 			};
 

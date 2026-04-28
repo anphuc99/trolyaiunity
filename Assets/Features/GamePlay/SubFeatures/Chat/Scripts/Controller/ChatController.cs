@@ -1273,7 +1273,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 
 			var rawReply = ollamaResponse.Message.Content;
-			var jsonReply = await EnsureValidOllamaReplyJsonAsync(rawReply);
+			var jsonReply = await EnsureValidOllamaReplyJsonAsync(rawReply, prepareResponse.SystemPrompt);
 			if (string.IsNullOrWhiteSpace(jsonReply))
 			{
 				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
@@ -1363,7 +1363,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 
 			var rawReply = ollamaResponse.Message.Content;
-			var jsonReply = await EnsureValidOllamaReplyJsonAsync(rawReply);
+			var jsonReply = await EnsureValidOllamaReplyJsonAsync(rawReply, prepareResponse.SystemPrompt);
 			if (string.IsNullOrWhiteSpace(jsonReply))
 			{
 				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
@@ -1410,8 +1410,9 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		/// Returns null when repair fails.
 		/// </summary>
 		/// <param name="reply">Raw Ollama assistant reply.</param>
+		/// <param name="systemPrompt">Original chat system prompt used for generation.</param>
 		/// <returns>Valid assistant-turn JSON, or null when unrecoverable.</returns>
-		private static async Task<string> EnsureValidOllamaReplyJsonAsync(string reply)
+		private static async Task<string> EnsureValidOllamaReplyJsonAsync(string reply, string systemPrompt)
 		{
 			var current = reply?.Trim() ?? "";
 			if (IsValidAssistantReplyJson(current))
@@ -1424,7 +1425,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			{
 				Debug.Log("[ChatController] Ollama reply JSON invalid. Requesting repair attempt " + attempt + ".");
 
-				var repaired = await OllamaService.RepairReplyJsonAsync(current);
+				var repaired = await OllamaService.RepairReplyJsonAsync(current, systemPrompt);
 				var repairedContent = repaired?.Message?.Content?.Trim() ?? "";
 				if (string.IsNullOrWhiteSpace(repairedContent))
 				{
@@ -1445,7 +1446,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 		/// <summary>
 		/// Validates whether a reply can be parsed as assistant-turn JSON.
-		/// Requires at least one turn with non-empty Text.
+		/// Requires at least one turn and full required prompt fields.
 		/// </summary>
 		/// <param name="reply">Reply text to validate.</param>
 		/// <returns>True when JSON structure is valid for chat turns.</returns>
@@ -1459,15 +1460,17 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			try
 			{
 				var parsedList = JsonConvert.DeserializeObject<List<ChatAssistantTurnPayload>>(reply);
-				if (parsedList != null)
+				if (parsedList != null && parsedList.Count > 0)
 				{
 					for (var i = 0; i < parsedList.Count; i++)
 					{
-						if (parsedList[i] != null && !string.IsNullOrWhiteSpace(parsedList[i].Text))
+						if (!IsValidAssistantTurn(parsedList[i]))
 						{
-							return true;
+							return false;
 						}
 					}
+
+					return true;
 				}
 			}
 			catch
@@ -1477,13 +1480,29 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			try
 			{
 				var single = JsonConvert.DeserializeObject<ChatAssistantTurnPayload>(reply);
-				return single != null && !string.IsNullOrWhiteSpace(single.Text);
+				return IsValidAssistantTurn(single);
 			}
 			catch
 			{
 			}
 
 			return false;
+		}
+
+		/// <summary>
+		/// Validates one assistant turn against required prompt fields.
+		/// </summary>
+		/// <param name="turn">Assistant turn payload.</param>
+		/// <returns>True when all required fields are present.</returns>
+		private static bool IsValidAssistantTurn(ChatAssistantTurnPayload turn)
+		{
+			return turn != null
+				&& !string.IsNullOrWhiteSpace(turn.MessageId)
+				&& !string.IsNullOrWhiteSpace(turn.CharacterName)
+				&& !string.IsNullOrWhiteSpace(turn.Text)
+				&& !string.IsNullOrWhiteSpace(turn.Pinyin)
+				&& !string.IsNullOrWhiteSpace(turn.Tone)
+				&& !string.IsNullOrWhiteSpace(turn.Translation);
 		}
 
 		/// <summary>
