@@ -52,34 +52,21 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			var url = resolvedBaseUrl + "/api/chat";
 
 			// Build Ollama messages array
+			// Build compact message array using CharacterName:Text format to minimise token usage.
 			var messages = new List<OllamaChatMessage>();
 
-			// Add system prompt
-			var systemInstruction = BuildOllamaSystemInstruction(systemPrompt ?? "");
-			if (!string.IsNullOrWhiteSpace(systemInstruction))
+			// System prompt (sent as-is; no extra wrapper needed with the compact history format)
+			if (!string.IsNullOrWhiteSpace(systemPrompt))
 			{
-				messages.Add(new OllamaChatMessage { Role = "system", Content = systemInstruction });
+				messages.Add(new OllamaChatMessage { Role = "system", Content = systemPrompt.Trim() });
 			}
 
-			var pendingDeveloperMessages = new List<string>();
-
-			void FlushDeveloperOnlyBlock()
-			{
-				if (pendingDeveloperMessages.Count == 0) return;
-				var merged = FormatMergedDeveloperUserMessage(pendingDeveloperMessages, "");
-				if (!string.IsNullOrWhiteSpace(merged))
-				{
-					messages.Add(new OllamaChatMessage { Role = "user", Content = merged });
-				}
-				pendingDeveloperMessages.Clear();
-			}
-
-			// Add history (skip system messages as we already added the prompt)
+			// Compressed history: user → "User:<text>", developer → "developer:<text>",
+			// assistant → "<CharacterName>:<Text>" lines (JSON stripped).
 			if (history != null)
 			{
-				for (var i = 0; i < history.Count; i++)
+				foreach (var msg in history)
 				{
-					var msg = history[i];
 					if (msg == null || string.IsNullOrWhiteSpace(msg.Content))
 					{
 						continue;
@@ -91,61 +78,31 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 						continue;
 					}
 
-					if (role == "developer")
+					if (role == "assistant")
 					{
-						pendingDeveloperMessages.Add(msg.Content);
-					}
-					else if (role == "assistant")
-					{
-						FlushDeveloperOnlyBlock();
-						messages.Add(new OllamaChatMessage { Role = "assistant", Content = msg.Content });
-					}
-					else if (role == "user")
-					{
-						if (pendingDeveloperMessages.Count > 0)
+						var compressed = CompressAssistantContent(msg.Content);
+						if (!string.IsNullOrWhiteSpace(compressed))
 						{
-							var merged = FormatMergedDeveloperUserMessage(pendingDeveloperMessages, msg.Content);
-							if (!string.IsNullOrWhiteSpace(merged))
-							{
-								messages.Add(new OllamaChatMessage { Role = "user", Content = merged });
-							}
-							pendingDeveloperMessages.Clear();
+							messages.Add(new OllamaChatMessage { Role = "assistant", Content = compressed });
 						}
-						else
-						{
-							messages.Add(new OllamaChatMessage { Role = "user", Content = msg.Content });
-						}
+					}
+					else
+					{
+						// user → "User:<text>", developer → "developer:<text>"
+						var label = role == "developer" ? "developer" : "User";
+						messages.Add(new OllamaChatMessage { Role = "user", Content = label + ":" + msg.Content.Trim() });
 					}
 				}
 			}
 
-			// Add current user message
+			// Current user message
 			var currentUserMessage = userMessage?.Trim() ?? "";
-			if (pendingDeveloperMessages.Count > 0)
+			if (!string.IsNullOrWhiteSpace(currentUserMessage))
 			{
-				var merged = FormatMergedDeveloperUserMessage(pendingDeveloperMessages, currentUserMessage);
-				if (!string.IsNullOrWhiteSpace(merged))
-				{
-					messages.Add(new OllamaChatMessage { Role = "user", Content = merged });
-				}
-				pendingDeveloperMessages.Clear();
-			}
-			else if (!string.IsNullOrWhiteSpace(currentUserMessage))
-			{
-				messages.Add(new OllamaChatMessage { Role = "user", Content = currentUserMessage });
-			}
-			else
-			{
-				FlushDeveloperOnlyBlock();
+				messages.Add(new OllamaChatMessage { Role = "user", Content = "User:" + currentUserMessage });
 			}
 
-			foreach (var msg in messages)
-			{
-				if(msg.Role != "system")
-				{
-					Debug.Log($"{LogPrefix} Prepared message - Role: {msg.Role}, Content: {msg.Content}");
-				}
-			}
+			Debug.Log($"{LogPrefix} Sending {messages.Count} messages to Ollama (model: {resolvedModel}).");
 
 			var requestPayload = new OllamaChatRequestPayload
 			{
@@ -155,7 +112,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			};
 
 			var jsonBody = JsonConvert.SerializeObject(requestPayload);
-			Debug.Log($"{LogPrefix} Sending payload to Ollama: {jsonBody}");
 			var bodyBytes = Encoding.UTF8.GetBytes(jsonBody);
 
 			using (var request = new UnityWebRequest(url, "POST"))
@@ -167,7 +123,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 
 				var operation = request.SendWebRequest();
 
-				// Await completion
 				while (!operation.isDone)
 				{
 					await Task.Yield();
@@ -311,59 +266,63 @@ Only return the JSON object, no extra text.";
 			}
 		}
 
-		private static string BuildOllamaSystemInstruction(string systemPrompt)
+		/// <summary>
+		/// Compresses an assistant reply (JSON array or single object of turns) into compact
+		/// "CharacterName:Text" lines. Falls back to "Mimi:content" when JSON cannot be parsed.
+		/// </summary>
+		private static string CompressAssistantContent(string content)
 		{
-			const string developerRoleExplanation = @"
-====================================
-DEVELOPER ROLE EXPLANATION
-====================================
-You may receive a USER message that contains one or more blocks formatted like this:
+			if (string.IsNullOrWhiteSpace(content))
+			{
+				return "";
+			}
 
-developer:
-<instruction text>
+			try
+			{
+				var turns = JsonConvert.DeserializeObject<List<ChatAssistantTurnPayload>>(content);
+				if (turns != null && turns.Count > 0)
+				{
+					return BuildCompressedTurns(turns);
+				}
+			}
+			catch { }
 
-user:
-<actual user message>
+			try
+			{
+				var turn = JsonConvert.DeserializeObject<ChatAssistantTurnPayload>(content);
+				if (turn != null && !string.IsNullOrWhiteSpace(turn.Text))
+				{
+					var name = !string.IsNullOrWhiteSpace(turn.CharacterName) ? turn.CharacterName.Trim() : "Mimi";
+					return name + ":" + turn.Text.Trim();
+				}
+			}
+			catch { }
 
-How this format works:
-1. Every ""developer:"" block is META-LEVEL instruction, not end-user dialogue.
-2. The final ""user:"" block is the real user message you should answer.
-3. If there is no ""user:"" block, treat the content as context update only.
-
-Developer instructions can:
-1. Provide context updates (e.g., story progress, relationship changes)
-2. Announce character additions or removals
-3. Request conversation summaries
-4. Provide editing instructions for previous messages
-
-When ""developer:"" blocks are present:
-- DO NOT answer or quote developer text directly
-- Apply those instructions silently as constraints/context
-- Answer only the ""user:"" part naturally
-- Never expose internal reasoning about these instructions
-
-";
-			return developerRoleExplanation + systemPrompt;
+			return "Mimi:" + content.Trim();
 		}
 
-		private static string FormatMergedDeveloperUserMessage(List<string> developerMessages, string userContent)
+		/// <summary>
+		/// Formats a list of parsed assistant turns as "CharacterName:Text" lines.
+		/// </summary>
+		private static string BuildCompressedTurns(List<ChatAssistantTurnPayload> turns)
 		{
-			var sections = new List<string>();
-			foreach (var entry in developerMessages)
+			var sb = new StringBuilder();
+			foreach (var turn in turns)
 			{
-				if (!string.IsNullOrWhiteSpace(entry))
+				if (turn == null)
 				{
-					sections.Add($"developer:\n{entry.Trim()}");
+					continue;
+				}
+
+				var name = !string.IsNullOrWhiteSpace(turn.CharacterName) ? turn.CharacterName.Trim() : "Mimi";
+				var text = !string.IsNullOrWhiteSpace(turn.Text) ? turn.Text.Trim() : "";
+				if (!string.IsNullOrWhiteSpace(text))
+				{
+					sb.AppendLine(name + ":" + text);
 				}
 			}
 
-			var trimmedUserContent = userContent?.Trim() ?? "";
-			if (!string.IsNullOrWhiteSpace(trimmedUserContent))
-			{
-				sections.Add($"user:\n{trimmedUserContent}");
-			}
-
-			return string.Join("\n\n", sections).Trim();
+			return sb.ToString().TrimEnd();
 		}
 	}
 }
