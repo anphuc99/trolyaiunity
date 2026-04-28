@@ -11,6 +11,12 @@
  *   node fsrs_sim.js
  *   node fsrs_sim.js "0 0 1 2 2 2"
  *   node fsrs_sim.js "[0,0,1,2,2,2]"
+ *   node fsrs_sim.js --r=0.85 "0 0 1 2 2 2"   ← tỉ lệ nhớ 85%
+ *   node fsrs_sim.js --r=0.95 "2 2 2 2 2"     ← tỉ lệ nhớ 95%
+ *
+ * --r  : tỉ lệ nhớ mục tiêu (request_retention), 0.70–0.99, mặc định 0.90
+ *        Cao hơn  → interval ngắn hơn (ôn nhiều hơn để chắc chắn nhớ)
+ *        Thấp hơn → interval dài hơn  (chấp nhận quên nhiều hơn)
  */
 
 import { FSRS, Rating, createEmptyCard, State } from "ts-fsrs";
@@ -57,8 +63,12 @@ function formatInterval(card, now) {
  * @param {number[]} ratings - Array of 0=Again,1=Hard,2=Good,3=Easy.
  * @returns {{ intervals: string[], rows: string[] }}
  */
-function simulate(ratings) {
-  const f   = new FSRS({});
+/**
+ * @param {number[]} ratings
+ * @param {number}   retention  Target retention 0.70–0.99 (default 0.90)
+ */
+function simulate(ratings, retention = 0.90) {
+  const f   = new FSRS({ request_retention: retention });
   let card  = createEmptyCard();
   let now   = new Date("2026-01-01T00:00:00Z"); // deterministic start date
 
@@ -101,6 +111,28 @@ function simulate(ratings) {
 
 // ─── CLI helpers ─────────────────────────────────────────────────────────────
 
+/**
+ * Extract --r=<value> flag from argv tokens.
+ * Returns { retention: number, rest: string[] }.
+ */
+function parseArgs(argv) {
+  let retention = 0.90;
+  const rest = [];
+  for (const arg of argv) {
+    const m = arg.match(/^--r=(.+)$/);
+    if (m) {
+      const v = parseFloat(m[1]);
+      if (isNaN(v) || v < 0.70 || v > 0.99) {
+        throw new Error("--r phải là số từ 0.70 đến 0.99 (ví dụ: --r=0.85)");
+      }
+      retention = v;
+    } else {
+      rest.push(arg);
+    }
+  }
+  return { retention, rest };
+}
+
 function parseRatings(text) {
   const cleaned = text.trim().replace(/^\[/, "").replace(/\]$/, "").replace(/,/g, " ");
   const parts   = cleaned.split(/\s+/).filter(Boolean);
@@ -112,8 +144,9 @@ function parseRatings(text) {
   return ratings;
 }
 
-function printResult(ratings, intervals, rows) {
+function printResult(ratings, intervals, rows, retention) {
   console.log();
+  console.log(`  Tỉ lệ nhớ: ${(retention * 100).toFixed(0)}%  (--r=${retention})`);
   console.log(`  Input    : [${ratings.join(", ")}]`);
   console.log(`  Output   : [${intervals.join(", ")}]`);
   console.log(`             (Learning phase = phút "m"  |  Review phase = ngày "d")`);
@@ -130,6 +163,7 @@ const BANNER = `
 ║                                                          ║
 ║  Grades:  0 = Again   1 = Hard   2 = Good   3 = Easy    ║
 ║                                                          ║
+║  --r=<0.70–0.99>  tỉ lệ nhớ mục tiêu (mặc định 0.90)   ║
 ║  Learning/Relearning phase  → interval tính bằng phút   ║
 ║  Review phase               → interval tính bằng ngày   ║
 ╚══════════════════════════════════════════════════════════╝`;
@@ -139,13 +173,22 @@ const BANNER = `
 function main() {
   console.log(BANNER);
 
+  // Parse --r flag and remaining args
+  let retention, rest;
+  try {
+    ({ retention, rest } = parseArgs(process.argv.slice(2)));
+  } catch (e) {
+    console.error(`  Lỗi: ${e.message}`);
+    process.exit(1);
+  }
+
   // CLI argument mode
-  if (process.argv.length > 2) {
-    const raw = process.argv.slice(2).join(" ");
+  if (rest.length > 0) {
+    const raw = rest.join(" ");
     try {
       const ratings              = parseRatings(raw);
-      const { intervals, rows } = simulate(ratings);
-      printResult(ratings, intervals, rows);
+      const { intervals, rows } = simulate(ratings, retention);
+      printResult(ratings, intervals, rows, retention);
     } catch (e) {
       console.error(`  Lỗi: ${e.message}`);
       process.exit(1);
@@ -155,6 +198,7 @@ function main() {
 
   // Interactive mode
   console.log("\n  Nhập ratings để mô phỏng, hoặc Enter / Ctrl+C để thoát.");
+  console.log(`  Tỉ lệ nhớ hiện tại: ${(retention * 100).toFixed(0)}% (thay đổi bằng --r=0.85 v.v.)`);
   console.log("  Ví dụ:  0 0 1 2 2 2   hoặc   [0,0,1,2,2,2]\n");
 
   const rl = readline.createInterface({
@@ -173,8 +217,8 @@ function main() {
     }
     try {
       const ratings              = parseRatings(raw);
-      const { intervals, rows } = simulate(ratings);
-      printResult(ratings, intervals, rows);
+      const { intervals, rows } = simulate(ratings, retention);
+      printResult(ratings, intervals, rows, retention);
     } catch (e) {
       console.error(`  ✗ Lỗi: ${e.message}\n`);
     }
