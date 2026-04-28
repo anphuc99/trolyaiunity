@@ -19,8 +19,7 @@
  *
  * Workload simulation (số từ cần ôn mỗi ngày):
  *   node fsrs_sim.js --days=180 --words=20 --rating=2
- *   node fsrs_sim.js --days=180 --words=20 --rating=2 --r=0.85
- *
+ *   node fsrs_sim.js --days=180 --words=20 --rating=2 --r=0.85 *   node fsrs_sim.js --days=180 --words=20 --rating="0 1 2 2 2" [--r=0.9] *
  * --days   : số ngày mô phỏng (mặc định 180)
  * --words  : số từ mới học mỗi ngày (mặc định 20)
  * --rating : mức đánh giá nhất quán  0–3 (mặc định 2 = Good)
@@ -119,26 +118,32 @@ function simulate(ratings, retention = 0.90) {
 // ─── Workload Simulator ───────────────────────────────────────────────────────
 
 /**
- * Simulate one card's full review schedule starting from day 0,
- * always rated with `rating`, stopping once the next due day > maxDays.
- * @param {number} retention   - request_retention 0.70–0.99
- * @param {number} rating      - user grade 0–3
- * @param {number} maxDays     - simulation window in days
+ * Simulate one card's full review schedule starting from day 0.
+ * Each review uses the corresponding rating from `ratings`; once the array
+ * is exhausted the last rating is repeated for all subsequent reviews.
+ * @param {number}   retention - request_retention 0.70–0.99
+ * @param {number[]} ratings   - ordered grades per review session (0–3)
+ * @param {number}   maxDays   - simulation window in days
  * @returns {Array<{relDay:number, reps:number}>}
  *   relDay = days from card creation, reps = repetitions done that day
  */
-function getSingleCardSchedule(retention, rating, maxDays) {
-  const f       = new FSRS({ request_retention: retention });
-  const tsRating = GRADE_TO_RATING[rating];
-  let card = createEmptyCard();
-  let now  = new Date(0);         // epoch = day 0
+function getSingleCardSchedule(retention, ratings, maxDays) {
+  const f    = new FSRS({ request_retention: retention });
+  let card   = createEmptyCard();
+  let now    = new Date(0);   // epoch = day 0
   const schedule  = [];
   let sameDayReps = 0;
   let currentAbsDay = 0;
+  let reviewIndex   = 0;
 
   while (true) {
-    const result  = f.next(card, now, tsRating);
-    const next    = result.card;
+    // Use ratings[reviewIndex], clamped to last element once exhausted.
+    const grade    = ratings[Math.min(reviewIndex, ratings.length - 1)];
+    const tsRating = GRADE_TO_RATING[grade];
+    reviewIndex++;
+
+    const result = f.next(card, now, tsRating);
+    const next   = result.card;
     sameDayReps++;
 
     const dueDayAbs = Math.floor(next.due.getTime() / 86_400_000);
@@ -148,7 +153,7 @@ function getSingleCardSchedule(retention, rating, maxDays) {
       now  = next.due;
       card = next;
     } else {
-      // Flush the current day's reps.
+      // Flush the current day’s reps.
       schedule.push({ relDay: currentAbsDay, reps: sameDayReps });
       sameDayReps = 0;
 
@@ -165,12 +170,12 @@ function getSingleCardSchedule(retention, rating, maxDays) {
 
 /**
  * Build a per-day workload table for learning `newPerDay` new cards every day
- * over `totalDays`, all rated consistently with `rating`.
+ * over `totalDays`, reviewed with the `ratings` array per card.
  * @returns {Array<{new:number, reviews:number, totalCards:number, totalReps:number}>}
  *   Index 1 = day 1, index totalDays = last day (index 0 unused).
  */
-function buildWorkload(newPerDay, rating, totalDays, retention) {
-  const relSched = getSingleCardSchedule(retention, rating, totalDays);
+function buildWorkload(newPerDay, ratings, totalDays, retention) {
+  const relSched = getSingleCardSchedule(retention, ratings, totalDays);
 
   const work = Array.from({ length: totalDays + 1 }, () => ({
     new: 0, reviews: 0, totalCards: 0, totalReps: 0,
@@ -205,15 +210,19 @@ function buildWorkload(newPerDay, rating, totalDays, retention) {
 /**
  * Print the workload table with bar chart and summary.
  */
-function printWorkloadResult(work, { newPerDay, rating, totalDays, retention }) {
+function printWorkloadResult(work, { newPerDay, ratings, totalDays, retention }) {
   const days     = work.slice(1);   // strip unused index 0
   const maxCards = Math.max(...days.map((d) => d.totalCards));
   const BAR_MAX  = 40;
   const scale    = Math.max(1, Math.ceil(maxCards / BAR_MAX));
 
+  const ratingLabel = ratings.length === 1
+    ? `${GRADE_NAMES[ratings[0]]} (${ratings[0]})`
+    : `[${ratings.join(",")}] (${ratings.map((r) => GRADE_NAMES[r][0]).join(",")})`;
+
   console.log();
   console.log(`  ── Workload Simulation ${'─'.repeat(43)}`);
-  console.log(`  Words/day : ${newPerDay}  |  Days: ${totalDays}  |  Rating: ${GRADE_NAMES[rating]} (${rating})  |  Retention: ${(retention * 100).toFixed(0)}%`);
+  console.log(`  Words/day : ${newPerDay}  |  Days: ${totalDays}  |  Rating: ${ratingLabel}  |  Retention: ${(retention * 100).toFixed(0)}%`);
   console.log(`  1█ = ${scale} card${scale > 1 ? 's' : ''}`);
   console.log();
   console.log(`  ${'Day'.padStart(4)} │ ${'New'.padStart(4)} │ ${'Reviews'.padStart(7)} │ ${'Total'.padStart(5)} │ Chart`);
@@ -255,7 +264,7 @@ function parseArgs(argv) {
   let retention = 0.90;
   let words     = 20;
   let days      = null;   // null = not specified (per-card mode)
-  let rating    = 2;
+  let rating    = [2];    // default: [Good]
   const rest    = [];
 
   for (const arg of argv) {
@@ -271,8 +280,14 @@ function parseArgs(argv) {
     } else if ((m = arg.match(/^--days=(\d+)$/))) {
       days = parseInt(m[1], 10);
       if (days < 1) throw new Error("--days phải >= 1");
-    } else if ((m = arg.match(/^--rating=([0-3])$/))) {
-      rating = parseInt(m[1], 10);
+    } else if ((m = arg.match(/^--rating=(.+)$/))) {
+      // Accept single value (--rating=2) or array (--rating="0 1 2 2")
+      const cleaned = m[1].replace(/^\[/, "").replace(/\]$/, "").replace(/,/g, " ");
+      const parts   = cleaned.trim().split(/\s+/).filter(Boolean);
+      const parsed  = parts.map(Number);
+      if (!parsed.length || parsed.some((v) => !Number.isInteger(v) || v < 0 || v > 3))
+        throw new Error("--rating phải là số 0–3 hoặc mảng các số 0–3 (ví dụ: --rating=2 hoặc --rating=\"0 1 2 2\")");
+      rating = parsed;
     } else {
       rest.push(arg);
     }
@@ -336,7 +351,7 @@ function main() {
   // ── Workload mode: triggered when --days is specified
   if (days !== null) {
     const work = buildWorkload(words, rating, days, retention);
-    printWorkloadResult(work, { newPerDay: words, rating, totalDays: days, retention });
+    printWorkloadResult(work, { newPerDay: words, ratings: rating, totalDays: days, retention });
     return;
   }
 
