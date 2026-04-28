@@ -24,7 +24,6 @@ import path from "path";
 import bcrypt from "bcryptjs";
 import { AppDataSource } from "../data-source.js";
 import VocabularyEntity from "../models/vocabulary.entity.js";
-import VocabularyReviewEntity from "../models/vocabulary-review.entity.js";
 import CharacterEntity from "../models/character.entity.js";
 import JournalEntity from "../models/journal.entity.js";
 import MessageEntity from "../models/message.entity.js";
@@ -202,7 +201,6 @@ interface OldStoryFile {
 interface MigrationStats {
   stories: { total: number; success: number; skipped: number; errors: string[] };
   vocabularies: { total: number; success: number; skipped: number; errors: string[] };
-  vocabularyReviews: { total: number; success: number; skipped: number; errors: string[] };
   characters: { total: number; success: number; skipped: number; errors: string[] };
   journals: { total: number; success: number; skipped: number; errors: string[] };
   messages: { total: number; success: number; skipped: number; errors: string[] };
@@ -214,7 +212,6 @@ interface MigrationStats {
 const createEmptyStats = (): MigrationStats => ({
   stories: { total: 0, success: 0, skipped: 0, errors: [] },
   vocabularies: { total: 0, success: 0, skipped: 0, errors: [] },
-  vocabularyReviews: { total: 0, success: 0, skipped: 0, errors: [] },
   characters: { total: 0, success: 0, skipped: 0, errors: [] },
   journals: { total: 0, success: 0, skipped: 0, errors: [] },
   messages: { total: 0, success: 0, skipped: 0, errors: [] },
@@ -292,6 +289,8 @@ async function ensureDefaultUser(): Promise<void> {
 
 /**
  * Migrates vocabularies from vocabulary-store.json.
+ * Review (FSRS) data from the same store is merged directly into each
+ * vocabulary row since the two tables have been consolidated.
  */
 async function migrateVocabularies(
   vocabStore: OldVocabularyStore,
@@ -300,6 +299,11 @@ async function migrateVocabularies(
   console.log("\n📚 Migrating vocabularies...");
   const vocabRepo = AppDataSource.getRepository(VocabularyEntity);
   const idMap = new Map<string, string>(); // old ID -> new ID (same in this case)
+
+  // Build a fast lookup map for review data keyed by vocabularyId
+  const reviewMap = new Map<string, OldVocabularyReview>(
+    vocabStore.reviews.map((r) => [r.vocabularyId, r])
+  );
 
   stats.vocabularies.total = vocabStore.vocabularies.length;
 
@@ -322,6 +326,23 @@ async function migrateVocabularies(
       newVocab.isManuallyAdded = oldVocab.isManuallyAdded ?? false;
       newVocab.userId = DEFAULT_USER_ID;
 
+      // Embed FSRS review state if a review record exists for this vocabulary
+      const oldReview = reviewMap.get(oldVocab.id);
+      if (oldReview) {
+        const nextReviewDate = parseDate(oldReview.nextReviewDate);
+        if (nextReviewDate) {
+          newVocab.stability = oldReview.stability ?? 0;
+          newVocab.difficulty = oldReview.difficulty ?? 5;
+          newVocab.lapses = oldReview.lapses ?? 0;
+          newVocab.currentIntervalDays = oldReview.currentIntervalDays;
+          newVocab.nextReviewDate = nextReviewDate;
+          newVocab.lastReviewDate = parseDate(oldReview.lastReviewDate);
+          newVocab.cardDirection = oldReview.cardDirection ?? "kr-vn";
+          newVocab.isStarred = oldReview.isStarred ?? false;
+          newVocab.reviewHistoryJson = JSON.stringify(oldReview.reviewHistory || []);
+        }
+      }
+
       await vocabRepo.save(newVocab);
       idMap.set(oldVocab.id, oldVocab.id);
       stats.vocabularies.success++;
@@ -333,66 +354,6 @@ async function migrateVocabularies(
 
   console.log(`   ✅ ${stats.vocabularies.success} migrated, ${stats.vocabularies.skipped} skipped`);
   return idMap;
-}
-
-/**
- * Migrates vocabulary reviews from vocabulary-store.json.
- */
-async function migrateVocabularyReviews(
-  vocabStore: OldVocabularyStore,
-  vocabIdMap: Map<string, string>,
-  stats: MigrationStats
-): Promise<void> {
-  console.log("\n📖 Migrating vocabulary reviews...");
-  const reviewRepo = AppDataSource.getRepository(VocabularyReviewEntity);
-
-  stats.vocabularyReviews.total = vocabStore.reviews.length;
-
-  for (const oldReview of vocabStore.reviews) {
-    try {
-      // Skip if vocabulary doesn't exist
-      if (!vocabIdMap.has(oldReview.vocabularyId)) {
-        stats.vocabularyReviews.skipped++;
-        continue;
-      }
-
-      // Check if already exists
-      const existing = await reviewRepo.findOne({
-        where: { vocabularyId: oldReview.vocabularyId }
-      });
-      if (existing) {
-        stats.vocabularyReviews.skipped++;
-        continue;
-      }
-
-      const nextReviewDate = parseDate(oldReview.nextReviewDate);
-      if (!nextReviewDate) {
-        stats.vocabularyReviews.errors.push(`Review for ${oldReview.vocabularyId}: Invalid nextReviewDate`);
-        continue;
-      }
-
-      const newReview = new VocabularyReviewEntity();
-      newReview.vocabularyId = oldReview.vocabularyId;
-      newReview.stability = oldReview.stability ?? 0;
-      newReview.difficulty = oldReview.difficulty ?? 5;
-      newReview.lapses = oldReview.lapses ?? 0;
-      newReview.currentIntervalDays = oldReview.currentIntervalDays;
-      newReview.nextReviewDate = nextReviewDate;
-      newReview.lastReviewDate = parseDate(oldReview.lastReviewDate);
-      newReview.cardDirection = oldReview.cardDirection ?? "kr-vn";
-      newReview.isStarred = oldReview.isStarred ?? false;
-      newReview.reviewHistoryJson = JSON.stringify(oldReview.reviewHistory || []);
-      newReview.userId = DEFAULT_USER_ID;
-
-      await reviewRepo.save(newReview);
-      stats.vocabularyReviews.success++;
-    } catch (err) {
-      const msg = `Review ${oldReview.vocabularyId}: ${err instanceof Error ? err.message : String(err)}`;
-      stats.vocabularyReviews.errors.push(msg);
-    }
-  }
-
-  console.log(`   ✅ ${stats.vocabularyReviews.success} migrated, ${stats.vocabularyReviews.skipped} skipped`);
 }
 
 /**
@@ -836,7 +797,6 @@ function printReport(stats: MigrationStats): void {
   const categories = [
     { name: "Stories", data: stats.stories },
     { name: "Vocabularies", data: stats.vocabularies },
-    { name: "Vocabulary Reviews", data: stats.vocabularyReviews },
     { name: "Characters", data: stats.characters },
     { name: "Journals", data: stats.journals },
     { name: "Messages", data: stats.messages },
@@ -907,12 +867,10 @@ async function runMigration(sourcePath: string): Promise<void> {
     const translationStorePath = path.join(sourcePath, "translation-store.json");
     const streakJsonPath = path.join(sourcePath, "streak.json");
 
-    // 1. Migrate vocabularies
+    // 1. Migrate vocabularies (review data embedded)
     const vocabStore = readJsonFile<OldVocabularyStore>(vocabStorePath);
-    let vocabIdMap = new Map<string, string>();
     if (vocabStore) {
-      vocabIdMap = await migrateVocabularies(vocabStore, stats);
-      await migrateVocabularyReviews(vocabStore, vocabIdMap, stats);
+      await migrateVocabularies(vocabStore, stats);
     }
 
     // 2. Migrate stories (includes journals and messages from story files)

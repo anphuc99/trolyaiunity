@@ -1000,26 +1000,46 @@ Transcribe user audio (Korean) using OpenAI.
 
 All endpoints in this group require auth.
 
+FSRS review state fields (`stability`, `difficulty`, `lapses`, `currentIntervalDays`,
+`nextReviewDate`, `lastReviewDate`, `cardDirection`, `isStarred`, `reviewHistory`) are
+stored directly on the vocabulary row. They are `null` for vocabularies whose review
+state has not yet been initialised.
+
+### Vocabulary item shape
+
+```json
+{
+  "id": "<uuid>",
+  "korean": "...",
+  "vietnamese": "...",
+  "pinyin": "...",
+  "level": "HSK1",
+  "isManuallyAdded": true,
+  "isIgnored": false,
+  "userId": 1,
+  "createdAt": "...",
+  "updatedAt": "...",
+  "stability": 1.5,
+  "difficulty": 5.0,
+  "lapses": 0,
+  "currentIntervalDays": 1,
+  "nextReviewDate": "...",
+  "lastReviewDate": null,
+  "cardDirection": "kr-vn",
+  "isStarred": false,
+  "reviewHistory": []
+}
+```
+
 ### GET /api/vocabulary
 
-List vocabularies with review.
+List all vocabularies for the authenticated user.
 
 - Response `200`:
 
 ```json
 {
-  "vocabularies": [
-    {
-      "id": "<uuid>",
-      "korean": "...",
-      "vietnamese": "...",
-      "isManuallyAdded": true,
-      "userId": 1,
-      "createdAt": "...",
-      "updatedAt": "...",
-      "review": { /* review fields */ }
-    }
-  ]
+  "vocabularies": [ /* vocabulary item shape */ ]
 }
 ```
 
@@ -1040,7 +1060,7 @@ List vocabularies with review.
 
 ### GET /api/vocabulary/learned-count
 
-Count words that were actually reviewed at least once.
+Count words reviewed at least once (`lastReviewDate` is not null).
 
 - Response `200`:
 
@@ -1052,38 +1072,25 @@ Count words that were actually reviewed at least once.
 
 ### GET /api/vocabulary/due
 
-Get vocabularies due today.
+Get vocabularies due for review today (not ignored, `nextReviewDate` ≤ today).
 
 - Response `200`:
 
 ```json
-{ "vocabularies": [/* same item shape */], "total": 1 }
+{ "vocabularies": [ /* vocabulary item shape */ ], "total": 1 }
 ```
 
 ### GET /api/vocabulary/:id
 
-Get a vocabulary with review.
+Get a single vocabulary.
 
 - Path params:
   - `id` (string) – vocabulary uuid
-- Response `200` (not wrapped):
-
-```json
-{
-  "id": "<uuid>",
-  "korean": "...",
-  "vietnamese": "...",
-  "isManuallyAdded": true,
-  "userId": 1,
-  "createdAt": "...",
-  "updatedAt": "...",
-  "review": { /* review fields */ }
-}
-```
+- Response `200`: vocabulary item shape
 
 ### POST /api/vocabulary
 
-Collect a new vocabulary.
+Collect a new vocabulary. The FSRS review state is seeded immediately.
 
 - Body:
 
@@ -1091,23 +1098,25 @@ Collect a new vocabulary.
 {
   "korean": "string",
   "vietnamese": "string",
+  "pinyin": "string?",
+  "level": "string?",
   "difficultyRating": "very_easy|easy|medium|hard"
 }
 ```
 
-- Response `201`: created vocabulary object with `review`.
+- Response `201`: vocabulary item shape
 
 ### PUT /api/vocabulary/:id
 
-Update vocabulary text.
+Update vocabulary text fields (korean, vietnamese, pinyin, level).
 
 - Body:
 
 ```json
-{ "korean": "string?", "vietnamese": "string?" }
+{ "korean": "string?", "vietnamese": "string?", "pinyin": "string?", "level": "string?" }
 ```
 
-- Response `200`: updated vocabulary entity
+- Response `200`: vocabulary item shape
 
 ### DELETE /api/vocabulary/:id
 
@@ -1119,7 +1128,7 @@ Update vocabulary text.
 
 ### POST /api/vocabulary/:id/review
 
-Submit FSRS rating for the vocab’s review.
+Submit FSRS rating. Returns `200` with current state if the word is not yet due.
 
 - Body:
 
@@ -1127,17 +1136,17 @@ Submit FSRS rating for the vocab’s review.
 { "rating": 1 }
 ```
 
-- Response `200`: Review JSON
+- Response `200`: vocabulary item shape
 
 ### PUT /api/vocabulary/:id/star
 
-Toggle starred state.
+Toggle `isStarred`. Initialises the FSRS state if not already set.
 
-- Response `200`: Review JSON
+- Response `200`: vocabulary item shape
 
 ### PUT /api/vocabulary/:id/direction
 
-Set card direction.
+Set `cardDirection`.
 
 - Body:
 
@@ -1145,7 +1154,7 @@ Set card direction.
 { "direction": "kr-vn" }
 ```
 
-- Response `200`: Review JSON
+- Response `200`: vocabulary item shape
 
 ---
 
