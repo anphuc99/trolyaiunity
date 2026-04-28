@@ -28,6 +28,8 @@ interface JournalController {
   getJournal: (request: Request, response: Response) => Promise<void>;
   searchMessages: (request: Request, response: Response) => Promise<void>;
   endConversation: (request: Request, response: Response) => Promise<void>;
+  /** Accepts a pre-computed summary from the client (local AI) and saves journal without server-side AI call. */
+  endConversationLocal: (request: Request, response: Response) => Promise<void>;
   getDueJournals: (request: Request, response: Response) => Promise<void>;
   submitJournalReview: (request: Request, response: Response) => Promise<void>;
   downloadJournalAudio: (request: Request, response: Response) => Promise<void>;
@@ -626,6 +628,102 @@ Please summarize the above conversation in Vietnamese, update the story descript
     }
   };
 
+  /**
+   * Accepts a pre-computed summary from a local AI client (e.g. Ollama on PC).
+   * Creates journal, saves message entities, updates story, and clears history
+   * without calling any server-side AI service.
+   *
+   * Body: { summary: string, updatedStoryDescription?: string }
+   */
+  const endConversationLocal: JournalController["endConversationLocal"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const summary = typeof request.body?.summary === "string" ? request.body.summary.trim() : "";
+    const updatedStoryDescription = typeof request.body?.updatedStoryDescription === "string"
+      ? request.body.updatedStoryDescription.trim()
+      : "";
+
+    if (!summary) {
+      response.status(400).json({ message: "Summary is required" });
+      return;
+    }
+
+    const sessionId = getSessionId(request.body?.sessionId);
+    let storyId = parseStoryId(request.body?.storyId);
+
+    try {
+      // Fallback to user's currentStoryId if not provided
+      if (!storyId) {
+        const user = await userRepository.findOne({ where: { id: request.user.id } });
+        storyId = user?.currentStoryId ?? null;
+      }
+
+      let story: StoryEntity | null = null;
+
+      if (storyId) {
+        story = await storyRepository.findOne({
+          where: { id: storyId, userId: request.user.id }
+        });
+      }
+
+      const history = await historyStore.load(request.user.id);
+      const adjustedHistory = applyAssistantEdits(history);
+
+      const journal = journalRepository.create({
+        summary,
+        userId: request.user.id,
+        storyId: story?.id ?? null
+      });
+
+      const savedJournal = await journalRepository.save(journal);
+      const characters = await characterRepository.find({ where: { userId: request.user.id } });
+      const voiceByCharacter = new Map(
+        characters
+          .filter((character) => character.voiceName)
+          .map((character) => [normalizeName(character.name), {
+            voiceModel: character.voiceModel ?? "openai",
+            voiceName: character.voiceName as string,
+            pitch: character.pitch ?? null,
+            speakingRate: character.speakingRate ?? null,
+          }])
+      );
+
+      const messageEntities = buildMessageEntities(adjustedHistory, request.user.id, savedJournal.id, voiceByCharacter);
+
+      if (messageEntities.length) {
+        await messageRepository.save(messageEntities.map((message) => messageRepository.create(message)));
+      }
+
+      if (story && updatedStoryDescription) {
+        try {
+          story.currentProgress = updatedStoryDescription;
+          await storyRepository.save(story);
+        } catch (error) {
+          if (!hasLoggedStoryProgressUpdateFailure) {
+            console.warn("Story progress update failed (local); continuing without updating story progress.", error);
+            hasLoggedStoryProgressUpdateFailure = true;
+          }
+        }
+      }
+
+      await historyStore.clear(request.user.id);
+
+      response.json({
+        journalId: savedJournal.id,
+        summary: savedJournal.summary
+      });
+    } catch (error) {
+      console.error("Error in endConversationLocal:", error);
+      response.status(500).json({
+        message: "Failed to finalize journal (local)",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
   // ────────────────────────────────────────────────────────────────────────
   // FSRS Journal Review handlers
   // ────────────────────────────────────────────────────────────────────────
@@ -1070,6 +1168,7 @@ Please summarize the above conversation in Vietnamese, update the story descript
     getJournal,
     searchMessages,
     endConversation,
+    endConversationLocal,
     getDueJournals,
     submitJournalReview,
     downloadJournalAudio

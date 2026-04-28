@@ -20,6 +20,7 @@ export const createJournalRoutes = (dataSource: DataSource) => {
   router.get("/:id/audio", requireAuth, controller.downloadJournalAudio);
   router.get("/:id", requireAuth, controller.getJournal);
   router.post("/end", requireAuth, controller.endConversation);
+  router.post("/end-local", requireAuth, controller.endConversationLocal);
 
   return router;
 };

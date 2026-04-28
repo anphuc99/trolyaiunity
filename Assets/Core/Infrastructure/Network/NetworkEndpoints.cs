@@ -24,6 +24,7 @@ namespace Core.Infrastructure.Network
 		public const string ChatSaveLocal = "/api/chat/save-local";
 		public const string Journals = "/api/journals";
 		public const string JournalsEnd = "/api/journals/end";
+		public const string JournalsEndLocal = "/api/journals/end-local";
 		public const string JournalReviewDue = "/api/journals/review/due";
 		public const string JournalReview = "/api/journals/review";
 		public const string Stories = "/api/stories";

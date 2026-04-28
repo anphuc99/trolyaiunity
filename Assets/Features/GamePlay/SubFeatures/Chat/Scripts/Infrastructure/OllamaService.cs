@@ -230,6 +230,87 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			}
 		}
 
+		/// <summary>
+		/// Sends a summarization request to the local Ollama instance.
+		/// Uses a simple prompt with compressed conversation history.
+		/// </summary>
+		/// <param name="compressedHistory">Compressed conversation in CharacterName:Text format.</param>
+		/// <param name="baseUrl">Ollama API base URL.</param>
+		/// <param name="model">Model name.</param>
+		/// <returns>Raw assistant content string, or null on failure.</returns>
+		public static async Task<OllamaChatResponsePayload> SummarizeConversationAsync(
+			string compressedHistory,
+			string baseUrl = null,
+			string model = null)
+		{
+			var resolvedBaseUrl = string.IsNullOrWhiteSpace(baseUrl) ? DefaultBaseUrl : baseUrl.TrimEnd('/');
+			var resolvedModel = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
+			var url = resolvedBaseUrl + "/api/chat";
+
+			var summaryInstruction = @"Please summarize the above conversation in Vietnamese, update the story description, and return it in JSON format as follows:
+{
+  ""Summary"": ""Summary of the conversation here."",
+  ""UpdatedStoryDescription"": ""The story description has been updated here.""
+}
+Only return the JSON object, no extra text.";
+
+			var messages = new List<OllamaChatMessage>
+			{
+				new OllamaChatMessage { Role = "user", Content = compressedHistory },
+				new OllamaChatMessage { Role = "user", Content = summaryInstruction }
+			};
+
+			var requestPayload = new OllamaChatRequestPayload
+			{
+				Model = resolvedModel,
+				Messages = messages,
+				Stream = false,
+			};
+
+			var jsonBody = JsonConvert.SerializeObject(requestPayload);
+			Debug.Log($"{LogPrefix} Sending summarization request to Ollama.");
+			var bodyBytes = Encoding.UTF8.GetBytes(jsonBody);
+
+			using (var request = new UnityWebRequest(url, "POST"))
+			{
+				request.uploadHandler = new UploadHandlerRaw(bodyBytes);
+				request.downloadHandler = new DownloadHandlerBuffer();
+				request.SetRequestHeader("Content-Type", "application/json");
+				request.timeout = TimeoutSeconds;
+
+				var operation = request.SendWebRequest();
+
+				while (!operation.isDone)
+				{
+					await Task.Yield();
+				}
+
+				if (request.result != UnityWebRequest.Result.Success)
+				{
+					Debug.LogError($"{LogPrefix} Summarization request failed: {request.error}");
+					return null;
+				}
+
+				var responseText = request.downloadHandler.text;
+				if (string.IsNullOrWhiteSpace(responseText))
+				{
+					Debug.LogError($"{LogPrefix} Empty summarization response from Ollama.");
+					return null;
+				}
+
+				try
+				{
+					var response = JsonConvert.DeserializeObject<OllamaChatResponsePayload>(responseText);
+					return response;
+				}
+				catch (System.Exception ex)
+				{
+					Debug.LogError($"{LogPrefix} Failed to parse Ollama summarization response: {ex.Message}");
+					return null;
+				}
+			}
+		}
+
 		private static string BuildOllamaSystemInstruction(string systemPrompt)
 		{
 			const string developerRoleExplanation = @"

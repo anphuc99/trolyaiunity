@@ -772,10 +772,22 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 		}
 
+		/// <summary>
+		/// Ends the conversation. On desktop platforms (non-MyLog mode), compresses history
+		/// and uses local Ollama to summarize before sending the result to the server.
+		/// Otherwise falls back to the server-side AI summarization.
+		/// </summary>
 		private static async Task EndConversationInternalAsync()
 		{
 			try
 			{
+				// Desktop + non-MyLog: use local Ollama for summarization
+				if (IsDesktopPlatform() && !IsMyLogChatMode())
+				{
+					await EndConversationViaLocalAIAsync();
+					return;
+				}
+
 				var responseJson = await HttpClient.PostJsonTaskAsync<object>(GetChatEndEndpoint(), null);
 				if (string.IsNullOrWhiteSpace(responseJson))
 				{
@@ -806,6 +818,197 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					Message = "Failed to finalize conversation: " + exception.Message
 				});
 			}
+		}
+
+		/// <summary>
+		/// Ends conversation on desktop using local Ollama for summarization.
+		/// 1. Loads chat history from server.
+		/// 2. Compresses history to CharacterName:Text format.
+		/// 3. Sends compressed history to local Ollama for summarization.
+		/// 4. Sends pre-computed summary to server via /api/journals/end-local.
+		/// </summary>
+		private static async Task EndConversationViaLocalAIAsync()
+		{
+			// Step 1: Load history from server
+			var historyEndpoint = BuildHistoryEndpoint(null);
+			var historyJson = await HttpClient.GetTaskAsync(historyEndpoint);
+			if (string.IsNullOrWhiteSpace(historyJson))
+			{
+				Debug.LogWarning("[ChatController] Empty history for local summarization, falling back to server.");
+				await EndConversationViaServerAsync();
+				return;
+			}
+
+			var historyResponse = JsonConvert.DeserializeObject<ChatHistoryResponsePayload>(historyJson);
+			if (historyResponse?.Messages == null || historyResponse.Messages.Count == 0)
+			{
+				Debug.LogWarning("[ChatController] No messages in history for local summarization, falling back to server.");
+				await EndConversationViaServerAsync();
+				return;
+			}
+
+			// Step 2: Compress history to CharacterName:Text format
+			var compressedHistory = CompressHistoryForSummary(historyResponse.Messages);
+			if (string.IsNullOrWhiteSpace(compressedHistory))
+			{
+				Debug.LogWarning("[ChatController] Compressed history is empty, falling back to server.");
+				await EndConversationViaServerAsync();
+				return;
+			}
+
+			Debug.Log("[ChatController] Compressed history for Ollama summarization:\n" + compressedHistory);
+
+			// Step 3: Send compressed history to local Ollama
+			var ollamaResponse = await OllamaService.SummarizeConversationAsync(compressedHistory);
+			if (ollamaResponse?.Message == null || string.IsNullOrWhiteSpace(ollamaResponse.Message.Content))
+			{
+				Debug.LogWarning("[ChatController] Ollama summarization failed, falling back to server.");
+				await EndConversationViaServerAsync();
+				return;
+			}
+
+			// Step 4: Parse Ollama summary JSON
+			OllamaSummaryResult summaryResult = null;
+			try
+			{
+				summaryResult = JsonConvert.DeserializeObject<OllamaSummaryResult>(ollamaResponse.Message.Content);
+			}
+			catch (Exception ex)
+			{
+				Debug.LogWarning("[ChatController] Failed to parse Ollama summary JSON: " + ex.Message
+					+ "\nRaw: " + ollamaResponse.Message.Content);
+			}
+
+			// If JSON parsing fails, use the raw text as summary
+			var summary = summaryResult?.Summary ?? ollamaResponse.Message.Content;
+			var updatedStoryDescription = summaryResult?.UpdatedStoryDescription ?? "";
+
+			// Step 5: Send pre-computed summary to server
+			var localPayload = new ChatEndConversationLocalRequestPayload
+			{
+				Summary = summary,
+				UpdatedStoryDescription = updatedStoryDescription,
+			};
+
+			var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.JournalsEndLocal, localPayload);
+			if (string.IsNullOrWhiteSpace(responseJson))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to save local AI summary to server."
+				});
+				return;
+			}
+
+			ChatEndConversationResponsePayload response = null;
+			try
+			{
+				response = JsonConvert.DeserializeObject<ChatEndConversationResponsePayload>(responseJson);
+			}
+			catch (Exception ex)
+			{
+				Debug.LogWarning("[ChatController] Failed to parse end-local response: " + ex.Message);
+			}
+
+			EventBus.Publish(ChatEvents.ConversationEnded, response);
+			ChatState.ParentSignals?.OpenHome?.Invoke();
+		}
+
+		/// <summary>
+		/// Fallback: ends conversation via server-side AI summarization.
+		/// </summary>
+		private static async Task EndConversationViaServerAsync()
+		{
+			var responseJson = await HttpClient.PostJsonTaskAsync<object>(GetChatEndEndpoint(), null);
+			if (string.IsNullOrWhiteSpace(responseJson))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to finalize conversation."
+				});
+				return;
+			}
+
+			ChatEndConversationResponsePayload response = null;
+			try
+			{
+				response = JsonConvert.DeserializeObject<ChatEndConversationResponsePayload>(responseJson);
+			}
+			catch (Exception ex)
+			{
+				Debug.LogWarning("[ChatController] Failed to parse end-conversation response: " + ex.Message);
+			}
+
+			EventBus.Publish(ChatEvents.ConversationEnded, response);
+			ChatState.ParentSignals?.OpenHome?.Invoke();
+		}
+
+		/// <summary>
+		/// Compresses chat history messages into a compact format for local AI summarization.
+		/// Format: each line is "CharacterName:Text" for assistant turns, "User:Text" for user messages.
+		/// Developer/system messages are excluded to reduce token count.
+		/// </summary>
+		/// <param name="messages">Chat history messages.</param>
+		/// <returns>Compressed conversation string.</returns>
+		public static string CompressHistoryForSummary(List<ChatHistoryMessagePayload> messages)
+		{
+			if (messages == null || messages.Count == 0)
+			{
+				return "";
+			}
+
+			var builder = new System.Text.StringBuilder();
+
+			foreach (var message in messages)
+			{
+				if (message == null || string.IsNullOrWhiteSpace(message.Content))
+				{
+					continue;
+				}
+
+				var role = (message.Role ?? "").ToLowerInvariant();
+
+				if (role == "user")
+				{
+					var text = message.Content.Trim();
+					if (!string.IsNullOrWhiteSpace(text))
+					{
+						builder.AppendLine("User:" + text);
+					}
+				}
+				else if (role == "assistant")
+				{
+					var turns = ParseAssistantTurns(message.Content);
+					if (turns.Count > 0)
+					{
+						foreach (var turn in turns)
+						{
+							var charName = !string.IsNullOrWhiteSpace(turn.CharacterName)
+								? turn.CharacterName.Trim()
+								: "Mimi";
+							var text = !string.IsNullOrWhiteSpace(turn.Text)
+								? turn.Text.Trim()
+								: "";
+							if (!string.IsNullOrWhiteSpace(text))
+							{
+								builder.AppendLine(charName + ":" + text);
+							}
+						}
+					}
+					else
+					{
+						// Fallback: raw assistant content without JSON structure
+						var text = message.Content.Trim();
+						if (!string.IsNullOrWhiteSpace(text))
+						{
+							builder.AppendLine("Mimi:" + text);
+						}
+					}
+				}
+				// Skip developer and system messages to minimize tokens
+			}
+
+			return builder.ToString().TrimEnd();
 		}
 
 		/// <summary>

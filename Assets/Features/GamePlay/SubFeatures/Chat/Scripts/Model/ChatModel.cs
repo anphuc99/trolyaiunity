@@ -239,6 +239,42 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 	}
 
 	/// <summary>
+	/// Request payload for ending a conversation with a pre-computed local AI summary.
+	/// </summary>
+	public sealed class ChatEndConversationLocalRequestPayload
+	{
+		/// <summary>
+		/// Pre-computed conversation summary from local AI.
+		/// </summary>
+		[JsonProperty("summary")]
+		public string Summary { get; set; }
+
+		/// <summary>
+		/// Optional updated story description from local AI.
+		/// </summary>
+		[JsonProperty("updatedStoryDescription")]
+		public string UpdatedStoryDescription { get; set; }
+	}
+
+	/// <summary>
+	/// Ollama summary response parsed from JSON output.
+	/// </summary>
+	public sealed class OllamaSummaryResult
+	{
+		/// <summary>
+		/// Summary of the conversation in Vietnamese.
+		/// </summary>
+		[JsonProperty("Summary")]
+		public string Summary { get; set; }
+
+		/// <summary>
+		/// Updated story description in Vietnamese.
+		/// </summary>
+		[JsonProperty("UpdatedStoryDescription")]
+		public string UpdatedStoryDescription { get; set; }
+	}
+
+	/// <summary>
 	/// Response payload for /api/text-to-speech.
 	/// </summary>
 	public sealed class ChatTextToSpeechResponsePayload

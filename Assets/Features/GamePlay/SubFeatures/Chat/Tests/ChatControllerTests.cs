@@ -641,6 +641,121 @@ namespace Features.GamePlay.SubFeatures.Chat.Tests
 			Assert.IsTrue(payload.Done);
 		}
 
+		// ──────────────────────────────────────────────────────
+		// CompressHistoryForSummary tests
+		// ──────────────────────────────────────────────────────
+
+		[Test]
+		public void CompressHistoryForSummary_NullMessages_ReturnsEmpty()
+		{
+			var result = ChatController.CompressHistoryForSummary(null);
+			Assert.AreEqual("", result);
+		}
+
+		[Test]
+		public void CompressHistoryForSummary_EmptyList_ReturnsEmpty()
+		{
+			var result = ChatController.CompressHistoryForSummary(new List<ChatHistoryMessagePayload>());
+			Assert.AreEqual("", result);
+		}
+
+		[Test]
+		public void CompressHistoryForSummary_UserMessage_FormatsAsUser()
+		{
+			var messages = new List<ChatHistoryMessagePayload>
+			{
+				new ChatHistoryMessagePayload { Role = "user", Content = "Hello" }
+			};
+
+			var result = ChatController.CompressHistoryForSummary(messages);
+			Assert.AreEqual("User:Hello", result);
+		}
+
+		[Test]
+		public void CompressHistoryForSummary_AssistantTurns_FormatsWithCharacterName()
+		{
+			var assistantContent = "[{\"CharacterName\":\"Mimi\",\"Text\":\"你好\"}]";
+			var messages = new List<ChatHistoryMessagePayload>
+			{
+				new ChatHistoryMessagePayload { Role = "assistant", Content = assistantContent }
+			};
+
+			var result = ChatController.CompressHistoryForSummary(messages);
+			Assert.AreEqual("Mimi:你好", result);
+		}
+
+		[Test]
+		public void CompressHistoryForSummary_MultipleCharacters_AllIncluded()
+		{
+			var assistantContent = "[{\"CharacterName\":\"Mimi\",\"Text\":\"Hello\"},{\"CharacterName\":\"Lily\",\"Text\":\"Hi\"}]";
+			var messages = new List<ChatHistoryMessagePayload>
+			{
+				new ChatHistoryMessagePayload { Role = "user", Content = "Hey" },
+				new ChatHistoryMessagePayload { Role = "assistant", Content = assistantContent }
+			};
+
+			var result = ChatController.CompressHistoryForSummary(messages);
+			StringAssert.Contains("User:Hey", result);
+			StringAssert.Contains("Mimi:Hello", result);
+			StringAssert.Contains("Lily:Hi", result);
+		}
+
+		[Test]
+		public void CompressHistoryForSummary_DeveloperMessages_Excluded()
+		{
+			var messages = new List<ChatHistoryMessagePayload>
+			{
+				new ChatHistoryMessagePayload { Role = "developer", Content = "system info" },
+				new ChatHistoryMessagePayload { Role = "user", Content = "Hi" }
+			};
+
+			var result = ChatController.CompressHistoryForSummary(messages);
+			Assert.AreEqual("User:Hi", result);
+			Assert.IsFalse(result.Contains("system info"));
+		}
+
+		[Test]
+		public void CompressHistoryForSummary_FallbackAssistant_UsesMimi()
+		{
+			var messages = new List<ChatHistoryMessagePayload>
+			{
+				new ChatHistoryMessagePayload { Role = "assistant", Content = "plain text reply" }
+			};
+
+			var result = ChatController.CompressHistoryForSummary(messages);
+			Assert.AreEqual("Mimi:plain text reply", result);
+		}
+
+		// ──────────────────────────────────────────────────────
+		// Model payloads for local end-conversation
+		// ──────────────────────────────────────────────────────
+
+		[Test]
+		public void ChatEndConversationLocalRequestPayload_Properties_SetCorrectly()
+		{
+			var payload = new ChatEndConversationLocalRequestPayload
+			{
+				Summary = "test summary",
+				UpdatedStoryDescription = "updated desc"
+			};
+
+			Assert.AreEqual("test summary", payload.Summary);
+			Assert.AreEqual("updated desc", payload.UpdatedStoryDescription);
+		}
+
+		[Test]
+		public void OllamaSummaryResult_Properties_SetCorrectly()
+		{
+			var result = new OllamaSummaryResult
+			{
+				Summary = "summary text",
+				UpdatedStoryDescription = "story desc"
+			};
+
+			Assert.AreEqual("summary text", result.Summary);
+			Assert.AreEqual("story desc", result.UpdatedStoryDescription);
+		}
+
 		private static System.Collections.IEnumerator AwaitTask(Task task)
 		{
 			while (!task.IsCompleted)
