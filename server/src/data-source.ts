@@ -13,7 +13,6 @@ import TranslationCardEntity from "./models/translation-card.entity.js";
 import TranslationReviewEntity from "./models/translation-review.entity.js";
 import UserEntity from "./models/user.entity.js";
 import VocabularyEntity from "./models/vocabulary.entity.js";
-import VocabularyMemoryEntity from "./models/vocabulary-memory.entity.js";
 import VocabularyReviewEntity from "./models/vocabulary-review.entity.js";
 import MyLogEntity from "./models/my-log.entity.js";
 import MyLogJournalEntity from "./models/my-log-journal.entity.js";
@@ -97,7 +96,6 @@ export const AppDataSource = new DataSource({
     UserEntity,
     VoiceEntity,
     VocabularyEntity,
-    VocabularyMemoryEntity,
     VocabularyReviewEntity,
     LearningPathEntity,
     CharacterRelationshipEntity

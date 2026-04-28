@@ -1002,7 +1002,7 @@ All endpoints in this group require auth.
 
 ### GET /api/vocabulary
 
-List vocabularies with review + memory.
+List vocabularies with review.
 
 - Response `200`:
 
@@ -1017,8 +1017,7 @@ List vocabularies with review + memory.
       "userId": 1,
       "createdAt": "...",
       "updatedAt": "...",
-      "review": { /* review fields */ },
-      "memory": { /* memory fields */ }
+      "review": { /* review fields */ }
     }
   ]
 }
@@ -1063,7 +1062,7 @@ Get vocabularies due today.
 
 ### GET /api/vocabulary/:id
 
-Get a vocabulary with review + memory.
+Get a vocabulary with review.
 
 - Path params:
   - `id` (string) – vocabulary uuid
@@ -1078,8 +1077,7 @@ Get a vocabulary with review + memory.
   "userId": 1,
   "createdAt": "...",
   "updatedAt": "...",
-  "review": { /* review fields */ },
-  "memory": { /* memory fields */ }
+  "review": { /* review fields */ }
 }
 ```
 
@@ -1093,13 +1091,11 @@ Collect a new vocabulary.
 {
   "korean": "string",
   "vietnamese": "string",
-  "memory": "string (optional)",
-  "linkedMessageIds": ["<messageId>"],
   "difficultyRating": "very_easy|easy|medium|hard"
 }
 ```
 
-- Response `201`: created vocabulary object with `review` and `memory`.
+- Response `201`: created vocabulary object with `review`.
 
 ### PUT /api/vocabulary/:id
 
@@ -1132,29 +1128,6 @@ Submit FSRS rating for the vocab’s review.
 ```
 
 - Response `200`: Review JSON
-
-### PUT /api/vocabulary/:id/memory
-
-Create/update memory for a vocabulary.
-
-- Body:
-
-```json
-{ "userMemory": "string", "linkedMessageIds": ["<messageId>"] }
-```
-
-- Response `200`:
-
-```json
-{
-  "id": 1,
-  "vocabularyId": "<uuid>",
-  "userMemory": "...",
-  "linkedMessageIds": ["<uuid>"],
-  "createdAt": "...",
-  "updatedAt": "..."
-}
-```
 
 ### PUT /api/vocabulary/:id/star
 

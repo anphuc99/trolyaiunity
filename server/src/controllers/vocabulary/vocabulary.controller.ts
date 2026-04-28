@@ -2,7 +2,6 @@ import type { Request, Response } from "express";
 import { IsNull, Not, type DataSource, type Repository } from "typeorm";
 import VocabularyEntity from "../../models/vocabulary.entity.js";
 import VocabularyReviewEntity from "../../models/vocabulary-review.entity.js";
-import VocabularyMemoryEntity from "../../models/vocabulary-memory.entity.js";
 import UserEntity from "../../models/user.entity.js";
 import {
   createInitialReviewState,
@@ -23,7 +22,6 @@ interface VocabularyController {
   getLearnedCount: (request: Request, response: Response) => Promise<void>;
   getDueReviews: (request: Request, response: Response) => Promise<void>;
   getStats: (request: Request, response: Response) => Promise<void>;
-  saveMemory: (request: Request, response: Response) => Promise<void>;
   toggleStar: (request: Request, response: Response) => Promise<void>;
   setCardDirection: (request: Request, response: Response) => Promise<void>;
   lookupWord: (request: Request, response: Response) => Promise<void>;
@@ -54,28 +52,6 @@ const serialiseReview = (entity: VocabularyReviewEntity) => {
     cardDirection: entity.cardDirection,
     isStarred: entity.isStarred,
     reviewHistory
-  };
-};
-
-/**
- * Serialises a memory entity to a client-facing JSON shape.
- */
-const serialiseMemory = (entity: VocabularyMemoryEntity) => {
-  let linkedMessageIds: string[] = [];
-
-  try {
-    linkedMessageIds = JSON.parse(entity.linkedMessageIdsJson || "[]") as string[];
-  } catch {
-    linkedMessageIds = [];
-  }
-
-  return {
-    id: entity.id,
-    vocabularyId: entity.vocabularyId,
-    userMemory: entity.userMemory,
-    linkedMessageIds,
-    createdAt: entity.createdAt,
-    updatedAt: entity.updatedAt
   };
 };
 
@@ -152,7 +128,6 @@ const isValidVietnameseMeaning = (sourceWord: string, meaning: string): boolean 
 export const createVocabularyController = (dataSource: DataSource): VocabularyController => {
   const vocabRepo: Repository<VocabularyEntity> = dataSource.getRepository(VocabularyEntity);
   const reviewRepo: Repository<VocabularyReviewEntity> = dataSource.getRepository(VocabularyReviewEntity);
-  const memoryRepo: Repository<VocabularyMemoryEntity> = dataSource.getRepository(VocabularyMemoryEntity);
   const userRepo: Repository<UserEntity> = dataSource.getRepository(UserEntity);
   const toDateKey = (value: Date | string) =>
     new Date(value).toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
@@ -170,7 +145,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // List all vocabularies for the current user (with reviews + memories).
+  // List all vocabularies for the current user (with reviews).
   // ──────────────────────────────────────────────────────────────────────────
   const listVocabularies: VocabularyController["listVocabularies"] = async (request, response) => {
     const userId = request.user?.id;
@@ -187,19 +162,15 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       });
 
       const reviews = await reviewRepo.find({ where: { userId } });
-      const memories = await memoryRepo.find({ where: { userId } });
 
       const reviewMap = new Map<string, VocabularyReviewEntity>(reviews.map((r: VocabularyReviewEntity) => [r.vocabularyId, r]));
-      const memoryMap = new Map<string, VocabularyMemoryEntity>(memories.map((m: VocabularyMemoryEntity) => [m.vocabularyId, m]));
 
       const items = vocabularies.map((vocab: VocabularyEntity) => {
         const review = reviewMap.get(vocab.id);
-        const memory = memoryMap.get(vocab.id);
 
         return {
           ...vocab,
-          review: review ? serialiseReview(review) : null,
-          memory: memory ? serialiseMemory(memory) : null
+          review: review ? serialiseReview(review) : null
         };
       });
 
@@ -211,7 +182,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Get a single vocabulary with review + memory.
+  // Get a single vocabulary with review.
   // ──────────────────────────────────────────────────────────────────────────
   const getVocabulary: VocabularyController["getVocabulary"] = async (request, response) => {
     const userId = request.user?.id;
@@ -236,12 +207,10 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       }
 
       const review = await reviewRepo.findOne({ where: { vocabularyId: vocabId, userId } });
-      const memory = await memoryRepo.findOne({ where: { vocabularyId: vocabId, userId } });
 
       response.json({
         ...vocab,
-        review: review ? serialiseReview(review) : null,
-        memory: memory ? serialiseMemory(memory) : null
+        review: review ? serialiseReview(review) : null
       });
     } catch (error) {
       console.error("Failed to get vocabulary.", error);
@@ -250,8 +219,8 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Collect (create) a new vocabulary — optionally with initial memory and
-  // an initial difficulty rating that seeds the FSRS review.
+  // Collect (create) a new vocabulary with an optional initial difficulty
+  // rating that seeds the FSRS review.
   // ──────────────────────────────────────────────────────────────────────────
   const collectVocabulary: VocabularyController["collectVocabulary"] = async (request, response) => {
     const userId = request.user?.id;
@@ -266,16 +235,12 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       vietnamese,
       pinyin,
       level,
-      memory,
-      linkedMessageIds,
       difficultyRating
     } = request.body as {
       korean?: string;
       vietnamese?: string;
       pinyin?: string;
       level?: string;
-      memory?: string;
-      linkedMessageIds?: string[];
       difficultyRating?: "very_easy" | "easy" | "medium" | "hard";
     };
 
@@ -311,7 +276,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         vietnamese: trimmedVietnamese,
         pinyin: trimmedPinyin || null,
         level: trimmedLevel || currentUserLevel,
-        isManuallyAdded: !memory,
+        isManuallyAdded: true,
         userId
       });
 
@@ -336,24 +301,9 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
 
       const savedReview = await reviewRepo.save(reviewEntity);
 
-      // Optionally create memory
-      let savedMemory: VocabularyMemoryEntity | null = null;
-
-      if (memory && memory.trim()) {
-        const memoryEntity = memoryRepo.create({
-          vocabularyId: saved.id,
-          userId,
-          userMemory: memory.trim(),
-          linkedMessageIdsJson: JSON.stringify(linkedMessageIds ?? [])
-        });
-
-        savedMemory = await memoryRepo.save(memoryEntity);
-      }
-
       response.status(201).json({
         ...saved,
-        review: serialiseReview(savedReview),
-        memory: savedMemory ? serialiseMemory(savedMemory) : null
+        review: serialiseReview(savedReview)
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
@@ -455,7 +405,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Delete vocabulary (cascade removes review + memory).
+  // Delete vocabulary (cascade removes review).
   // ──────────────────────────────────────────────────────────────────────────
   const deleteVocabulary: VocabularyController["deleteVocabulary"] = async (request, response) => {
     const userId = request.user?.id;
@@ -621,16 +571,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
             .getMany()
         : [];
 
-      const memories = vocabIds.length
-        ? await memoryRepo
-            .createQueryBuilder("m")
-            .where("m.vocabulary_id IN (:...ids)", { ids: vocabIds })
-            .andWhere("m.user_id = :userId", { userId })
-            .getMany()
-        : [];
-
       const vocabMap = new Map<string, VocabularyEntity>(vocabularies.map((v: VocabularyEntity) => [v.id, v]));
-      const memoryMap = new Map<string, VocabularyMemoryEntity>(memories.map((m: VocabularyMemoryEntity) => [m.vocabularyId, m]));
 
       const items = dueReviews
         .map((r: VocabularyReviewEntity) => {
@@ -639,11 +580,9 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
             return null;
           }
 
-          const memory = memoryMap.get(r.vocabularyId);
           return {
             ...vocab,
-            review: serialiseReview(r),
-            memory: memory ? serialiseMemory(memory) : null
+            review: serialiseReview(r)
           };
         })
         .filter(Boolean);
@@ -710,63 +649,6 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     } catch (error) {
       console.error("Failed to get vocabulary stats.", error);
       response.status(500).json({ message: "Failed to get vocabulary stats" });
-    }
-  };
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // Save / update a memory for a vocabulary.
-  // ──────────────────────────────────────────────────────────────────────────
-  const saveMemory: VocabularyController["saveMemory"] = async (request, response) => {
-    const userId = request.user?.id;
-    const vocabId = String(request.params.id);
-
-    if (!userId) {
-      response.status(401).json({ message: "Unauthorized" });
-      return;
-    }
-
-    if (!isValidVocabId(vocabId)) {
-      response.status(400).json({ message: "Invalid vocabulary ID" });
-      return;
-    }
-
-    const { userMemory, linkedMessageIds } = request.body as {
-      userMemory?: string;
-      linkedMessageIds?: string[];
-    };
-
-    if (!userMemory?.trim()) {
-      response.status(400).json({ message: "Memory content is required" });
-      return;
-    }
-
-    try {
-      const vocab = await vocabRepo.findOne({ where: { id: vocabId, userId } });
-
-      if (!vocab) {
-        response.status(404).json({ message: "Vocabulary not found" });
-        return;
-      }
-
-      let memoryEntity = await memoryRepo.findOne({ where: { vocabularyId: vocabId, userId } });
-
-      if (memoryEntity) {
-        memoryEntity.userMemory = userMemory.trim();
-        memoryEntity.linkedMessageIdsJson = JSON.stringify(linkedMessageIds ?? []);
-      } else {
-        memoryEntity = memoryRepo.create({
-          vocabularyId: vocabId,
-          userId,
-          userMemory: userMemory.trim(),
-          linkedMessageIdsJson: JSON.stringify(linkedMessageIds ?? [])
-        });
-      }
-
-      const saved = await memoryRepo.save(memoryEntity);
-      response.json(serialiseMemory(saved));
-    } catch (error) {
-      console.error("Failed to save memory.", error);
-      response.status(500).json({ message: "Failed to save memory" });
     }
   };
 
@@ -1036,7 +918,6 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     getLearnedCount,
     getDueReviews,
     getStats,
-    saveMemory,
     toggleStar,
     setCardDirection,
     lookupWord,

@@ -11,7 +11,6 @@
  * - Stories (stories-index.json + stories/*.json)
  * - Vocabularies (vocabulary-store.json)
  * - Vocabulary Reviews (vocabulary-store.json)
- * - Vocabulary Memories (vocabulary-store.json)
  * - Characters (data.json)
  * - Journals and Messages (stories/*.json)
  * - Translation Cards and Reviews (translation-store.json)
@@ -26,7 +25,6 @@ import bcrypt from "bcryptjs";
 import { AppDataSource } from "../data-source.js";
 import VocabularyEntity from "../models/vocabulary.entity.js";
 import VocabularyReviewEntity from "../models/vocabulary-review.entity.js";
-import VocabularyMemoryEntity from "../models/vocabulary-memory.entity.js";
 import CharacterEntity from "../models/character.entity.js";
 import JournalEntity from "../models/journal.entity.js";
 import MessageEntity from "../models/message.entity.js";
@@ -84,19 +82,9 @@ interface OldVocabularyReview {
   storyId?: string;
 }
 
-interface OldVocabularyMemory {
-  vocabularyId: string;
-  userMemory: string;
-  linkedMessageIds: string[];
-  createdDate: string;
-  updatedDate?: string;
-  storyId?: string;
-}
-
 interface OldVocabularyStore {
   vocabularies: OldVocabularyItem[];
   reviews: OldVocabularyReview[];
-  memories: OldVocabularyMemory[];
   progress: Record<string, unknown>;
   lastUpdated?: string;
 }
@@ -215,7 +203,6 @@ interface MigrationStats {
   stories: { total: number; success: number; skipped: number; errors: string[] };
   vocabularies: { total: number; success: number; skipped: number; errors: string[] };
   vocabularyReviews: { total: number; success: number; skipped: number; errors: string[] };
-  vocabularyMemories: { total: number; success: number; skipped: number; errors: string[] };
   characters: { total: number; success: number; skipped: number; errors: string[] };
   journals: { total: number; success: number; skipped: number; errors: string[] };
   messages: { total: number; success: number; skipped: number; errors: string[] };
@@ -228,7 +215,6 @@ const createEmptyStats = (): MigrationStats => ({
   stories: { total: 0, success: 0, skipped: 0, errors: [] },
   vocabularies: { total: 0, success: 0, skipped: 0, errors: [] },
   vocabularyReviews: { total: 0, success: 0, skipped: 0, errors: [] },
-  vocabularyMemories: { total: 0, success: 0, skipped: 0, errors: [] },
   characters: { total: 0, success: 0, skipped: 0, errors: [] },
   journals: { total: 0, success: 0, skipped: 0, errors: [] },
   messages: { total: 0, success: 0, skipped: 0, errors: [] },
@@ -407,53 +393,6 @@ async function migrateVocabularyReviews(
   }
 
   console.log(`   ✅ ${stats.vocabularyReviews.success} migrated, ${stats.vocabularyReviews.skipped} skipped`);
-}
-
-/**
- * Migrates vocabulary memories from vocabulary-store.json.
- */
-async function migrateVocabularyMemories(
-  vocabStore: OldVocabularyStore,
-  vocabIdMap: Map<string, string>,
-  stats: MigrationStats
-): Promise<void> {
-  console.log("\n🧠 Migrating vocabulary memories...");
-  const memoryRepo = AppDataSource.getRepository(VocabularyMemoryEntity);
-
-  stats.vocabularyMemories.total = vocabStore.memories.length;
-
-  for (const oldMemory of vocabStore.memories) {
-    try {
-      // Skip if vocabulary doesn't exist
-      if (!vocabIdMap.has(oldMemory.vocabularyId)) {
-        stats.vocabularyMemories.skipped++;
-        continue;
-      }
-
-      // Check if already exists
-      const existing = await memoryRepo.findOne({
-        where: { vocabularyId: oldMemory.vocabularyId }
-      });
-      if (existing) {
-        stats.vocabularyMemories.skipped++;
-        continue;
-      }
-
-      const newMemory = new VocabularyMemoryEntity();
-      newMemory.vocabularyId = oldMemory.vocabularyId;
-      newMemory.userMemory = oldMemory.userMemory;
-      newMemory.linkedMessageIdsJson = JSON.stringify(oldMemory.linkedMessageIds || []);
-      newMemory.userId = DEFAULT_USER_ID;
-
-      await memoryRepo.save(newMemory);
-      stats.vocabularyMemories.success++;
-    } catch (err) {
-      const msg = `Memory ${oldMemory.vocabularyId}: ${err instanceof Error ? err.message : String(err)}`;
-      stats.vocabularyMemories.errors.push(msg);
-    }
-  }
-
-  console.log(`   ✅ ${stats.vocabularyMemories.success} migrated, ${stats.vocabularyMemories.skipped} skipped`);
 }
 
 /**
@@ -898,7 +837,6 @@ function printReport(stats: MigrationStats): void {
     { name: "Stories", data: stats.stories },
     { name: "Vocabularies", data: stats.vocabularies },
     { name: "Vocabulary Reviews", data: stats.vocabularyReviews },
-    { name: "Vocabulary Memories", data: stats.vocabularyMemories },
     { name: "Characters", data: stats.characters },
     { name: "Journals", data: stats.journals },
     { name: "Messages", data: stats.messages },
@@ -975,7 +913,6 @@ async function runMigration(sourcePath: string): Promise<void> {
     if (vocabStore) {
       vocabIdMap = await migrateVocabularies(vocabStore, stats);
       await migrateVocabularyReviews(vocabStore, vocabIdMap, stats);
-      await migrateVocabularyMemories(vocabStore, vocabIdMap, stats);
     }
 
     // 2. Migrate stories (includes journals and messages from story files)
