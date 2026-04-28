@@ -64,6 +64,14 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		[SerializeField]
 		private TextMeshProUGUI _countVocabText;
+		[SerializeField]
+		private bool _isBlackUI;
+		[SerializeField]
+		private GameObject _topMenu;
+		[SerializeField]
+		private GameObject _bottomMenu;
+		[SerializeField]
+		private GameObject _body;
 
 		/// <summary>
 		/// Regex to match **word** vocabulary markup in assistant text.
@@ -92,6 +100,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private bool _isAutoChatEnabled;
 		private bool _isAutoChatAwaitingReply;
 		private bool _hasSentAutoChatContext;
+		private Vector2 _saveBodyOriginalAnchorMin;
+		private Vector2 _saveBodyOriginalAnchorMax;
+		private Vector2 _saveBodyOriginalOffsetMin;
+		private Vector2 _saveBodyOriginalOffsetMax;
 
 		/// <summary>
 		/// Rich text marker shown in the input field when a voice recording is pending.
@@ -127,7 +139,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			SendChatMessage(_inputField.text);
 		}
-
 		protected override void OnDisabled()
 		{
 			StopAutoChatMode();
@@ -251,6 +262,26 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[OnEvent(ChatEvents.Installed)]
 		private void OnInstalled(object payload)
 		{
+			if (_isBlackUI)
+			{
+				_topMenu.SetActive(false);
+				_bottomMenu.SetActive(false);
+				var r = _body != null ? _body.GetComponent<RectTransform>() : null;
+				if (r != null)
+				{
+					_saveBodyOriginalAnchorMin = r.anchorMin;
+					_saveBodyOriginalAnchorMax = r.anchorMax;
+					_saveBodyOriginalOffsetMin = r.offsetMin;
+					_saveBodyOriginalOffsetMax = r.offsetMax;
+
+					r.anchorMin = new Vector2(0f, 0f);
+					r.anchorMax = new Vector2(1f, 1f);
+
+					// Keep current left/right spacing, force Bottom and Top to 0.
+					r.offsetMin = new Vector2(r.offsetMin.x, 0f);
+					r.offsetMax = new Vector2(r.offsetMax.x, 0f);
+				}
+			}
 			gameObject.SetActive(true);
 			EnsureDependencies();
 			EnableBackgroundRuntimeMode();
@@ -267,6 +298,19 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[OnEvent(ChatEvents.Uninstalled)]
 		private void OnUninstalled(object payload)
 		{
+			if (_isBlackUI)
+			{
+				_topMenu.SetActive(true);
+				_bottomMenu.SetActive(true);
+				var r = _body != null ? _body.GetComponent<RectTransform>() : null;
+				if (r != null)
+				{
+					r.anchorMin = _saveBodyOriginalAnchorMin;
+					r.anchorMax = _saveBodyOriginalAnchorMax;
+					r.offsetMin = _saveBodyOriginalOffsetMin;
+					r.offsetMax = _saveBodyOriginalOffsetMax;
+				}
+			}
 			StopAllCoroutines();
 			StopAutoChatMode();
 			StopRecordingIfNeeded();
