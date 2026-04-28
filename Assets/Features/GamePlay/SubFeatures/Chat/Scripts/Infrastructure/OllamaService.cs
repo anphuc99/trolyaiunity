@@ -188,7 +188,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			repairInstructionBuilder.AppendLine("REFERENCE EXAMPLES (follow this style):");
 			repairInstructionBuilder.AppendLine("[");
 			repairInstructionBuilder.AppendLine("  {");
-			repairInstructionBuilder.AppendLine("    \"MessageId\": \"11111111-2222-3333-4444-555555555555\",");
+			repairInstructionBuilder.AppendLine("    \"MessageId\": \"317e30c6-6c46-448c-b1a4-91aa5b9253a1\",");
 			repairInstructionBuilder.AppendLine("    \"CharacterName\": \"Mimi\",");
 			repairInstructionBuilder.AppendLine("    \"Text\": \"你怎么这样!!!\",");
 			repairInstructionBuilder.AppendLine("    \"Pinyin\": \"Nǐ zěn me zhè yàng!!!\",");
