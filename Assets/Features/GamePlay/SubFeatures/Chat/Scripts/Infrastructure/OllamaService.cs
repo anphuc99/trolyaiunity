@@ -124,6 +124,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 				try
 				{
 					var response = JsonConvert.DeserializeObject<OllamaChatResponsePayload>(responseText);
+					Debug.Log($"{LogPrefix} Received response from Ollama: {responseText}");
 					return response;
 				}
 				catch (System.Exception ex)
@@ -158,17 +159,14 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			var resolvedModel = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
 			var url = resolvedBaseUrl + "/api/chat";
 
+			// Note: the original system prompt is intentionally excluded here.
+			// Including the full production prompt (character info, story context, lesson data)
+			// makes the repair request too large and causes Ollama to produce a new reply
+			// instead of strictly reformatting the invalid content.
 			var repairInstructionBuilder = new StringBuilder();
 			repairInstructionBuilder.AppendLine("Rewrite the assistant response into a STRICT valid JSON reply.");
-			repairInstructionBuilder.AppendLine("You must follow the same response rules as the original chat prompt.");
+			repairInstructionBuilder.AppendLine("Do NOT generate new dialogue. Only reformat the content below into valid JSON.");
 			repairInstructionBuilder.AppendLine();
-
-			if (!string.IsNullOrWhiteSpace(originalSystemPrompt))
-			{
-				repairInstructionBuilder.AppendLine("ORIGINAL SYSTEM PROMPT (follow these rules exactly):");
-				repairInstructionBuilder.AppendLine(originalSystemPrompt.Trim());
-				repairInstructionBuilder.AppendLine();
-			}
 
 			repairInstructionBuilder.AppendLine("JSON FORMAT GUIDE (MUST MATCH):");
 			repairInstructionBuilder.AppendLine("1) Return ONLY valid JSON. No markdown, no code fences, no explanation.");
@@ -385,7 +383,8 @@ Only return the JSON object, no extra text.";
 		/// <summary>
 		/// Builds a compact text block from the full chat history for embedding in the system prompt.
 		/// Format per line: "User:<text>", "developer:<text>", or "<CharacterName>:<text>".
-		/// Developer and system messages are included so the model has full context.
+		/// Developer messages are included for character/context awareness.
+		/// Recall-memory tool messages and system messages are skipped.
 		/// </summary>
 		private static string BuildCompressedHistory(List<ChatHistoryMessagePayload> history)
 		{
@@ -410,6 +409,13 @@ Only return the JSON object, no extra text.";
 
 				if (role == "assistant")
 				{
+					// Skip recall-memory tool calls — they are internal AI mechanism messages
+					// (JSON like {"recall_memory":[...]}) and must not leak into the context.
+					if (IsRecallMemoryContent(msg.Content))
+					{
+						continue;
+					}
+
 					var compressed = CompressAssistantContent(msg.Content);
 					if (!string.IsNullOrWhiteSpace(compressed))
 					{
@@ -424,6 +430,35 @@ Only return the JSON object, no extra text.";
 			}
 
 			return sb.ToString().TrimEnd();
+		}
+
+		/// <summary>
+		/// Returns true when the message content is a recall-memory tool call.
+		/// Recall-memory messages are JSON objects with a "recall_memory" array key,
+		/// produced by the server AI pipeline — they must not be treated as dialogue.
+		/// </summary>
+		private static bool IsRecallMemoryContent(string content)
+		{
+			if (string.IsNullOrWhiteSpace(content))
+			{
+				return false;
+			}
+
+			var trimmed = content.Trim();
+			if (!trimmed.StartsWith("{"))
+			{
+				return false;
+			}
+
+			try
+			{
+				var obj = JsonConvert.DeserializeObject<Newtonsoft.Json.Linq.JObject>(trimmed);
+				return obj != null && obj.ContainsKey("recall_memory");
+			}
+			catch
+			{
+				return false;
+			}
 		}
 
 		/// <summary>
