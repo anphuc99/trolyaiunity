@@ -24,7 +24,7 @@ export interface FSRSSettings {
 export const DEFAULT_FSRS_SETTINGS: FSRSSettings = {
   maxReviewsPerDay: 50,
   newCardsPerDay: 20,
-  desiredRetention: 0.9
+  desiredRetention: 0.95
 };
 
 export interface ReviewHistoryEntry {
