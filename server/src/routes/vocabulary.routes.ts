@@ -19,6 +19,7 @@ export const createVocabularyRoutes = (dataSource: DataSource) => {
   router.get("/learned-count", controller.getLearnedCount);
   router.get("/stats", controller.getStats);
   router.get("/due", controller.getDueReviews);
+  router.post("/batch-review", controller.batchReviewByWords);
   router.get("/", controller.listVocabularies);
   router.get("/:id", controller.getVocabulary);
   router.post("/", controller.collectVocabulary);

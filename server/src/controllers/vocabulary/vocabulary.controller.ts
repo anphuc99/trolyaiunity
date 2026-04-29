@@ -12,6 +12,7 @@ import { createCheapAIService, type CheapAIService } from "../../services/cheap-
 interface VocabularyController {
   listVocabularies: (request: Request, response: Response) => Promise<void>;
   getVocabulary: (request: Request, response: Response) => Promise<void>;
+  batchReviewByWords: (request: Request, response: Response) => Promise<void>;
   collectVocabulary: (request: Request, response: Response) => Promise<void>;
   updateVocabulary: (request: Request, response: Response) => Promise<void>;
   deleteVocabulary: (request: Request, response: Response) => Promise<void>;
@@ -846,6 +847,94 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     }
   };
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // Batch-review vocabularies by word text. Looks up each word by its Chinese
+  // text and advances the FSRS cycle once. Skips words not found or not due.
+  // ──────────────────────────────────────────────────────────────────────────
+  const batchReviewByWords: VocabularyController["batchReviewByWords"] = async (request, response) => {
+    const userId = request.user?.id;
+
+    if (!userId) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const { words } = request.body as { words?: string[] };
+    if (!Array.isArray(words) || words.length === 0) {
+      response.status(400).json({ message: "A non-empty words array is required" });
+      return;
+    }
+
+    const todayKey = toDateKey(new Date());
+    let reviewed = 0;
+    let skipped = 0;
+
+    try {
+      for (const rawWord of words) {
+        const word = normalizeVocabularyWord(rawWord ?? "");
+        if (!word) {
+          skipped++;
+          continue;
+        }
+
+        const vocab = await vocabRepo.findOne({ where: { chinnese: word, userId } });
+        if (!vocab || !vocab.nextReviewDate || vocab.isIgnored) {
+          skipped++;
+          continue;
+        }
+
+        const nextReviewKey = toDateKey(vocab.nextReviewDate);
+        if (nextReviewKey > todayKey) {
+          skipped++;
+          continue;
+        }
+
+        let history: ReviewHistoryEntry[] = [];
+        try {
+          history = JSON.parse(vocab.reviewHistoryJson || "[]") as ReviewHistoryEntry[];
+        } catch {
+          history = [];
+        }
+
+        const currentState = {
+          cycleStep: vocab.stability ?? 0,
+          currentIntervalDays: vocab.currentIntervalDays ?? 0,
+          nextReviewDate: vocab.nextReviewDate instanceof Date
+            ? vocab.nextReviewDate.toISOString()
+            : String(vocab.nextReviewDate),
+          lastReviewDate: vocab.lastReviewDate
+            ? vocab.lastReviewDate instanceof Date
+              ? vocab.lastReviewDate.toISOString()
+              : String(vocab.lastReviewDate)
+            : null,
+          reviewHistory: history
+        };
+
+        const { state: updated, memorized } = advanceCycleStep(currentState);
+
+        vocab.stability = updated.cycleStep;
+        vocab.difficulty = null;
+        vocab.lapses = null;
+        vocab.currentIntervalDays = updated.currentIntervalDays;
+        vocab.nextReviewDate = new Date(updated.nextReviewDate);
+        vocab.lastReviewDate = updated.lastReviewDate ? new Date(updated.lastReviewDate) : null;
+        vocab.reviewHistoryJson = JSON.stringify(updated.reviewHistory);
+
+        if (memorized) {
+          vocab.isIgnored = true;
+        }
+
+        await vocabRepo.save(vocab);
+        reviewed++;
+      }
+
+      response.json({ reviewed, skipped });
+    } catch (error) {
+      console.error("Failed to batch-review vocabularies.", error);
+      response.status(500).json({ message: "Failed to batch-review vocabularies" });
+    }
+  };
+
   return {
     listVocabularies,
     getVocabulary,
@@ -859,6 +948,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     toggleStar,
     setCardDirection,
     lookupWord,
-    ignoreVocabulary
+    ignoreVocabulary,
+    batchReviewByWords
   };
 };

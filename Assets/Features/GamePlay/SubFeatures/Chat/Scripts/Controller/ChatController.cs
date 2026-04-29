@@ -463,6 +463,21 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			_ = LoadAutoChatVocabularyInternalAsync();
 		}
 
+		/// <summary>
+		/// Sends a list of vocabulary words to the server for batch review (mark as learned once).
+		/// </summary>
+		/// <param name="payload">Batch review request with word list.</param>
+		[Request(ChatRequests.BatchReviewAutoChatVocabulary)]
+		public static void HandleBatchReviewAutoChatVocabulary(ChatBatchReviewVocabRequestPayload payload)
+		{
+			if (payload == null || payload.Words == null || payload.Words.Count == 0)
+			{
+				return;
+			}
+
+			_ = BatchReviewAutoChatVocabularyInternalAsync(payload);
+		}
+
 		private static void RegisterAddCharacterMenu()
 		{
 			UnregisterAddCharacterMenu();
@@ -2049,6 +2064,26 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			{
 				EventBus.Publish(ChatEvents.AutoChatVocabularyLoaded, new ChatAutoChatVocabularyPayload());
 				Debug.LogWarning("[ChatController] Failed to load auto-chat vocabulary: " + exception.Message);
+			}
+		}
+
+		/// <summary>
+		/// Posts the list of used vocabulary words to the server for batch review.
+		/// Fire-and-forget; failures are logged but do not block the user.
+		/// </summary>
+		/// <param name="payload">Batch review request with word list.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task BatchReviewAutoChatVocabularyInternalAsync(ChatBatchReviewVocabRequestPayload payload)
+		{
+			try
+			{
+				var json = JsonConvert.SerializeObject(payload);
+				await HttpClient.PostJsonTaskAsync(NetworkEndpoints.VocabularyBatchReview, json);
+				Debug.Log("[ChatController] Batch-reviewed " + payload.Words.Count + " auto-chat vocab words.");
+			}
+			catch (Exception exception)
+			{
+				Debug.LogWarning("[ChatController] Failed to batch-review auto-chat vocabulary: " + exception.Message);
 			}
 		}
 

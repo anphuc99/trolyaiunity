@@ -924,4 +924,17 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		public System.Collections.Generic.List<string> NewWords { get; set; }
 			= new System.Collections.Generic.List<string>();
 	}
+
+	/// <summary>
+	/// Request payload sent to server to batch-review vocabulary words by text.
+	/// </summary>
+	public sealed class ChatBatchReviewVocabRequestPayload
+	{
+		/// <summary>
+		/// List of vocabulary word strings to mark as reviewed.
+		/// </summary>
+		[Newtonsoft.Json.JsonProperty("words")]
+		public System.Collections.Generic.List<string> Words { get; set; }
+			= new System.Collections.Generic.List<string>();
+	}
 }

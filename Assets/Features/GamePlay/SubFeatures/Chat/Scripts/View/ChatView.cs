@@ -117,6 +117,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private int _autoChatDueVocabIndex;
 		private int _autoChatNewVocabIndex;
 		private readonly List<string> _autoChatPendingVocabWords = new List<string>();
+		private readonly HashSet<string> _autoChatUsedVocabWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		private bool _isAutoChatVocabLoaded;
 		private Vector2 _saveBodyOriginalAnchorMin;
 		private Vector2 _saveBodyOriginalAnchorMax;
@@ -491,6 +492,16 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[OnEvent(ChatEvents.EndConversationRequested)]
 		private void OnEndConversationRequested(object payload)
 		{
+			// Send batch review for any vocab words used during auto-chat.
+			if (_autoChatUsedVocabWords.Count > 0)
+			{
+				var batchPayload = new ChatBatchReviewVocabRequestPayload
+				{
+					Words = new System.Collections.Generic.List<string>(_autoChatUsedVocabWords)
+				};
+				SendRequest(ChatRequests.BatchReviewAutoChatVocabulary, batchPayload);
+			}
+
 			StopAutoChatMode();
 			SendRequest(ChatRequests.EndConversation);
 		}
@@ -1884,6 +1895,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_autoChatDueVocabIndex = 0;
 			_autoChatNewVocabIndex = 0;
 			_autoChatPendingVocabWords.Clear();
+			_autoChatUsedVocabWords.Clear();
 			_isAutoChatVocabLoaded = false;
 		}
 
@@ -1999,7 +2011,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			for (var i = 0; i < _autoChatPendingVocabWords.Count; i++)
 			{
 				var word = _autoChatPendingVocabWords[i];
-				if (!ContainsVocabWord(combinedText, word))
+				if (ContainsVocabWord(combinedText, word))
+				{
+					_autoChatUsedVocabWords.Add(word);
+				}
+				else
 				{
 					unusedWords.Add(word);
 				}
