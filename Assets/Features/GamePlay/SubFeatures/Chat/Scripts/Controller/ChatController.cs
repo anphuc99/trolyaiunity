@@ -3,6 +3,7 @@ using Features.GamePlay.SubFeatures.Chat.Infrastructure;
 using Features.GamePlay.SubFeatures.Chat.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.Chat.Model;
 using Features.GamePlay.SubFeatures.Chat.Requests;
+using Features.GamePlay.SubFeatures.LearningPath.Model;
 using Core.Infrastructure.Network;
 using Core.Infrastructure.State;
 using Newtonsoft.Json;
@@ -1959,17 +1960,18 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
-		/// Loads due vocabulary and full vocabulary list from server, splits them
-		/// into due (old) and non-due (new) word lists, then publishes the result.
+		/// Loads due vocabulary from the review endpoint and new vocabulary from
+		/// learning paths, then publishes the combined result. Each API call is
+		/// independent so a failure in one does not block the other.
 		/// </summary>
 		/// <returns>Awaitable task.</returns>
 		private static async Task LoadAutoChatVocabularyInternalAsync()
 		{
 			try
 			{
-				// Fetch due and all vocabulary independently so one failure doesn't block the other.
+				// Fetch due vocabulary and learning paths independently.
 				string dueJson = null;
-				string allJson = null;
+				string learningPathsJson = null;
 
 				try
 				{
@@ -1982,19 +1984,17 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 				try
 				{
-					allJson = await HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyList);
+					learningPathsJson = await HttpClient.GetTaskAsync(NetworkEndpoints.LearningPaths);
 				}
-				catch (Exception allException)
+				catch (Exception lpException)
 				{
-					Debug.LogWarning("[ChatController] Failed to load all vocabulary: " + allException.Message);
+					Debug.LogWarning("[ChatController] Failed to load learning paths: " + lpException.Message);
 				}
 
+				// Parse due vocabulary.
 				var dueResponse = string.IsNullOrWhiteSpace(dueJson)
 					? null
 					: JsonConvert.DeserializeObject<ChatVocabularyListResponsePayload>(dueJson);
-				var allResponse = string.IsNullOrWhiteSpace(allJson)
-					? null
-					: JsonConvert.DeserializeObject<ChatVocabularyListResponsePayload>(allJson);
 
 				var dueWords = new List<string>();
 				if (dueResponse?.Vocabularies != null)
@@ -2009,16 +2009,32 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					}
 				}
 
+				// Parse new words from learning paths (comma-separated vocabulary field).
 				var dueWordSet = new HashSet<string>(dueWords, StringComparer.OrdinalIgnoreCase);
 				var newWords = new List<string>();
-				if (allResponse?.Vocabularies != null)
+				var lpResponse = string.IsNullOrWhiteSpace(learningPathsJson)
+					? null
+					: JsonConvert.DeserializeObject<LearningPathListResponsePayload>(learningPathsJson);
+
+				if (lpResponse?.LearningPaths != null)
 				{
-					for (var i = 0; i < allResponse.Vocabularies.Count; i++)
+					for (var i = 0; i < lpResponse.LearningPaths.Count; i++)
 					{
-						var word = allResponse.Vocabularies[i]?.Korean;
-						if (!string.IsNullOrWhiteSpace(word) && !dueWordSet.Contains(word.Trim()))
+						var vocabCsv = lpResponse.LearningPaths[i]?.Vocabulary;
+						if (string.IsNullOrWhiteSpace(vocabCsv))
 						{
-							newWords.Add(word.Trim());
+							continue;
+						}
+
+						var words = vocabCsv.Split(',');
+						for (var j = 0; j < words.Length; j++)
+						{
+							var word = words[j]?.Trim();
+							if (!string.IsNullOrWhiteSpace(word) && !dueWordSet.Contains(word))
+							{
+								newWords.Add(word);
+								dueWordSet.Add(word); // Prevent duplicates across learning paths.
+							}
 						}
 					}
 				}
