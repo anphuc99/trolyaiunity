@@ -12,7 +12,6 @@ using CoreGlobalModes = Core.Infrastructure.State.GlobalModes;
 using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -24,17 +23,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 	[Core.Infrastructure.Attributes.ControllerScope(Core.Infrastructure.Attributes.ControllerScopeKey.GamePlayGameplay)]
 	public static class ChatController
 	{
-		private static readonly char[] LearningPathVocabularySeparators = { ',', ';', '，', '；', '|', '\n', '\r', '\t' };
-
 		/// <summary>
 		/// Called when the controller scope is entered.
 		/// </summary>
 		[Core.Infrastructure.Attributes.ControllerInit]
 		public static void OnEnterScope()
 		{
-			ChatState.LearningPathVocabularyCandidates = new List<string>();
-			ChatState.LearnedVocabularySet = new HashSet<string>(StringComparer.Ordinal);
-			ChatState.IsVocabularyMarkerSourceLoaded = false;
 			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		}
 
@@ -44,9 +38,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		[Core.Infrastructure.Attributes.ControllerShutdown]
 		public static void OnExitScope()
 		{
-			ChatState.LearningPathVocabularyCandidates = new List<string>();
-			ChatState.LearnedVocabularySet = new HashSet<string>(StringComparer.Ordinal);
-			ChatState.IsVocabularyMarkerSourceLoaded = false;
 			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		}
 
@@ -60,7 +51,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			RegisterAutoChatMenu();
 			RegisterEndConversationMenu();
 			_ = LoadDeveloperStateInternalAsync();
-			_ = LoadVocabularyMarkerSourcesInternalAsync();
 			EventBus.Publish(ChatEvents.Installed, null);
 		}
 
@@ -1021,8 +1011,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				await EnsureVocabularyMarkerSourcesLoadedAsync();
-
 				var endpoint = BuildHistoryEndpoint(payload?.SessionId);
 				var responseJson = await HttpClient.GetTaskAsync(endpoint);
 				if (string.IsNullOrWhiteSpace(responseJson))
@@ -1050,7 +1038,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 						if (string.Equals(message.Role, "assistant", System.StringComparison.OrdinalIgnoreCase))
 						{
 							var parsedTurns = ParseAssistantTurns(message.Content);
-							ApplyVocabularyMarkersToTurns(parsedTurns);
 							message.Turns = parsedTurns;
 						}
 					}
@@ -1077,8 +1064,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				await EnsureVocabularyMarkerSourcesLoadedAsync();
-
 				if (IsDesktopPlatform() && !HasAudioPayload(payload))
 				{
 					await SendMessageViaLocalAIAsync(payload);
@@ -1116,7 +1101,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				}
 
 				var turns = ParseAssistantTurns(response.Reply);
-				ApplyVocabularyMarkersToTurns(turns);
 
 				EventBus.Publish(ChatEvents.MessageReceived, new ChatAssistantMessagePayload
 				{
@@ -1148,8 +1132,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				await EnsureVocabularyMarkerSourcesLoadedAsync();
-
 				if (IsDesktopPlatform())
 				{
 					await GenerateReplyFromHistoryViaLocalAIAsync(payload);
@@ -1177,7 +1159,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				}
 
 				var turns = ParseAssistantTurns(response.Reply);
-				ApplyVocabularyMarkersToTurns(turns);
 
 				EventBus.Publish(ChatEvents.MessageReceived, new ChatAssistantMessagePayload
 				{
@@ -1324,7 +1305,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 			// Step 4: Publish to views
 			var turns = ParseAssistantTurns(effectiveReply);
-			ApplyVocabularyMarkersToTurns(turns);
 
 			EventBus.Publish(ChatEvents.MessageReceived, new ChatAssistantMessagePayload
 			{
@@ -1434,7 +1414,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 			// Step 4: Publish to views
 			var turns = ParseAssistantTurns(effectiveReply);
-			ApplyVocabularyMarkersToTurns(turns);
 
 			EventBus.Publish(ChatEvents.MessageReceived, new ChatAssistantMessagePayload
 			{
@@ -1712,13 +1691,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
-		/// Regex to match **word** vocabulary markup for stripping before TTS.
-		/// </summary>
-		private static readonly Regex VocabMarkupRegex = new Regex(@"\*\*(.+?)\*\*", RegexOptions.Compiled);
-
-		/// <summary>
 		/// Pre-resolves TTS audio URLs for each turn so the View only needs to download audio clips.
-		/// Strips **vocab** markup from text before sending to TTS.
 		/// </summary>
 		/// <param name="turns">Parsed turn list to enrich with AudioUrl.</param>
 		/// <returns>Awaitable task.</returns>
@@ -1728,8 +1701,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			{
 				return;
 			}
-
-			await EnsureVocabularyMarkerSourcesLoadedAsync();
 
 			for (var i = 0; i < turns.Count; i++)
 			{
@@ -1748,8 +1719,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 					var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
 					var tone = string.IsNullOrWhiteSpace(turn.Tone) ? "neutral" : turn.Tone.Trim();
-					var cleanText = VocabMarkupRegex.Replace(turn.Text, "$1");
-					turn.AudioUrl = await ResolveTtsAudioUrlAsync(cleanText, tone, characterName, false, turn.MessageId);
+					turn.AudioUrl = await ResolveTtsAudioUrlAsync(turn.Text, tone, characterName, false, turn.MessageId);
 
 					if (!string.IsNullOrWhiteSpace(turn.AudioUrl))
 					{
@@ -1976,292 +1946,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					Message = "Failed to load learned vocabulary count: " + exception.Message
 				});
 			}
-		}
-
-		/// <summary>
-		/// Ensures learning-path and learned-vocabulary sources are loaded before marking text.
-		/// </summary>
-		/// <returns>Awaitable task.</returns>
-		private static async Task EnsureVocabularyMarkerSourcesLoadedAsync()
-		{
-			if (ChatState.IsVocabularyMarkerSourceLoaded)
-			{
-				return;
-			}
-
-			await LoadVocabularyMarkerSourcesInternalAsync();
-		}
-
-		/// <summary>
-		/// Loads marker candidates from learning paths and learned words from vocabulary list.
-		/// </summary>
-		/// <returns>Awaitable task.</returns>
-		private static async Task LoadVocabularyMarkerSourcesInternalAsync()
-		{
-			try
-			{
-				var learningPathTask = HttpClient.GetTaskAsync(NetworkEndpoints.LearningPaths);
-				var vocabularyTask = HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyReview);
-
-				var learningPathJson = await learningPathTask;
-				var vocabularyJson = await vocabularyTask;
-
-				ChatState.LearningPathVocabularyCandidates = BuildLearningPathVocabularyCandidates(learningPathJson);
-				ChatState.LearnedVocabularySet = BuildLearnedVocabularySet(vocabularyJson);
-				ChatState.IsVocabularyMarkerSourceLoaded = true;
-			}
-			catch (Exception exception)
-			{
-				Debug.LogWarning("[ChatController] Failed to load vocabulary marker sources: " + exception.Message);
-			}
-		}
-
-		/// <summary>
-		/// Applies vocabulary marker rules to all assistant turns.
-		/// </summary>
-		/// <param name="turns">Parsed assistant turns.</param>
-		private static void ApplyVocabularyMarkersToTurns(List<ChatAssistantTurnPayload> turns)
-		{
-			if (turns == null || turns.Count == 0)
-			{
-				return;
-			}
-
-			for (var i = 0; i < turns.Count; i++)
-			{
-				var turn = turns[i];
-				if (turn == null || string.IsNullOrWhiteSpace(turn.Text))
-				{
-					continue;
-				}
-
-				turn.Text = MarkTextWithLearningPathVocabulary(turn.Text);
-			}
-		}
-
-		/// <summary>
-		/// Marks unlearned learning-path vocabulary in text using **word** markers.
-		/// Overlap resolution is short-first; longer words are considered only if shorter words are learned.
-		/// </summary>
-		/// <param name="text">Source assistant text.</param>
-		/// <returns>Text with **word** markers for clickable vocab links.</returns>
-		private static string MarkTextWithLearningPathVocabulary(string text)
-		{
-			if (string.IsNullOrWhiteSpace(text))
-			{
-				return text;
-			}
-
-			if (!ChatState.IsVocabularyMarkerSourceLoaded)
-			{
-				return text;
-			}
-
-			var plainText = VocabMarkupRegex.Replace(text, "$1");
-			var candidates = BuildUnlearnedVocabularyCandidates();
-			if (candidates.Count == 0)
-			{
-				return plainText;
-			}
-
-			var matches = FindShortestFirstMatches(plainText, candidates);
-			if (matches.Count == 0)
-			{
-				return plainText;
-			}
-
-			return InjectVocabularyMarkers(plainText, matches);
-		}
-
-		private static List<string> BuildUnlearnedVocabularyCandidates()
-		{
-			var source = ChatState.LearningPathVocabularyCandidates;
-			var learnedSet = ChatState.LearnedVocabularySet;
-			var unlearned = new List<string>();
-			if (source == null || source.Count == 0)
-			{
-				return unlearned;
-			}
-
-			for (var i = 0; i < source.Count; i++)
-			{
-				var candidate = source[i];
-				if (string.IsNullOrWhiteSpace(candidate))
-				{
-					continue;
-				}
-
-				if (learnedSet != null && learnedSet.Contains(candidate))
-				{
-					continue;
-				}
-
-				unlearned.Add(candidate);
-			}
-
-			unlearned.Sort((left, right) =>
-			{
-				var lengthCompare = left.Length.CompareTo(right.Length);
-				if (lengthCompare != 0)
-				{
-					return lengthCompare;
-				}
-
-				return string.CompareOrdinal(left, right);
-			});
-
-			return unlearned;
-		}
-
-		private static List<(int Start, int Length)> FindShortestFirstMatches(string text, List<string> candidates)
-		{
-			var matches = new List<(int Start, int Length)>();
-			if (string.IsNullOrEmpty(text) || candidates == null || candidates.Count == 0)
-			{
-				return matches;
-			}
-
-			var position = 0;
-			while (position < text.Length)
-			{
-				var matchedLength = 0;
-
-				for (var i = 0; i < candidates.Count; i++)
-				{
-					var candidate = candidates[i];
-					var candidateLength = candidate.Length;
-					if (candidateLength == 0 || position + candidateLength > text.Length)
-					{
-						continue;
-					}
-
-					if (!string.Equals(text.Substring(position, candidateLength), candidate, StringComparison.Ordinal))
-					{
-						continue;
-					}
-
-					matchedLength = candidateLength;
-					break;
-				}
-
-				if (matchedLength > 0)
-				{
-					matches.Add((position, matchedLength));
-					position += matchedLength;
-					continue;
-				}
-
-				position += 1;
-			}
-
-			return matches;
-		}
-
-		private static string InjectVocabularyMarkers(string text, List<(int Start, int Length)> matches)
-		{
-			var builder = new StringBuilder(text.Length + matches.Count * 4);
-			var cursor = 0;
-
-			for (var i = 0; i < matches.Count; i++)
-			{
-				var match = matches[i];
-				if (match.Start > cursor)
-				{
-					builder.Append(text, cursor, match.Start - cursor);
-				}
-
-				builder.Append("**");
-				builder.Append(text, match.Start, match.Length);
-				builder.Append("**");
-
-				cursor = match.Start + match.Length;
-			}
-
-			if (cursor < text.Length)
-			{
-				builder.Append(text, cursor, text.Length - cursor);
-			}
-
-			return builder.ToString();
-		}
-
-		private static List<string> BuildLearningPathVocabularyCandidates(string responseJson)
-		{
-			var result = new List<string>();
-			if (string.IsNullOrWhiteSpace(responseJson))
-			{
-				return result;
-			}
-
-			var response = JsonConvert.DeserializeObject<ChatLearningPathListResponsePayload>(responseJson);
-			var paths = response?.LearningPaths;
-			if (paths == null || paths.Count == 0)
-			{
-				return result;
-			}
-
-			var seen = new HashSet<string>(StringComparer.Ordinal);
-			for (var i = 0; i < paths.Count; i++)
-			{
-				var vocabulary = paths[i]?.Vocabulary;
-				if (string.IsNullOrWhiteSpace(vocabulary))
-				{
-					continue;
-				}
-
-				var tokens = vocabulary.Split(LearningPathVocabularySeparators, StringSplitOptions.RemoveEmptyEntries);
-				for (var j = 0; j < tokens.Length; j++)
-				{
-					var normalized = NormalizeVocabularyWord(tokens[j]);
-					if (string.IsNullOrWhiteSpace(normalized) || !seen.Add(normalized))
-					{
-						continue;
-					}
-
-					result.Add(normalized);
-				}
-			}
-
-			return result;
-		}
-
-		private static HashSet<string> BuildLearnedVocabularySet(string responseJson)
-		{
-			var result = new HashSet<string>(StringComparer.Ordinal);
-			if (string.IsNullOrWhiteSpace(responseJson))
-			{
-				return result;
-			}
-
-			var response = JsonConvert.DeserializeObject<ChatVocabularyListResponsePayload>(responseJson);
-			var vocabularies = response?.Vocabularies;
-			if (vocabularies == null || vocabularies.Count == 0)
-			{
-				return result;
-			}
-
-			for (var i = 0; i < vocabularies.Count; i++)
-			{
-				var normalized = NormalizeVocabularyWord(vocabularies[i]?.Korean);
-				if (string.IsNullOrWhiteSpace(normalized))
-				{
-					continue;
-				}
-
-				result.Add(normalized);
-			}
-
-			return result;
-		}
-
-		private static string NormalizeVocabularyWord(string value)
-		{
-			if (string.IsNullOrWhiteSpace(value))
-			{
-				return string.Empty;
-			}
-
-			return value.Replace("**", string.Empty).Trim();
 		}
 
 		/// <summary>
