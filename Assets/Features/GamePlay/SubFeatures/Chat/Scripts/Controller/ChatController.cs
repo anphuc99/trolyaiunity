@@ -1967,12 +1967,27 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				var dueTask = HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyDue);
-				var allTask = HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyList);
-				await Task.WhenAll(dueTask, allTask);
+				// Fetch due and all vocabulary independently so one failure doesn't block the other.
+				string dueJson = null;
+				string allJson = null;
 
-				var dueJson = dueTask.Result;
-				var allJson = allTask.Result;
+				try
+				{
+					dueJson = await HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyDue);
+				}
+				catch (Exception dueException)
+				{
+					Debug.LogWarning("[ChatController] Failed to load due vocabulary: " + dueException.Message);
+				}
+
+				try
+				{
+					allJson = await HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyList);
+				}
+				catch (Exception allException)
+				{
+					Debug.LogWarning("[ChatController] Failed to load all vocabulary: " + allException.Message);
+				}
 
 				var dueResponse = string.IsNullOrWhiteSpace(dueJson)
 					? null
