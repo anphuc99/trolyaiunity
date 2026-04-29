@@ -122,13 +122,15 @@ The chat server supports optional long-term AI memory backed by ChromaDB. When e
 
 ## Chat: Auto Talk Mode (Client)
 
-The GamePlay Chat client supports an auto-conversation mode controlled from parent menu and keyboard shortcut.
+The GamePlay Chat client supports a batch auto-conversation mode controlled from parent menu, keyboard shortcut, or the Apply button.
 
 - Menu: `Chat tự động` (toggle on/off)
 - Shortcut: `Ctrl+R` (same toggle behavior)
-- First auto turn: sends context `AI tự nói chuyện ít nhất 10 tin nhắn mỗi lượt` through the same Save + Send flow used by context popup
-- Follow-up turns: repeatedly requests `GenerateReplyFromHistory`
-- Auto mode stops when user toggles off, chat ends/uninstalls, no active scene characters remain, or an in-flight auto request fails
+- Apply button: `_buttonApplyAutoChat` starts/stops batch auto chat using the count from `_inputNumberAutochat`
+- **Phase 1 – Generation**: sends context `AI tự nói chuyện ít nhất {N} tin nhắn mỗi lượt` then repeatedly requests `GenerateReplyFromHistory`, buffering all turns silently (no display, no TTS playback). Chat input is disabled during this phase.
+- **Phase 2 – Playback**: once the accumulated turn count reaches or exceeds N, all buffered turns are enqueued and played back sequentially with TTS audio (audio is pre-loaded by Controller during Phase 1).
+- After playback completes, auto chat stops automatically.
+- Auto mode also stops when user toggles off, chat ends/uninstalls, no active scene characters remain, or a request fails.
 
 ## Chat: Local AI via Ollama (PC Desktop)
 

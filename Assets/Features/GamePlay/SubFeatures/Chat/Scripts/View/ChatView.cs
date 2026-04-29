@@ -27,7 +27,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private const int RecordingFrequencyHz = 16000;
 		private const int MaxRecordingSeconds = 60;
 		private const string DefaultSpeechLanguage = "zh";
-		private const string AutoChatContext = "AI tự nói chuyện ít nhất 10 tin nhắn mỗi lượt. Các nhân vật không được phép ngủ";
+		private const string AutoChatContextTemplate = "AI tự nói chuyện ít nhất {0} tin nhắn mỗi lượt. Các nhân vật không được phép ngủ";
 
 		[SerializeField]
 		private TMP_InputField _inputField;
@@ -72,6 +72,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private GameObject _bottomMenu;
 		[SerializeField]
 		private GameObject _body;
+		[SerializeField]
+		private TMP_InputField _inputNumberAutochat;
+		[SerializeField]
+		private Button _buttonApplyAutoChat;
 
 		/// <summary>
 		/// Regex to match **word** vocabulary markup in assistant text.
@@ -100,6 +104,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private bool _isAutoChatEnabled;
 		private bool _isAutoChatAwaitingReply;
 		private bool _hasSentAutoChatContext;
+		private int _autoChatTargetTurnCount = 10;
+		private int _autoChatGeneratedTurnCount;
+		private bool _isAutoChatBatchGenerating;
+		private readonly List<ChatAssistantTurnPayload> _autoChatBatchBuffer = new List<ChatAssistantTurnPayload>();
 		private Vector2 _saveBodyOriginalAnchorMin;
 		private Vector2 _saveBodyOriginalAnchorMax;
 		private Vector2 _saveBodyOriginalOffsetMin;
@@ -145,6 +153,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			StopRecordingIfNeeded();
 			UnbindInputFieldEvents();
 			UnbindRecordButtonEvents();
+			UnbindApplyAutoChatButtonEvents();
 			UnbindAudioInputGuard();
 			RestoreForegroundRuntimeMode();
 		}
@@ -597,6 +606,65 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_isAutoChatAwaitingReply = false;
 
 			var turns = response.Turns != null && response.Turns.Count > 0 ? response.Turns : new List<ChatAssistantTurnPayload>();
+
+			// Batch generating phase: buffer turns silently without display or TTS playback.
+			if (_isAutoChatBatchGenerating)
+			{
+				var turnCount = 0;
+				for (var i = 0; i < turns.Count; i++)
+				{
+					if (turns[i] == null)
+					{
+						continue;
+					}
+
+					_autoChatBatchBuffer.Add(turns[i]);
+					turnCount++;
+				}
+
+				// If no structured turns, count the raw reply as one turn.
+				if (turnCount == 0 && !string.IsNullOrWhiteSpace(response.Reply))
+				{
+					_autoChatBatchBuffer.Add(new ChatAssistantTurnPayload
+					{
+						MessageId = Guid.NewGuid().ToString("N"),
+						CharacterName = DefaultCharacterDisplayName,
+						Text = response.Reply,
+						Tone = DefaultTtsTone,
+						IsAudioPreloadCompleted = true,
+					});
+					turnCount = 1;
+				}
+
+				_autoChatGeneratedTurnCount += turnCount;
+				Debug.Log("[ChatView] Auto chat batch gen: " + _autoChatGeneratedTurnCount + "/" + _autoChatTargetTurnCount + " turns buffered.");
+
+				if (_autoChatGeneratedTurnCount >= _autoChatTargetTurnCount)
+				{
+					// Enough turns generated. Move buffer to queue and start playback.
+					_isAutoChatBatchGenerating = false;
+					for (var i = 0; i < _autoChatBatchBuffer.Count; i++)
+					{
+						_pendingCharacterTurns.Enqueue(_autoChatBatchBuffer[i]);
+					}
+
+					_autoChatBatchBuffer.Clear();
+					SetCharacterRespondingState(true);
+
+					if (!_isProcessingCharacterTurns)
+					{
+						StartCoroutine(ProcessCharacterTurnsSequentially());
+					}
+				}
+				else
+				{
+					// Need more turns. Request the next generation.
+					TryTriggerNextAutoChatTurn();
+				}
+
+				return;
+			}
+
 			if (turns.Count == 0)
 			{
 				_messageContainer.AddNewMessage(new MessageBubbleData
@@ -695,6 +763,14 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			_isProcessingCharacterTurns = false;
 			SetCharacterRespondingState(false);
+
+			// If batch playback just finished, stop auto chat entirely.
+			if (_isAutoChatEnabled && !_isAutoChatBatchGenerating && _autoChatGeneratedTurnCount >= _autoChatTargetTurnCount)
+			{
+				StopAutoChatMode();
+				yield break;
+			}
+
 			TryTriggerNextAutoChatTurn();
 		}
 
@@ -809,6 +885,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			BindRecordButtonEvents();
+			BindApplyAutoChatButtonEvents();
 			UpdateRecordButtonVisualState();
 
 			SetChatInputInteractable(!_isCharacterResponding && _hasSceneCharacters);
@@ -1064,6 +1141,61 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			_recordButton.onClick.RemoveListener(HandleRecordButtonClicked);
+		}
+
+		/// <summary>
+		/// Binds click listener for the Apply Auto Chat button.
+		/// </summary>
+		private void BindApplyAutoChatButtonEvents()
+		{
+			if (_buttonApplyAutoChat == null)
+			{
+				return;
+			}
+
+			_buttonApplyAutoChat.onClick.RemoveListener(HandleApplyAutoChatClicked);
+			_buttonApplyAutoChat.onClick.AddListener(HandleApplyAutoChatClicked);
+		}
+
+		/// <summary>
+		/// Unbinds click listener for the Apply Auto Chat button.
+		/// </summary>
+		private void UnbindApplyAutoChatButtonEvents()
+		{
+			if (_buttonApplyAutoChat == null)
+			{
+				return;
+			}
+
+			_buttonApplyAutoChat.onClick.RemoveListener(HandleApplyAutoChatClicked);
+		}
+
+		/// <summary>
+		/// Handles Apply Auto Chat button click. Starts or stops batch auto chat.
+		/// </summary>
+		private void HandleApplyAutoChatClicked()
+		{
+			ToggleAutoChatMode();
+		}
+
+		/// <summary>
+		/// Parses the target turn count from the auto chat input field.
+		/// Returns at least 1, defaults to 10 when input is empty or invalid.
+		/// </summary>
+		/// <returns>Clamped target turn count.</returns>
+		private int ParseAutoChatTargetCount()
+		{
+			if (_inputNumberAutochat == null || string.IsNullOrWhiteSpace(_inputNumberAutochat.text))
+			{
+				return 10;
+			}
+
+			if (int.TryParse(_inputNumberAutochat.text.Trim(), out var parsed) && parsed >= 1)
+			{
+				return parsed;
+			}
+
+			return 10;
 		}
 
 		private void HandleInputSubmitted(string value)
@@ -1521,9 +1653,15 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
+			_autoChatTargetTurnCount = ParseAutoChatTargetCount();
+			_autoChatGeneratedTurnCount = 0;
+			_isAutoChatBatchGenerating = true;
+			_autoChatBatchBuffer.Clear();
 			_isAutoChatEnabled = true;
 			_isAutoChatAwaitingReply = false;
 			_hasSentAutoChatContext = false;
+			SetChatInputInteractable(false);
+			Debug.Log("[ChatView] Auto chat batch started. Target: " + _autoChatTargetTurnCount + " turns.");
 			EnsureAutoChatTranslationsVisible();
 			TryTriggerNextAutoChatTurn();
 		}
@@ -1544,9 +1682,19 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		/// </summary>
 		private void StopAutoChatMode()
 		{
+			var wasBatchGenerating = _isAutoChatBatchGenerating;
 			_isAutoChatEnabled = false;
 			_isAutoChatAwaitingReply = false;
 			_hasSentAutoChatContext = false;
+			_isAutoChatBatchGenerating = false;
+			_autoChatGeneratedTurnCount = 0;
+			_autoChatBatchBuffer.Clear();
+
+			// Re-enable chat input if we were in batch generation (input was disabled).
+			if (wasBatchGenerating && !_isCharacterResponding)
+			{
+				SetChatInputInteractable(_hasSceneCharacters);
+			}
 		}
 
 		/// <summary>
@@ -1556,7 +1704,13 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		/// </summary>
 		private void TryTriggerNextAutoChatTurn()
 		{
-			if (!_isAutoChatEnabled || _isAutoChatAwaitingReply || _isCharacterResponding)
+			if (!_isAutoChatEnabled || _isAutoChatAwaitingReply)
+			{
+				return;
+			}
+
+			// During batch generation, skip the responding check since nothing is playing yet.
+			if (!_isAutoChatBatchGenerating && _isCharacterResponding)
 			{
 				return;
 			}
@@ -1573,7 +1727,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (!_hasSentAutoChatContext)
 			{
 				_hasSentAutoChatContext = true;
-				HandleSaveAndSendContextClicked(AutoChatContext);
+				HandleSaveAndSendContextClicked(string.Format(AutoChatContextTemplate, _autoChatTargetTurnCount));
 				return;
 			}
 
@@ -1892,7 +2046,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				SetVocabAudioRequestInProgress(false);
 			}
 
-			if (_isAutoChatEnabled && _isAutoChatAwaitingReply)
+			if (_isAutoChatEnabled && (_isAutoChatAwaitingReply || _isAutoChatBatchGenerating))
 			{
 				Debug.LogWarning("[ChatView] Auto chat stopped because request failed.", this);
 				StopAutoChatMode();
