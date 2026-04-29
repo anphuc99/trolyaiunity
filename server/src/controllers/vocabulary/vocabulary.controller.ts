@@ -41,7 +41,8 @@ const serialiseVocabulary = (entity: VocabularyEntity) => {
 
   return {
     id: entity.id,
-    korean: entity.korean,
+    chinnese: entity.chinnese,
+    korean: entity.chinnese,
     vietnamese: entity.vietnamese,
     pinyin: entity.pinyin ?? null,
     level: entity.level ?? null,
@@ -217,17 +218,20 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
 
     const {
       korean,
+      chinnese,
       vietnamese,
       pinyin,
       level
     } = request.body as {
       korean?: string;
+      chinnese?: string;
       vietnamese?: string;
       pinyin?: string;
       level?: string;
     };
 
-    const trimmedKorean = normalizeVocabularyWord(korean ?? "");
+    const sourceWord = chinnese ?? korean;
+    const trimmedKorean = normalizeVocabularyWord(sourceWord ?? "");
     const trimmedVietnamese = (vietnamese ?? "").trim();
     const trimmedPinyin = (pinyin ?? "").trim();
     const trimmedLevel = (level ?? "").trim();
@@ -244,7 +248,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
 
     try {
       // Check duplicate
-      const existing = await vocabRepo.findOne({ where: { korean: trimmedKorean, userId } });
+      const existing = await vocabRepo.findOne({ where: { chinnese: trimmedKorean, userId } });
 
       if (existing) {
         response.status(409).json({ message: "Vocabulary already exists", vocabulary: existing });
@@ -254,7 +258,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       const currentUserLevel = await resolveCurrentUserLevel(userId);
 
       const vocab = vocabRepo.create({
-        korean: trimmedKorean,
+        chinnese: trimmedKorean,
         vietnamese: trimmedVietnamese,
         pinyin: trimmedPinyin || null,
         level: trimmedLevel || currentUserLevel,
@@ -280,7 +284,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       response.status(201).json(serialiseVocabulary(saved));
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        const existing = await vocabRepo.findOne({ where: { korean: trimmedKorean, userId } });
+        const existing = await vocabRepo.findOne({ where: { chinnese: trimmedKorean, userId } });
         response.status(409).json({ message: "Vocabulary already exists", vocabulary: existing ?? null });
         return;
       }
@@ -307,8 +311,15 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       return;
     }
 
-    const { korean, vietnamese, pinyin, level } = request.body as { korean?: string; vietnamese?: string; pinyin?: string; level?: string };
-    const normalizedKorean = typeof korean === "string" ? normalizeVocabularyWord(korean) : null;
+    const { korean, chinnese, vietnamese, pinyin, level } = request.body as {
+      korean?: string;
+      chinnese?: string;
+      vietnamese?: string;
+      pinyin?: string;
+      level?: string;
+    };
+    const incomingSourceWord = typeof chinnese === "string" ? chinnese : korean;
+    const normalizedKorean = typeof incomingSourceWord === "string" ? normalizeVocabularyWord(incomingSourceWord) : null;
 
     try {
       const vocab = await vocabRepo.findOne({ where: { id: vocabId, userId } });
@@ -318,16 +329,16 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         return;
       }
 
-      if (typeof korean === "string") {
+      if (typeof korean === "string" || typeof chinnese === "string") {
         if (!normalizedKorean) {
           response.status(400).json({ message: "Korean cannot be empty" });
           return;
         }
 
-        if (normalizedKorean !== vocab.korean) {
+        if (normalizedKorean !== vocab.chinnese) {
           const duplicate = await vocabRepo.findOne({
             where: {
-              korean: normalizedKorean,
+              chinnese: normalizedKorean,
               userId,
               id: Not(vocabId)
             }
@@ -339,12 +350,12 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
           }
         }
 
-        vocab.korean = normalizedKorean;
+        vocab.chinnese = normalizedKorean;
       }
 
       if (vietnamese?.trim()) {
         const normalizedMeaning = vietnamese.trim();
-        const sourceWord = ((typeof korean === "string" ? normalizedKorean : vocab.korean) || "").trim();
+        const sourceWord = (((typeof korean === "string" || typeof chinnese === "string") ? normalizedKorean : vocab.chinnese) || "").trim();
 
         if (!isValidVietnameseMeaning(sourceWord, normalizedMeaning)) {
           response.status(400).json({ message: "Vietnamese meaning is invalid (cannot be Chinese or same as source word)" });
@@ -737,8 +748,8 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     try {
       const cheapAI: CheapAIService = createCheapAIService();
 
-      // Try to find existing vocabulary by korean (Chinese) text
-      const existing = await vocabRepo.findOne({ where: { korean: word, userId } });
+      // Try to find existing vocabulary by source text
+      const existing = await vocabRepo.findOne({ where: { chinnese: word, userId } });
 
       if (existing) {
         let pinyin = existing.pinyin ?? "";
@@ -796,7 +807,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       const currentUserLevel = await resolveCurrentUserLevel(userId);
 
       const vocab = vocabRepo.create({
-        korean: word,
+        chinnese: word,
         vietnamese,
         pinyin: pinyin || null,
         level: currentUserLevel,
@@ -825,7 +836,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        const existing = await vocabRepo.findOne({ where: { korean: word, userId } });
+        const existing = await vocabRepo.findOne({ where: { chinnese: word, userId } });
         response.status(409).json({ message: "Vocabulary already exists", vocabulary: existing ?? null });
         return;
       }

@@ -19,7 +19,7 @@ import UserEntity from "./user.entity.js";
  *
  * Uses string UUID for compatibility with old data migration.
  */
-@Index(["userId", "korean"], { unique: true })
+@Index(["userId", "chinnese"], { unique: true })
 @Entity({ name: "vocabularies" })
 class VocabularyEntity {
   @PrimaryColumn({ type: "varchar", length: 36 })
@@ -32,9 +32,9 @@ class VocabularyEntity {
     }
   }
 
-  /** Korean word or phrase. */
-  @Column({ type: "varchar", length: 255 })
-  korean!: string;
+  /** Chinese word or phrase. */
+  @Column({ name: "korean", type: "varchar", length: 255 })
+  chinnese!: string;
 
   /** Vietnamese translation. */
   @Column({ type: "varchar", length: 255 })

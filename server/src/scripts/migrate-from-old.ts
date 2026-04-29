@@ -319,7 +319,7 @@ async function migrateVocabularies(
 
       const newVocab = new VocabularyEntity();
       newVocab.id = oldVocab.id;
-      newVocab.korean = oldVocab.korean;
+      newVocab.chinnese = oldVocab.korean;
       newVocab.vietnamese = oldVocab.vietnamese;
       newVocab.pinyin = oldVocab.pinyin?.trim() || null;
       newVocab.level = oldVocab.level?.trim() || null;
