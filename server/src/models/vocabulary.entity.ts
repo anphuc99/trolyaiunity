@@ -33,7 +33,7 @@ class VocabularyEntity {
   }
 
   /** Chinese word or phrase. */
-  @Column({ name: "korean", type: "varchar", length: 255 })
+  @Column({ type: "varchar", length: 255 })
   chinnese!: string;
 
   /** Vietnamese translation. */
