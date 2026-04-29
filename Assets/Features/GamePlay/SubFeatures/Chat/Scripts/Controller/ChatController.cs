@@ -3,7 +3,6 @@ using Features.GamePlay.SubFeatures.Chat.Infrastructure;
 using Features.GamePlay.SubFeatures.Chat.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.Chat.Model;
 using Features.GamePlay.SubFeatures.Chat.Requests;
-using Features.GamePlay.SubFeatures.LearningPath.Model;
 using Core.Infrastructure.Network;
 using Core.Infrastructure.State;
 using Newtonsoft.Json;
@@ -2012,15 +2011,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				// Parse new words from learning paths (comma-separated vocabulary field).
 				var dueWordSet = new HashSet<string>(dueWords, StringComparer.OrdinalIgnoreCase);
 				var newWords = new List<string>();
-				var lpResponse = string.IsNullOrWhiteSpace(learningPathsJson)
+				var lpRoot = string.IsNullOrWhiteSpace(learningPathsJson)
 					? null
-					: JsonConvert.DeserializeObject<LearningPathListResponsePayload>(learningPathsJson);
+					: JsonConvert.DeserializeObject<JObject>(learningPathsJson);
+				var learningPaths = lpRoot?["learningPaths"] as JArray;
 
-				if (lpResponse?.LearningPaths != null)
+				if (learningPaths != null)
 				{
-					for (var i = 0; i < lpResponse.LearningPaths.Count; i++)
+					for (var i = 0; i < learningPaths.Count; i++)
 					{
-						var vocabCsv = lpResponse.LearningPaths[i]?.Vocabulary;
+						var vocabCsv = learningPaths[i]?["vocabulary"]?.ToString();
 						if (string.IsNullOrWhiteSpace(vocabCsv))
 						{
 							continue;
