@@ -103,6 +103,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private bool _hasSceneCharacters;
 		private bool _isAutoChatEnabled;
 		private bool _isAutoChatAwaitingReply;
+		private bool _isAutoChatAwaitingApply;
 		private bool _hasSentAutoChatContext;
 		private int _autoChatTargetTurnCount = 10;
 		private int _autoChatGeneratedTurnCount;
@@ -257,6 +258,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		protected override void OnEnabled()
 		{
 			EnsureDependencies();
+			ResetAutoChatInputUi();
 			EnableBackgroundRuntimeMode();
 			RefreshSceneCharacterState();
 			RefreshHistory();
@@ -643,6 +645,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				{
 					// Enough turns generated. Move buffer to queue and start playback.
 					_isAutoChatBatchGenerating = false;
+					SetAutoChatTargetInputVisible(false);
 					for (var i = 0; i < _autoChatBatchBuffer.Count; i++)
 					{
 						_pendingCharacterTurns.Enqueue(_autoChatBatchBuffer[i]);
@@ -1171,11 +1174,90 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		}
 
 		/// <summary>
-		/// Handles Apply Auto Chat button click. Starts or stops batch auto chat.
+		/// Handles Apply Auto Chat button click.
 		/// </summary>
 		private void HandleApplyAutoChatClicked()
 		{
-			ToggleAutoChatMode();
+			if (_isAutoChatEnabled)
+			{
+				return;
+			}
+
+			if (!_isAutoChatAwaitingApply)
+			{
+				EnterAutoChatApplyMode();
+				return;
+			}
+
+			StartAutoChatMode();
+		}
+
+		/// <summary>
+		/// Shows and enables auto-chat target input, waiting for Apply.
+		/// </summary>
+		private void EnterAutoChatApplyMode()
+		{
+			_isAutoChatAwaitingApply = true;
+			SetAutoChatTargetInputVisible(true);
+			SetAutoChatTargetInputInteractable(true);
+
+			if (_buttonApplyAutoChat != null)
+			{
+				_buttonApplyAutoChat.interactable = true;
+			}
+
+			if (_inputNumberAutochat != null)
+			{
+				_inputNumberAutochat.ActivateInputField();
+				_inputNumberAutochat.Select();
+			}
+		}
+
+		/// <summary>
+		/// Resets auto-chat target input UI to idle state.
+		/// </summary>
+		private void ResetAutoChatInputUi()
+		{
+			_isAutoChatAwaitingApply = false;
+			SetAutoChatTargetInputInteractable(true);
+			SetAutoChatTargetInputVisible(false);
+
+			if (_buttonApplyAutoChat != null)
+			{
+				_buttonApplyAutoChat.interactable = true;
+			}
+		}
+
+		/// <summary>
+		/// Shows or hides the auto-chat target input field.
+		/// </summary>
+		/// <param name="isVisible">True to show the input field.</param>
+		private void SetAutoChatTargetInputVisible(bool isVisible)
+		{
+			if (_inputNumberAutochat == null)
+			{
+				return;
+			}
+
+			_inputNumberAutochat.gameObject.SetActive(isVisible);
+		}
+
+		/// <summary>
+		/// Enables or disables editing for the auto-chat target input field.
+		/// </summary>
+		/// <param name="isInteractable">True to allow editing.</param>
+		private void SetAutoChatTargetInputInteractable(bool isInteractable)
+		{
+			if (_inputNumberAutochat == null)
+			{
+				return;
+			}
+
+			_inputNumberAutochat.interactable = isInteractable;
+			if (!isInteractable)
+			{
+				_inputNumberAutochat.DeactivateInputField();
+			}
 		}
 
 		/// <summary>
@@ -1633,7 +1715,13 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			StartAutoChatMode();
+			if (_isAutoChatAwaitingApply)
+			{
+				ResetAutoChatInputUi();
+				return;
+			}
+
+			EnterAutoChatApplyMode();
 		}
 
 		/// <summary>
@@ -1655,11 +1743,17 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			_autoChatTargetTurnCount = ParseAutoChatTargetCount();
 			_autoChatGeneratedTurnCount = 0;
+			_isAutoChatAwaitingApply = false;
 			_isAutoChatBatchGenerating = true;
 			_autoChatBatchBuffer.Clear();
 			_isAutoChatEnabled = true;
 			_isAutoChatAwaitingReply = false;
 			_hasSentAutoChatContext = false;
+			SetAutoChatTargetInputInteractable(false);
+			if (_buttonApplyAutoChat != null)
+			{
+				_buttonApplyAutoChat.interactable = false;
+			}
 			SetChatInputInteractable(false);
 			Debug.Log("[ChatView] Auto chat batch started. Target: " + _autoChatTargetTurnCount + " turns.");
 			EnsureAutoChatTranslationsVisible();
@@ -1685,10 +1779,17 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			var wasBatchGenerating = _isAutoChatBatchGenerating;
 			_isAutoChatEnabled = false;
 			_isAutoChatAwaitingReply = false;
+			_isAutoChatAwaitingApply = false;
 			_hasSentAutoChatContext = false;
 			_isAutoChatBatchGenerating = false;
 			_autoChatGeneratedTurnCount = 0;
 			_autoChatBatchBuffer.Clear();
+			SetAutoChatTargetInputInteractable(true);
+			SetAutoChatTargetInputVisible(false);
+			if (_buttonApplyAutoChat != null)
+			{
+				_buttonApplyAutoChat.interactable = true;
+			}
 
 			// Re-enable chat input if we were in batch generation (input was disabled).
 			if (wasBatchGenerating && !_isCharacterResponding)

@@ -122,13 +122,14 @@ The chat server supports optional long-term AI memory backed by ChromaDB. When e
 
 ## Chat: Auto Talk Mode (Client)
 
-The GamePlay Chat client supports a batch auto-conversation mode controlled from parent menu, keyboard shortcut, or the Apply button.
+The GamePlay Chat client supports a batch auto-conversation mode controlled from parent menu, keyboard shortcut, and an Apply confirmation step.
 
 - Menu: `Chat tự động` (toggle on/off)
 - Shortcut: `Ctrl+R` (same toggle behavior)
-- Apply button: `_buttonApplyAutoChat` starts/stops batch auto chat using the count from `_inputNumberAutochat`
+- Toggle ON: shows `_inputNumberAutochat` so user can set target turn count.
+- Apply button: starts batch auto chat using `_inputNumberAutochat` and disables that input while generation is running.
 - **Phase 1 – Generation**: sends context `AI tự nói chuyện ít nhất {N} tin nhắn mỗi lượt` then repeatedly requests `GenerateReplyFromHistory`, buffering all turns silently (no display, no TTS playback). Chat input is disabled during this phase.
-- **Phase 2 – Playback**: once the accumulated turn count reaches or exceeds N, all buffered turns are enqueued and played back sequentially with TTS audio (audio is pre-loaded by Controller during Phase 1).
+- **Phase 2 – Playback**: once the accumulated turn count reaches or exceeds N, `_inputNumberAutochat` is hidden, then all buffered turns are enqueued and played back sequentially with TTS audio (audio is pre-loaded by Controller during Phase 1).
 - After playback completes, auto chat stops automatically.
 - Auto mode also stops when user toggles off, chat ends/uninstalls, no active scene characters remain, or a request fails.
 
