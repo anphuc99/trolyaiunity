@@ -1961,7 +1961,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_autoChatPendingVocabWords.Add(words[i]);
 			}
 
-			return "Hãy chèn các từ vựng sau vào câu nói (đánh dấu bằng **từ**): " + string.Join(", ", words);
+			return "Hãy chèn các từ vựng sau vào câu nói: " + string.Join(", ", words);
 		}
 
 		/// <summary>
@@ -1999,7 +1999,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			for (var i = 0; i < _autoChatPendingVocabWords.Count; i++)
 			{
 				var word = _autoChatPendingVocabWords[i];
-				if (!combinedText.Contains("**" + word + "**"))
+				if (!ContainsVocabWord(combinedText, word))
 				{
 					unusedWords.Add(word);
 				}
@@ -2015,6 +2015,27 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				Debug.Log("[ChatView] Auto chat vocab carry-over: " + unusedWords.Count + " unused words.");
 			}
+		}
+
+		/// <summary>
+		/// Checks whether the reply text contains a vocabulary word, with or without **word** markup.
+		/// </summary>
+		/// <param name="text">Reply text to inspect.</param>
+		/// <param name="word">Vocabulary word to find.</param>
+		/// <returns>True when word is found in either format.</returns>
+		private static bool ContainsVocabWord(string text, string word)
+		{
+			if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(word))
+			{
+				return false;
+			}
+
+			if (text.IndexOf("**" + word + "**", StringComparison.OrdinalIgnoreCase) >= 0)
+			{
+				return true;
+			}
+
+			return text.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0;
 		}
 
 		/// <summary>
@@ -2046,6 +2067,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			// Build vocab context for this turn.
 			var vocabContext = BuildAutoChatVocabContext();
+			Debug.Log(vocabContext);
 
 			if (!_hasSentAutoChatContext)
 			{
