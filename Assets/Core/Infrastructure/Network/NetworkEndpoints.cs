@@ -54,6 +54,7 @@ namespace Core.Infrastructure.Network
 		public const string CharacterRelationshipsEvaluateSession = "/api/character-relationships/evaluate-session";
 		public const string VocabularyLookup = "/api/vocabulary/lookup";
 		public const string VocabularyLearnedCount = "/api/vocabulary/learned-count";
+		public const string VocabularyTodayNewCount = "/api/vocabulary/today-new-count";
 		public const string VocabularyDue = "/api/vocabulary/due";
 		public const string VocabularyBatchReview = "/api/vocabulary/batch-review";
 		public const string VocabularyReview = "/api/vocabulary";

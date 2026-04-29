@@ -1983,9 +1983,10 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				// Fetch due vocabulary and learning paths independently.
+				// Fetch due vocabulary, learning paths, and today's new count independently.
 				string dueJson = null;
 				string learningPathsJson = null;
+				string todayNewCountJson = null;
 
 				try
 				{
@@ -2003,6 +2004,15 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				catch (Exception lpException)
 				{
 					Debug.LogWarning("[ChatController] Failed to load learning paths: " + lpException.Message);
+				}
+
+				try
+				{
+					todayNewCountJson = await HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyTodayNewCount);
+				}
+				catch (Exception cntException)
+				{
+					Debug.LogWarning("[ChatController] Failed to load today's new vocab count: " + cntException.Message);
 				}
 
 				// Parse due vocabulary.
@@ -2058,6 +2068,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				{
 					DueWords = dueWords,
 					NewWords = newWords,
+					TodayNewCount = ParseTodayNewCount(todayNewCountJson),
 				});
 			}
 			catch (Exception exception)
@@ -2065,6 +2076,35 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				EventBus.Publish(ChatEvents.AutoChatVocabularyLoaded, new ChatAutoChatVocabularyPayload());
 				Debug.LogWarning("[ChatController] Failed to load auto-chat vocabulary: " + exception.Message);
 			}
+		}
+
+		/// <summary>
+		/// Parses the today-new-count response payload, returning 0 on missing/invalid input.
+		/// </summary>
+		/// <param name="json">Raw JSON response body.</param>
+		/// <returns>Count of vocabulary entries created today.</returns>
+		private static int ParseTodayNewCount(string json)
+		{
+			if (string.IsNullOrWhiteSpace(json))
+			{
+				return 0;
+			}
+
+			try
+			{
+				var root = JsonConvert.DeserializeObject<JObject>(json);
+				var token = root?["count"];
+				if (token != null && token.Type != JTokenType.Null)
+				{
+					return token.Value<int>();
+				}
+			}
+			catch (Exception parseException)
+			{
+				Debug.LogWarning("[ChatController] Failed to parse today's new vocab count: " + parseException.Message);
+			}
+
+			return 0;
 		}
 
 		/// <summary>

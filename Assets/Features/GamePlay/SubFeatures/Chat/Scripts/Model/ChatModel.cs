@@ -923,6 +923,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		public System.Collections.Generic.List<string> NewWords { get; set; }
 			= new System.Collections.Generic.List<string>();
+
+		/// <summary>
+		/// Number of vocabulary entries created today (used to cap daily new-word intake).
+		/// </summary>
+		public int TodayNewCount { get; set; }
 	}
 
 	/// <summary>

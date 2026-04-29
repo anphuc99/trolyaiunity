@@ -18,6 +18,7 @@ interface VocabularyController {
   deleteVocabulary: (request: Request, response: Response) => Promise<void>;
   reviewVocabulary: (request: Request, response: Response) => Promise<void>;
   getLearnedCount: (request: Request, response: Response) => Promise<void>;
+  getTodayNewCount: (request: Request, response: Response) => Promise<void>;
   getDueReviews: (request: Request, response: Response) => Promise<void>;
   getStats: (request: Request, response: Response) => Promise<void>;
   toggleStar: (request: Request, response: Response) => Promise<void>;
@@ -533,6 +534,33 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   };
 
   // ──────────────────────────────────────────────────────────────────────────
+  // Count vocabularies created today (used to cap daily new-word intake in chat).
+  // ──────────────────────────────────────────────────────────────────────────
+  const getTodayNewCount: VocabularyController["getTodayNewCount"] = async (request, response) => {
+    const userId = request.user?.id;
+
+    if (!userId) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    try {
+      const vocabs = await vocabRepo.find({
+        where: { userId },
+        select: ["id", "createdAt"]
+      });
+
+      const todayKey = toDateKey(new Date());
+      const count = vocabs.filter((v: VocabularyEntity) => toDateKey(v.createdAt) === todayKey).length;
+
+      response.json({ count });
+    } catch (error) {
+      console.error("Failed to get today's new vocabulary count.", error);
+      response.status(500).json({ message: "Failed to get today's new vocabulary count" });
+    }
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
   // Get vocabularies due for review today.
   // ──────────────────────────────────────────────────────────────────────────
   const getDueReviews: VocabularyController["getDueReviews"] = async (request, response) => {
@@ -943,6 +971,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     deleteVocabulary,
     reviewVocabulary,
     getLearnedCount,
+    getTodayNewCount,
     getDueReviews,
     getStats,
     toggleStar,
