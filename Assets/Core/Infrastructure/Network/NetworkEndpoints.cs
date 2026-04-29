@@ -57,5 +57,6 @@ namespace Core.Infrastructure.Network
 		public const string VocabularyDue = "/api/vocabulary/due";
 		public const string VocabularyReview = "/api/vocabulary";
 		public const string VocabularyIgnore = "/api/vocabulary";
+		public const string VocabularyList = "/api/vocabulary";
 	}
 }

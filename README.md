@@ -129,6 +129,7 @@ The GamePlay Chat client supports a batch auto-conversation mode controlled from
 - Toggle ON: shows `_inputNumberAutochat` so user can set target turn count.
 - Apply button: starts batch auto chat using `_inputNumberAutochat` and disables that input while generation is running.
 - **Phase 1 – Generation**: sends context `AI tự nói chuyện ít nhất {N} tin nhắn mỗi lượt` then repeatedly requests `GenerateReplyFromHistory`, buffering all turns silently (no display, no TTS playback). Chat input is disabled during this phase.
+- **Vocabulary injection**: At the start of auto-chat, due vocabulary (max 40) and new vocabulary (max 20) are loaded from server. Each turn, 5 words are injected into the AI context with `**word**` markup instruction. If the AI doesn't use all 5, unused words carry over to the next turn. When all 60 words are exhausted, the pool cycles.
 - **Phase 2 – Playback**: once the accumulated turn count reaches or exceeds N, `_inputNumberAutochat` is hidden, then all buffered turns are enqueued and played back sequentially with TTS audio (audio is pre-loaded by Controller during Phase 1).
 - After playback completes, auto chat stops automatically.
 - Auto mode also stops when user toggles off, chat ends/uninstalls, no active scene characters remain, or a request fails.

@@ -453,6 +453,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			_ = LoadVocabularyLearnedCountInternalAsync();
 		}
 
+		/// <summary>
+		/// Loads due and all vocabulary lists for auto-chat word injection.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[Request(ChatRequests.LoadAutoChatVocabulary)]
+		public static void HandleLoadAutoChatVocabulary(object payload)
+		{
+			_ = LoadAutoChatVocabularyInternalAsync();
+		}
+
 		private static void RegisterAddCharacterMenu()
 		{
 			UnregisterAddCharacterMenu();
@@ -1945,6 +1955,69 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				{
 					Message = "Failed to load learned vocabulary count: " + exception.Message
 				});
+			}
+		}
+
+		/// <summary>
+		/// Loads due vocabulary and full vocabulary list from server, splits them
+		/// into due (old) and non-due (new) word lists, then publishes the result.
+		/// </summary>
+		/// <returns>Awaitable task.</returns>
+		private static async Task LoadAutoChatVocabularyInternalAsync()
+		{
+			try
+			{
+				var dueTask = HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyDue);
+				var allTask = HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyList);
+				await Task.WhenAll(dueTask, allTask);
+
+				var dueJson = dueTask.Result;
+				var allJson = allTask.Result;
+
+				var dueResponse = string.IsNullOrWhiteSpace(dueJson)
+					? null
+					: JsonConvert.DeserializeObject<ChatVocabularyListResponsePayload>(dueJson);
+				var allResponse = string.IsNullOrWhiteSpace(allJson)
+					? null
+					: JsonConvert.DeserializeObject<ChatVocabularyListResponsePayload>(allJson);
+
+				var dueWords = new List<string>();
+				if (dueResponse?.Vocabularies != null)
+				{
+					for (var i = 0; i < dueResponse.Vocabularies.Count; i++)
+					{
+						var word = dueResponse.Vocabularies[i]?.Korean;
+						if (!string.IsNullOrWhiteSpace(word))
+						{
+							dueWords.Add(word.Trim());
+						}
+					}
+				}
+
+				var dueWordSet = new HashSet<string>(dueWords, StringComparer.OrdinalIgnoreCase);
+				var newWords = new List<string>();
+				if (allResponse?.Vocabularies != null)
+				{
+					for (var i = 0; i < allResponse.Vocabularies.Count; i++)
+					{
+						var word = allResponse.Vocabularies[i]?.Korean;
+						if (!string.IsNullOrWhiteSpace(word) && !dueWordSet.Contains(word.Trim()))
+						{
+							newWords.Add(word.Trim());
+						}
+					}
+				}
+
+				EventBus.Publish(ChatEvents.AutoChatVocabularyLoaded, new ChatAutoChatVocabularyPayload
+				{
+					DueWords = dueWords,
+					NewWords = newWords,
+				});
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(ChatEvents.AutoChatVocabularyLoaded, new ChatAutoChatVocabularyPayload());
+				Debug.LogWarning("[ChatController] Failed to load auto-chat vocabulary: " + exception.Message);
 			}
 		}
 

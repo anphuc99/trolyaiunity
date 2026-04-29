@@ -109,6 +109,15 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private int _autoChatGeneratedTurnCount;
 		private bool _isAutoChatBatchGenerating;
 		private readonly List<ChatAssistantTurnPayload> _autoChatBatchBuffer = new List<ChatAssistantTurnPayload>();
+		private const int MaxAutoChatDueVocabCount = 40;
+		private const int MaxAutoChatNewVocabCount = 20;
+		private const int AutoChatVocabWordsPerTurn = 5;
+		private readonly List<string> _autoChatDueVocab = new List<string>();
+		private readonly List<string> _autoChatNewVocab = new List<string>();
+		private int _autoChatDueVocabIndex;
+		private int _autoChatNewVocabIndex;
+		private readonly List<string> _autoChatPendingVocabWords = new List<string>();
+		private bool _isAutoChatVocabLoaded;
 		private Vector2 _saveBodyOriginalAnchorMin;
 		private Vector2 _saveBodyOriginalAnchorMax;
 		private Vector2 _saveBodyOriginalOffsetMin;
@@ -640,6 +649,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 				_autoChatGeneratedTurnCount += turnCount;
 				Debug.Log("[ChatView] Auto chat batch gen: " + _autoChatGeneratedTurnCount + "/" + _autoChatTargetTurnCount + " turns buffered.");
+
+				// Check which vocab words AI actually used in this response.
+				CheckAutoChatVocabUsage(turns, response.Reply);
 
 				if (_autoChatGeneratedTurnCount >= _autoChatTargetTurnCount)
 				{
@@ -1757,7 +1769,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			SetChatInputInteractable(false);
 			Debug.Log("[ChatView] Auto chat batch started. Target: " + _autoChatTargetTurnCount + " turns.");
 			EnsureAutoChatTranslationsVisible();
-			TryTriggerNextAutoChatTurn();
+			SendRequest(ChatRequests.LoadAutoChatVocabulary);
 		}
 
 		private void EnsureAutoChatTranslationsVisible()
@@ -1784,6 +1796,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_isAutoChatBatchGenerating = false;
 			_autoChatGeneratedTurnCount = 0;
 			_autoChatBatchBuffer.Clear();
+			ClearAutoChatVocabState();
 			SetAutoChatTargetInputInteractable(true);
 			SetAutoChatTargetInputVisible(false);
 			if (_buttonApplyAutoChat != null)
@@ -1795,6 +1808,212 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (wasBatchGenerating && !_isCharacterResponding)
 			{
 				SetChatInputInteractable(_hasSceneCharacters);
+			}
+		}
+
+		/// <summary>
+		/// Handles auto-chat vocabulary loaded from controller.
+		/// Stores the due/new word pools and triggers the first auto-chat turn.
+		/// </summary>
+		/// <param name="payload">Auto-chat vocabulary payload.</param>
+		[OnEvent(ChatEvents.AutoChatVocabularyLoaded)]
+		private void OnAutoChatVocabularyLoaded(object payload)
+		{
+			if (!_isAutoChatEnabled)
+			{
+				return;
+			}
+
+			var vocabPayload = payload as ChatAutoChatVocabularyPayload;
+			InitializeAutoChatVocabPool(vocabPayload);
+			_isAutoChatVocabLoaded = true;
+			Debug.Log("[ChatView] Auto chat vocab loaded. Due: " + _autoChatDueVocab.Count + ", New: " + _autoChatNewVocab.Count);
+			TryTriggerNextAutoChatTurn();
+		}
+
+		/// <summary>
+		/// Initializes the auto-chat vocabulary pool from the loaded payload.
+		/// Takes up to MaxAutoChatDueVocabCount due words and MaxAutoChatNewVocabCount new words.
+		/// </summary>
+		/// <param name="payload">Loaded vocabulary payload.</param>
+		private void InitializeAutoChatVocabPool(ChatAutoChatVocabularyPayload payload)
+		{
+			_autoChatDueVocab.Clear();
+			_autoChatNewVocab.Clear();
+			_autoChatDueVocabIndex = 0;
+			_autoChatNewVocabIndex = 0;
+			_autoChatPendingVocabWords.Clear();
+
+			if (payload == null)
+			{
+				return;
+			}
+
+			if (payload.DueWords != null)
+			{
+				var dueCount = Mathf.Min(payload.DueWords.Count, MaxAutoChatDueVocabCount);
+				for (var i = 0; i < dueCount; i++)
+				{
+					if (!string.IsNullOrWhiteSpace(payload.DueWords[i]))
+					{
+						_autoChatDueVocab.Add(payload.DueWords[i]);
+					}
+				}
+			}
+
+			if (payload.NewWords != null)
+			{
+				var newCount = Mathf.Min(payload.NewWords.Count, MaxAutoChatNewVocabCount);
+				for (var i = 0; i < newCount; i++)
+				{
+					if (!string.IsNullOrWhiteSpace(payload.NewWords[i]))
+					{
+						_autoChatNewVocab.Add(payload.NewWords[i]);
+					}
+				}
+			}
+		}
+
+		/// <summary>
+		/// Clears all auto-chat vocabulary state.
+		/// </summary>
+		private void ClearAutoChatVocabState()
+		{
+			_autoChatDueVocab.Clear();
+			_autoChatNewVocab.Clear();
+			_autoChatDueVocabIndex = 0;
+			_autoChatNewVocabIndex = 0;
+			_autoChatPendingVocabWords.Clear();
+			_isAutoChatVocabLoaded = false;
+		}
+
+		/// <summary>
+		/// Selects the next batch of vocabulary words for auto-chat context.
+		/// Starts from carry-over (unused) words, then fills from due pool, then new pool.
+		/// When both pools are exhausted, resets indices to cycle through again.
+		/// </summary>
+		/// <returns>List of up to AutoChatVocabWordsPerTurn words.</returns>
+		private List<string> SelectNextAutoChatVocabWords()
+		{
+			var totalPoolSize = _autoChatDueVocab.Count + _autoChatNewVocab.Count;
+			if (totalPoolSize == 0)
+			{
+				return new List<string>();
+			}
+
+			var selected = new List<string>(_autoChatPendingVocabWords);
+			_autoChatPendingVocabWords.Clear();
+
+			while (selected.Count < AutoChatVocabWordsPerTurn)
+			{
+				// Try due vocab first.
+				if (_autoChatDueVocabIndex < _autoChatDueVocab.Count)
+				{
+					selected.Add(_autoChatDueVocab[_autoChatDueVocabIndex]);
+					_autoChatDueVocabIndex++;
+					continue;
+				}
+
+				// Then new vocab.
+				if (_autoChatNewVocabIndex < _autoChatNewVocab.Count)
+				{
+					selected.Add(_autoChatNewVocab[_autoChatNewVocabIndex]);
+					_autoChatNewVocabIndex++;
+					continue;
+				}
+
+				// Both exhausted, cycle back.
+				_autoChatDueVocabIndex = 0;
+				_autoChatNewVocabIndex = 0;
+
+				// Safety break: avoid infinite loop if pool is smaller than words-per-turn.
+				if (selected.Count >= totalPoolSize)
+				{
+					break;
+				}
+			}
+
+			return selected;
+		}
+
+		/// <summary>
+		/// Builds the vocabulary context string to include in auto-chat turn requests.
+		/// Returns null when no vocabulary is available.
+		/// </summary>
+		/// <returns>Vocab instruction string, or null.</returns>
+		private string BuildAutoChatVocabContext()
+		{
+			if (!_isAutoChatVocabLoaded)
+			{
+				return null;
+			}
+
+			var words = SelectNextAutoChatVocabWords();
+			if (words.Count == 0)
+			{
+				return null;
+			}
+
+			// Store selected words so we can check usage later.
+			_autoChatPendingVocabWords.Clear();
+			for (var i = 0; i < words.Count; i++)
+			{
+				_autoChatPendingVocabWords.Add(words[i]);
+			}
+
+			return "Hãy chèn các từ vựng sau vào câu nói (đánh dấu bằng **từ**): " + string.Join(", ", words);
+		}
+
+		/// <summary>
+		/// Checks which pending vocabulary words were used by the AI in its response.
+		/// Words not found in **word** markup are carried over to the next turn.
+		/// </summary>
+		/// <param name="turns">Structured turns from the response.</param>
+		/// <param name="rawReply">Raw reply text.</param>
+		private void CheckAutoChatVocabUsage(List<ChatAssistantTurnPayload> turns, string rawReply)
+		{
+			if (_autoChatPendingVocabWords.Count == 0)
+			{
+				return;
+			}
+
+			// Combine all text sources for checking.
+			var combinedText = string.Empty;
+			if (turns != null)
+			{
+				for (var i = 0; i < turns.Count; i++)
+				{
+					if (turns[i]?.Text != null)
+					{
+						combinedText += turns[i].Text;
+					}
+				}
+			}
+
+			if (!string.IsNullOrWhiteSpace(rawReply))
+			{
+				combinedText += rawReply;
+			}
+
+			var unusedWords = new List<string>();
+			for (var i = 0; i < _autoChatPendingVocabWords.Count; i++)
+			{
+				var word = _autoChatPendingVocabWords[i];
+				if (!combinedText.Contains("**" + word + "**"))
+				{
+					unusedWords.Add(word);
+				}
+			}
+
+			_autoChatPendingVocabWords.Clear();
+			for (var i = 0; i < unusedWords.Count; i++)
+			{
+				_autoChatPendingVocabWords.Add(unusedWords[i]);
+			}
+
+			if (unusedWords.Count > 0)
+			{
+				Debug.Log("[ChatView] Auto chat vocab carry-over: " + unusedWords.Count + " unused words.");
 			}
 		}
 
@@ -1825,11 +2044,26 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			_isAutoChatAwaitingReply = true;
 
+			// Build vocab context for this turn.
+			var vocabContext = BuildAutoChatVocabContext();
+
 			if (!_hasSentAutoChatContext)
 			{
 				_hasSentAutoChatContext = true;
-				HandleSaveAndSendContextClicked(string.Format(AutoChatContextTemplate, _autoChatTargetTurnCount));
+				var fullContext = string.Format(AutoChatContextTemplate, _autoChatTargetTurnCount);
+				if (!string.IsNullOrEmpty(vocabContext))
+				{
+					fullContext += "\n" + vocabContext;
+				}
+
+				HandleSaveAndSendContextClicked(fullContext);
 				return;
+			}
+
+			// For subsequent turns, update context with vocab words before requesting reply.
+			if (!string.IsNullOrEmpty(vocabContext))
+			{
+				HandleSaveContextClicked(vocabContext);
 			}
 
 			SendRequest(ChatRequests.GenerateReplyFromHistory, new ChatSendRequestPayload

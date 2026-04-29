@@ -905,4 +905,23 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		[JsonProperty("done")]
 		public bool Done { get; set; }
 	}
+
+	/// <summary>
+	/// Payload published when auto-chat vocabulary has been loaded from server.
+	/// Contains due (old/review) words and non-due (new) words.
+	/// </summary>
+	public sealed class ChatAutoChatVocabularyPayload
+	{
+		/// <summary>
+		/// Vocabulary words that are due for review (old).
+		/// </summary>
+		public System.Collections.Generic.List<string> DueWords { get; set; }
+			= new System.Collections.Generic.List<string>();
+
+		/// <summary>
+		/// Vocabulary words that are not due (new).
+		/// </summary>
+		public System.Collections.Generic.List<string> NewWords { get; set; }
+			= new System.Collections.Generic.List<string>();
+	}
 }
