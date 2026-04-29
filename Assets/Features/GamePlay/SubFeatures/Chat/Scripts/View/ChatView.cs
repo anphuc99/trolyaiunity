@@ -119,6 +119,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private readonly List<string> _autoChatPendingVocabWords = new List<string>();
 		private readonly HashSet<string> _autoChatUsedVocabWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		private bool _isAutoChatVocabLoaded;
+		private readonly List<string> _vocabReviewQueue = new List<string>();
+		private int _vocabReviewIndex;
+		private bool _isVocabReviewMode;
 		private Vector2 _saveBodyOriginalAnchorMin;
 		private Vector2 _saveBodyOriginalAnchorMax;
 		private Vector2 _saveBodyOriginalOffsetMin;
@@ -492,9 +495,16 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[OnEvent(ChatEvents.EndConversationRequested)]
 		private void OnEndConversationRequested(object payload)
 		{
-			// Send batch review for any vocab words used during auto-chat.
+			// Save used vocab words for post-chat review before StopAutoChatMode clears them.
+			_vocabReviewQueue.Clear();
+			_vocabReviewIndex = 0;
 			if (_autoChatUsedVocabWords.Count > 0)
 			{
+				foreach (var word in _autoChatUsedVocabWords)
+				{
+					_vocabReviewQueue.Add(word);
+				}
+
 				var batchPayload = new ChatBatchReviewVocabRequestPayload
 				{
 					Words = new System.Collections.Generic.List<string>(_autoChatUsedVocabWords)
@@ -513,6 +523,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[OnEvent(ChatEvents.ConversationEnded)]
 		private void OnConversationEnded(object payload)
 		{
+			if (_vocabReviewQueue.Count > 0)
+			{
+				StartVocabReviewMode();
+				return;
+			}
+
 			ClearConversationState();
 		}
 
@@ -898,9 +914,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			if (_vocabPopupView != null)
 			{
-				_vocabPopupView.SetRatingButtonsVisible(true);
-				_vocabPopupView.SetReviewCallback(HandleVocabReviewRequested);
 				_vocabPopupView.SetClosedCallback(HandleVocabPopupClosed);
+				_vocabPopupView.SetNextCallback(HandleVocabReviewNext);
 				_vocabPopupView.SetAudioPlayCallback(HandleVocabAudioPlayRequested);
 				RefreshVocabCharacterOptions();
 			}
@@ -2306,11 +2321,17 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		/// <summary>
 		/// Handles vocabulary review completion from controller.
+		/// In review mode, advances to the next word automatically.
 		/// </summary>
 		/// <param name="payload">Unused payload.</param>
 		[OnEvent(ChatEvents.VocabReviewCompleted)]
 		private void OnVocabReviewCompleted(object payload)
 		{
+			if (_isVocabReviewMode)
+			{
+				return;
+			}
+
 			if (_vocabPopupView != null)
 			{
 				_vocabPopupView.Hide();
@@ -2336,29 +2357,102 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		/// <summary>
 		/// Re-loads learned vocabulary count after popup closes.
+		/// If in review mode and popup is closed early, finishes review and navigates home.
 		/// </summary>
 		private void HandleVocabPopupClosed()
 		{
 			RefreshVocabularyLearnedCount();
+
+			if (_isVocabReviewMode)
+			{
+				FinishVocabReviewMode();
+			}
 		}
 
 		/// <summary>
-		/// Handles vocab review rating from the popup and forwards to controller.
+		/// Handles Next button in vocab review popup. Advances to the next word or finishes.
 		/// </summary>
-		/// <param name="vocabularyId">Reviewed vocabulary id.</param>
-		/// <param name="rating">FSRS rating value.</param>
-		private void HandleVocabReviewRequested(string vocabularyId, int rating)
+		private void HandleVocabReviewNext()
 		{
-			if (string.IsNullOrWhiteSpace(vocabularyId))
+			if (!_isVocabReviewMode)
 			{
 				return;
 			}
 
-			SendRequest(ChatRequests.ReviewVocabulary, new ChatVocabReviewRequestPayload
+			_vocabReviewIndex++;
+			if (_vocabReviewIndex < _vocabReviewQueue.Count)
 			{
-				VocabularyId = vocabularyId,
-				Rating = rating
+				ShowCurrentVocabReview();
+			}
+			else
+			{
+				if (_vocabPopupView != null)
+				{
+					_vocabPopupView.Hide();
+				}
+
+				FinishVocabReviewMode();
+			}
+		}
+
+		/// <summary>
+		/// Starts post-conversation vocabulary review mode.
+		/// Shows vocab words one by one in the popup for the user to review.
+		/// </summary>
+		private void StartVocabReviewMode()
+		{
+			_isVocabReviewMode = true;
+			_vocabReviewIndex = 0;
+
+			if (_vocabPopupView != null)
+			{
+				_vocabPopupView.SetNextButtonVisible(true);
+			}
+
+			Debug.Log("[ChatView] Starting vocab review mode with " + _vocabReviewQueue.Count + " words.");
+			ShowCurrentVocabReview();
+		}
+
+		/// <summary>
+		/// Shows the current vocabulary word in the review popup via server lookup.
+		/// </summary>
+		private void ShowCurrentVocabReview()
+		{
+			if (_vocabReviewIndex >= _vocabReviewQueue.Count)
+			{
+				return;
+			}
+
+			var word = _vocabReviewQueue[_vocabReviewIndex];
+			if (_vocabPopupView != null)
+			{
+				SetVocabAudioRequestInProgress(false);
+				RefreshVocabCharacterOptions();
+				_vocabPopupView.ShowLoading(word);
+			}
+
+			SendRequest(ChatRequests.LookupVocabulary, new ChatVocabLookupRequestPayload
+			{
+				Word = word
 			});
+		}
+
+		/// <summary>
+		/// Ends vocab review mode, clears review queue, and navigates home.
+		/// </summary>
+		private void FinishVocabReviewMode()
+		{
+			_isVocabReviewMode = false;
+			_vocabReviewQueue.Clear();
+			_vocabReviewIndex = 0;
+
+			if (_vocabPopupView != null)
+			{
+				_vocabPopupView.SetNextButtonVisible(false);
+			}
+
+			Debug.Log("[ChatView] Vocab review mode finished.");
+			ClearConversationState();
 		}
 
 		/// <summary>
