@@ -17,8 +17,7 @@ import { createChatHistoryStore, type ChatHistoryMessage, type ChatHistoryStore 
 import { buildAudioId, getAudioPath, createTtsAudio, createGeminiTtsAudio } from "../../services/tts.service.js";
 import {
   createInitialReviewState,
-  updateReviewAfterRating,
-  type FSRSRating,
+  advanceCycleStep,
   type ReviewHistoryEntry,
   type ReviewState
 } from "../../services/fsrs.service.js";
@@ -805,10 +804,10 @@ Please summarize the above conversation in Vietnamese, update the story descript
   };
 
   /**
-   * Submits an FSRS review rating for a journal.
-   * Creates the review row on first rating.
+   * Advances the review cycle for a journal by one step.
+   * Creates the review row on first mark.
    *
-   * Body: { journalId: number, rating: 1|2|3|4 }
+   * Body: { journalId: number }
    */
   const submitJournalReview: JournalController["submitJournalReview"] = async (request, response) => {
     if (!request.user) {
@@ -816,18 +815,12 @@ Please summarize the above conversation in Vietnamese, update the story descript
       return;
     }
 
-    const { journalId, rating } = request.body as {
+    const { journalId } = request.body as {
       journalId?: number;
-      rating?: number;
     };
 
     if (!journalId || !Number.isInteger(journalId) || journalId <= 0) {
       response.status(400).json({ message: "Valid journalId is required" });
-      return;
-    }
-
-    if (!rating || rating < 1 || rating > 4) {
-      response.status(400).json({ message: "Rating must be 1–4" });
       return;
     }
 
@@ -851,9 +844,7 @@ Please summarize the above conversation in Vietnamese, update the story descript
 
       const currentState: ReviewState = reviewEntity
         ? {
-          stability: reviewEntity.stability,
-          difficulty: reviewEntity.difficulty,
-          lapses: reviewEntity.lapses,
+          cycleStep: reviewEntity.stability ?? 0,
           currentIntervalDays: reviewEntity.currentIntervalDays,
           nextReviewDate: reviewEntity.nextReviewDate instanceof Date
             ? reviewEntity.nextReviewDate.toISOString()
@@ -873,14 +864,12 @@ Please summarize the above conversation in Vietnamese, update the story descript
         }
         : createInitialReviewState();
 
-      const updated = updateReviewAfterRating(currentState, rating as FSRSRating);
+      const { state: updated } = advanceCycleStep(currentState);
 
       const nextReview = {
         journalId,
         userId,
-        stability: updated.stability,
-        difficulty: updated.difficulty,
-        lapses: updated.lapses,
+        stability: updated.cycleStep,
         currentIntervalDays: updated.currentIntervalDays,
         nextReviewDate: new Date(updated.nextReviewDate),
         lastReviewDate: updated.lastReviewDate ? new Date(updated.lastReviewDate) : null,

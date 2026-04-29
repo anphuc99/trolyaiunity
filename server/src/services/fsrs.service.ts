@@ -1,279 +1,139 @@
-import { fsrs, createEmptyCard, Rating, State, type Card, type Grade, type FSRS } from "ts-fsrs";
+/**
+ * Fixed-cycle spaced repetition scheduler.
+ *
+ * Replaces FSRS with a deterministic review schedule defined by REVIEW_CYCLE.
+ * Each entry in the cycle is the number of days to wait before the next review.
+ * After completing all reviews in the cycle, the word is considered memorised
+ * and is excluded from future reviews (isIgnored = true on the entity).
+ *
+ * DB column mapping (reusing existing FSRS column names to avoid schema migration):
+ *   stability           → cycleStep  (number of reviews completed)
+ *   currentIntervalDays → currentIntervalDays (unchanged)
+ *   nextReviewDate      → nextReviewDate (unchanged)
+ *   lastReviewDate      → lastReviewDate (unchanged)
+ *   reviewHistoryJson   → JSON array of ReviewHistoryEntry
+ */
+
+// ────────────────────────────────────────────────────────────────────────────
+// Cycle definition
+// ────────────────────────────────────────────────────────────────────────────
 
 /**
- * FSRS (Free Spaced Repetition Scheduler) service.
+ * Fixed review interval schedule (days between consecutive reviews).
  *
- * Wraps the ts-fsrs library to provide scheduling for vocabulary reviews.
- * Mirrors the old mimichat logic: 4-level rating, stability, difficulty,
- * retrievability, and review history tracking.
+ * Index N is the gap in days between review N and review N+1.
+ * The word starts due immediately (step 0). After each completed review the
+ * next one is scheduled at `now + REVIEW_CYCLE[currentStep]` days.
+ * When `cycleStep` reaches `REVIEW_CYCLE.length` the word is memorised.
  */
+export const REVIEW_CYCLE: readonly number[] = [
+  1, 1, 1, 1, 1,
+  2, 1, 1,
+  4, 1, 1,
+  8, 1, 1,
+  20, 1, 1, 1,
+  60, 1, 1, 1,
+  150, 1, 1, 1
+];
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
 // ────────────────────────────────────────────────────────────────────────────
 
-/** 1=Again, 2=Hard, 3=Good, 4=Easy */
-export type FSRSRating = 1 | 2 | 3 | 4;
-
-export interface FSRSSettings {
-  maxReviewsPerDay: number;
-  newCardsPerDay: number;
-  desiredRetention: number;
-}
-
-export const DEFAULT_FSRS_SETTINGS: FSRSSettings = {
-  maxReviewsPerDay: 50,
-  newCardsPerDay: 20,
-  desiredRetention: 0.95
-};
-
+/** A single entry in the review history. */
 export interface ReviewHistoryEntry {
+  /** ISO date-time of the review. */
   date: string;
-  rating: FSRSRating;
-  stabilityBefore: number;
-  stabilityAfter: number;
-  difficultyBefore: number;
-  difficultyAfter: number;
-  retrievability: number;
+  /** Cycle step reached after this review (equals total completed reviews). */
+  step: number;
 }
 
+/**
+ * Persisted review state for a vocabulary word using the fixed-cycle scheduler.
+ * Stored on VocabularyEntity via individual columns + reviewHistoryJson.
+ */
 export interface ReviewState {
-  stability: number;
-  difficulty: number;
-  lapses: number;
+  /** Number of reviews completed so far (0 = never reviewed). */
+  cycleStep: number;
+  /** Interval in days used to schedule the current review slot. */
   currentIntervalDays: number;
+  /** ISO date-time of the next scheduled review. */
   nextReviewDate: string;
+  /** ISO date-time of the last completed review, or null if never reviewed. */
   lastReviewDate: string | null;
+  /** Ordered list of completed review events. */
   reviewHistory: ReviewHistoryEntry[];
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// Internal helpers
-// ────────────────────────────────────────────────────────────────────────────
-
-const fsrsCache = new Map<number, FSRS>();
-
-/**
- * Returns a cached FSRS scheduler for the given desired retention.
- *
- * @param desiredRetention - Target recall probability (0.5–0.97).
- * @returns A ts-fsrs FSRS scheduler.
- */
-const getFsrsScheduler = (desiredRetention = 0.9): FSRS => {
-  const normalized = Math.max(0.5, Math.min(0.97, desiredRetention));
-  const key = Number(normalized.toFixed(3));
-
-  if (!fsrsCache.has(key)) {
-    fsrsCache.set(key, fsrs({ request_retention: normalized }));
-  }
-
-  return fsrsCache.get(key)!;
-};
-
-/**
- * Maps our 4-level rating to ts-fsrs Grade.
- */
-const mapRating = (rating: FSRSRating): Grade => {
-  switch (rating) {
-    case 1:
-      return Rating.Again;
-    case 2:
-      return Rating.Hard;
-    case 3:
-      return Rating.Good;
-    case 4:
-      return Rating.Easy;
-    default:
-      return Rating.Good;
-  }
-};
-
-/**
- * Converts persisted review state into a ts-fsrs Card.
- */
-const toCard = (state: ReviewState): Card => {
-  const hasStability = state.stability > 0;
-  const hasHistory = state.reviewHistory.length > 0;
-
-  if (!hasStability) {
-    const initialStability = 3;
-    const initialDifficulty = 5;
-
-    return {
-      due: hasHistory ? new Date(state.nextReviewDate) : new Date(),
-      stability: initialStability,
-      difficulty: initialDifficulty,
-      elapsed_days: state.lastReviewDate
-        ? Math.max(0, (Date.now() - new Date(state.lastReviewDate).getTime()) / 86_400_000)
-        : 0,
-      scheduled_days: state.currentIntervalDays || 0,
-      learning_steps: 0,
-      reps: hasHistory ? state.reviewHistory.length : 0,
-      lapses: state.lapses || 0,
-      state: hasHistory ? State.Review : State.New,
-      last_review: state.lastReviewDate ? new Date(state.lastReviewDate) : undefined
-    };
-  }
-
-  return {
-    due: new Date(state.nextReviewDate),
-    stability: state.stability,
-    difficulty: state.difficulty || 5,
-    elapsed_days: state.lastReviewDate
-      ? Math.max(0, (Date.now() - new Date(state.lastReviewDate).getTime()) / 86_400_000)
-      : 0,
-    scheduled_days: state.currentIntervalDays || 0,
-    learning_steps: 0,
-    reps: state.reviewHistory.length,
-    lapses: state.lapses || 0,
-    state: state.lapses && state.lapses > 0 ? State.Relearning : State.Review,
-    last_review: state.lastReviewDate ? new Date(state.lastReviewDate) : undefined
-  };
-};
 
 // ────────────────────────────────────────────────────────────────────────────
 // Public API
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
- * Calculates retrievability (probability of recall).
+ * Creates the initial review state for a newly collected vocabulary word.
+ * The first review is scheduled immediately (nextReviewDate = now).
  *
- * @param stability - Current stability in days.
- * @param elapsedDays - Days since last review.
- * @returns Recall probability [0–1].
+ * @returns A fresh ReviewState at cycleStep 0.
  */
-export const calculateRetrievability = (stability: number, elapsedDays: number): number => {
-  if (stability <= 0) {
-    return 0;
+export const createInitialReviewState = (): ReviewState => ({
+  cycleStep: 0,
+  currentIntervalDays: 0,
+  nextReviewDate: new Date().toISOString(),
+  lastReviewDate: null,
+  reviewHistory: []
+});
+
+/**
+ * Advances the review cycle by one step after the user marks the word as learned.
+ *
+ * - Increments cycleStep.
+ * - Schedules the next review at `now + REVIEW_CYCLE[currentStep]` days.
+ * - When the new cycleStep equals `REVIEW_CYCLE.length`, the word is memorised
+ *   and the caller should set `isIgnored = true` on the entity.
+ *
+ * @param state - The current ReviewState.
+ * @returns Updated state and a `memorized` flag. When `memorized` is true the
+ *          caller must mark the vocabulary as ignored.
+ */
+export const advanceCycleStep = (
+  state: ReviewState
+): { state: ReviewState; memorized: boolean } => {
+  const now = new Date();
+  const nextStep = state.cycleStep + 1;
+
+  const historyEntry: ReviewHistoryEntry = {
+    date: now.toISOString(),
+    step: nextStep
+  };
+
+  const updatedHistory = [...state.reviewHistory, historyEntry];
+
+  if (nextStep >= REVIEW_CYCLE.length) {
+    // All reviews completed — word is memorised
+    return {
+      state: {
+        cycleStep: nextStep,
+        currentIntervalDays: 0,
+        nextReviewDate: now.toISOString(),
+        lastReviewDate: now.toISOString(),
+        reviewHistory: updatedHistory
+      },
+      memorized: true
+    };
   }
 
-  const DECAY = -0.5;
-  const FACTOR = Math.pow(0.9, 1 / DECAY) - 1;
-  return Math.pow(1 + (FACTOR * elapsedDays) / stability, DECAY);
-};
-
-/**
- * Builds the initial review state for a newly collected vocabulary.
- * The first review is scheduled immediately to show in learn/review.
- *
- * @returns A fresh ReviewState.
- */
-export const createInitialReviewState = (): ReviewState => {
-  const now = new Date();
-
-  return {
-    stability: 0,
-    difficulty: 5,
-    lapses: 0,
-    currentIntervalDays: 1,
-    nextReviewDate: now.toISOString(),
-    lastReviewDate: null,
-    reviewHistory: []
-  };
-};
-
-/**
- * Builds a review state from a user difficulty rating at collection time.
- *
- * Maps: very_easy → 14d, easy → 7d, medium → 3d, hard → 1d.
- *
- * @param difficultyRating - User self-assessment when collecting.
- * @returns A pre-seeded ReviewState.
- */
-export const createReviewFromDifficulty = (
-  difficultyRating: "very_easy" | "easy" | "medium" | "hard"
-): ReviewState => {
-  const now = new Date();
-
-  const fsrsRating: FSRSRating =
-    difficultyRating === "very_easy" ? 4 : difficultyRating === "easy" ? 3 : difficultyRating === "medium" ? 2 : 1;
-
-  const intervalDays =
-    difficultyRating === "very_easy" ? 14 : difficultyRating === "easy" ? 7 : difficultyRating === "medium" ? 3 : 1;
-
-  const initialStability = intervalDays;
-  const initialDifficulty =
-    difficultyRating === "very_easy" ? 1 : difficultyRating === "easy" ? 3 : difficultyRating === "medium" ? 5 : 7;
-
+  const intervalDays = REVIEW_CYCLE[state.cycleStep];
   const nextReviewDate = new Date(now);
-
-  const historyEntry: ReviewHistoryEntry = {
-    date: now.toISOString(),
-    rating: fsrsRating,
-    stabilityBefore: 0,
-    stabilityAfter: initialStability,
-    difficultyBefore: 5,
-    difficultyAfter: initialDifficulty,
-    retrievability: 1
-  };
+  nextReviewDate.setDate(nextReviewDate.getDate() + intervalDays);
 
   return {
-    stability: initialStability,
-    difficulty: initialDifficulty,
-    lapses: 0,
-    currentIntervalDays: intervalDays,
-    nextReviewDate: nextReviewDate.toISOString(),
-    lastReviewDate: now.toISOString(),
-    reviewHistory: [historyEntry]
+    state: {
+      cycleStep: nextStep,
+      currentIntervalDays: intervalDays,
+      nextReviewDate: nextReviewDate.toISOString(),
+      lastReviewDate: now.toISOString(),
+      reviewHistory: updatedHistory
+    },
+    memorized: false
   };
-};
-
-/**
- * Updates a review state after the user rates a card.
- * Uses ts-fsrs for scheduling.
- *
- * @param state - Current ReviewState.
- * @param rating - User rating (1–4).
- * @param settings - FSRS settings.
- * @returns Updated ReviewState.
- */
-export const updateReviewAfterRating = (
-  state: ReviewState,
-  rating: FSRSRating,
-  settings: FSRSSettings = DEFAULT_FSRS_SETTINGS
-): ReviewState => {
-  const now = new Date();
-  const scheduler = getFsrsScheduler(settings.desiredRetention);
-  const card = toCard(state);
-  const schedulingCards = scheduler.repeat(card, now);
-  const grade = mapRating(rating);
-  const result = schedulingCards[grade];
-  const newCard = result.card;
-
-  const lastReviewDate = state.lastReviewDate ? new Date(state.lastReviewDate) : now;
-  const elapsedDays = Math.max(0, (now.getTime() - lastReviewDate.getTime()) / 86_400_000);
-  const retrievability =
-    state.stability > 0 ? calculateRetrievability(state.stability, elapsedDays) : 1;
-
-  const historyEntry: ReviewHistoryEntry = {
-    date: now.toISOString(),
-    rating,
-    stabilityBefore: state.stability || 0,
-    stabilityAfter: newCard.stability,
-    difficultyBefore: state.difficulty || 5,
-    difficultyAfter: newCard.difficulty,
-    retrievability
-  };
-
-  return {
-    stability: newCard.stability,
-    difficulty: newCard.difficulty,
-    lapses: newCard.lapses,
-    currentIntervalDays: newCard.scheduled_days,
-    nextReviewDate: newCard.due.toISOString(),
-    lastReviewDate: now.toISOString(),
-    reviewHistory: [...state.reviewHistory, historyEntry]
-  };
-};
-
-/**
- * Calculates interval for a brand-new card given a rating.
- * Useful for preview ("If you rate Good, next review in X days").
- */
-export const calculateNewCardInterval = (rating: FSRSRating, desiredRetention = 0.9): number => {
-  const newCard = createEmptyCard();
-  const scheduler = getFsrsScheduler(desiredRetention);
-  const result = scheduler.repeat(newCard, new Date());
-  const grade = mapRating(rating);
-  return result[grade].card.scheduled_days;
 };

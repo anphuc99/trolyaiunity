@@ -4,9 +4,7 @@ import VocabularyEntity from "../../models/vocabulary.entity.js";
 import UserEntity from "../../models/user.entity.js";
 import {
   createInitialReviewState,
-  createReviewFromDifficulty,
-  updateReviewAfterRating,
-  type FSRSRating,
+  advanceCycleStep,
   type ReviewHistoryEntry
 } from "../../services/fsrs.service.js";
 import { createCheapAIService, type CheapAIService } from "../../services/cheap-ai.service.js";
@@ -52,9 +50,7 @@ const serialiseVocabulary = (entity: VocabularyEntity) => {
     userId: entity.userId,
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt,
-    stability: entity.stability ?? null,
-    difficulty: entity.difficulty ?? null,
-    lapses: entity.lapses ?? null,
+    cycleStep: entity.stability ?? 0,
     currentIntervalDays: entity.currentIntervalDays ?? null,
     nextReviewDate: entity.nextReviewDate ?? null,
     lastReviewDate: entity.lastReviewDate ?? null,
@@ -209,8 +205,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Collect (create) a new vocabulary with an optional initial difficulty
-  // rating that seeds the FSRS review state.
+  // Collect (create) a new vocabulary and seed the cycle review state.
   // ──────────────────────────────────────────────────────────────────────────
   const collectVocabulary: VocabularyController["collectVocabulary"] = async (request, response) => {
     const userId = request.user?.id;
@@ -224,14 +219,12 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       korean,
       vietnamese,
       pinyin,
-      level,
-      difficultyRating
+      level
     } = request.body as {
       korean?: string;
       vietnamese?: string;
       pinyin?: string;
       level?: string;
-      difficultyRating?: "very_easy" | "easy" | "medium" | "hard";
     };
 
     const trimmedKorean = normalizeVocabularyWord(korean ?? "");
@@ -272,14 +265,12 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         userId
       });
 
-      // Seed FSRS review state immediately
-      const reviewState = difficultyRating
-        ? createReviewFromDifficulty(difficultyRating)
-        : createInitialReviewState();
+      // Seed cycle review state immediately
+      const reviewState = createInitialReviewState();
 
-      vocab.stability = reviewState.stability;
-      vocab.difficulty = reviewState.difficulty;
-      vocab.lapses = reviewState.lapses;
+      vocab.stability = reviewState.cycleStep;
+      vocab.difficulty = null;
+      vocab.lapses = null;
       vocab.currentIntervalDays = reviewState.currentIntervalDays;
       vocab.nextReviewDate = new Date(reviewState.nextReviewDate);
       vocab.lastReviewDate = reviewState.lastReviewDate ? new Date(reviewState.lastReviewDate) : null;
@@ -420,7 +411,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Submit a review rating (FSRS update).
+  // Mark a vocabulary as learned — advances the fixed review cycle by one step.
   // ──────────────────────────────────────────────────────────────────────────
   const reviewVocabulary: VocabularyController["reviewVocabulary"] = async (request, response) => {
     const userId = request.user?.id;
@@ -436,18 +427,17 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       return;
     }
 
-    const { rating } = request.body as { rating?: number };
-
-    if (!rating || rating < 1 || rating > 4) {
-      response.status(400).json({ message: "Rating must be 1–4" });
-      return;
-    }
-
     try {
       const vocab = await vocabRepo.findOne({ where: { id: vocabId, userId } });
 
       if (!vocab || !vocab.nextReviewDate) {
         response.status(404).json({ message: "Vocabulary not found or review not initialised" });
+        return;
+      }
+
+      // Already memorised — nothing to do
+      if (vocab.isIgnored) {
+        response.json(serialiseVocabulary(vocab));
         return;
       }
 
@@ -468,9 +458,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       }
 
       const currentState = {
-        stability: vocab.stability ?? 0,
-        difficulty: vocab.difficulty ?? 5,
-        lapses: vocab.lapses ?? 0,
+        cycleStep: vocab.stability ?? 0,
         currentIntervalDays: vocab.currentIntervalDays ?? 0,
         nextReviewDate: vocab.nextReviewDate instanceof Date
           ? vocab.nextReviewDate.toISOString()
@@ -483,15 +471,20 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         reviewHistory: history
       };
 
-      const updated = updateReviewAfterRating(currentState, rating as FSRSRating);
+      const { state: updated, memorized } = advanceCycleStep(currentState);
 
-      vocab.stability = updated.stability;
-      vocab.difficulty = updated.difficulty;
-      vocab.lapses = updated.lapses;
+      vocab.stability = updated.cycleStep;
+      vocab.difficulty = null;
+      vocab.lapses = null;
       vocab.currentIntervalDays = updated.currentIntervalDays;
       vocab.nextReviewDate = new Date(updated.nextReviewDate);
       vocab.lastReviewDate = updated.lastReviewDate ? new Date(updated.lastReviewDate) : null;
       vocab.reviewHistoryJson = JSON.stringify(updated.reviewHistory);
+
+      // Cycle complete — mark as memorised so it no longer appears in reviews
+      if (memorized) {
+        vocab.isIgnored = true;
+      }
 
       const saved = await vocabRepo.save(vocab);
       response.json(serialiseVocabulary(saved));
@@ -583,35 +576,13 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       ).length;
       const withoutReview = totalVocabularies - withReview;
 
-      // Count difficult today (rated Hard/Again today)
-      const todayStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
-      let difficultCount = 0;
-
-      for (const vocab of vocabsWithReview) {
-        let history: ReviewHistoryEntry[] = [];
-        try {
-          history = JSON.parse(vocab.reviewHistoryJson || "[]") as ReviewHistoryEntry[];
-        } catch {
-          continue;
-        }
-
-        const hasTodayDifficult = history.some((h) => {
-          const reviewDate = new Date(h.date).toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
-          return reviewDate === todayStr && (h.rating === 1 || h.rating === 2);
-        });
-
-        if (hasTodayDifficult) {
-          difficultCount++;
-        }
-      }
-
       response.json({
         totalVocabularies,
         withReview,
         withoutReview,
         dueToday,
         starredCount,
-        difficultCount
+        difficultCount: 0
       });
     } catch (error) {
       console.error("Failed to get vocabulary stats.", error);
@@ -645,11 +616,11 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       }
 
       if (!vocab.nextReviewDate) {
-        // FSRS state not yet initialised — initialise and star in one step
+        // Cycle review state not yet initialised — initialise and star in one step
         const state = createInitialReviewState();
-        vocab.stability = state.stability;
-        vocab.difficulty = state.difficulty;
-        vocab.lapses = state.lapses;
+        vocab.stability = state.cycleStep;
+        vocab.difficulty = null;
+        vocab.lapses = null;
         vocab.currentIntervalDays = state.currentIntervalDays;
         vocab.nextReviewDate = new Date(state.nextReviewDate);
         vocab.lastReviewDate = null;
@@ -836,11 +807,11 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         userId
       });
 
-      // Initialise FSRS review state immediately
+      // Initialise cycle review state immediately
       const reviewState = createInitialReviewState();
-      vocab.stability = reviewState.stability;
-      vocab.difficulty = reviewState.difficulty;
-      vocab.lapses = reviewState.lapses;
+      vocab.stability = reviewState.cycleStep;
+      vocab.difficulty = null;
+      vocab.lapses = null;
       vocab.currentIntervalDays = reviewState.currentIntervalDays;
       vocab.nextReviewDate = new Date(reviewState.nextReviewDate);
       vocab.lastReviewDate = null;

@@ -8,8 +8,7 @@ import TranslationReviewEntity from "../../models/translation-review.entity.js";
 import { createOpenAIClient } from "../../services/openai.service.js";
 import {
   createInitialReviewState,
-  updateReviewAfterRating,
-  type FSRSRating,
+  advanceCycleStep,
   type ReviewHistoryEntry
 } from "../../services/fsrs.service.js";
 
@@ -52,9 +51,7 @@ const serialiseReview = (entity: TranslationReviewEntity) => {
   return {
     id: entity.id,
     translationCardId: entity.translationCardId,
-    stability: entity.stability,
-    difficulty: entity.difficulty,
-    lapses: entity.lapses,
+    cycleStep: entity.stability ?? 0,
     currentIntervalDays: entity.currentIntervalDays,
     nextReviewDate: entity.nextReviewDate,
     lastReviewDate: entity.lastReviewDate,
@@ -334,35 +331,13 @@ export const createTranslationController = (
       const dueToday = allReviews.filter((review: TranslationReviewEntity) => toDateKey(review.nextReviewDate) <= todayKey).length;
       const withoutReview = totalCards - totalReviews;
 
-      const todayStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
-      let difficultCount = 0;
-
-      for (const review of allReviews) {
-        let history: ReviewHistoryEntry[] = [];
-
-        try {
-          history = JSON.parse(review.reviewHistoryJson || "[]") as ReviewHistoryEntry[];
-        } catch {
-          continue;
-        }
-
-        const hasTodayDifficult = history.some((entry) => {
-          const reviewDate = new Date(entry.date).toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
-          return reviewDate === todayStr && (entry.rating === 1 || entry.rating === 2);
-        });
-
-        if (hasTodayDifficult) {
-          difficultCount++;
-        }
-      }
-
       response.json({
         totalCards,
         withReview: totalReviews,
         withoutReview,
         dueToday,
         starredCount,
-        difficultCount
+        difficultCount: 0
       });
     } catch (error) {
       console.error("Failed to get translation stats.", error);
@@ -601,7 +576,7 @@ export const createTranslationController = (
   };
 
   /**
-   * Submits a translation review rating and schedules the next review.
+   * Marks a translation as learned — advances the fixed review cycle by one step.
    */
   const reviewTranslation: TranslationController["reviewTranslation"] = async (request, response) => {
     const userId = request.user?.id;
@@ -611,17 +586,11 @@ export const createTranslationController = (
       return;
     }
 
-    const { rating, messageId, cardId, userTranslation } = request.body as {
-      rating?: number;
+    const { messageId, cardId, userTranslation } = request.body as {
       messageId?: string;
       cardId?: number;
       userTranslation?: string;
     };
-
-    if (!rating || rating < 1 || rating > 4) {
-      response.status(400).json({ message: "Rating must be 1–4" });
-      return;
-    }
 
     try {
       let card: TranslationCardEntity | null = null;
@@ -668,9 +637,7 @@ export const createTranslationController = (
 
       const currentState = reviewEntity
         ? {
-            stability: reviewEntity.stability,
-            difficulty: reviewEntity.difficulty,
-            lapses: reviewEntity.lapses,
+            cycleStep: reviewEntity.stability ?? 0,
             currentIntervalDays: reviewEntity.currentIntervalDays,
             nextReviewDate: reviewEntity.nextReviewDate instanceof Date
               ? reviewEntity.nextReviewDate.toISOString()
@@ -690,13 +657,11 @@ export const createTranslationController = (
           }
         : createInitialReviewState();
 
-      const updated = updateReviewAfterRating(currentState, rating as FSRSRating);
+      const { state: updated } = advanceCycleStep(currentState);
       const nextReview = {
         translationCardId: card.id,
         userId,
-        stability: updated.stability,
-        difficulty: updated.difficulty,
-        lapses: updated.lapses,
+        stability: updated.cycleStep,
         currentIntervalDays: updated.currentIntervalDays,
         nextReviewDate: new Date(updated.nextReviewDate),
         lastReviewDate: updated.lastReviewDate ? new Date(updated.lastReviewDate) : null,
@@ -746,9 +711,7 @@ export const createTranslationController = (
         reviewEntity = reviewRepo.create({
           translationCardId: cardId,
           userId,
-          stability: state.stability,
-          difficulty: state.difficulty,
-          lapses: state.lapses,
+          stability: state.cycleStep,
           currentIntervalDays: state.currentIntervalDays,
           nextReviewDate: new Date(state.nextReviewDate),
           lastReviewDate: null,
