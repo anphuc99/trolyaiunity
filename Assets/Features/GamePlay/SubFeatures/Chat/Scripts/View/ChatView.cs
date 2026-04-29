@@ -504,12 +504,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				{
 					_vocabReviewQueue.Add(word);
 				}
-
-				var batchPayload = new ChatBatchReviewVocabRequestPayload
-				{
-					Words = new System.Collections.Generic.List<string>(_autoChatUsedVocabWords)
-				};
-				SendRequest(ChatRequests.BatchReviewAutoChatVocabulary, batchPayload);
 			}
 
 			StopAutoChatMode();
@@ -2370,13 +2364,24 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		}
 
 		/// <summary>
-		/// Handles Next button in vocab review popup. Advances to the next word or finishes.
+		/// Handles Next button in vocab review popup.
+		/// Sends a single-word review for the current word, then advances to the next.
 		/// </summary>
 		private void HandleVocabReviewNext()
 		{
 			if (!_isVocabReviewMode)
 			{
 				return;
+			}
+
+			// Review the current word before advancing.
+			if (_vocabReviewIndex < _vocabReviewQueue.Count)
+			{
+				var currentWord = _vocabReviewQueue[_vocabReviewIndex];
+				SendRequest(ChatRequests.BatchReviewAutoChatVocabulary, new ChatBatchReviewVocabRequestPayload
+				{
+					Words = new System.Collections.Generic.List<string> { currentWord }
+				});
 			}
 
 			_vocabReviewIndex++;
