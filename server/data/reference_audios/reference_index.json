@@ -613,5 +613,1405 @@
         "text": "只要有你在身边，我无论做什么事情都觉得开心！",
         "file": "audio_Kore_1777548097808_198.wav",
         "intensity": "high"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "high",
+        "text": "终于完成了这周的工作任务可以好好地休息了!",
+        "file": "audio_Zephyr_1777557607774_000.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "high",
+        "text": "没想到新开的餐厅味道这么好真是让人开心啊!",
+        "file": "audio_Zephyr_1777557617919_001.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "high",
+        "text": "收到你送的这份生日礼物我特别喜欢谢谢你啊!",
+        "file": "audio_Zephyr_1777557622401_002.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "high",
+        "text": "努力了这么久这次期末考试终于拿到了第一名!",
+        "file": "audio_Zephyr_1777557627382_003.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "medium",
+        "text": "我们一家人好久没去海边度假了这次玩得很开心!",
+        "file": "audio_Zephyr_1777557633147_004.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "low",
+        "text": "刚才买到了最后一份烤冷面今天的运气真是不错!",
+        "file": "audio_Zephyr_1777557638949_005.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "medium",
+        "text": "看着阳台上种的花终于开出第一朵好有成就感啊!",
+        "file": "audio_Zephyr_1777557645208_006.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "medium",
+        "text": "能够和你一起散步吹吹晚风就是最幸福的事情了!",
+        "file": "audio_Zephyr_1777557651058_007.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "high",
+        "text": "房贷终于全部还清了感觉身上的石头终于落下了!",
+        "file": "audio_Zephyr_1777557657905_008.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "low",
+        "text": "听说老板明天请大家喝下午茶这真是个好消息啊!",
+        "file": "audio_Zephyr_1777557665209_009.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "medium",
+        "text": "狗狗学会了握手的新技能它实在是太聪明乖巧了!",
+        "file": "audio_Zephyr_1777557671455_010.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "low",
+        "text": "周末没有任何安排可以在家里舒舒服服地躺着了!",
+        "file": "audio_Zephyr_1777557675772_011.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "high",
+        "text": "最喜欢的小说终于大结局了而且是非常完美结局!",
+        "file": "audio_Zephyr_1777557681808_012.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "medium",
+        "text": "在旧外套口袋里发现一百块钱这简直就是小确幸!",
+        "file": "audio_Zephyr_1777557687365_013.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "medium",
+        "text": "刚出炉的蛋挞奶香味十足一口咬下去真的好满足!",
+        "file": "audio_Zephyr_1777557700492_014.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "low",
+        "text": "今天的夕阳美得就像是一幅画让人忍不住想拍照!",
+        "file": "audio_Zephyr_1777557707057_015.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "happy",
+        "intensity": "medium",
+        "text": "今天天气真不错和朋友去公园野餐真的是太棒了!",
+        "file": "audio_Zephyr_1777557713495_016.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "high",
+        "text": "哇!这件限量版外套被我成功买到了太棒了!!!",
+        "file": "audio_Zephyr_1777557717997_017.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "high",
+        "text": "哇!那个超级大明星竟然出现在公司楼下了!!!",
+        "file": "audio_Zephyr_1777557723827_018.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "high",
+        "text": "哇!老板刚才宣布今年大家的年终奖翻倍了!!!",
+        "file": "audio_Zephyr_1777557729429_019.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "high",
+        "text": "哇!我最爱的球队在最后三秒成功绝杀对手!!!",
+        "file": "audio_Zephyr_1777557733847_020.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "high",
+        "text": "哇!妈妈终于同意明天带我去游乐园游玩了!!!",
+        "file": "audio_Zephyr_1777557738252_021.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "high",
+        "text": "哇!这款新出的智能手机拍照效果太清晰了!!!",
+        "file": "audio_Zephyr_1777557743990_022.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "medium",
+        "text": "哇!你这次画的水彩风景图简直是大师级别!!!",
+        "file": "audio_Zephyr_1777557750160_023.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "high",
+        "text": "哇!我们终于要坐飞机去欧洲旅行半个月了!!!",
+        "file": "audio_Zephyr_1777557757100_024.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "medium",
+        "text": "哇!这家店的冰淇淋竟然有二十多种新口味!!!",
+        "file": "audio_Zephyr_1777557761610_025.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "medium",
+        "text": "哇!你今天做的红烧肉闻起来也太香喷喷了!!!",
+        "file": "audio_Zephyr_1777557766604_026.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "high",
+        "text": "哇!抽奖系统居然显示我中了一辆全新汽车!!!",
+        "file": "audio_Zephyr_1777557775460_027.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "high",
+        "text": "哇!我刚才查到我被心仪的重点大学录取了!!!",
+        "file": "audio_Zephyr_1777557779950_028.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "high",
+        "text": "哇!这篇文章刚发出去一小时就有一万点赞!!!",
+        "file": "audio_Zephyr_1777557785680_029.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "high",
+        "text": "哇!没想到这道超级复杂的数学题被解开了!!!",
+        "file": "audio_Zephyr_1777557792261_030.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "medium",
+        "text": "哇!朋友从远方给我寄来一整箱各种零食啊!!!",
+        "file": "audio_Zephyr_1777557797625_031.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "high",
+        "text": "哇!男主向女主求婚的那个浪漫场景太感人!!!",
+        "file": "audio_Zephyr_1777557801921_032.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "excited",
+        "intensity": "high",
+        "text": "哇!这部新出动漫的动作打斗戏份燃到爆炸!!!",
+        "file": "audio_Zephyr_1777557807508_033.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "high",
+        "text": "... ... 养了十年的小猫昨晚离开我了。",
+        "file": "audio_Zephyr_1777557813031_034.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "medium",
+        "text": "... ... 辛苦准备那么久的面试没通过。",
+        "file": "audio_Zephyr_1777557818232_035.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "high",
+        "text": "... ... 看着他离开的背影我还是哭了。",
+        "file": "audio_Zephyr_1777557822654_036.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "high",
+        "text": "... ... 拼命努力却还是达不到你要求。",
+        "file": "audio_Zephyr_1777557828891_037.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "medium",
+        "text": "... ... 新手机摔粉碎珍贵照片全丢了。",
+        "file": "audio_Zephyr_1777557835586_038.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "low",
+        "text": "... ... 外面一直下大雨心情变得糟糕。",
+        "file": "audio_Zephyr_1777557840432_039.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "high",
+        "text": "... ... 我们现在变成了熟悉的陌生人。",
+        "file": "audio_Zephyr_1777557845286_040.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "high",
+        "text": "... ... 听闻奶奶突然生病我感到无助。",
+        "file": "audio_Zephyr_1777557851102_041.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "high",
+        "text": "... ... 辛辛苦苦写的报告因停电没了。",
+        "file": "audio_Zephyr_1777557856927_042.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "low",
+        "text": "... ... 钱包里没钱了现在的我只能叹气。",
+        "file": "audio_Zephyr_1777557864534_043.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "medium",
+        "text": "... ... 约好过节他却说公司突然要加班。",
+        "file": "audio_Zephyr_1777557869126_044.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "low",
+        "text": "... ... 电影男女主角没在一起真的遗憾。",
+        "file": "audio_Zephyr_1777557875391_045.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "high",
+        "text": "... ... 以为他懂我其实他根本就不在乎。",
+        "file": "audio_Zephyr_1777557881131_046.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "high",
+        "text": "... ... 偌大的城市竟没有我的容身之处。",
+        "file": "audio_Zephyr_1777557886740_047.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "high",
+        "text": "... ... 曾经许下的美好诺言就像个笑话。",
+        "file": "audio_Zephyr_1777557892926_048.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "high",
+        "text": "... ... 现在真的很想念你却没有理由找。",
+        "file": "audio_Zephyr_1777557897566_049.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "sad",
+        "intensity": "medium",
+        "text": "... ... 深夜里的那种孤独感总是让人疲惫。",
+        "file": "audio_Zephyr_1777557904791_050.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "high",
+        "text": "明明答应过不迟到的结果又让我等一小时!!!",
+        "file": "audio_Zephyr_1777557909276_051.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "high",
+        "text": "无良商家居然故意卖假货给我一定要投诉!!!",
+        "file": "audio_Zephyr_1777557916623_052.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "high",
+        "text": "凭什么所有的错都要我承担这实在不公平!!!",
+        "file": "audio_Zephyr_1777557921260_053.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "high",
+        "text": "请不要再对我指手画脚我有自己的判断力!!!",
+        "file": "audio_Zephyr_1777557925612_054.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "high",
+        "text": "买的新自行车停楼下十分钟竟然就被偷了!!!",
+        "file": "audio_Zephyr_1777557929843_055.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "high",
+        "text": "那个司机突然变道不打转向灯简直不要命!!!",
+        "file": "audio_Zephyr_1777557934211_056.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "high",
+        "text": "他怎么可以一直在背后这样造谣实在过分!!!",
+        "file": "audio_Zephyr_1777557938625_057.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "high",
+        "text": "对你忍耐到了极限请立刻从我的房间出去!!!",
+        "file": "audio_Zephyr_1777557943123_058.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "medium",
+        "text": "楼上邻居半夜大声放音乐到底有没有公德心!!!",
+        "file": "audio_Zephyr_1777557947333_059.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "high",
+        "text": "为什么你永远只顾自己从来不考虑别人感受!!!",
+        "file": "audio_Zephyr_1777557952050_060.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "high",
+        "text": "这么简单的工作都能搞砸你脑子里在想什么!!!",
+        "file": "audio_Zephyr_1777557956787_061.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "high",
+        "text": "你这种恶劣态度让我觉得不被尊重不能接受!!!",
+        "file": "audio_Zephyr_1777557962852_062.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "high",
+        "text": "说好一起分摊这笔房租你却打算拍屁股走人!!!",
+        "file": "audio_Zephyr_1777557967358_063.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "medium",
+        "text": "餐厅服务员不仅把菜上错服务态度还很恶劣!!!",
+        "file": "audio_Zephyr_1777557971982_064.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "high",
+        "text": "讨厌别人未经允许随便翻抽屉严重侵犯隐私!!!",
+        "file": "audio_Zephyr_1777557977495_065.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "high",
+        "text": "你这种毫无责任感的自私行为迟早害死大家!!!",
+        "file": "audio_Zephyr_1777557984256_066.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "angry",
+        "intensity": "high",
+        "text": "别再用敷衍的语气跟我说话我又不是个傻子!!!",
+        "file": "audio_Zephyr_1777557988692_067.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "快点从安全通道撤离这栋大楼火势变大了!!!!!",
+        "file": "audio_Zephyr_1777557993803_068.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "站在马路正中间干什么太危险赶紧给我回来!!!!!",
+        "file": "audio_Zephyr_1777557999204_069.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "抓小偷啊大家快帮忙拦住前面那个黑衣劫匪!!!!!",
+        "file": "audio_Zephyr_1777558003636_070.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "篮球赛只剩下最后十秒钟大家赶紧把球投出!!!!!",
+        "file": "audio_Zephyr_1777558009289_071.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "我在这里顶着大太阳等了你三个小时快点啊!!!!!",
+        "file": "audio_Zephyr_1777558014057_072.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "救命啊这里突然有人晕倒失去意识快叫医生!!!!!",
+        "file": "audio_Zephyr_1777558020239_073.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "你们不要再为了这件小事吵架让我安静十分!!!!!",
+        "file": "audio_Zephyr_1777558025192_074.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "千万别碰那个红色的危险按钮会引发大爆炸!!!!!",
+        "file": "audio_Zephyr_1777558030565_075.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "里面的人立刻放下手中的武器双手抱头蹲下!!!!!",
+        "file": "audio_Zephyr_1777558035126_076.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "之前提醒过多少遍了绝对别把垃圾扔楼道里!!!!!",
+        "file": "audio_Zephyr_1777558039945_077.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "危险那辆大卡车已经完全失控大家赶快躲避!!!!!",
+        "file": "audio_Zephyr_1777558046319_078.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "冲锋的战斗号角已经吹响前面的兄弟跟我冲!!!!!",
+        "file": "audio_Zephyr_1777558053585_079.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "里面的歹徒仔细听着你已经被所有警察包围!!!!!",
+        "file": "audio_Zephyr_1777558059535_080.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "别让嫌疑犯跑了大家快点把大门死死地关上!!!!!",
+        "file": "audio_Zephyr_1777558065032_081.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "前面河水水流太急了千万不要冒险下水游泳!!!!!",
+        "file": "audio_Zephyr_1777558070512_082.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "听不到我说话吗赶紧把音响的音乐音量调小!!!!!",
+        "file": "audio_Zephyr_1777558075514_083.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shouting",
+        "intensity": "high",
+        "text": "是谁让你没有命令擅自行动马上退回到原位!!!!!",
+        "file": "audio_Zephyr_1777558080710_084.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "high",
+        "text": "呃... ... 墙角爬出的那只大蟑螂太恶心了。",
+        "file": "audio_Zephyr_1777558085161_085.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "medium",
+        "text": "呃... ... 下水道的脏水漫出来味道很难受。",
+        "file": "audio_Zephyr_1777558090265_086.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "low",
+        "text": "呃... ... 这碗带泥腥味的鱼汤我喝不下去。",
+        "file": "audio_Zephyr_1777558096310_087.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "medium",
+        "text": "呃... ... 他吃饭时吧唧嘴的吃相真倒胃口。",
+        "file": "audio_Zephyr_1777558101558_088.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "high",
+        "text": "呃... ... 那大叔竟在公共场所随地吐痰啊。",
+        "file": "audio_Zephyr_1777558106325_089.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "low",
+        "text": "呃... ... 放在桌子三天的面包长满绿霉菌。",
+        "file": "audio_Zephyr_1777558114688_090.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "high",
+        "text": "呃... ... 公共厕所墙壁上的污垢让人反胃。",
+        "file": "audio_Zephyr_1777558120842_091.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "medium",
+        "text": "呃... ... 恐怖电影里的变异怪物实在惊悚。",
+        "file": "audio_Zephyr_1777558135537_092.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "high",
+        "text": "呃... ... 他身上的汗臭味熏得我睁不开眼。",
+        "file": "audio_Zephyr_1777558141116_093.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "high",
+        "text": "呃... ... 刚端上的盘子里居然有蠕动绿虫。",
+        "file": "audio_Zephyr_1777558147726_094.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "high",
+        "text": "呃... ... 那种极度虚伪讨好的嘴脸看不下。",
+        "file": "audio_Zephyr_1777558152642_095.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "medium",
+        "text": "呃... ... 他说话满嘴喷口水差点弄我脸上。",
+        "file": "audio_Zephyr_1777558157880_096.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "medium",
+        "text": "呃... ... 那件满是油污没洗的衣服我绝不穿。",
+        "file": "audio_Zephyr_1777558164677_097.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "high",
+        "text": "呃... ... 剩菜乱七八糟混在一起令人作呕。",
+        "file": "audio_Zephyr_1777558170031_098.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "medium",
+        "text": "呃... ... 他当众挖鼻孔瞬间让我不想理他。",
+        "file": "audio_Zephyr_1777558176149_099.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "medium",
+        "text": "呃... ... 不小心踩到草丛里臭气熏天的狗屎。",
+        "file": "audio_Zephyr_1777558181962_100.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "disgusted",
+        "intensity": "medium",
+        "text": "呃... ... 这种极其油腻的搭讪方式让人无语。",
+        "file": "audio_Zephyr_1777558186067_101.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "medium",
+        "text": "啊... ... 一道巨大闪电突然劈在窗旁树上。",
+        "file": "audio_Zephyr_1777558190767_102.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "high",
+        "text": "啊... ... 那个黑漆漆旧衣柜里有东西乱动。",
+        "file": "audio_Zephyr_1777558195355_103.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "high",
+        "text": "啊... ... 那个拿刀的恐怖面具男正朝我走。",
+        "file": "audio_Zephyr_1777558199606_104.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "low",
+        "text": "啊... ... 突然停电楼道黑漆漆的我不敢下。",
+        "file": "audio_Zephyr_1777558208797_105.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "high",
+        "text": "啊... ... 后面那只极其凶恶大黑狗在追我。",
+        "file": "audio_Zephyr_1777558214093_106.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "medium",
+        "text": "啊... ... 晚上我一个人不敢看这血腥鬼片。",
+        "file": "audio_Zephyr_1777558218703_107.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "high",
+        "text": "啊... ... 刚才看到窗外诡异飘过白色影子。",
+        "file": "audio_Zephyr_1777558225155_108.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "high",
+        "text": "啊... ... 运行中电梯突然停半空剧烈摇晃。",
+        "file": "audio_Zephyr_1777558234417_109.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "medium",
+        "text": "啊... ... 我有严重恐高症不敢低头看悬崖。",
+        "file": "audio_Zephyr_1777558238821_110.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "high",
+        "text": "啊... ... 那条带有剧毒青蛇吐信子靠近我。",
+        "file": "audio_Zephyr_1777558243078_111.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "high",
+        "text": "啊... ... 家里门锁被暴力撬开可能有小偷。",
+        "file": "audio_Zephyr_1777558247726_112.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "high",
+        "text": "啊... ... 黑暗森林深处传来几声凄厉狼叫。",
+        "file": "audio_Zephyr_1777558254871_113.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "medium",
+        "text": "啊... ... 游乐园里的恐怖鬼屋布置太吓人。",
+        "file": "audio_Zephyr_1777558261629_114.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "high",
+        "text": "啊... ... 手术室门打开医生摇头我好害怕。",
+        "file": "audio_Zephyr_1777558268729_115.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "high",
+        "text": "啊... ... 汽车刹车突然失灵现在的车速快。",
+        "file": "audio_Zephyr_1777558274518_116.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "medium",
+        "text": "啊... ... 这座废弃破旧医院到处阴森恐怖。",
+        "file": "audio_Zephyr_1777558280250_117.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "scared",
+        "intensity": "high",
+        "text": "啊... ... 悬崖边的岩石松动我快掉下去了。",
+        "file": "audio_Zephyr_1777558286490_118.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "high",
+        "text": "咦?! 昨天不是刚说你今天必须去北京出差吗?!",
+        "file": "audio_Zephyr_1777558291338_119.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "medium",
+        "text": "咦?! 刚才还放在桌上的草莓蛋糕怎么不见了?!",
+        "file": "audio_Zephyr_1777558296576_120.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "medium",
+        "text": "咦?! 办公室钥匙刚放口袋怎么现在摸不到了?!",
+        "file": "audio_Zephyr_1777558302342_121.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "high",
+        "text": "咦?! 一直是长头发怎么今天突然剪成短发了?!",
+        "file": "audio_Zephyr_1777558309196_122.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "high",
+        "text": "咦?! 平时一直很安静的鹦鹉今天突然唱歌了?!",
+        "file": "audio_Zephyr_1777558316043_123.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "high",
+        "text": "咦?! 那个向来抠门的老板竟主动提出加薪水?!",
+        "file": "audio_Zephyr_1777558321571_124.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "medium",
+        "text": "咦?! 昨晚洗干净晾阳台的衣服早上竟结冰了?!",
+        "file": "audio_Zephyr_1777558327137_125.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "medium",
+        "text": "咦?! 你穿的这件新款外套跟我买的竟是同款?!",
+        "file": "audio_Zephyr_1777558332103_126.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "medium",
+        "text": "咦?! 从来不吃辣的你今天怎么点大碗麻辣烫?!",
+        "file": "audio_Zephyr_1777558337312_127.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "low",
+        "text": "咦?! 明明用完全一样的公式答案为什么不同?!",
+        "file": "audio_Zephyr_1777558343151_128.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "high",
+        "text": "咦?! 刚才明明还站在角落里怎么转眼消失了?!",
+        "file": "audio_Zephyr_1777558348747_129.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "medium",
+        "text": "咦?! 手机连接充电器充了一整晚怎么没有电?!",
+        "file": "audio_Zephyr_1777558354199_130.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "medium",
+        "text": "咦?! 楼下买的大西瓜切开后里面竟没有颗籽?!",
+        "file": "audio_Zephyr_1777558360528_131.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "high",
+        "text": "咦?! 那棵枯萎整整三年的老树今年竟发芽了?!",
+        "file": "audio_Zephyr_1777558367130_132.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "high",
+        "text": "咦?! 这种天文现象真少见天上竟有两个月亮?!",
+        "file": "audio_Zephyr_1777558374014_133.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "high",
+        "text": "咦?! 记得已锁在抽屉的日记本怎么放在桌上?!",
+        "file": "audio_Zephyr_1777558378443_134.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "surprised",
+        "intensity": "medium",
+        "text": "咦?! 这杯咖啡刚才加了三大勺糖怎么还是苦?!",
+        "file": "audio_Zephyr_1777558382801_135.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "high",
+        "text": "... 其实我一个人在心里默默喜欢你有三年了。",
+        "file": "audio_Zephyr_1777558388534_136.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "medium",
+        "text": "... 那个如果不介意的话能给我留联系方式吗？",
+        "file": "audio_Zephyr_1777558394715_137.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "high",
+        "text": "... 今天为了见你特意换上这件漂亮粉色裙子。",
+        "file": "audio_Zephyr_1777558401322_138.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "high",
+        "text": "... 每次跟你单独走在一起我的心跳就特别快。",
+        "file": "audio_Zephyr_1777558407313_139.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "medium",
+        "text": "... 谢谢你刚才夸奖我漂亮弄得我有点不好意思。",
+        "file": "audio_Zephyr_1777558413515_140.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "medium",
+        "text": "... 你昨天送我的那盒手工巧克力我很喜欢谢谢。",
+        "file": "audio_Zephyr_1777558419888_141.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "high",
+        "text": "... 刚才在走廊和你眼神对视的那一秒我脸红了。",
+        "file": "audio_Zephyr_1777558425465_142.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "medium",
+        "text": "... 这条围巾是我亲手织的希望你能收下它。",
+        "file": "audio_Zephyr_1777558431789_143.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "high",
+        "text": "... 那封情书是我趁你不在时悄悄放进课桌里的。",
+        "file": "audio_Zephyr_1777558437482_144.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "high",
+        "text": "... 我一直低着头不敢看你生怕被发现小心思。",
+        "file": "audio_Zephyr_1777558442236_145.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "high",
+        "text": "... 和你过马路牵手的时候因为太紧张手心全汗。",
+        "file": "audio_Zephyr_1777558448298_146.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "medium",
+        "text": "... 如果周末有空能和我一起去电影院看电影吗？",
+        "file": "audio_Zephyr_1777558453681_147.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "medium",
+        "text": "... 大家都旁边不停起哄弄得我不知道该说什么。",
+        "file": "audio_Zephyr_1777558459179_148.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "high",
+        "text": "... 虽然我很想主动和你搭话最后还是退缩了。",
+        "file": "audio_Zephyr_1777558465751_149.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "high",
+        "text": "... 刚才你在阳光下温柔笑起来的样子让我心动。",
+        "file": "audio_Zephyr_1777558471251_150.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "shy",
+        "intensity": "medium",
+        "text": "... 其实我在感情方面不太会表达但我很在乎你。",
+        "file": "audio_Zephyr_1777558478080_151.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "high",
+        "text": "嗯... 无论未来发生什么困难我都会永远陪着你。",
+        "file": "audio_Zephyr_1777558483432_152.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "medium",
+        "text": "嗯... 亲爱的今天在公司上班辛苦了吧让我抱抱。",
+        "file": "audio_Zephyr_1777558490532_153.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "medium",
+        "text": "嗯... 只要能静静靠在你肩膀上我就感到很踏实。",
+        "file": "audio_Zephyr_1777558496646_154.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "high",
+        "text": "嗯... 天气变冷了出门多穿衣服不然我会心疼的。",
+        "file": "audio_Zephyr_1777558502807_155.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "medium",
+        "text": "嗯... 回家路上要注意安全我做好了晚饭在等你。",
+        "file": "audio_Zephyr_1777558508308_156.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "high",
+        "text": "嗯... 看着你安静睡着的样子真想偷偷亲你一口。",
+        "file": "audio_Zephyr_1777558513885_157.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "high",
+        "text": "嗯... 不用担心未来因为只要我们拥有彼此足够。",
+        "file": "audio_Zephyr_1777558520103_158.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "medium",
+        "text": "嗯... 我特意给你熬了最喜欢的鸡汤赶紧趁热喝。",
+        "file": "audio_Zephyr_1777558525564_159.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "high",
+        "text": "嗯... 无论世界怎么改变我对你的真心永远不变。",
+        "file": "audio_Zephyr_1777558532102_160.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "high",
+        "text": "嗯... 遇见你就是最好缘分是我收到最珍贵礼物。",
+        "file": "audio_Zephyr_1777558539561_161.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "high",
+        "text": "嗯... 只要能看到你开心笑容我觉得付出都值得。",
+        "file": "audio_Zephyr_1777558546031_162.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "medium",
+        "text": "嗯... 快过来让我紧紧抱抱你把烦恼全都交给我。",
+        "file": "audio_Zephyr_1777558552562_163.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "high",
+        "text": "嗯... 只要有你一直陪伴身边多苦的日子也很甜。",
+        "file": "audio_Zephyr_1777558559372_164.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "medium",
+        "text": "嗯... 你的双手怎么这么冷快放进怀里帮你捂热。",
+        "file": "audio_Zephyr_1777558564994_165.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "low",
+        "text": "嗯... 周末天气好的话就陪你去一直想去的海边。",
+        "file": "audio_Zephyr_1777558570960_166.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "affectionate",
+        "intensity": "high",
+        "text": "嗯... 乖乖别难过哭了我会保证永远挡前面保护。",
+        "file": "audio_Zephyr_1777558577524_167.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "high",
+        "text": ". 公司季度的财务报表审查存在严重弄虚作假问题。",
+        "file": "audio_Zephyr_1777558582560_168.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "high",
+        "text": ". 必须清楚明白违反公司保密规定后果是非常严重。",
+        "file": "audio_Zephyr_1777558589122_169.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "high",
+        "text": ". 当前面临的市场竞争极大绝对不能有任何的松懈。",
+        "file": "audio_Zephyr_1777558594040_170.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "high",
+        "text": ". 这次造成重大安全事故相关责任人必须受到严惩。",
+        "file": "audio_Zephyr_1777558598493_171.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "high",
+        "text": ". 项目交付期限是本周五绝对不允许有任何延误。",
+        "file": "audio_Zephyr_1777558604631_172.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "medium",
+        "text": ". 请大家集中注意力接下来的战略会议非常关键。",
+        "file": "audio_Zephyr_1777558611326_173.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "high",
+        "text": ". 作为团队主要负责人你需要为这次失败承担全责。",
+        "file": "audio_Zephyr_1777558617201_174.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "medium",
+        "text": ". 投资市场的风险极大做任何重要决定前必须深思。",
+        "file": "audio_Zephyr_1777558623739_175.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "high",
+        "text": ". 底线是不接受任何妥协核心原则问题绝不退让。",
+        "file": "audio_Zephyr_1777558630219_176.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "medium",
+        "text": ". 这份重要合同的每个条款都要经过法务仔细审核。",
+        "file": "audio_Zephyr_1777558635476_177.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "high",
+        "text": ". 关系到职业生涯的严肃谈话请端正态度好好听着。",
+        "file": "audio_Zephyr_1777558641069_178.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "high",
+        "text": ". 为避免再次发生数据泄漏安全系统必须全面升级。",
+        "file": "audio_Zephyr_1777558653327_179.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "medium",
+        "text": ". 昨天提交的运营方案存在明显漏洞需要重新修改。",
+        "file": "audio_Zephyr_1777558659567_180.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "high",
+        "text": ". 无论前进道路困难有多大公司的核心目标不改变。",
+        "file": "audio_Zephyr_1777558666272_181.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "medium",
+        "text": ". 实验室对比测试数据必须在今晚十二点前汇总好。",
+        "file": "audio_Zephyr_1777558671546_182.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "serious",
+        "intensity": "high",
+        "text": ". 既然已经是成年人就要学会为自己说的蠢话负责。",
+        "file": "audio_Zephyr_1777558676811_183.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "帮我把桌上的那份重要会议文件拿去复印三份吧。",
+        "file": "audio_Zephyr_1777558681084_184.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "午餐你是打算在食堂吃面条还是去楼下买个快餐？",
+        "file": "audio_Zephyr_1777558687310_185.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "麻烦你傍晚下班的时候顺路去超市买点新鲜蔬菜。",
+        "file": "audio_Zephyr_1777558693398_186.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "外面好像马上就要下雨出门记得带上柜里的黑伞。",
+        "file": "audio_Zephyr_1777558700046_187.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "家里这个月的宽带上网费我已提前用手机交过了。",
+        "file": "audio_Zephyr_1777558704326_188.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "他平时没有特别爱好喜欢周末去图书馆看历史书。",
+        "file": "audio_Zephyr_1777558711204_189.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "这班公交车刚开走我们还要等大概十五分钟才到。",
+        "file": "audio_Zephyr_1777558717134_190.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "刚才快递员打电话说把大包裹放在门口消防栓了。",
+        "file": "audio_Zephyr_1777558722597_191.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "会议记录仔细整理好后记得发一份到我公司邮箱。",
+        "file": "audio_Zephyr_1777558729637_192.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "如果明天天气比较晴朗一家人打算去郊外去爬山。",
+        "file": "audio_Zephyr_1777558734964_193.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "干洗店的老板告诉我他们明天上午十点正式开门。",
+        "file": "audio_Zephyr_1777558739981_194.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "昨晚睡觉的时候忘关窗户了今天早上起来觉得冷。",
+        "file": "audio_Zephyr_1777558746699_195.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "这牌子的洗衣液去污效果不错超市卖的价格合理。",
+        "file": "audio_Zephyr_1777558752673_196.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "厨房调料罐的盐快用完了记得去菜市场买包大盐。",
+        "file": "audio_Zephyr_1777558758470_197.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "现在手机电量只剩下百分之十得赶快找地方充电。",
+        "file": "audio_Zephyr_1777558766261_198.wav"
+    },
+    {
+        "voice": "Zephyr",
+        "emotion": "neutral",
+        "intensity": "low",
+        "text": "前面的马路正在修路所有的过往车辆都需要绕行。",
+        "file": "audio_Zephyr_1777558771465_199.wav"
     }
 ]
