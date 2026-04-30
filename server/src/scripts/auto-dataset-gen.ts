@@ -19,7 +19,7 @@ if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 if (!fs.existsSync(REFERENCE_DIR)) fs.mkdirSync(REFERENCE_DIR, { recursive: true });
 
 const TARGET_SENTENCES = 200;
-const VOICES = ["Leda"]; // Các giọng Gemini TTS "Puck", "Charon", "Fenrir", "Leda", 
+const VOICES = ["Charon"]; // Các giọng Gemini TTS "Puck", "Charon", "Fenrir", "Leda", 
 
 // ==========================================
 // PHẦN 1: DÙNG GEMINI TẠO KỊCH BẢN (TEXT)

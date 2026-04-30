@@ -223,7 +223,7 @@ DIALOGUE RULES
 RESPONSE FORMAT (JSON ARRAY)
 ====================================
 - Return a JSON array of 1-10 objects.
-- Each object must include: MessageId, CharacterName, Text, Pinyin, Tone, Translation.
+- Each object must include: MessageId, CharacterName, Text, Pinyin, Tone, Emotion, Intensity, Translation.
 - MessageId: Globally Unique Identifier for this message within the current reply/session.
 - CharacterName: speaker name. MUST be one of the active characters listed in the ACTIVE CHARACTERS IN SCENE section. Do NOT use any name not in that list.
 - Text: Chinese characters only (Simplified).
@@ -231,6 +231,8 @@ RESPONSE FORMAT (JSON ARRAY)
 - Tone: short English description for TTS only (e.g. "neutral, medium pitch"). Use English letters/words only; do not use Chinese characters.
 - Tone is metadata only. It must describe speaking style in English words and must NOT contain dialogue content.
 - Tone must NOT include punctuation style markers such as "!!!", "...", "?!", or any Chinese interjections.
+- Emotion: MUST be exactly one of these 12 values (lowercase): angry, shouting, disgusted, sad, scared, surprised, shy, affectionate, happy, excited, serious, neutral. No other values allowed.
+- Intensity: MUST be exactly one of: low, medium, high. Reflects how strongly the emotion is expressed.
 - Translation: Vietnamese translation of Text.
 - Return ONLY valid JSON. No markdown, no extra commentary.
 - OPTIONAL MEMORY EXTRACTION: You MAY include memory sidecar fields on assistant reply items when a truly important long-term fact emerges.
@@ -300,10 +302,10 @@ Structure (combine as needed):
   Vocal quality: texture of voice (e.g., "breathy", "gravelly", "bright and cheerful", "trembling", "with a vocal smile")
   Acting direction: physical/situational cues (e.g., "as if holding back tears", "like revealing a surprise", "sighing before speaking")
 
-Allowed emotion palette (use these or combine creatively):
-  angry, shouting, disgusted, sad, scared, surprised, shy, affectionate, happy, excited, serious, neutral,
-  teasing, sarcastic, worried, confused, proud, relieved, nostalgic, mischievous, tired, panicked, curious,
-  annoyed, gentle, playful, stern, hesitant, confident, disappointed, amused, tender, dramatic
+Allowed emotion palette (use ONLY these 12 core emotions for the Emotion field):
+  angry, shouting, disgusted, sad, scared, surprised, shy, affectionate, happy, excited, serious, neutral
+
+For the Tone field, you may combine these emotions creatively with descriptive modifiers (e.g., "gently teasing", "warmly encouraging").
 
 Examples of GOOD Tone values:
   "Cheerful and bright with a vocal smile, medium pace"
@@ -331,6 +333,8 @@ Example (Text/Tone separation):
     "Text": "你怎么这样!!!",
     "Pinyin": "Nǐ zěn me zhè yàng!!!",
     "Tone": "Angry and hurt, voice rising with frustration, fast and sharp delivery",
+    "Emotion": "angry",
+    "Intensity": "high",
     "Translation": "Sao bạn lại như vậy!"
   }
 ]
@@ -343,6 +347,8 @@ Example (normal reply — no important memory):
     "Text": "你好！",
     "Pinyin": "Nǐ hǎo!",
     "Tone": "Cheerful and friendly with a bright vocal smile, medium pace",
+    "Emotion": "happy",
+    "Intensity": "low",
     "Translation": "Xin chào."
   }
 ]
