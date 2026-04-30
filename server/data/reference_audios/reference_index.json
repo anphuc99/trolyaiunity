@@ -1,0 +1,617 @@
+[
+    {
+        "voice": "Kore",
+        "emotion": "happy",
+        "text": "今天的天气真的很不错，我们一起去公园散散步吧！",
+        "file": "audio_Kore_1777546871092_000.wav",
+        "intensity": "medium"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "你到底还要在这里浪费多少时间？快点把作业写完！",
+        "file": "audio_Kore_1777546877054_001.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "scared",
+        "text": "在那漆黑的森林深处，好像有什么东西在慢慢靠近我。啊... ...",
+        "file": "audio_Kore_1777546896699_004.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "excited",
+        "text": "哇! !!! 我终于抽到梦寐以求的游戏角色了，太棒了！",
+        "file": "audio_Kore_1777546936763_010.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "sad",
+        "text": "离别的时刻总是让人感到伤感，愿我们以后还能再相见... ...",
+        "file": "audio_Kore_1777546957890_013.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "surprised",
+        "text": "咦?! ?! 你居然偷偷买了一张去远方的机票，真是太惊喜了！",
+        "file": "audio_Kore_1777546972197_015.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "affectionate",
+        "text": "你是这世界上对我最好的人，我们要永远在一起不分开。嗯...",
+        "file": "audio_Kore_1777546985047_017.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "serious",
+        "text": "请务必在明天会议开始之前，提交那份完整的财务报表。",
+        "file": "audio_Kore_1777546990335_018.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "happy",
+        "text": "考试成绩终于出来了，我这次竟然考了满分，太开心了！",
+        "file": "audio_Kore_1777547005506_020.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "你竟敢背着我做出这种背信弃义的事情，我真的忍无可忍！!!!!!",
+        "file": "audio_Kore_1777547011992_021.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "scared",
+        "text": "那道闪电划破了夜空，雷声震耳欲聋让我感到害怕。啊... ...",
+        "file": "audio_Kore_1777547032719_024.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "serious",
+        "text": "这项实验必须严格按照操作步骤执行，绝不能出任何差错。",
+        "file": "audio_Kore_1777547058409_028.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "excited",
+        "text": "周末我们可以去游乐园玩过山车，想到就觉得好兴奋呀！哇! !!!",
+        "file": "audio_Kore_1777547073070_030.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "disgusted",
+        "text": "那个过期的牛奶散发着阵阵酸臭味，赶紧把它倒掉吧。呃... ...",
+        "file": "audio_Kore_1777547086175_032.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "scared",
+        "text": "电梯突然在半空中停住不动了，我一个人在里面很害怕。啊... ...",
+        "file": "audio_Kore_1777547099905_034.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "affectionate",
+        "text": "每天睁开眼睛就能看到你的脸，是我觉得最浪漫的事。嗯...",
+        "file": "audio_Kore_1777547118801_037.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "serious",
+        "text": "我们现在的处境非常危险，必须要保持绝对的冷静思考。",
+        "file": "audio_Kore_1777547124871_038.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "happy",
+        "text": "看到大家都在为我的表演鼓掌，我感到无比的高兴满足！",
+        "file": "audio_Kore_1777547136449_040.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "你竟敢当众让我下不来台，这笔账我们以后慢慢算！!!!!!",
+        "file": "audio_Kore_1777547142186_041.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "disgusted",
+        "text": "那些爬虫在盘子里到处乱爬，看着真让人感到恶心。呃... ...",
+        "file": "audio_Kore_1777547148792_042.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "scared",
+        "text": "深夜的走廊里传来奇怪的脚步声，听着好恐怖啊。啊... ...",
+        "file": "audio_Kore_1777547163430_044.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "affectionate",
+        "text": "希望能和你一起慢慢变老，看遍这世界所有的风景。嗯...",
+        "file": "audio_Kore_1777547182773_047.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "happy",
+        "text": "今天的天气真是太棒了，我们一起出去走走吧！",
+        "file": "audio_Kore_1777547200413_050.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "你到底为什么要这样做，这真的让我很生气！",
+        "file": "audio_Kore_1777547204721_051.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "scared",
+        "text": "啊... ... 刚才那个巨大的声响真的把我吓坏了！",
+        "file": "audio_Kore_1777547231301_056.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "serious",
+        "text": "请你务必认真听我说，这件事情非常的重要。",
+        "file": "audio_Kore_1777547244102_058.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "excited",
+        "text": "哇! !!! 我们终于赢得了这次比赛的最后胜利！",
+        "file": "audio_Kore_1777547251762_059.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "disgusted",
+        "text": "呃... ... 这盘菜的味道实在太奇怪了，难吃。",
+        "file": "audio_Kore_1777547274400_063.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "sad",
+        "text": "其实我心里还是很舍不得你的，真的很难受。",
+        "file": "audio_Kore_1777547298005_067.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "happy",
+        "text": "这就是我一直梦寐以求的奖杯，太棒了啊！",
+        "file": "audio_Kore_1777547309006_069.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "请你以后不要再打扰我的生活了，我受够了！",
+        "file": "audio_Kore_1777547314593_070.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "excited",
+        "text": "哇! !!! 我简直不敢相信，这就是我想要的礼物！",
+        "file": "audio_Kore_1777547330421_072.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "affectionate",
+        "text": "嗯... ... 看到你这么努力，我心里真的好开心。",
+        "file": "audio_Kore_1777547353781_076.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "scared",
+        "text": "我刚才真的以为我们要被困在这里了，好怕。",
+        "file": "audio_Kore_1777547364578_078.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "affectionate",
+        "text": "无论发生什么事情，我都会一直陪着你走的。",
+        "file": "audio_Kore_1777547374308_080.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "excited",
+        "text": "太不可思议了，我居然真的做到了这件事！",
+        "file": "audio_Kore_1777547384135_082.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "你能不能尊重一下别人，不要乱动我的东西！",
+        "file": "audio_Kore_1777547402105_085.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "disgusted",
+        "text": "呃... ... 这味道简直让我无法忍受，快关掉吧。",
+        "file": "audio_Kore_1777547407765_086.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "excited",
+        "text": "哇! !!! 这真的是我今年收到过最好的礼物了！",
+        "file": "audio_Kore_1777547419429_088.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "affectionate",
+        "text": "嗯... ... 只要是你提出来的要求，我都愿意听。",
+        "file": "audio_Kore_1777547449507_094.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "我根本不想听你的任何解释，请你离开吧。",
+        "file": "audio_Kore_1777547454225_095.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "scared",
+        "text": "在那漆黑的夜里，我真的害怕极了，救命。",
+        "file": "audio_Kore_1777547469086_098.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "excited",
+        "text": "哇! !!! 今天简直是我人生中最快乐的一天了！",
+        "file": "audio_Kore_1777547473955_099.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "happy",
+        "text": "今天的天气真的很不错，心情也变得特别好！",
+        "file": "audio_Kore_1777547479337_100.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "你怎么可以这样对我说话，真是太过分了！！！",
+        "file": "audio_Kore_1777547483759_101.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "scared",
+        "text": "那个地方黑漆漆的，我真的不敢一个人进去啊... ...",
+        "file": "audio_Kore_1777547503591_104.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "serious",
+        "text": "这件事必须现在就处理好，不能再拖延下去了。",
+        "file": "audio_Kore_1777547529135_108.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "happy",
+        "text": "终于等到假期了，我们可以去海边玩水啦！!",
+        "file": "audio_Kore_1777547540638_110.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "你到底有没有在听我说话，快点给我住口！！!!!",
+        "file": "audio_Kore_1777547545745_111.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "sad",
+        "text": "如果当时我能早点做出决定，就不会这么难过了... ...",
+        "file": "audio_Kore_1777547552222_112.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "scared",
+        "text": "刚才窗外好像有人在盯着我看，太恐怖了啊... ...",
+        "file": "audio_Kore_1777547566974_114.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "excited",
+        "text": "哇! 我终于买到梦寐以求的演唱会门票了！！！",
+        "file": "audio_Kore_1777547613814_120.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "你总是把房间弄得乱七八糟的，真让人火大！！！",
+        "file": "audio_Kore_1777547619072_121.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "sad",
+        "text": "我的小狗昨天生病去世了，我很舍不得它... ...",
+        "file": "audio_Kore_1777547625366_122.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "surprised",
+        "text": "咦?! 你竟然把我的秘密告诉了别人，太意外了。",
+        "file": "audio_Kore_1777547646642_125.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "affectionate",
+        "text": "你是世界上对我最好的人，我真的好喜欢你嗯...",
+        "file": "audio_Kore_1777547659369_127.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "serious",
+        "text": "我们现在的处境非常危险，必须保持绝对冷静。",
+        "file": "audio_Kore_1777547664184_128.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "excited",
+        "text": "哇! 这一道菜真的是太好吃了，味道非常棒！！！",
+        "file": "audio_Kore_1777547676320_130.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "你为什么要故意破坏我的计划，真是太可恶了！！！",
+        "file": "audio_Kore_1777547680750_131.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "disgusted",
+        "text": "那边的垃圾桶全是苍蝇，味道实在太冲了呃... ...",
+        "file": "audio_Kore_1777547698509_133.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "scared",
+        "text": "后面是不是有人在追我们，我真的快要吓死了啊... ...",
+        "file": "audio_Kore_1777547704787_134.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "excited",
+        "text": "哇! 终于可以放长假去环游世界旅游了啦！！！",
+        "file": "audio_Kore_1777547738721_140.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "别再用这种态度敷衍我，否则我会更生气的！！！",
+        "file": "audio_Kore_1777547744249_141.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "scared",
+        "text": "这个鬼屋的设计太真实了，简直要把我吓坏啊... ...",
+        "file": "audio_Kore_1777547763219_144.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "affectionate",
+        "text": "不论以后发生什么事，我都会永远陪着你嗯...",
+        "file": "audio_Kore_1777547777974_147.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "你到底在搞什么鬼啊！！！快点给我解释清楚现在！",
+        "file": "audio_Kore_1777547811735_152.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "sad",
+        "text": "我的人生好像彻底失败了，什么事情都做不好啊... ...",
+        "file": "audio_Kore_1777547824537_154.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "scared",
+        "text": "黑漆漆的走廊里好像有东西，我真的好害怕啊！啊... ...",
+        "file": "audio_Kore_1777547832169_155.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "affectionate",
+        "text": "亲爱的，谢谢你一直陪在我身边，我真的好爱你！嗯...",
+        "file": "audio_Kore_1777547850621_158.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "excited",
+        "text": "哇! 我终于中奖了！这份礼物真是太让人兴奋了吧！!!!",
+        "file": "audio_Kore_1777547856912_159.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "serious",
+        "text": "关于这次会议的详细内容，我们必须要严谨地处理。",
+        "file": "audio_Kore_1777547862686_160.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "happy",
+        "text": "看到你脸上带着这么灿烂的笑容，我也觉得很开心！",
+        "file": "audio_Kore_1777547872368_162.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "你总是这样自以为是，真的让我感到非常非常生气！",
+        "file": "audio_Kore_1777547884968_164.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "disgusted",
+        "text": "这碗汤的味道实在是太奇怪了，我真的喝不下去啊。呃... ...",
+        "file": "audio_Kore_1777547892801_165.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "surprised",
+        "text": "咦?! 你居然真的买到了这张限量版的演出门票吗？",
+        "file": "audio_Kore_1777547917074_168.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "excited",
+        "text": "我们要去旅游啦！我已经迫不及待想要出发了！哇! !!!",
+        "file": "audio_Kore_1777547936179_171.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "sad",
+        "text": "看着空荡荡的房间，我突然觉得心里空落落的啊... ...",
+        "file": "audio_Kore_1777547959016_175.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "你怎么可以随便乱丢我的东西！快给我捡起来！！！！！",
+        "file": "audio_Kore_1777547964230_176.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "scared",
+        "text": "半夜听到敲门声，这种感觉真的太吓人了，救命啊！啊... ...",
+        "file": "audio_Kore_1777547983497_179.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "excited",
+        "text": "哇! 那场烟火表演简直太震撼了，色彩非常绚丽！!!!",
+        "file": "audio_Kore_1777548007525_183.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "serious",
+        "text": "我们必须制定一个切实可行的方案来解决问题点。",
+        "file": "audio_Kore_1777548011859_184.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "sad",
+        "text": "因为我的粗心导致这次行动失败，我真的好自责... ...",
+        "file": "audio_Kore_1777548030914_187.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "angry",
+        "text": "你竟然敢背着我做这种事情，真的是太不可理喻了！！！！！",
+        "file": "audio_Kore_1777548037354_188.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "disgusted",
+        "text": "这些过期变质的食物快扔掉，看起来太恶心了啊！呃... ...",
+        "file": "audio_Kore_1777548044037_189.wav"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "scared",
+        "text": "这栋古老的建筑里好像有怪声，我不敢进去了啊！啊... ...",
+        "file": "audio_Kore_1777548056133_191.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "surprised",
+        "text": "咦?! 你什么时候学会了这么高超的乐器演奏技巧？",
+        "file": "audio_Kore_1777548061623_192.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "affectionate",
+        "text": "你就是我生命中最珍贵的存在，我会永远珍惜你！嗯...",
+        "file": "audio_Kore_1777548074744_194.wav",
+        "intensity": "high"
+    },
+    {
+        "voice": "Kore",
+        "emotion": "happy",
+        "text": "只要有你在身边，我无论做什么事情都觉得开心！",
+        "file": "audio_Kore_1777548097808_198.wav",
+        "intensity": "high"
+    }
+]

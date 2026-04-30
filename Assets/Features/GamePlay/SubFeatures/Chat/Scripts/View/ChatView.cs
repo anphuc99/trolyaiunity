@@ -354,6 +354,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_messageContainer.OnVocabWordClicked = null;
 			}
 			_reloadingTtsMessageIndices.Clear();
+			_autoChatUsedVocabWords.Clear();
 			if (_characterVoiceAudioSource != null)
 			{
 				_characterVoiceAudioSource.Stop();
@@ -1919,7 +1920,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_autoChatVocabIndex = 0;
 			_autoChatVocabWordsPerTurn = 0;
 			_autoChatPendingVocabWords.Clear();
-			_autoChatUsedVocabWords.Clear();
 			_isAutoChatVocabLoaded = false;
 		}
 
@@ -2209,6 +2209,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_isProcessingCharacterTurns = false;
 			SetCharacterRespondingState(false);
 			_reloadingTtsMessageIndices.Clear();
+			_autoChatUsedVocabWords.Clear();
 
 			if (_characterVoiceAudioSource != null)
 			{

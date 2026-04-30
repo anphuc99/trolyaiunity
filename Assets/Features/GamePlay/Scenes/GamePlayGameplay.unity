@@ -3872,10 +3872,14 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 793897765965241428, guid: ba7bb1e619aa24941aeb1cefe327934c, type: 3}
       propertyPath: m_Enabled
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1903839597104805317, guid: ba7bb1e619aa24941aeb1cefe327934c, type: 3}
       propertyPath: _visible
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4544901274388058524, guid: ba7bb1e619aa24941aeb1cefe327934c, type: 3}
+      propertyPath: m_SizeDelta.y
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7044129812205114970, guid: ba7bb1e619aa24941aeb1cefe327934c, type: 3}
