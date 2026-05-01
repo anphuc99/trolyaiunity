@@ -497,6 +497,11 @@ export const createTtsController = (dataSource: DataSource, refAudioService?: Re
       );
 
       const filePath = path.join(AUDIO_DIR, `${audioId}.mp3`);
+      await fs.unlink(filePath).catch((error) => {
+        if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
+          throw error;
+        }
+      });
       await fs.writeFile(filePath, mp3Buffer);
 
       // Attach audio to message if messageId is provided
