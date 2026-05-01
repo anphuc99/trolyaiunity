@@ -207,6 +207,8 @@ export const createTtsController = (dataSource: DataSource, refAudioService?: Re
         resolvedSettings.speakingRate
       );
 
+      console.log(text, tone, characterName, "=>", audioId);
+
       // 3. Lấy đường dẫn vật lý của file audio
       const audioPath = getAudioPath(audioId);
 
