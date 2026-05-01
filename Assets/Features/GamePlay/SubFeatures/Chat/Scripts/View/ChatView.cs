@@ -27,7 +27,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private const int RecordingFrequencyHz = 16000;
 		private const int MaxRecordingSeconds = 60;
 		private const string DefaultSpeechLanguage = "zh";
-		private const string AutoChatContextTemplate = "AI tự nói chuyện ít nhất {0} tin nhắn mỗi lượt. Các nhân vật không được phép ngủ";
+		private const string AutoChatContextTemplate = "AI tự nói chuyện khoảng {0} tin nhắn mỗi lượt. Các nhân vật không được phép ngủ";
 
 		[SerializeField]
 		private TMP_InputField _inputField;
@@ -508,7 +508,17 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			StopAutoChatMode();
-			SendRequest(ChatRequests.EndConversation);
+
+			// If we have words to review, start review mode first.
+			// Otherwise, end the conversation on server immediately.
+			if (_vocabReviewQueue.Count > 0)
+			{
+				StartVocabReviewMode();
+			}
+			else
+			{
+				SendRequest(ChatRequests.EndConversation);
+			}
 		}
 
 		/// <summary>
@@ -518,12 +528,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[OnEvent(ChatEvents.ConversationEnded)]
 		private void OnConversationEnded(object payload)
 		{
-			if (_vocabReviewQueue.Count > 0)
-			{
-				StartVocabReviewMode();
-				return;
-			}
-
 			ClearConversationState();
 		}
 
@@ -2107,7 +2111,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (!_hasSentAutoChatContext)
 			{
 				_hasSentAutoChatContext = true;
-				var fullContext = string.Format(AutoChatContextTemplate, _autoChatTargetTurnCount);
+				var fullContext = string.Format(AutoChatContextTemplate, Mathf.Min(_autoChatTargetTurnCount, 10));
 				if (!string.IsNullOrEmpty(vocabContext))
 				{
 					fullContext += "\n" + vocabContext;
@@ -2463,8 +2467,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_vocabPopupView.SetNextButtonVisible(false);
 			}
 
-			Debug.Log("[ChatView] Vocab review mode finished.");
-			ClearConversationState();
+			Debug.Log("[ChatView] Vocab review mode finished. Now ending conversation on server.");
+
+			// After review is finished, finalize the conversation (summarize) on server.
+			SendRequest(ChatRequests.EndConversation);
 		}
 
 		/// <summary>
