@@ -469,12 +469,13 @@ export const createTtsController = (dataSource: DataSource, refAudioService?: Re
     const tone = typeof request.body.tone === "string" ? request.body.tone.trim() : "";
     const characterName = typeof request.body.characterName === "string" ? request.body.characterName.trim() : "";
     const messageId = typeof request.body.messageId === "string" ? request.body.messageId.trim() : "";
-
+    
+    
     if (!text) {
       response.status(400).json({ message: "text is required" });
       return;
     }
-
+    
     const userId = request.user.id;
 
     try {
@@ -482,7 +483,7 @@ export const createTtsController = (dataSource: DataSource, refAudioService?: Re
       const audioId = buildAudioId(
         text,
         tone,
-        `${resolvedSettings.voiceName ?? ""}`,
+        `${resolvedSettings.voiceModel}:${resolvedSettings.voiceName ?? ""}`,
         resolvedSettings.pitch,
         resolvedSettings.speakingRate
       );
