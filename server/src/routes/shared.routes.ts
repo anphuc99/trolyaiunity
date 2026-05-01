@@ -29,7 +29,7 @@ export const createSharedRoutes = (dataSource: DataSource, refAudioService?: Ref
   router.post("/token/refresh", tokenController.refreshToken);
   router.get("/voices", requireAuth, voicesController.listVoices);
   router.get("/text-to-speech", requireAuth, ttsController.getTextToSpeech);
-  router.get("/check-audio", ttsController.checkAudioExists);
+  router.get("/check-audio", requireAuth, ttsController.checkAudioExists);
   router.get("/reference-audio", requireAuth, ttsController.getReferenceAudio);
   router.post("/process-tts-wav", requireAuth, upload.single("audio"), ttsController.processTtsWav);
 
