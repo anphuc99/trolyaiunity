@@ -225,6 +225,18 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
+		/// Resolves TTS audio for a specific assistant turn.
+		/// Used by View to trigger sequential JIT (Just-In-Time) audio generation.
+		/// </summary>
+		/// <param name="turn">The turn payload to resolve audio for.</param>
+		[Request(ChatRequests.ResolveTurnAudio)]
+		public static void HandleResolveTurnAudio(ChatAssistantTurnPayload turn)
+		{
+			if (turn == null) return;
+			_ = ResolveTurnAudioInternalAsync(turn);
+		}
+
+		/// <summary>
 		/// Gets cached character avatar sprite from parent signal.
 		/// </summary>
 		/// <param name="payload">Character name payload.</param>
@@ -1136,7 +1148,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					Transcribe = response.Transcribe,
 				});
 
-				_ = PreResolveTtsAudioUrlsAsync(turns);
+				// _ = PreResolveTtsAudioUrlsAsync(turns);
 			}
 			catch (Exception exception)
 			{
@@ -1193,7 +1205,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					Turns = turns,
 				});
 
-				_ = PreResolveTtsAudioUrlsAsync(turns);
+				// _ = PreResolveTtsAudioUrlsAsync(turns);
 			}
 			catch (Exception exception)
 			{
@@ -1763,6 +1775,44 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				{
 					turn.IsAudioPreloadCompleted = true;
 				}
+			}
+		}
+
+		/// <summary>
+		/// Resolves audio for a single turn. Called sequentially by the View.
+		/// </summary>
+		private static async Task ResolveTurnAudioInternalAsync(ChatAssistantTurnPayload turn)
+		{
+			if (turn == null || turn.IsAudioPreloadCompleted) return;
+
+			try
+			{
+				if (string.IsNullOrWhiteSpace(turn.Text))
+				{
+					turn.IsAudioPreloadCompleted = true;
+					return;
+				}
+
+				var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
+				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? "neutral" : turn.Tone.Trim();
+
+				turn.AudioUrl = await ResolveTtsAudioUrlAsync(
+					turn.Text, tone, characterName, false, turn.MessageId,
+					turn.Emotion, turn.Intensity);
+
+				if (!string.IsNullOrWhiteSpace(turn.AudioUrl))
+				{
+					var audioType = AudioUrlUtils.ResolveAudioType(turn.AudioUrl);
+					turn.AudioClip = await HttpClient.DownloadAudioClipTaskAsync(turn.AudioUrl, audioType);
+				}
+			}
+			catch (Exception ex)
+			{
+				Debug.LogWarning("[ChatController] Failed to resolve turn audio: " + ex.Message);
+			}
+			finally
+			{
+				turn.IsAudioPreloadCompleted = true;
 			}
 		}
 

@@ -28,6 +28,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Requests
 		public const string ReviewVocabulary = "game.play.chat.review.vocabulary.request";
 		public const string LoadVocabularyLearnedCount = "game.play.chat.load.vocabulary.learned.count.request";
 		public const string LoadAutoChatVocabulary = "game.play.chat.load.autochat.vocabulary.request";
+		public const string ResolveTurnAudio = "game.play.chat.resolve.turn.audio.request";
 		public const string BatchReviewAutoChatVocabulary = "game.play.chat.batch.review.autochat.vocabulary.request";
 	}
 }
