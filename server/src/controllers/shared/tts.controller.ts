@@ -16,6 +16,7 @@ interface TtsController {
   getTextToSpeech: (request: Request, response: Response) => Promise<void>;
   getReferenceAudio: (request: Request, response: Response) => Promise<void>;
   processTtsWav: (request: Request, response: Response) => Promise<void>;
+  checkAudioExists: (request: Request, response: Response) => Promise<void>; // Thêm dòng này
 }
 
 const NO_AUDIO_ERROR_MARKER = "gemini tts returned no audio data";
@@ -168,6 +169,71 @@ export const createTtsController = (dataSource: DataSource, refAudioService?: Re
       myLogMessage.content = rewrittenText;
       myLogMessage.audio = newAudioId;
       await myLogMessageRepository.save(myLogMessage);
+    }
+  };
+
+  const checkAudioExists: TtsController["checkAudioExists"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const text = typeof request.query.text === "string" ? request.query.text.trim() : "";
+    const tone = typeof request.query.tone === "string" ? request.query.tone.trim() : "Neutral and calm, natural conversational tone, medium pace";
+    const characterName = typeof request.query.characterName === "string" ? request.query.characterName.trim() : "";
+
+    if (!text) {
+      response.status(400).json({ message: "Text is required" });
+      return;
+    }
+
+    if (!characterName) {
+      response.status(400).json({ message: "characterName is required" });
+      return;
+    }
+
+    const userId = request.user.id;
+
+    try {
+      // 1. Lấy cấu hình voice của nhân vật
+      const resolvedSettings = await resolveCharacterVoiceSettings(userId, characterName);
+
+      // 2. Tạo audioId dựa trên tham số (giống như getTextToSpeech)
+      const audioId = buildAudioId(
+        text,
+        tone,
+        `${resolvedSettings.voiceModel}:${resolvedSettings.voiceName ?? ""}`,
+        resolvedSettings.pitch,
+        resolvedSettings.speakingRate
+      );
+
+      // 3. Lấy đường dẫn vật lý của file audio
+      const audioPath = getAudioPath(audioId);
+
+      // 4. Kiểm tra xem file có tồn tại không
+      try {
+        await fs.access(audioPath);
+        // Nếu không có lỗi văng ra nghĩa là file tồn tại
+        response.json({
+          exists: true,
+          audioId: audioId,
+          url: `/audio/${audioId}.mp3`
+        });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException)?.code === "ENOENT") {
+          // ENOENT nghĩa là Error NO ENTry (Không tìm thấy file)
+          response.json({ exists: false });
+        } else {
+          // Bắn ra lỗi nếu là các lỗi truy cập khác (vd: permission denied)
+          throw error;
+        }
+      }
+    } catch (error) {
+      console.error("Failed to check audio existence.", error);
+      response.status(500).json({
+        message: "Failed to check audio existence",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   };
 
@@ -468,5 +534,5 @@ export const createTtsController = (dataSource: DataSource, refAudioService?: Re
     }
   };
 
-  return { getTextToSpeech, getReferenceAudio, processTtsWav };
+  return { getTextToSpeech, getReferenceAudio, processTtsWav, checkAudioExists };
 };
