@@ -1,5 +1,4 @@
 import type { Request, Response } from "express";
-import "multer";
 import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
