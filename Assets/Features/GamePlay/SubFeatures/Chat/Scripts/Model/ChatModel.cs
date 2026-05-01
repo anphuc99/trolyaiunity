@@ -310,6 +310,21 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		public string Pinyin { get; set; }
 	}
 
+	public sealed class ChatCheckAudioResponsePayload
+	{
+		[JsonProperty("exists")]
+		public bool Exists { get; set; }
+		[JsonProperty("audioId")]
+		public string AudioId { get; set; }
+		[JsonProperty("url")]
+		public string Url { get; set; }
+
+		[JsonProperty("message")]
+		public string Message { get; set; }
+		[JsonProperty("error")]
+		public string Error { get; set; }
+	}
+
 	/// <summary>
 	/// Event payload for notifying views that a message's content was rewritten by the TTS service.
 	/// </summary>
@@ -413,6 +428,19 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		[JsonProperty("Transcribe")]
 		public string Transcribe { get; set; }
+
+		/// <summary>
+		/// Emotion label for this turn (e.g. happy, sad, neutral).
+		/// One of: angry, shouting, disgusted, sad, scared, surprised, shy, affectionate, happy, excited, serious, neutral.
+		/// </summary>
+		[JsonProperty("Emotion")]
+		public string Emotion { get; set; }
+
+		/// <summary>
+		/// Emotional intensity for this turn: low | medium | high.
+		/// </summary>
+		[JsonProperty("Intensity")]
+		public string Intensity { get; set; }
 	}
 
 	/// <summary>

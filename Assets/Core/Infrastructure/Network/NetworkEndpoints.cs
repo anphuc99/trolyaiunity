@@ -46,6 +46,9 @@ namespace Core.Infrastructure.Network
 		public const string TranslationReview = "/api/translation/review";
 		public const string TasksToday = "/api/tasks/today";
 		public const string TextToSpeech = "/api/text-to-speech";
+		public const string CheckAudio = "/api/check-audio";
+		public const string ReferenceAudio = "/api/reference-audio";
+		public const string ProcessTtsWav = "/api/process-tts-wav";
 		public const string UserMe = "/api/users/me";
 		public const string UserProfile = "/api/users/profile";
 		public const string Personalities = "/personalities";

@@ -1717,6 +1717,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 		/// <summary>
 		/// Pre-resolves TTS audio URLs for each turn so the View only needs to download audio clips.
+		/// When the character uses gpt-sovits, the full local TTS pipeline is executed.
 		/// </summary>
 		/// <param name="turns">Parsed turn list to enrich with AudioUrl.</param>
 		/// <returns>Awaitable task.</returns>
@@ -1744,7 +1745,9 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 					var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
 					var tone = string.IsNullOrWhiteSpace(turn.Tone) ? "neutral" : turn.Tone.Trim();
-					turn.AudioUrl = await ResolveTtsAudioUrlAsync(turn.Text, tone, characterName, false, turn.MessageId);
+					turn.AudioUrl = await ResolveTtsAudioUrlAsync(
+						turn.Text, tone, characterName, false, turn.MessageId,
+						turn.Emotion, turn.Intensity);
 
 					if (!string.IsNullOrWhiteSpace(turn.AudioUrl))
 					{
@@ -2129,48 +2132,111 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 		/// <summary>
 		/// Calls the TTS endpoint and returns the resolved absolute audio URL.
+		/// On PC when character uses gpt-sovits voice model, uses the local GPT-SoVITS pipeline instead.
 		/// </summary>
 		/// <param name="text">Text to synthesize.</param>
 		/// <param name="tone">Tone hint.</param>
 		/// <param name="characterName">Character name.</param>
 		/// <param name="forceReload">Whether to force regeneration.</param>
 		/// <param name="messageId">Optional AI-generated message id for server-side rewrite tracking.</param>
+		/// <param name="emotion">Optional emotion label from AI (used by GPT-SoVITS path).</param>
+		/// <param name="intensity">Optional intensity label from AI (used by GPT-SoVITS path).</param>
 		/// <returns>Absolute audio URL, or null on failure.</returns>
-		private static async Task<string> ResolveTtsAudioUrlAsync(string text, string tone, string characterName, bool forceReload = false, string messageId = null)
+		private static async Task<string> ResolveTtsAudioUrlAsync(
+			string text,
+			string tone,
+			string characterName,
+			bool forceReload = false,
+			string messageId = null,
+			string emotion = null,
+			string intensity = null)
 		{
 			try
 			{
-				var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload, messageId);
-				var endpoint = NetworkEndpoints.TextToSpeech + query;
-				var responseJson = await HttpClient.GetTaskAsync(endpoint);
-				if (string.IsNullOrWhiteSpace(responseJson))
+				// ── 1. Check if audio already exists on server (Cache lookup) ──────────
+				if (!forceReload && !string.IsNullOrWhiteSpace(characterName))
 				{
-					return null;
-				}
-
-				var ttsResponse = JsonConvert.DeserializeObject<ChatTextToSpeechResponsePayload>(responseJson);
-
-				// When the server rewrites the text for TTS compatibility, notify the view
-				// so it can update the displayed message content.
-				if (ttsResponse?.Rewritten == true && !string.IsNullOrWhiteSpace(messageId))
-				{
-					EventBus.Publish(ChatEvents.MessageContentUpdated, new ChatMessageContentUpdatedPayload
+					var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload, messageId);
+					var endpoint = NetworkEndpoints.CheckAudio + query;
+					var responseJson = await HttpClient.GetTaskAsync(endpoint);
+					if (!string.IsNullOrWhiteSpace(responseJson))
 					{
-						MessageId = messageId,
-						Text = ttsResponse.Text,
-						Pinyin = ttsResponse.Pinyin,
-					});
+						var ttsResponse = JsonConvert.DeserializeObject<ChatCheckAudioResponsePayload>(responseJson);
+						if (ttsResponse != null && ttsResponse.Exists == true && !string.IsNullOrWhiteSpace(ttsResponse.Url))
+						{
+							var settingsForUrl = UnityEngine.Resources.Load<NetworkSettings>("NetworkSettings");
+							var baseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settingsForUrl != null ? settingsForUrl.BaseUrl : null);
+							return AudioUrlUtils.ResolveAudioUrl(ttsResponse.Url, baseUrl);
+						}
+					}
 				}
 
-				var rawUrl = ttsResponse?.Url;
-				if (string.IsNullOrWhiteSpace(rawUrl))
+				// ── 2. GPT-SoVITS path (PC only, when character uses gemini voice model) ──
+				if (IsDesktopPlatform() && !string.IsNullOrWhiteSpace(characterName))
 				{
-					return null;
+					var voiceModel = ChatState.ParentSignals?.GetCharacterVoiceModelByName?.Invoke(characterName.Trim());
+					if (string.Equals(voiceModel, "gemini", StringComparison.OrdinalIgnoreCase))
+					{
+						var voiceName = ChatState.ParentSignals?.GetCharacterVoiceNameByName?.Invoke(characterName.Trim());
+						var settings = UnityEngine.Resources.Load<NetworkSettings>("NetworkSettings");
+						var serverBaseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settings != null ? settings.BaseUrl : null);
+						if (!string.IsNullOrWhiteSpace(serverBaseUrl))
+						{
+							var mp3Url = await Features.GamePlay.SubFeatures.Chat.Infrastructure.GptSoVitsTtsService.SynthesizeAsync(
+								text,
+								emotion,
+								intensity,
+								voiceName,
+								tone,
+								characterName,
+								messageId,
+								serverBaseUrl);
+
+							if (!string.IsNullOrWhiteSpace(mp3Url))
+							{
+								return mp3Url;
+							}
+
+							Debug.LogWarning("[ChatController] GPT-SoVITS pipeline failed; falling back to server TTS.");
+						}
+					}
 				}
 
-				var settings = UnityEngine.Resources.Load<NetworkSettings>("NetworkSettings");
-				var baseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settings != null ? settings.BaseUrl : null);
-				return AudioUrlUtils.ResolveAudioUrl(rawUrl, baseUrl);
+				// ── 3. Standard server TTS path ─────────────────────────────────────────
+				{
+					var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload, messageId);
+					var endpoint = NetworkEndpoints.TextToSpeech + query;
+					var responseJson = await HttpClient.GetTaskAsync(endpoint);
+					if (string.IsNullOrWhiteSpace(responseJson))
+					{
+						return null;
+					}
+
+					var ttsResponse = JsonConvert.DeserializeObject<ChatTextToSpeechResponsePayload>(responseJson);
+
+					// When the server rewrites the text for TTS compatibility, notify the view
+					// so it can update the displayed message content.
+					if (ttsResponse?.Rewritten == true && !string.IsNullOrWhiteSpace(messageId))
+					{
+						EventBus.Publish(ChatEvents.MessageContentUpdated, new ChatMessageContentUpdatedPayload
+						{
+							MessageId = messageId,
+							Text = ttsResponse.Text,
+							Pinyin = ttsResponse.Pinyin,
+						});
+					}
+
+					var rawUrl = ttsResponse?.Url;
+					if (string.IsNullOrWhiteSpace(rawUrl))
+					{
+						return null;
+					}
+
+					var settingsForUrl = UnityEngine.Resources.Load<NetworkSettings>("NetworkSettings");
+					var baseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settingsForUrl != null ? settingsForUrl.BaseUrl : null);
+					return AudioUrlUtils.ResolveAudioUrl(rawUrl, baseUrl);
+				}
+
 			}
 			catch (Exception exception)
 			{
