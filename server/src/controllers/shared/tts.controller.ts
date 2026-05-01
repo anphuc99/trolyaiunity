@@ -207,7 +207,7 @@ export const createTtsController = (dataSource: DataSource, refAudioService?: Re
         resolvedSettings.speakingRate
       );
 
-      console.log(text, tone, characterName, "=>", audioId);
+      console.log(text, tone, characterName, resolvedSettings.voiceModel, resolvedSettings.voiceName, resolvedSettings.pitch, resolvedSettings.speakingRate, "=>", audioId);
 
       // 3. Lấy đường dẫn vật lý của file audio
       const audioPath = getAudioPath(audioId);
@@ -489,7 +489,7 @@ export const createTtsController = (dataSource: DataSource, refAudioService?: Re
         resolvedSettings.pitch,
         resolvedSettings.speakingRate
       );
-      console.log(text, tone, characterName, "=>", audioId);
+      console.log(text, tone, characterName, resolvedSettings.voiceModel, resolvedSettings.voiceName, resolvedSettings.pitch, resolvedSettings.speakingRate, "=>", audioId);
 
       const AUDIO_DIR = path.join(process.cwd(), "data", "audio");
       await fs.mkdir(AUDIO_DIR, { recursive: true });
