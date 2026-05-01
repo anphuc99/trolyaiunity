@@ -797,12 +797,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				// Desktop + non-MyLog: use local Ollama for summarization
-				if (IsDesktopPlatform() && !IsMyLogChatMode())
-				{
-					await EndConversationViaLocalAIAsync();
-					return;
-				}
+				// // Desktop + non-MyLog: use local Ollama for summarization
+				// if (IsDesktopPlatform() && !IsMyLogChatMode())
+				// {
+				// 	await EndConversationViaLocalAIAsync();
+				// 	return;
+				// }
 
 				var responseJson = await HttpClient.PostJsonTaskAsync<object>(GetChatEndEndpoint(), null);
 				if (string.IsNullOrWhiteSpace(responseJson))
@@ -1089,11 +1089,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				if (IsDesktopPlatform() && !HasAudioPayload(payload))
-				{
-					await SendMessageViaLocalAIAsync(payload);
-					return;
-				}
+				// if (IsDesktopPlatform() && !HasAudioPayload(payload))
+				// {
+				// 	await SendMessageViaLocalAIAsync(payload);
+				// 	return;
+				// }
 
 				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatSendEndpoint(), payload);
 				if (string.IsNullOrWhiteSpace(responseJson))
@@ -1157,11 +1157,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				if (IsDesktopPlatform())
-				{
-					await GenerateReplyFromHistoryViaLocalAIAsync(payload);
-					return;
-				}
+				// if (IsDesktopPlatform())
+				// {
+				// 	await GenerateReplyFromHistoryViaLocalAIAsync(payload);
+				// 	return;
+				// }
 
 				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatRespondEndpoint(), payload);
 				if (string.IsNullOrWhiteSpace(responseJson))
