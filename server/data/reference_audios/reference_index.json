@@ -584,7 +584,8 @@
         "voice": "Kore",
         "emotion": "disgusted",
         "text": "这些过期变质的食物快扔掉，看起来太恶心了啊！呃... ...",
-        "file": "audio_Kore_1777548044037_189.wav"
+        "file": "audio_Kore_1777548044037_189.wav",
+        "intensity": "high"
     },
     {
         "voice": "Kore",

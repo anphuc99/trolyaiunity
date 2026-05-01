@@ -134,28 +134,43 @@ export const createReferenceAudioVectorService = (
     }
 
     const collection = await getCollection();
+    // 1. Lấy tất cả các ID đang có sẵn trong ChromaDB
+    const existingDocs = await collection.get({
+      include: [] // Không cần include document hay metadata để query cho nhẹ
+    });
+    const existingIds = new Set(existingDocs.ids);
 
-    // Batch upsert (ChromaDB has a limit of ~5000 per batch)
+    // 2. Lọc ra những entry CHƯA có trong ChromaDB
+    const newEntries = entries.filter(e => !existingIds.has(buildRefId(e.voice, e.file)));
+
+    if (newEntries.length === 0) {
+      console.log("[RefAudio] All reference audios are already indexed. Skipping.");
+      return;
+    }
+
+    console.log(`[RefAudio] Found ${newEntries.length} new entries to index.`);
+
+    // 3. Chỉ upsert những entry mới
     const BATCH_SIZE = 500;
     let indexed = 0;
 
-    for (let i = 0; i < entries.length; i += BATCH_SIZE) {
-      const batch = entries.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < newEntries.length; i += BATCH_SIZE) {
+      const batch = newEntries.slice(i, i + BATCH_SIZE);
 
       const ids = batch.map((e) => buildRefId(e.voice, e.file));
       const documents = batch.map((e) => e.text);
       const metadatas = batch.map((e) => ({
-        voice: e.voice,
-        emotion: e.emotion.toLowerCase(),
-        intensity: e.intensity.toLowerCase(),
-        file: e.file
+        voice: e.voice || "",
+        emotion: (e.emotion || "").toLowerCase(),
+        intensity: (e.intensity || "").toLowerCase(),
+        file: e.file || ""
       }));
 
       await collection.upsert({ ids, documents, metadatas });
       indexed += batch.length;
     }
 
-    console.log(`[RefAudio] Indexed ${indexed} reference audio entries into ChromaDB.`);
+    console.log(`[RefAudio] Successfully indexed ${indexed} new reference audio entries into ChromaDB.`);
   };
 
   const query: ReferenceAudioVectorService["query"] = async (params) => {
