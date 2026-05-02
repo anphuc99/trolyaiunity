@@ -29,6 +29,15 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		private const string NoneOptionLabel = "Không chọn";
 		private const int MinAge = 0;
 		private const int MaxAge = 120;
+		private const string SelectedModelKey = "SelectedModel";
+
+		private static readonly (string label, string id)[] ModelOptions = new[]
+		{
+			("Gemini 3 Flash Preview", "gemini-3-flash-preview"),
+			("Gemini 3 Pro Preview", "gemini-3.1-pro-preview"),
+			("Gemini 3 Flash Lite Preview", "gemini-3.1-flash-lite-preview"),
+			("Gemini Flash Lite Lastest", "gemini-flash-lite-latest")
+		};
 
 		[Header("Input Fields")]
 		[SerializeField] private TMP_InputField _nameInputField;
@@ -45,6 +54,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		[SerializeField] private TMP_Dropdown _levelDropdown;
 		[SerializeField] private TMP_Dropdown _currentStoryDropdown;
 		[SerializeField] private TMP_Dropdown _voiceNameDropdown;
+		[SerializeField] private TMP_Dropdown _modelDropdown;
 
 		[Header("Voice Settings")]
 		[SerializeField] private Slider _pitchSlider;
@@ -124,6 +134,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 
 			_ageInputField?.onEndEdit.AddListener(HandleAgeInputChanged);
 			_pitchSlider?.onValueChanged.AddListener(HandlePitchChanged);
+			_modelDropdown?.onValueChanged.AddListener(HandleModelChanged);
 		}
 
 		private static void BindButton(Button button, UnityEngine.Events.UnityAction action)
@@ -154,6 +165,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			PopulateDropdown(_levelDropdown, _levelOptions, opt => opt.Name ?? $"Cấp {opt.Id}", null);
 			PopulateDropdown(_currentStoryDropdown, _storyOptions, opt => opt.Name ?? $"Story {opt.Id}", null);
 			ApplyPitchToSlider(null);
+			InitializeModelDropdown();
 		}
 
 		private void RenderProfile(SettingProfilePayload profile)
@@ -171,6 +183,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			PopulateDropdown(_levelDropdown, _levelOptions, opt => opt.Name ?? $"Cấp {opt.Id}", profile.LevelId);
 			PopulateDropdown(_currentStoryDropdown, _storyOptions, opt => opt.Name ?? $"Story {opt.Id}", profile.CurrentStoryId);
 			ApplyPitchToSlider(profile.Pitch);
+			RenderModelSelection();
 		}
 
 		#endregion
@@ -265,6 +278,57 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 		private void HandleAgeInputChanged(string rawValue)
 		{
 			SetAgeValue(ParseAge(rawValue));
+		}
+
+		private void HandleModelChanged(int index)
+		{
+			if (_suppressUiEvents) return;
+			if (index < 0 || index >= ModelOptions.Length) return;
+
+			var modelId = ModelOptions[index].id;
+			PlayerPrefs.SetString(SelectedModelKey, modelId);
+			PlayerPrefs.Save();
+			Debug.Log($"[SettingView] Saved model: {modelId}");
+		}
+
+		#endregion
+
+		#region Model Helpers
+
+		private void InitializeModelDropdown()
+		{
+			if (_modelDropdown == null) return;
+
+			_suppressUiEvents = true;
+			_modelDropdown.options.Clear();
+			foreach (var option in ModelOptions)
+			{
+				_modelDropdown.options.Add(new TMP_Dropdown.OptionData(option.label));
+			}
+			_suppressUiEvents = false;
+
+			RenderModelSelection();
+		}
+
+		private void RenderModelSelection()
+		{
+			if (_modelDropdown == null) return;
+
+			var savedModel = PlayerPrefs.GetString(SelectedModelKey, "gemini-flash-lite-latest");
+			var index = 0;
+			for (var i = 0; i < ModelOptions.Length; i++)
+			{
+				if (ModelOptions[i].id == savedModel)
+				{
+					index = i;
+					break;
+				}
+			}
+
+			_suppressUiEvents = true;
+			_modelDropdown.value = index;
+			_modelDropdown.RefreshShownValue();
+			_suppressUiEvents = false;
 		}
 
 		#endregion
@@ -380,6 +444,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			SetInteractable(_decreaseAgeButton, isInteractable);
 			SetInteractable(_saveButton, isInteractable);
 			SetInteractable(_logoutButton, isInteractable);
+			SetInteractable(_modelDropdown, isInteractable);
 		}
 
 		private static void SetInteractable(Selectable selectable, bool interactable)

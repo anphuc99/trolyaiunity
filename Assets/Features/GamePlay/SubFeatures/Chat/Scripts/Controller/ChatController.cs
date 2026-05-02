@@ -1126,6 +1126,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				// 	return;
 				// }
 
+				var savedModel = PlayerPrefs.GetString("SelectedModel", "gemini-flash-lite-latest");
+				if (string.IsNullOrWhiteSpace(payload.Model))
+				{
+					payload.Model = savedModel;
+				}
+
 				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatSendEndpoint(), payload);
 				if (string.IsNullOrWhiteSpace(responseJson))
 				{
@@ -1193,6 +1199,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				// 	await GenerateReplyFromHistoryViaLocalAIAsync(payload);
 				// 	return;
 				// }
+
+				var savedModel = PlayerPrefs.GetString("SelectedModel", "gemini-flash-lite-latest");
+				if (string.IsNullOrWhiteSpace(payload.Model))
+				{
+					payload.Model = savedModel;
+				}
 
 				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatRespondEndpoint(), payload);
 				if (string.IsNullOrWhiteSpace(responseJson))
