@@ -10,8 +10,7 @@ export const GEMINI_MODELS = [
   "gemini-3.1-flash-lite-preview",
   "gemini-3-flash-preview",
   "gemini-3-pro-preview",
-  "gemma-4-26b-a4b-it",
-  "gemma-4-31b-it"
+  "gemini-flash-lite-latest"
 ] as const;
 
 export type GeminiModel = (typeof GEMINI_MODELS)[number];
