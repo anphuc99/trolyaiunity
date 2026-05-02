@@ -596,10 +596,10 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
 
       // No words due. Check how many new words were learned today.
       const todayNewCount = allVocabs.filter((v: VocabularyEntity) => toDateKey(v.createdAt) === todayKey).length;
-
+      console.log("Today new count:", todayNewCount);
       if (todayNewCount < 10) {
         const neededCount = 10 - todayNewCount;
-        
+
         // Find user's current level
         const currentLevel = await resolveCurrentUserLevel(userId);
         if (currentLevel) {
@@ -610,7 +610,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
 
           if (learningPath && learningPath.vocabulary) {
             const existingWords = new Set(allVocabs.map((v) => v.chinnese.trim().toLowerCase()));
-            
+
             // Parse comma-separated words from the learning path
             const pathWords = learningPath.vocabulary
               .split(",")
@@ -629,7 +629,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
 
             if (missingWords.length > 0) {
               const cheapAI: CheapAIService = createCheapAIService();
-              
+
               for (const word of missingWords) {
                 let pinyin = "";
                 let vietnamese = "";
