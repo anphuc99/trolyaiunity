@@ -63,5 +63,6 @@ namespace Core.Infrastructure.Network
 		public const string VocabularyReview = "/api/vocabulary";
 		public const string VocabularyIgnore = "/api/vocabulary";
 		public const string VocabularyList = "/api/vocabulary";
+		public const string ChatGenerateVocabExample = "/api/chat/generate-vocab-example";
 	}
 }

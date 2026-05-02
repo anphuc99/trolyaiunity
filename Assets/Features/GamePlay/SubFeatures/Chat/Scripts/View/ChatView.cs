@@ -922,6 +922,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_vocabPopupView.SetClosedCallback(HandleVocabPopupClosed);
 				_vocabPopupView.SetNextCallback(HandleVocabReviewNext);
 				_vocabPopupView.SetAudioPlayCallback(HandleVocabAudioPlayRequested);
+				_vocabPopupView.SetGenerateExampleCallback(HandleGenerateVocabExample);
 				RefreshVocabCharacterOptions();
 			}
 
@@ -2342,6 +2343,41 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				_vocabPopupView.Hide();
 			}
+		}
+
+		/// <summary>
+		/// Handles the AI-generated vocabulary example sentence result from controller.
+		/// Forwards the result to the vocab popup view for display.
+		/// </summary>
+		/// <param name="payload">Example result payload.</param>
+		[OnEvent(ChatEvents.VocabExampleGenerated)]
+		private void OnVocabExampleGenerated(object payload)
+		{
+			var result = payload as ChatVocabExampleResultPayload;
+			if (result == null || _vocabPopupView == null)
+			{
+				return;
+			}
+
+			_vocabPopupView.ShowExampleSentence(result.Sentence, result.Pinyin, result.Translation);
+		}
+
+		/// <summary>
+		/// Callback from vocab popup when the Example Sentences button is clicked.
+		/// Triggers a request to generate a story-relevant example sentence.
+		/// </summary>
+		/// <param name="word">The vocabulary word to generate an example for.</param>
+		private void HandleGenerateVocabExample(string word)
+		{
+			if (string.IsNullOrWhiteSpace(word))
+			{
+				return;
+			}
+
+			SendRequest(ChatRequests.GenerateVocabExample, new ChatVocabExampleRequestPayload
+			{
+				Word = word.Trim()
+			});
 		}
 
 		/// <summary>

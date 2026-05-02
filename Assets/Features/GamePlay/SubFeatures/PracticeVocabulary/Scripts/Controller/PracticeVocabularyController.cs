@@ -184,6 +184,22 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Controller
 			_ = IgnoreVocabularyInternalAsync(payload);
 		}
 
+		/// <summary>
+		/// Handles vocabulary example sentence generation from practice popup.
+		/// </summary>
+		/// <param name="payload">Request payload with word.</param>
+		[Request(PracticeVocabularyRequests.GenerateVocabExample)]
+		public static void HandleGenerateVocabExample(PracticeVocabExampleRequestPayload payload)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.Word))
+			{
+				PublishError("Missing word for example sentence generation.");
+				return;
+			}
+
+			_ = GenerateVocabExampleInternalAsync(payload);
+		}
+
 		private sealed class ResolvedTtsPayload
 		{
 			public string Url;
@@ -296,6 +312,45 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Controller
 			catch (Exception exception)
 			{
 				PublishError("Failed to ignore vocabulary: " + exception.Message);
+			}
+		}
+
+		/// <summary>
+		/// Generates a story-relevant example sentence for a vocabulary word via API.
+		/// </summary>
+		/// <param name="payload">Request payload with word.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task GenerateVocabExampleInternalAsync(PracticeVocabExampleRequestPayload payload)
+		{
+			try
+			{
+				var word = payload.Word.Trim();
+				var body = new PracticeVocabExampleRequestPayload { Word = word };
+				var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatGenerateVocabExample, body);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					PublishError("Empty response from example sentence generation.");
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<PracticeVocabExampleResponsePayload>(responseJson);
+				if (response == null || string.IsNullOrWhiteSpace(response.Sentence))
+				{
+					PublishError("Failed to parse example sentence response.");
+					return;
+				}
+
+				EventBus.Publish(PracticeVocabularyEvents.VocabExampleGenerated, new PracticeVocabExampleResultPayload
+				{
+					Word = word,
+					Sentence = response.Sentence,
+					Pinyin = response.Pinyin,
+					Translation = response.Translation
+				});
+			}
+			catch (Exception exception)
+			{
+				PublishError("Failed to generate example sentence: " + exception.Message);
 			}
 		}
 

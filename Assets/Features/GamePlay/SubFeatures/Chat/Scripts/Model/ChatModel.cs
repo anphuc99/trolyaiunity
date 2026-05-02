@@ -970,4 +970,66 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		public System.Collections.Generic.List<string> Words { get; set; }
 			= new System.Collections.Generic.List<string>();
 	}
+
+	/// <summary>
+	/// Request payload for generating a vocabulary example sentence.
+	/// </summary>
+	public sealed class ChatVocabExampleRequestPayload
+	{
+		/// <summary>
+		/// The Chinese word to generate an example sentence for.
+		/// </summary>
+		[Newtonsoft.Json.JsonProperty("word")]
+		public string Word { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload from the generate-vocab-example endpoint.
+	/// </summary>
+	public sealed class ChatVocabExampleResponsePayload
+	{
+		/// <summary>
+		/// The example sentence in Chinese.
+		/// </summary>
+		[Newtonsoft.Json.JsonProperty("sentence")]
+		public string Sentence { get; set; }
+
+		/// <summary>
+		/// Pinyin reading of the sentence.
+		/// </summary>
+		[Newtonsoft.Json.JsonProperty("pinyin")]
+		public string Pinyin { get; set; }
+
+		/// <summary>
+		/// Vietnamese translation of the sentence.
+		/// </summary>
+		[Newtonsoft.Json.JsonProperty("translation")]
+		public string Translation { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload when a vocabulary example sentence has been generated.
+	/// </summary>
+	public sealed class ChatVocabExampleResultPayload
+	{
+		/// <summary>
+		/// The Chinese word the example was generated for.
+		/// </summary>
+		public string Word { get; set; }
+
+		/// <summary>
+		/// The example sentence in Chinese.
+		/// </summary>
+		public string Sentence { get; set; }
+
+		/// <summary>
+		/// Pinyin reading of the sentence.
+		/// </summary>
+		public string Pinyin { get; set; }
+
+		/// <summary>
+		/// Vietnamese translation of the sentence.
+		/// </summary>
+		public string Translation { get; set; }
+	}
 }

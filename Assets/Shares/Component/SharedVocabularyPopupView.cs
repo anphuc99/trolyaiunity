@@ -21,6 +21,7 @@ namespace Share.Components
         [Header("Button")]
         [SerializeField] private Button _closeButton;
         [SerializeField] private Button _nextButton;
+        [SerializeField] private Button _exampleSentencesButton;
 
         [SerializeField] private GameObject _loadingIndicator;
         [SerializeField] private GameObject _contentGroup;
@@ -43,6 +44,16 @@ namespace Share.Components
         /// Callback invoked when the Next button is clicked.
         /// </summary>
         private System.Action _onNextRequested;
+
+        /// <summary>
+        /// Callback invoked when the Example Sentences button is clicked: (word).
+        /// </summary>
+        private System.Action<string> _onGenerateExampleRequested;
+
+        /// <summary>
+        /// True while waiting for example sentence response from server.
+        /// </summary>
+        private bool _isExampleRequestInProgress;
 
         /// <summary>
         /// Callback for audio playback request: (word, characterName).
@@ -81,6 +92,11 @@ namespace Share.Components
                 _showMeaningButton.onClick.AddListener(ShowMeaning);
             }
 
+            if (_exampleSentencesButton != null)
+            {
+                _exampleSentencesButton.onClick.AddListener(HandleGenerateExample);
+            }
+
             SetNextButtonVisible(false);
             UpdateAudioControlsState();
 
@@ -107,6 +123,11 @@ namespace Share.Components
             if (_showMeaningButton != null)
             {
                 _showMeaningButton.onClick.RemoveListener(ShowMeaning);
+            }
+
+            if (_exampleSentencesButton != null)
+            {
+                _exampleSentencesButton.onClick.RemoveListener(HandleGenerateExample);
             }
         }
 
@@ -406,6 +427,97 @@ namespace Share.Components
             if (_meaningText != null)
             {
                 _meaningText.gameObject.SetActive(true);
+            }
+        }
+
+        /// <summary>
+        /// Registers callback fired when the Example Sentences button is clicked.
+        /// </summary>
+        /// <param name="onGenerateExample">Callback signature: (word).</param>
+        public void SetGenerateExampleCallback(System.Action<string> onGenerateExample)
+        {
+            _onGenerateExampleRequested = onGenerateExample;
+        }
+
+        /// <summary>
+        /// Handles the Example Sentences button click.
+        /// </summary>
+        private void HandleGenerateExample()
+        {
+            if (_onGenerateExampleRequested == null)
+            {
+                return;
+            }
+
+            var word = _vocabText != null ? _vocabText.text : null;
+            if (string.IsNullOrWhiteSpace(word))
+            {
+                return;
+            }
+
+            _isExampleRequestInProgress = true;
+            SetExampleButtonInteractable(false);
+            _onGenerateExampleRequested.Invoke(word.Trim());
+        }
+
+        /// <summary>
+        /// Displays the AI-generated example sentence in the meaning text area.
+        /// </summary>
+        /// <param name="sentence">Chinese sentence.</param>
+        /// <param name="pinyin">Pinyin reading.</param>
+        /// <param name="translation">Vietnamese translation.</param>
+        public void ShowExampleSentence(string sentence, string pinyin, string translation)
+        {
+            _isExampleRequestInProgress = false;
+            SetExampleButtonInteractable(true);
+
+            if (_meaningText == null)
+            {
+                return;
+            }
+
+            var builder = new System.Text.StringBuilder();
+
+            if (!string.IsNullOrWhiteSpace(_meaningText.text))
+            {
+                builder.Append(_meaningText.text);
+                builder.Append("\n\n");
+            }
+
+            builder.Append("<b>Ví dụ:</b>\n");
+
+            if (!string.IsNullOrWhiteSpace(sentence))
+            {
+                builder.Append(sentence);
+            }
+
+            if (!string.IsNullOrWhiteSpace(pinyin))
+            {
+                builder.Append("\n");
+                builder.Append("<i>");
+                builder.Append(pinyin);
+                builder.Append("</i>");
+            }
+
+            if (!string.IsNullOrWhiteSpace(translation))
+            {
+                builder.Append("\n");
+                builder.Append(translation);
+            }
+
+            _meaningText.text = builder.ToString();
+            _meaningText.gameObject.SetActive(true);
+        }
+
+        /// <summary>
+        /// Enables or disables the example sentences button.
+        /// </summary>
+        /// <param name="interactable">Whether the button should be interactable.</param>
+        private void SetExampleButtonInteractable(bool interactable)
+        {
+            if (_exampleSentencesButton != null)
+            {
+                _exampleSentencesButton.interactable = interactable;
             }
         }
     }

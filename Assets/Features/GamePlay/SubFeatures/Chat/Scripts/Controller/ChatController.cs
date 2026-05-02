@@ -490,6 +490,25 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			_ = BatchReviewAutoChatVocabularyInternalAsync(payload);
 		}
 
+		/// <summary>
+		/// Handles vocabulary example sentence generation from chat popup.
+		/// </summary>
+		/// <param name="payload">Request payload with word.</param>
+		[Request(ChatRequests.GenerateVocabExample)]
+		public static void HandleGenerateVocabExample(ChatVocabExampleRequestPayload payload)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.Word))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Missing word for example sentence generation."
+				});
+				return;
+			}
+
+			_ = GenerateVocabExampleInternalAsync(payload);
+		}
+
 		private static void RegisterAddCharacterMenu()
 		{
 			UnregisterAddCharacterMenu();
@@ -1983,6 +2002,54 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
 				{
 					Message = "Failed to review vocabulary: " + exception.Message
+				});
+			}
+		}
+
+		/// <summary>
+		/// Generates a story-relevant example sentence for a vocabulary word via API.
+		/// </summary>
+		/// <param name="payload">Request payload with word.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task GenerateVocabExampleInternalAsync(ChatVocabExampleRequestPayload payload)
+		{
+			try
+			{
+				var word = payload.Word.Trim();
+				var body = new ChatVocabExampleRequestPayload { Word = word };
+				var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatGenerateVocabExample, body);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = "Empty response from example sentence generation."
+					});
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<ChatVocabExampleResponsePayload>(responseJson);
+				if (response == null || string.IsNullOrWhiteSpace(response.Sentence))
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = "Failed to parse example sentence response."
+					});
+					return;
+				}
+
+				EventBus.Publish(ChatEvents.VocabExampleGenerated, new ChatVocabExampleResultPayload
+				{
+					Word = word,
+					Sentence = response.Sentence,
+					Pinyin = response.Pinyin,
+					Translation = response.Translation
+				});
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to generate example sentence: " + exception.Message
 				});
 			}
 		}

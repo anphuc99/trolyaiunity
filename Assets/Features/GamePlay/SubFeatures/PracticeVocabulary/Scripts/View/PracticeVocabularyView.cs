@@ -78,6 +78,7 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 			{
 				_vocabularyPopupView.SetReviewCallback(null);
 				_vocabularyPopupView.SetAudioPlayCallback(null);
+				_vocabularyPopupView.SetGenerateExampleCallback(null);
 			}
 
 			SetAudioRequestInProgress(false);
@@ -199,6 +200,23 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 			StartCoroutine(PlayVocabularyAudio(playback));
 		}
 
+		/// <summary>
+		/// Handles the AI-generated vocabulary example sentence result from controller.
+		/// Forwards the result to the vocab popup view for display.
+		/// </summary>
+		/// <param name="payload">Example result payload.</param>
+		[OnEvent(PracticeVocabularyEvents.VocabExampleGenerated)]
+		private void OnVocabExampleGenerated(object payload)
+		{
+			var result = payload as PracticeVocabExampleResultPayload;
+			if (result == null || _vocabularyPopupView == null)
+			{
+				return;
+			}
+
+			_vocabularyPopupView.ShowExampleSentence(result.Sentence, result.Pinyin, result.Translation);
+		}
+
 		private IEnumerator PlayVocabularyAudio(PracticeVocabularyPlayAudioPayload playback)
 		{
 			if (playback.AudioClip == null)
@@ -267,6 +285,24 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 				CharacterName = selectedCharacterName,
 				Text = word.Trim(),
 				Tone = DefaultTtsTone,
+			});
+		}
+
+		/// <summary>
+		/// Callback from vocab popup when the Example Sentences button is clicked.
+		/// Triggers a request to generate a story-relevant example sentence.
+		/// </summary>
+		/// <param name="word">The vocabulary word to generate an example for.</param>
+		private void HandleGenerateVocabExample(string word)
+		{
+			if (string.IsNullOrWhiteSpace(word))
+			{
+				return;
+			}
+
+			SendRequest(PracticeVocabularyRequests.GenerateVocabExample, new PracticeVocabExampleRequestPayload
+			{
+				Word = word.Trim()
 			});
 		}
 
@@ -355,6 +391,7 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 			_vocabularyPopupView.SetRatingButtonsVisible(true);
 			_vocabularyPopupView.SetReviewCallback(HandleReviewRequested);
 			_vocabularyPopupView.SetAudioPlayCallback(HandleVocabularyAudioPlayRequested);
+			_vocabularyPopupView.SetGenerateExampleCallback(HandleGenerateVocabExample);
 			RefreshVocabularyCharacterOptions();
 		}
 

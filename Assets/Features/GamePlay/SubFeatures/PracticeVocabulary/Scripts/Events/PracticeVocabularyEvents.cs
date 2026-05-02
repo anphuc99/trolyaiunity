@@ -15,5 +15,6 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Events
 		public const string VocabularyAudioPlayRequested = "game.play.practice.vocabulary.audio.play.requested.event";
 		public const string RequestFailed = "game.play.practice.vocabulary.request.failed.event";
 		public const string VocabularyIgnored = "game.play.practice.vocabulary.vocabulary.ignored.event";
+		public const string VocabExampleGenerated = "game.play.practice.vocabulary.vocab.example.generated.event";
 	}
 }
