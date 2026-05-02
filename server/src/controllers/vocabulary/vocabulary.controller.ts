@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { IsNull, Not, type DataSource, type Repository } from "typeorm";
 import VocabularyEntity from "../../models/vocabulary.entity.js";
 import UserEntity from "../../models/user.entity.js";
+import LearningPathEntity from "../../models/learning-path.entity.js";
 import {
   createInitialReviewState,
   advanceCycleStep,
@@ -136,6 +137,7 @@ const isValidVietnameseMeaning = (sourceWord: string, meaning: string): boolean 
 export const createVocabularyController = (dataSource: DataSource): VocabularyController => {
   const vocabRepo: Repository<VocabularyEntity> = dataSource.getRepository(VocabularyEntity);
   const userRepo: Repository<UserEntity> = dataSource.getRepository(UserEntity);
+  const learningPathRepo: Repository<LearningPathEntity> = dataSource.getRepository(LearningPathEntity);
   const toDateKey = (value: Date | string) =>
     new Date(value).toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
 
@@ -562,6 +564,8 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
 
   // ──────────────────────────────────────────────────────────────────────────
   // Get vocabularies due for review today.
+  // If no words are due, checks if the user has learned 10 words today.
+  // If not, it picks (10 - learned) words from the user's current level's learning path.
   // ──────────────────────────────────────────────────────────────────────────
   const getDueReviews: VocabularyController["getDueReviews"] = async (request, response) => {
     const userId = request.user?.id;
@@ -572,15 +576,103 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     }
 
     try {
-      // Fetch only vocabs that have been initialised for review
-      const vocabs = await vocabRepo.find({
-        where: { userId, nextReviewDate: Not(IsNull()) }
+      // Fetch all vocabs for the user to count today's new ones and find existing words
+      const allVocabs = await vocabRepo.find({
+        where: { userId }
       });
 
       const todayKey = toDateKey(new Date());
-      const dueVocabs = vocabs.filter(
-        (v: VocabularyEntity) => toDateKey(v.nextReviewDate!) <= todayKey && !v.isIgnored
+
+      // Filter due vocabs
+      const dueVocabs = allVocabs.filter(
+        (v: VocabularyEntity) => v.nextReviewDate && toDateKey(v.nextReviewDate) <= todayKey && !v.isIgnored
       );
+
+      // If there are words due, just return them
+      if (dueVocabs.length > 0) {
+        response.json({ vocabularies: dueVocabs.map(serialiseVocabulary), total: dueVocabs.length });
+        return;
+      }
+
+      // No words due. Check how many new words were learned today.
+      const todayNewCount = allVocabs.filter((v: VocabularyEntity) => toDateKey(v.createdAt) === todayKey).length;
+
+      if (todayNewCount < 10) {
+        const neededCount = 10 - todayNewCount;
+        
+        // Find user's current level
+        const currentLevel = await resolveCurrentUserLevel(userId);
+        if (currentLevel) {
+          // Find learning path for this level
+          const learningPath = await learningPathRepo.findOne({
+            where: { userId, level: currentLevel }
+          });
+
+          if (learningPath && learningPath.vocabulary) {
+            const existingWords = new Set(allVocabs.map((v) => v.chinnese.trim().toLowerCase()));
+            
+            // Parse comma-separated words from the learning path
+            const pathWords = learningPath.vocabulary
+              .split(",")
+              .map((w) => w.trim())
+              .filter((w) => w.length > 0);
+
+            const missingWords: string[] = [];
+            for (const word of pathWords) {
+              if (!existingWords.has(word.toLowerCase())) {
+                missingWords.push(word);
+                if (missingWords.length >= neededCount) {
+                  break;
+                }
+              }
+            }
+
+            if (missingWords.length > 0) {
+              const cheapAI: CheapAIService = createCheapAIService();
+              
+              for (const word of missingWords) {
+                let pinyin = "";
+                let vietnamese = "";
+                try {
+                  const translation = await cheapAI.translateVocabulary(word);
+                  pinyin = translation.pinyin;
+                  if (isValidVietnameseMeaning(word, translation.vietnamese ?? "")) {
+                    vietnamese = translation.vietnamese;
+                  }
+                } catch (aiError) {
+                  console.warn(`Cheap AI translation failed for path word ${word}:`, aiError);
+                }
+
+                vietnamese = vietnamese || "chua co nghia";
+
+                const newVocab = vocabRepo.create({
+                  chinnese: word,
+                  vietnamese,
+                  pinyin: pinyin || null,
+                  level: currentLevel,
+                  isManuallyAdded: false,
+                  isIgnored: false,
+                  cardDirection: "kr-vn",
+                  isStarred: false,
+                  userId
+                });
+
+                const reviewState = createInitialReviewState();
+                newVocab.stability = reviewState.cycleStep;
+                newVocab.difficulty = null;
+                newVocab.lapses = null;
+                newVocab.currentIntervalDays = reviewState.currentIntervalDays;
+                newVocab.nextReviewDate = new Date(reviewState.nextReviewDate);
+                newVocab.lastReviewDate = null;
+                newVocab.reviewHistoryJson = JSON.stringify(reviewState.reviewHistory);
+
+                const savedVocab = await vocabRepo.save(newVocab);
+                dueVocabs.push(savedVocab);
+              }
+            }
+          }
+        }
+      }
 
       response.json({ vocabularies: dueVocabs.map(serialiseVocabulary), total: dueVocabs.length });
     } catch (error) {
