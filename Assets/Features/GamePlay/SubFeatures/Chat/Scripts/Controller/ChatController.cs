@@ -1860,7 +1860,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					? null
 					: ChatState.ParentSignals?.GetCharacterSpeakingRateByName?.Invoke(characterName);
 
-				var audioUrl = await ResolveTtsAudioUrlAsync(payload.Text, payload.Tone, characterName, payload.ForceReload, payload.MessageId);
+				var audioUrl = await ResolveTtsAudioUrlAsync(payload.Text, payload.Tone, characterName, payload.ForceReload, payload.MessageId, payload.Emotion, payload.Intensity);
 
 				AudioClip audioClip = null;
 				if (!string.IsNullOrWhiteSpace(audioUrl))
@@ -1882,6 +1882,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					AudioClip = audioClip,
 					ForceReload = payload.ForceReload,
 					MessageIndex = payload.MessageIndex,
+					Emotion = payload.Emotion,
+					Intensity = payload.Intensity,
 				});
 			}
 			catch (Exception exception)

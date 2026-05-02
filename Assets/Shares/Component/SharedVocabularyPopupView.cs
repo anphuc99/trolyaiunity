@@ -70,6 +70,9 @@ namespace Share.Components
         /// </summary>
         private bool _isAudioRequestInProgress;
 
+        private string _cachedMeaning;
+        private string _cachedExample;
+
         private void Awake()
         {
             if (_closeButton != null)
@@ -273,9 +276,11 @@ namespace Share.Components
 
             if (_meaningText != null)
             {
-                _meaningText.text = meaning ?? string.Empty;
+                _cachedMeaning = meaning ?? string.Empty;
+                _meaningText.text = _cachedMeaning;
             }
             
+            _cachedExample = string.Empty;
             _meaningText.gameObject.SetActive(false);
             SetLoadingState(false);
             UpdateAudioControlsState();
@@ -426,7 +431,13 @@ namespace Share.Components
         {
             if (_meaningText != null)
             {
+                _meaningText.text = _cachedMeaning;
                 _meaningText.gameObject.SetActive(true);
+            }
+
+            if (_onNextRequested != null)
+            {
+                SetNextButtonVisible(true);
             }
         }
 
@@ -478,14 +489,6 @@ namespace Share.Components
 
             var builder = new System.Text.StringBuilder();
 
-            if (!string.IsNullOrWhiteSpace(_meaningText.text))
-            {
-                builder.Append(_meaningText.text);
-                builder.Append("\n\n");
-            }
-
-            builder.Append("<b>Ví dụ:</b>\n");
-
             if (!string.IsNullOrWhiteSpace(sentence))
             {
                 builder.Append(sentence);
@@ -493,7 +496,7 @@ namespace Share.Components
 
             if (!string.IsNullOrWhiteSpace(pinyin))
             {
-                builder.Append("\n");
+                if (builder.Length > 0) builder.Append("\n");
                 builder.Append("<i>");
                 builder.Append(pinyin);
                 builder.Append("</i>");
@@ -501,12 +504,18 @@ namespace Share.Components
 
             if (!string.IsNullOrWhiteSpace(translation))
             {
-                builder.Append("\n");
+                if (builder.Length > 0) builder.Append("\n");
                 builder.Append(translation);
             }
 
-            _meaningText.text = builder.ToString();
+            _cachedExample = builder.ToString();
+            _meaningText.text = _cachedExample;
             _meaningText.gameObject.SetActive(true);
+
+            if (_onNextRequested != null)
+            {
+                SetNextButtonVisible(true);
+            }
         }
 
         /// <summary>

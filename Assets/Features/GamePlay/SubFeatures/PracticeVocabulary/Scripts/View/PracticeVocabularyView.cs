@@ -307,6 +307,19 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 		}
 
 		/// <summary>
+		/// Callback from vocab popup when the Next button is clicked.
+		/// Submits a default rating (3) and advances to the next word.
+		/// </summary>
+		private void HandleVocabReviewNext()
+		{
+			var current = GetCurrentVocabulary();
+			if (current != null)
+			{
+				HandleReviewRequested(current.Id, 3);
+			}
+		}
+
+		/// <summary>
 		/// Resolves selected character name, with fallback to the first available scene character.
 		/// </summary>
 		/// <param name="selectedCharacterName">Character name selected in dropdown.</param>
@@ -390,6 +403,7 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 
 			_vocabularyPopupView.SetRatingButtonsVisible(true);
 			_vocabularyPopupView.SetReviewCallback(HandleReviewRequested);
+			_vocabularyPopupView.SetNextCallback(HandleVocabReviewNext);
 			_vocabularyPopupView.SetAudioPlayCallback(HandleVocabularyAudioPlayRequested);
 			_vocabularyPopupView.SetGenerateExampleCallback(HandleGenerateVocabExample);
 			RefreshVocabularyCharacterOptions();
@@ -471,6 +485,7 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 
 			SetAudioRequestInProgress(false);
 			RefreshVocabularyCharacterOptions();
+			_vocabularyPopupView.SetNextButtonVisible(false);
 
 			var safeWord = string.IsNullOrWhiteSpace(vocabulary.Korean) ? string.Empty : vocabulary.Korean.Trim();
 			_vocabularyPopupView.ShowLoading(safeWord);

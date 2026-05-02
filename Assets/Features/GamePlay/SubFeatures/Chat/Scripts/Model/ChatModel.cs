@@ -89,6 +89,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// View-local message index for reloading UI state tracking.
 		/// </summary>
 		public int MessageIndex { get; set; } = -1;
+
+		/// <summary>
+		/// Emotion label for this turn (e.g. happy, sad, neutral).
+		/// </summary>
+		public string Emotion { get; set; }
+
+		/// <summary>
+		/// Emotional intensity for this turn: low | medium | high.
+		/// </summary>
+		public string Intensity { get; set; }
 	}
 
 	/// <summary>
@@ -151,6 +161,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// View-local message index for reloading UI state tracking.
 		/// </summary>
 		public int MessageIndex { get; set; } = -1;
+
+		/// <summary>
+		/// Emotion label for this turn.
+		/// </summary>
+		public string Emotion { get; set; }
+
+		/// <summary>
+		/// Emotional intensity for this turn.
+		/// </summary>
+		public string Intensity { get; set; }
 	}
 
 	/// <summary>

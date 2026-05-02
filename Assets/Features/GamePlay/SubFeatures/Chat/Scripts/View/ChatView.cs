@@ -612,6 +612,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 						Translation = turn.Translation,
 						Pinyin = turn.Pinyin,
 						Tone = string.IsNullOrWhiteSpace(turn.Tone) ? DefaultTtsTone : turn.Tone.Trim(),
+						Emotion = turn.Emotion,
+						Intensity = turn.Intensity,
 						Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, characterName),
 					});
 				}
@@ -792,6 +794,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					Translation = turn.Translation,
 					Pinyin = turn.Pinyin,
 					Tone = tone,
+					Emotion = turn.Emotion,
+					Intensity = turn.Intensity,
 					Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, characterName),
 				};
 
@@ -1640,6 +1644,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				CharacterName = messageData.Type == MessageBubbleType.User ? "User" : messageData.SenderName,
 				Text = string.IsNullOrWhiteSpace(messageData.OriginalMessage) ? messageData.Message : messageData.OriginalMessage,
 				Tone = string.IsNullOrWhiteSpace(messageData.Tone) ? DefaultTtsTone : messageData.Tone,
+				Emotion = messageData.Emotion,
+				Intensity = messageData.Intensity,
 			});
 		}
 
@@ -1677,6 +1683,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				Tone = tone,
 				ForceReload = true,
 				MessageIndex = messageData.MessageIndex,
+				Emotion = messageData.Emotion,
+				Intensity = messageData.Intensity,
 			});
 		}
 
