@@ -900,7 +900,8 @@ export const createChatController = (
 
     const message = typeof request.body?.message === "string" ? request.body.message.trim() : "";
     const sessionId = getSessionId(request.body?.sessionId);
-    const modelOverride = "gemini-flash-lite-latest";
+    const modelOverride = request.body?.model || "gemini-flash-lite-latest";
+    console.log("modelOverride: ", modelOverride);
     const audioBase64 = typeof request.body?.audio === "string" ? request.body.audio.trim() : "";
     const hasAudio = Boolean(audioBase64);
 
