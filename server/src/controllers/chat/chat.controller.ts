@@ -1738,6 +1738,7 @@ Rules:
 - The sentence MUST contain the word "${word}".
 - If story context is provided, make the sentence relate to that story/characters.
 - Keep the sentence at an intermediate learner level (HSK3-4).
+- The sentence should be short, around 5-7 Chinese characters.
 - Output ONLY valid JSON: {"sentence": "...", "pinyin": "...", "translation": "..."}
 - "sentence" is the Chinese sentence.
 - "pinyin" is the full pinyin with tone marks.
