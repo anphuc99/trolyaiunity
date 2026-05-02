@@ -2321,6 +2321,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				SetVocabAudioRequestInProgress(false);
 				_vocabPopupView.ShowResult(result.Id, result.Word, result.Pinyin, result.Vietnamese);
+				_vocabPopupView.gameObject.SetActive(true);
 			}
 		}
 
@@ -2420,13 +2421,13 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_isVocabReviewMode = true;
 			_vocabReviewIndex = 0;
 
+			Debug.Log("[ChatView] Starting vocab review mode with " + _vocabReviewQueue.Count + " words.");
+			ShowCurrentVocabReview();
+
 			if (_vocabPopupView != null)
 			{
 				_vocabPopupView.SetNextButtonVisible(true);
 			}
-
-			Debug.Log("[ChatView] Starting vocab review mode with " + _vocabReviewQueue.Count + " words.");
-			ShowCurrentVocabReview();
 		}
 
 		/// <summary>
