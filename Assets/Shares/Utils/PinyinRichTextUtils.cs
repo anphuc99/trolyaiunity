@@ -106,7 +106,7 @@ namespace Share.Utils
 			var pinyinLineBuilder = new StringBuilder();
 			var hanLineBuilder = new StringBuilder();
 			var currentPositionEm = 0f;
-			var rowHanCount = 0;
+			var rowColumnCount = 0f;
 			var syllableIndex = 0;
 
 			for (var i = 0; i < cleanText.Length; i++)
@@ -121,18 +121,18 @@ namespace Share.Utils
 				{
 					FlushRubyRow(blockBuilder, pinyinLineBuilder, hanLineBuilder);
 					currentPositionEm = 0f;
-					rowHanCount = 0;
+					rowColumnCount = 0f;
 					continue;
 				}
 
 				if (IsCjkIdeograph(ch))
 				{
 					// Wrap before this Han character if the row is full.
-					if (rowHanCount >= safeWrapCount)
+					if (rowColumnCount >= safeWrapCount)
 					{
 						FlushRubyRow(blockBuilder, pinyinLineBuilder, hanLineBuilder);
 						currentPositionEm = 0f;
-						rowHanCount = 0;
+						rowColumnCount = 0f;
 					}
 
 					if (currentPositionEm > 0f)
@@ -170,7 +170,7 @@ namespace Share.Utils
 					}
 
 					currentPositionEm += DefaultColumnStepEm;
-					rowHanCount++;
+					rowColumnCount += 1f;
 				}
 				else
 				{
@@ -185,6 +185,12 @@ namespace Share.Utils
 
 					// Skip pinyin syllables that correspond to Latin text in this group.
 					syllableIndex = SkipLatinPinyinSyllables(syllables, syllableIndex, groupText);
+
+					// Convert non-CJK width to equivalent Han columns for wrapping.
+					// Don't wrap before non-CJK groups; they stay with preceding text.
+					// Wrapping will trigger at the next CJK character boundary.
+					var groupWidthEm = EstimateNonHanGroupWidth(groupText);
+					var equivalentColumns = groupWidthEm / DefaultColumnStepEm;
 
 					if (currentPositionEm > 0f)
 					{
@@ -222,7 +228,8 @@ namespace Share.Utils
 						hanLineBuilder.Append("<size=").Append(DefaultHanSize).Append('>').Append(EscapeTmpText(groupText)).Append("</size>");
 					}
 
-					currentPositionEm += EstimateNonHanGroupWidth(groupText);
+					currentPositionEm += groupWidthEm;
+					rowColumnCount += equivalentColumns;
 				}
 			}
 

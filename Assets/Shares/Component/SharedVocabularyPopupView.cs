@@ -328,6 +328,7 @@ namespace Share.Components
         /// </summary>
         private void HandleNext()
         {
+            SetNextButtonInteractable(false);
             _onNextRequested?.Invoke();
         }
 
@@ -389,6 +390,7 @@ namespace Share.Components
                 _contentGroup.SetActive(!isLoading);
             }
 
+            SetNextButtonInteractable(!isLoading);
             UpdateAudioControlsState();
         }
 
@@ -438,6 +440,7 @@ namespace Share.Components
             if (_onNextRequested != null)
             {
                 SetNextButtonVisible(true);
+                SetNextButtonInteractable(true);
             }
         }
 
@@ -515,6 +518,7 @@ namespace Share.Components
             if (_onNextRequested != null)
             {
                 SetNextButtonVisible(true);
+                SetNextButtonInteractable(true);
             }
         }
 
