@@ -373,7 +373,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 				text_lang = "zh",
 				ref_audio_path = refAudioPath,
 				prompt_text = refText ?? string.Empty,
-				prompt_lang = "zh"
+				prompt_lang = "zh",
+				speed_factor = 0.8f
 			};
 
 			var jsonBody = JsonConvert.SerializeObject(requestBody);
