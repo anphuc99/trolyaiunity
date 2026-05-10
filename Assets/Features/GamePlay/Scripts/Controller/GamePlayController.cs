@@ -272,6 +272,8 @@ namespace Features.GamePlay.Controller
 				OnEchoed = OnSubControllerEchoed,
 				GetCharacterNames = GetChatCharacterNames,
 				GetAvatar = GetChatCharacterAvatar, 
+				GetCharacterVoiceNameByName = GetChatCharacterVoiceName,
+				GetCharacterVoiceModelByName = GetChatCharacterVoiceModel
 			});
 			MyLogController.SetParentSignals(new MyLogParentSignals
 			{

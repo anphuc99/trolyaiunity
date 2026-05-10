@@ -2303,7 +2303,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				}
 
 				// ── 2. GPT-SoVITS path (PC only, when character uses gemini voice model) ──
-				if (IsDesktopPlatform() && !string.IsNullOrWhiteSpace(characterName))
+				if (IsDesktopPlatform() && !string.IsNullOrWhiteSpace(characterName) && !string.Equals(characterName.Trim(), "User", StringComparison.OrdinalIgnoreCase))
 				{
 					var voiceModel = ChatState.ParentSignals?.GetCharacterVoiceModelByName?.Invoke(characterName.Trim());
 					if (string.Equals(voiceModel, "gemini", StringComparison.OrdinalIgnoreCase))
@@ -2313,7 +2313,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 						var serverBaseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settings != null ? settings.BaseUrl : null);
 						if (!string.IsNullOrWhiteSpace(serverBaseUrl))
 						{
-							var mp3Url = await Features.GamePlay.SubFeatures.Chat.Infrastructure.GptSoVitsTtsService.SynthesizeAsync(
+							var mp3Url = await Share.Utils.GptSoVitsTtsService.SynthesizeAsync(
 								text,
 								emotion,
 								intensity,

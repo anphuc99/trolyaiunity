@@ -25,5 +25,9 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 		public Func<List<string>> GetCharacterNames { get; set; }
 
 		public Func<string, Sprite> GetAvatar { get; set; }
+
+		public Func<string, string> GetCharacterVoiceNameByName { get; set; }
+
+		public Func<string, string> GetCharacterVoiceModelByName { get; set; }
 	}
 }

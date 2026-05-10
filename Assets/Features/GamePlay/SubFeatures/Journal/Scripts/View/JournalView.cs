@@ -1177,7 +1177,9 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				CharacterName = messageData.Type == MessageBubbleType.User ? "User" : messageData.SenderName,
 				Text = text,
 				Tone = messageData.Tone,
-				ForceReload = forceReload
+				ForceReload = forceReload,
+				Emotion = messageData.Emotion,
+				Intensity = messageData.Intensity
 			});
 		}
 
