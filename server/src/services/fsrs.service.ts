@@ -75,13 +75,17 @@ export interface ReviewState {
  *
  * @returns A fresh ReviewState at cycleStep 0.
  */
-export const createInitialReviewState = (): ReviewState => ({
-  cycleStep: 0,
-  currentIntervalDays: 0,
-  nextReviewDate: new Date().toISOString(),
-  lastReviewDate: null,
-  reviewHistory: []
-});
+export const createInitialReviewState = (): ReviewState => {
+  const nextReview = new Date();
+  nextReview.setHours(0, 0, 0, 0);
+  return {
+    cycleStep: 0,
+    currentIntervalDays: 0,
+    nextReviewDate: nextReview.toISOString(),
+    lastReviewDate: null,
+    reviewHistory: []
+  };
+};
 
 /**
  * Advances the review cycle by one step after the user marks the word as learned.
@@ -125,6 +129,7 @@ export const advanceCycleStep = (
   const intervalDays = REVIEW_CYCLE[state.cycleStep];
   const nextReviewDate = new Date(now);
   nextReviewDate.setDate(nextReviewDate.getDate() + intervalDays);
+  nextReviewDate.setHours(0, 0, 0, 0);
 
   return {
     state: {
