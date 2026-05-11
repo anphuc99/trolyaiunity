@@ -264,7 +264,8 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 		/// </summary>
 		/// <param name="word">Vocabulary word to synthesize.</param>
 		/// <param name="characterName">Selected character name from dropdown.</param>
-		private void HandleVocabularyAudioPlayRequested(string word, string characterName)
+		/// <param name="forceReload">Whether to force reload the TTS audio.</param>
+		private void HandleVocabularyAudioPlayRequested(string word, string characterName, bool forceReload)
 		{
 			if (string.IsNullOrWhiteSpace(word))
 			{
@@ -285,6 +286,7 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 				CharacterName = selectedCharacterName,
 				Text = word.Trim(),
 				Tone = DefaultTtsTone,
+				ForceReload = forceReload
 			});
 		}
 

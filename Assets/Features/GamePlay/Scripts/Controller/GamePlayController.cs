@@ -291,6 +291,7 @@ namespace Features.GamePlay.Controller
 				GetCharacterVoiceNameByName = GetChatCharacterVoiceName,
 				GetCharacterPitchByName = GetChatCharacterPitch,
 				GetCharacterSpeakingRateByName = GetChatCharacterSpeakingRate,
+				GetCharacterVoiceModelByName = GetChatCharacterVoiceModel,
 			});
 			StoryController.SetParentSignals(new StoryParentSignals { OnEchoed = OnSubControllerEchoed });
 			TaskController.SetParentSignals(new TaskParentSignals { OnEchoed = OnSubControllerEchoed });

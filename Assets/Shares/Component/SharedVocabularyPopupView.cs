@@ -2,6 +2,7 @@ using TMPro;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 /// <summary>
 /// Popup view for displaying vocabulary details in chat.
@@ -29,6 +30,7 @@ namespace Share.Components
         [Header("Âm thanh")]
         [SerializeField] private Button _playAudioButton;
         [SerializeField] private TMP_Dropdown _characterDropdown;
+        [SerializeField] [Min(0.1f)] private float _audioLongPressSeconds = 0.45f;
 
         /// <summary>
         /// Stores the current vocabulary ID for external reference.
@@ -56,9 +58,12 @@ namespace Share.Components
         private bool _isExampleRequestInProgress;
 
         /// <summary>
-        /// Callback for audio playback request: (word, characterName).
+        /// Callback for audio playback request: (word, characterName, forceReload).
         /// </summary>
-        private System.Action<string, string> _onPlayAudioRequested;
+        private System.Action<string, string, bool> _onPlayAudioRequested;
+
+        private Coroutine _audioLongPressCoroutine;
+        private bool _suppressNextAudioClick;
 
         /// <summary>
         /// True while lookup data is loading.
@@ -88,6 +93,7 @@ namespace Share.Components
             if (_playAudioButton != null)
             {
                 _playAudioButton.onClick.AddListener(HandlePlayAudio);
+                SetupAudioLongPressEvents();
             }
 
             if (_showMeaningButton != null)
@@ -117,6 +123,8 @@ namespace Share.Components
             {
                 _nextButton.onClick.RemoveListener(HandleNext);
             }
+
+            CancelAudioLongPress();
 
             if (_playAudioButton != null)
             {
@@ -163,8 +171,8 @@ namespace Share.Components
         /// <summary>
         /// Registers callback fired when play-audio button is clicked.
         /// </summary>
-        /// <param name="onPlayAudioRequested">Callback signature: (word, characterName).</param>
-        public void SetAudioPlayCallback(System.Action<string, string> onPlayAudioRequested)
+        /// <param name="onPlayAudioRequested">Callback signature: (word, characterName, forceReload).</param>
+        public void SetAudioPlayCallback(System.Action<string, string, bool> onPlayAudioRequested)
         {
             _onPlayAudioRequested = onPlayAudioRequested;
             UpdateAudioControlsState();
@@ -337,6 +345,12 @@ namespace Share.Components
         /// </summary>
         private void HandlePlayAudio()
         {
+            if (_suppressNextAudioClick)
+            {
+                _suppressNextAudioClick = false;
+                return;
+            }
+
             if (_onPlayAudioRequested == null)
             {
                 return;
@@ -348,7 +362,102 @@ namespace Share.Components
                 return;
             }
 
-            _onPlayAudioRequested.Invoke(word.Trim(), GetSelectedCharacterName());
+            _onPlayAudioRequested.Invoke(word.Trim(), GetSelectedCharacterName(), false);
+        }
+
+        private void SetupAudioLongPressEvents()
+        {
+            if (_playAudioButton == null)
+            {
+                return;
+            }
+
+            var trigger = _playAudioButton.GetComponent<EventTrigger>();
+            if (trigger == null)
+            {
+                trigger = _playAudioButton.gameObject.AddComponent<EventTrigger>();
+            }
+
+            if (trigger.triggers == null)
+            {
+                trigger.triggers = new List<EventTrigger.Entry>();
+            }
+
+            AddEventTrigger(trigger, EventTriggerType.PointerDown, OnAudioPointerDown);
+            AddEventTrigger(trigger, EventTriggerType.PointerUp, OnAudioPointerUpOrExit);
+            AddEventTrigger(trigger, EventTriggerType.PointerExit, OnAudioPointerUpOrExit);
+        }
+
+        private void AddEventTrigger(EventTrigger trigger, EventTriggerType eventType, System.Action<BaseEventData> handler)
+        {
+            for (var i = 0; i < trigger.triggers.Count; i++)
+            {
+                if (trigger.triggers[i].eventID == eventType)
+                {
+                    trigger.triggers[i].callback.AddListener(eventData => handler?.Invoke(eventData));
+                    return;
+                }
+            }
+
+            var entry = new EventTrigger.Entry
+            {
+                eventID = eventType,
+                callback = new EventTrigger.TriggerEvent()
+            };
+            entry.callback.AddListener(eventData => handler?.Invoke(eventData));
+            trigger.triggers.Add(entry);
+        }
+
+        private void OnAudioPointerDown(BaseEventData eventData)
+        {
+            if (_audioLongPressCoroutine != null)
+            {
+                StopCoroutine(_audioLongPressCoroutine);
+            }
+
+            _audioLongPressCoroutine = StartCoroutine(DetectAudioLongPress());
+        }
+
+        private void OnAudioPointerUpOrExit(BaseEventData eventData)
+        {
+            CancelAudioLongPress();
+        }
+
+        private System.Collections.IEnumerator DetectAudioLongPress()
+        {
+            yield return new WaitForSeconds(_audioLongPressSeconds);
+
+            _audioLongPressCoroutine = null;
+
+            if (_isAudioRequestInProgress)
+            {
+                yield break;
+            }
+
+            if (_onPlayAudioRequested == null)
+            {
+                yield break;
+            }
+
+            var word = _vocabText != null ? _vocabText.text : null;
+            if (string.IsNullOrWhiteSpace(word))
+            {
+                yield break;
+            }
+
+            _suppressNextAudioClick = true;
+            _onPlayAudioRequested.Invoke(word.Trim(), GetSelectedCharacterName(), true);
+        }
+
+        private void CancelAudioLongPress()
+        {
+            if (_audioLongPressCoroutine == null)
+            {
+                return;
+            }
+
+            StopCoroutine(_audioLongPressCoroutine);
+            _audioLongPressCoroutine = null;
         }
 
         /// <summary>
