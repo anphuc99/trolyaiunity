@@ -31,5 +31,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Requests
 		public const string ResolveTurnAudio = "game.play.chat.resolve.turn.audio.request";
 		public const string BatchReviewAutoChatVocabulary = "game.play.chat.batch.review.autochat.vocabulary.request";
 		public const string GenerateVocabExample = "game.play.chat.generate.vocab.example.request";
+		public const string LoadMissionVocabulary = "game.play.chat.load.mission.vocabulary.request";
 	}
 }

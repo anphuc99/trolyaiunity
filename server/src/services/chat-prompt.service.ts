@@ -222,10 +222,10 @@ DIALOGUE RULES
 ====================================
 RESPONSE FORMAT (JSON ARRAY)
 ====================================
-- Return a JSON array of 1-10 objects.
-- Each object must include: MessageId, CharacterName, Text, Pinyin, Tone, Emotion, Intensity, Translation.
+- Each object must include: MessageId, CharacterName, Context, Text, Pinyin, Tone, Emotion, Intensity, Translation.
 - MessageId: Globally Unique Identifier for this message within the current reply/session.
 - CharacterName: speaker name. MUST be one of the active characters listed in the ACTIVE CHARACTERS IN SCENE section. Do NOT use any name not in that list.
+- Context: Vietnamese description of character's action, posture, or situational context (e.g., "Mimi húp một ngụm mì rồi hét lên").
 - Text: Chinese characters only (Simplified).
 - Pinyin: Pinyin reading of the Text. MUST SEPARATE EVERY SINGLE SYLLABLE WITH A SPACE to map 1:1 with Chinese characters (include tone marks, e.g., "Nǐ hǎo", write "wǒ men" instead of "wǒmen").
 - Tone: short English description for TTS only (e.g. "neutral, medium pitch"). Use English letters/words only; do not use Chinese characters.
@@ -330,6 +330,7 @@ Example (Text/Tone separation):
   {
     "MessageId": "11111111-2222-3333-4444-555555555555",
     "CharacterName": "Mimi",
+    "Context": "Mimi húp một ngụm mì rồi hét lên",
     "Text": "你怎么这样!!!",
     "Pinyin": "Nǐ zěn me zhè yàng!!!",
     "Tone": "Angry and hurt, voice rising with frustration, fast and sharp delivery",
@@ -344,6 +345,7 @@ Example (normal reply — no important memory):
   {
     "MessageId": "30dd879c-ee2f-11db-8314-0800200c9a66",
     "CharacterName": "Mimi",
+    "Context": "Mimi mỉm cười chào bạn",
     "Text": "你好！",
     "Pinyin": "Nǐ hǎo!",
     "Tone": "Cheerful and friendly with a bright vocal smile, medium pace",
@@ -358,6 +360,7 @@ Example (GLOBAL memory on first item — objective fact, GlobalMemory* fields):
   {
     "MessageId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "CharacterName": "Mimi",
+    "Context": "Mimi hào hứng vẫy tay",
     "Text": "好的，我们这周末去公园！",
     "Pinyin": "Hǎo de, wǒ men zhè zhōu mò qù gōng yuán!",
     "Tone": "Excited and happy, bright voice with a big smile, upbeat pace",
@@ -373,6 +376,7 @@ Example (CHARACTER memory on first item — subjective first-person, ImportantMe
   {
     "MessageId": "b0c1d2e3-f4a5-6789-abcd-ef1234567890",
     "CharacterName": "Mimi",
+    "Context": "Mimi xoa cằm suy nghĩ rồi reo lên",
     "Text": "那我们去吃炸鸡吧！",
     "Pinyin": "Nà wǒ men qù chī zhá jī ba!",
     "Tone": "Enthusiastic and eager, playful suggestion with a cheerful lilt",
@@ -389,6 +393,7 @@ Example (BOTH on first item — global fact + character memory coexist, differen
   {
     "MessageId": "d4e5f6a7-b8c9-0123-def0-333333333333",
     "CharacterName": "Mimi",
+    "Context": "Mimi nhảy cẫng lên vì vui sướng",
     "Text": "好！我们这周末去公园吧！",
     "Pinyin": "Hǎo! Wǒ men zhè zhōu mò qù gōng yuán ba!",
     "Tone": "Delighted and enthusiastic, bright upbeat voice bursting with energy",
@@ -408,6 +413,7 @@ Example (two characters each storing their own memory):
   {
     "MessageId": "b1c2d3e4-f5a6-7890-abcd-111111111111",
     "CharacterName": "Mimi",
+    "Context": "Mimi kể về món ăn yêu thích của mình",
     "Text": "我喜欢吃炸鸡！",
     "Pinyin": "Wǒ xǐ huan chī zhá jī!",
     "Tone": "Happy and passionate, voice lighting up with genuine excitement",
@@ -420,6 +426,7 @@ Example (two characters each storing their own memory):
   {
     "MessageId": "c2d3e4f5-a6b7-8901-bcde-222222222222",
     "CharacterName": "Lisa",
+    "Context": "Lisa mỉm cười trêu chọc Mimi",
     "Text": "我更喜欢披萨！",
     "Pinyin": "Wǒ gèng xǐ huan pī sà!",
     "Tone": "Playfully competitive, cheerful and assertive with a teasing grin",

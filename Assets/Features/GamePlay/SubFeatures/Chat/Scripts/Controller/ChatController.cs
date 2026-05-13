@@ -509,6 +509,57 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			_ = GenerateVocabExampleInternalAsync(payload);
 		}
 
+		/// <summary>
+		/// Loads due vocabulary items for the mission panel.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[Request(ChatRequests.LoadMissionVocabulary)]
+		public static void HandleLoadMissionVocabulary(object payload)
+		{
+			_ = LoadMissionVocabularyInternalAsync();
+		}
+
+		private static async Task LoadMissionVocabularyInternalAsync()
+		{
+			try
+			{
+				var json = await HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyDue);
+				var result = new ChatMissionVocabularyPayload();
+
+				if (!string.IsNullOrWhiteSpace(json))
+				{
+					var parsed = JsonConvert.DeserializeObject<JObject>(json);
+					var vocabArray = parsed?["vocabularies"] as JArray;
+					if (vocabArray != null)
+					{
+						for (var i = 0; i < vocabArray.Count; i++)
+						{
+							var item = vocabArray[i];
+							var korean = item?["korean"]?.ToString();
+							if (string.IsNullOrWhiteSpace(korean))
+							{
+								continue;
+							}
+
+							result.Items.Add(new ChatMissionVocabItemPayload
+							{
+								Korean = korean.Trim(),
+								Pinyin = item?["pinyin"]?.ToString() ?? string.Empty,
+								Vietnamese = item?["vietnamese"]?.ToString() ?? string.Empty,
+							});
+						}
+					}
+				}
+
+				EventBus.Publish(ChatEvents.MissionVocabularyLoaded, result);
+			}
+			catch (Exception exception)
+			{
+				Debug.LogWarning("[ChatController] Failed to load mission vocabulary: " + exception.Message);
+				EventBus.Publish(ChatEvents.MissionVocabularyLoaded, new ChatMissionVocabularyPayload());
+			}
+		}
+
 		private static void RegisterAddCharacterMenu()
 		{
 			UnregisterAddCharacterMenu();

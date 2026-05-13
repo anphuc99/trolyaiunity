@@ -104,6 +104,19 @@ namespace Share.Components
 			set => _message = value;
 		}
 
+		[SerializeField]
+		[TextArea(1, 4)]
+		private string _context;
+
+		/// <summary>
+		/// Context describing character actions or situation.
+		/// </summary>
+		public string Context
+		{
+			get => _context;
+			set => _context = value;
+		}
+
 		/// <summary>
 		/// Sender avatar.
 		/// </summary>

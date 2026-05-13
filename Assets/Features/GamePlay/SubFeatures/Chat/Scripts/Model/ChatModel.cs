@@ -408,6 +408,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		public string Text { get; set; }
 
 		/// <summary>
+		/// Context of the action/situation.
+		/// </summary>
+		[JsonProperty("Context")]
+		public string Context { get; set; }
+
+		/// <summary>
 		/// Pinyin reading of the text.
 		/// </summary>
 		[JsonProperty("Pinyin")]
@@ -1051,5 +1057,30 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// Vietnamese translation of the sentence.
 		/// </summary>
 		public string Translation { get; set; }
+	}
+
+	/// <summary>
+	/// Payload published when mission vocabulary has been loaded from server.
+	/// Contains due vocabulary words with their pinyin and meaning.
+	/// </summary>
+	public sealed class ChatMissionVocabularyPayload
+	{
+		public System.Collections.Generic.List<ChatMissionVocabItemPayload> Items { get; set; }
+			= new System.Collections.Generic.List<ChatMissionVocabItemPayload>();
+	}
+
+	/// <summary>
+	/// Single mission vocabulary item with hanzi, pinyin, and Vietnamese meaning.
+	/// </summary>
+	public sealed class ChatMissionVocabItemPayload
+	{
+		[JsonProperty("korean")]
+		public string Korean { get; set; }
+
+		[JsonProperty("pinyin")]
+		public string Pinyin { get; set; }
+
+		[JsonProperty("vietnamese")]
+		public string Vietnamese { get; set; }
 	}
 }

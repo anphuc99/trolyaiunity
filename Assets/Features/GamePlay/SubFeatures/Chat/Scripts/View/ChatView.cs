@@ -77,6 +77,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[SerializeField]
 		private Button _buttonApplyAutoChat;
 
+		[SerializeField] 
+		private ChatMissionView _chatMissionView;
+
 		/// <summary>
 		/// Regex to match **word** vocabulary markup in assistant text.
 		/// </summary>
@@ -237,6 +240,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_pendingAudioBase64 = null;
 			UnbindAudioInputGuard();
 
+			// Check user text against mission vocabulary before sending.
+			if (!hasAudio && !string.IsNullOrWhiteSpace(userTextForTracking))
+			{
+				CheckMissionVocabUsage(userTextForTracking);
+			}
+
 			SendRequest(ChatRequests.SendMessage, payload);
 
 			if (_inputField != null)
@@ -313,6 +322,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			SendRequest(ChatRequests.LoadDeveloperState);
 			RefreshHistory();
 			RefreshVocabularyLearnedCount();
+			LoadMissionVocabulary();
 		}
 
 		/// <summary>
@@ -368,6 +378,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_contextPopupView.HideImmediate();
 			}
 			RestoreForegroundRuntimeMode();
+			ClearMissionVocabulary();
 			gameObject.SetActive(false);
 		}
 
@@ -601,12 +612,20 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 					var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? DefaultCharacterDisplayName : turn.CharacterName.Trim();
 					var text = string.IsNullOrWhiteSpace(turn.Text) ? string.Empty : turn.Text;
+					
+					var displayMessage = ConvertVocabMarkupToRichText(text);
+					if (!string.IsNullOrWhiteSpace(turn.Context))
+					{
+						displayMessage = $"<size=30>{turn.Context.Trim()}</size>\n----------------------\n" + displayMessage;
+					}
+
 					mapped.Add(new MessageBubbleData
 					{
 						MessageId = string.IsNullOrWhiteSpace(turn.MessageId) ? Guid.NewGuid().ToString("N") : turn.MessageId,
 						Type = MessageBubbleType.Character,
 						SenderName = characterName,
-						Message = ConvertVocabMarkupToRichText(text),
+						Context = turn.Context,
+						Message = displayMessage,
 						OriginalMessage = StripVocabMarkup(text),
 						RawVocabText = text,
 						Translation = turn.Translation,
@@ -783,12 +802,19 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					yield return null;
 				}
 
+				var displayMessage = ConvertVocabMarkupToRichText(messageText);
+				if (!string.IsNullOrWhiteSpace(turn.Context))
+				{
+					displayMessage = $"<size=30>{turn.Context.Trim()}</size>\n----------------------\n" + displayMessage;
+				}
+
 				var characterMessage = new MessageBubbleData
 				{
 					MessageId = string.IsNullOrWhiteSpace(turn.MessageId) ? Guid.NewGuid().ToString("N") : turn.MessageId,
 					Type = MessageBubbleType.Character,
 					SenderName = characterName,
-					Message = ConvertVocabMarkupToRichText(messageText),
+					Context = turn.Context,
+					Message = displayMessage,
 					OriginalMessage = StripVocabMarkup(messageText),
 					RawVocabText = messageText,
 					Translation = turn.Translation,
@@ -2604,5 +2630,93 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_vocabPopupView.SetAudioRequestInProgress(isInProgress);
 			}
 		}
+
+		#region Mission Vocabulary
+
+		/// <summary>
+		/// Requests due vocabulary from server for the mission panel.
+		/// </summary>
+		private void LoadMissionVocabulary()
+		{
+			SendRequest(ChatRequests.LoadMissionVocabulary);
+		}
+
+		/// <summary>
+		/// Handles mission vocabulary loaded from controller.
+		/// Populates the ChatMissionView with due vocabulary items.
+		/// </summary>
+		/// <param name="payload">Mission vocabulary payload.</param>
+		[OnEvent(ChatEvents.MissionVocabularyLoaded)]
+		private void OnMissionVocabularyLoaded(object payload)
+		{
+			if (_chatMissionView == null)
+			{
+				return;
+			}
+
+			var missionPayload = payload as ChatMissionVocabularyPayload;
+			if (missionPayload == null || missionPayload.Items == null || missionPayload.Items.Count == 0)
+			{
+				_chatMissionView.ClearAll();
+				_chatMissionView.gameObject.SetActive(false);
+				return;
+			}
+
+			var entries = new List<MissionVocabEntry>();
+			for (var i = 0; i < missionPayload.Items.Count; i++)
+			{
+				var item = missionPayload.Items[i];
+				if (item == null || string.IsNullOrWhiteSpace(item.Korean))
+				{
+					continue;
+				}
+
+				entries.Add(new MissionVocabEntry
+				{
+					Hanzi = item.Korean.Trim(),
+					Pinyin = item.Pinyin,
+					Vietnamese = item.Vietnamese,
+				});
+			}
+
+			if (entries.Count > 0)
+			{
+				_chatMissionView.gameObject.SetActive(true);
+				_chatMissionView.SetMissionItems(entries);
+			}
+			else
+			{
+				_chatMissionView.ClearAll();
+				_chatMissionView.gameObject.SetActive(false);
+			}
+		}
+
+		/// <summary>
+		/// Checks user text against mission vocabulary words.
+		/// Marks matching words as completed (strikethrough) and moves them to the bottom.
+		/// </summary>
+		/// <param name="userText">User message text.</param>
+		private void CheckMissionVocabUsage(string userText)
+		{
+			if (_chatMissionView == null || string.IsNullOrWhiteSpace(userText))
+			{
+				return;
+			}
+
+			_chatMissionView.CheckAndMarkUsedWords(userText);
+		}
+
+		/// <summary>
+		/// Clears mission vocabulary state.
+		/// </summary>
+		private void ClearMissionVocabulary()
+		{
+			if (_chatMissionView != null)
+			{
+				_chatMissionView.ClearAll();
+			}
+		}
+
+		#endregion
 	}
 }
