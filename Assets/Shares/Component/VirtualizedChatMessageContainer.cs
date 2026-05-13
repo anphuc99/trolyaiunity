@@ -366,7 +366,12 @@ namespace Share.Components
 
 		private static string BuildDisplayBaseText(MessageBubbleData message, string originalText)
 		{
-			return originalText ?? string.Empty;
+			var baseText = originalText ?? string.Empty;
+			if (message != null && !string.IsNullOrWhiteSpace(message.Context))
+			{
+				baseText = $"<size=30>{message.Context.Trim()}</size>\n{TranslationSeparator}\n" + baseText;
+			}
+			return baseText;
 		}
 
 		private static string BuildPinyinLine(string pinyin)
@@ -405,23 +410,28 @@ namespace Share.Components
 
 		private string BuildDefaultMessageText(MessageBubbleData message, string originalText)
 		{
-			if (!_usePinyinRubyOnTranslate)
+			string baseText;
+			if (!_usePinyinRubyOnTranslate || message == null || string.IsNullOrWhiteSpace(message.Pinyin))
 			{
-				return originalText ?? string.Empty;
+				baseText = originalText ?? string.Empty;
+			}
+			else
+			{
+				var textForRuby = string.IsNullOrWhiteSpace(message.RawVocabText)
+					? (originalText ?? string.Empty)
+					: message.RawVocabText;
+				baseText = PinyinRichTextUtils.BuildWrappedInlineRuby(
+					textForRuby,
+					message.Pinyin,
+					RubyWrapHanCountPerLine);
 			}
 
-			if (message == null || string.IsNullOrWhiteSpace(message.Pinyin))
+			if (message != null && !string.IsNullOrWhiteSpace(message.Context))
 			{
-				return originalText ?? string.Empty;
+				baseText = $"<size=30>{message.Context.Trim()}</size>\n{TranslationSeparator}\n" + baseText;
 			}
 
-			var textForRuby = string.IsNullOrWhiteSpace(message.RawVocabText)
-				? (originalText ?? string.Empty)
-				: message.RawVocabText;
-			return PinyinRichTextUtils.BuildWrappedInlineRuby(
-				textForRuby,
-				message.Pinyin,
-				RubyWrapHanCountPerLine);
+			return baseText;
 		}
 
 		/// <summary>

@@ -613,19 +613,13 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? DefaultCharacterDisplayName : turn.CharacterName.Trim();
 					var text = string.IsNullOrWhiteSpace(turn.Text) ? string.Empty : turn.Text;
 					
-					var displayMessage = ConvertVocabMarkupToRichText(text);
-					if (!string.IsNullOrWhiteSpace(turn.Context))
-					{
-						displayMessage = $"<size=30>{turn.Context.Trim()}</size>\n----------------------\n" + displayMessage;
-					}
-
 					mapped.Add(new MessageBubbleData
 					{
 						MessageId = string.IsNullOrWhiteSpace(turn.MessageId) ? Guid.NewGuid().ToString("N") : turn.MessageId,
 						Type = MessageBubbleType.Character,
 						SenderName = characterName,
 						Context = turn.Context,
-						Message = displayMessage,
+						Message = ConvertVocabMarkupToRichText(text),
 						OriginalMessage = StripVocabMarkup(text),
 						RawVocabText = text,
 						Translation = turn.Translation,
@@ -802,19 +796,13 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					yield return null;
 				}
 
-				var displayMessage = ConvertVocabMarkupToRichText(messageText);
-				if (!string.IsNullOrWhiteSpace(turn.Context))
-				{
-					displayMessage = $"<size=30>{turn.Context.Trim()}</size>\n----------------------\n" + displayMessage;
-				}
-
 				var characterMessage = new MessageBubbleData
 				{
 					MessageId = string.IsNullOrWhiteSpace(turn.MessageId) ? Guid.NewGuid().ToString("N") : turn.MessageId,
 					Type = MessageBubbleType.Character,
 					SenderName = characterName,
 					Context = turn.Context,
-					Message = displayMessage,
+					Message = ConvertVocabMarkupToRichText(messageText),
 					OriginalMessage = StripVocabMarkup(messageText),
 					RawVocabText = messageText,
 					Translation = turn.Translation,
@@ -832,10 +820,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				}
 				ScrollMessagesToBottom();
 
-				if (turn.AudioClip != null)
-				{
-					yield return StartCoroutine(PlayCharacterVoiceAsync(turn.AudioClip));
-				}
+				// if (turn.AudioClip != null)
+				// {
+				// 	yield return StartCoroutine(PlayCharacterVoiceAsync(turn.AudioClip));
+				// }
 			}
 
 			_isProcessingCharacterTurns = false;
