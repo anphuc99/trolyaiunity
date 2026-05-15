@@ -880,11 +880,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			try
 			{
 				// // Desktop + non-MyLog: use local Ollama for summarization
-				// if (IsDesktopPlatform() && !IsMyLogChatMode())
-				// {
-				// 	await EndConversationViaLocalAIAsync();
-				// 	return;
-				// }
+				if (IsDesktopPlatform() && !IsMyLogChatMode())
+				{
+					await EndConversationViaLocalAIAsync();
+					return;
+				}
 
 				var responseJson = await HttpClient.PostJsonTaskAsync<object>(GetChatEndEndpoint(), null);
 				if (string.IsNullOrWhiteSpace(responseJson))
@@ -1171,11 +1171,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				// if (IsDesktopPlatform() && !HasAudioPayload(payload))
-				// {
-				// 	await SendMessageViaLocalAIAsync(payload);
-				// 	return;
-				// }
+				if (IsDesktopPlatform() && !HasAudioPayload(payload))
+				{
+					await SendMessageViaLocalAIAsync(payload);
+					return;
+				}
 
 				var savedModel = PlayerPrefs.GetString("SelectedModel", "gemini-flash-lite-latest");
 				if (string.IsNullOrWhiteSpace(payload.Model))
@@ -1547,7 +1547,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 		/// <summary>
 		/// Ensures a local Ollama reply is valid assistant-turn JSON.
-		/// If invalid, requests Ollama to reformat into the required JSON shape.
+		/// If invalid, normalizes malformed wrappers/special characters and requests Ollama
+		/// to reformat into the required JSON shape.
 		/// Returns null when repair fails.
 		/// </summary>
 		/// <param name="reply">Raw Ollama assistant reply.</param>
@@ -1555,7 +1556,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		/// <returns>Valid assistant-turn JSON, or null when unrecoverable.</returns>
 		private static async Task<string> EnsureValidOllamaReplyJsonAsync(string reply, string systemPrompt)
 		{
-			var current = reply?.Trim() ?? "";
+			var current = NormalizePotentialOllamaJsonReply(reply);
 			if (IsValidAssistantReplyJson(current))
 			{
 				return current;
@@ -1567,7 +1568,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				Debug.Log("[ChatController] Ollama reply JSON invalid. Requesting repair attempt " + attempt + ".");
 
 				var repaired = await OllamaService.RepairReplyJsonAsync(current, systemPrompt);
-				var repairedContent = repaired?.Message?.Content?.Trim() ?? "";
+				var repairedContent = NormalizePotentialOllamaJsonReply(repaired?.Message?.Content);
 				if (string.IsNullOrWhiteSpace(repairedContent))
 				{
 					break;
@@ -1583,6 +1584,100 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 
 			return null;
+		}
+
+		/// <summary>
+		/// Normalizes candidate JSON text from Ollama by removing markdown code fences,
+		/// stripping invisible/control characters, and trimming surrounding noise.
+		/// </summary>
+		/// <param name="reply">Raw assistant reply text.</param>
+		/// <returns>Sanitized text that is easier to parse as JSON.</returns>
+		private static string NormalizePotentialOllamaJsonReply(string reply)
+		{
+			if (string.IsNullOrWhiteSpace(reply))
+			{
+				return "";
+			}
+
+			var normalized = StripMarkdownJsonFence(reply.Trim());
+
+			var sanitizedBuilder = new StringBuilder(normalized.Length);
+			for (var i = 0; i < normalized.Length; i++)
+			{
+				var ch = normalized[i];
+
+				if (ch == '\uFEFF' || ch == '\u200B' || ch == '\u200C' || ch == '\u200D' || ch == '\u2060')
+				{
+					continue;
+				}
+
+				if (char.IsControl(ch) && ch != '\r' && ch != '\n' && ch != '\t')
+				{
+					continue;
+				}
+
+				sanitizedBuilder.Append(ch);
+			}
+
+			normalized = sanitizedBuilder.ToString().Trim();
+
+			var firstObjectIndex = normalized.IndexOf('{');
+			var firstArrayIndex = normalized.IndexOf('[');
+
+			var startIndex = -1;
+			if (firstObjectIndex >= 0 && firstArrayIndex >= 0)
+			{
+				startIndex = Math.Min(firstObjectIndex, firstArrayIndex);
+			}
+			else
+			{
+				startIndex = Math.Max(firstObjectIndex, firstArrayIndex);
+			}
+
+			var lastObjectIndex = normalized.LastIndexOf('}');
+			var lastArrayIndex = normalized.LastIndexOf(']');
+			var endIndex = Math.Max(lastObjectIndex, lastArrayIndex);
+
+			if (startIndex >= 0 && endIndex >= startIndex)
+			{
+				normalized = normalized.Substring(startIndex, endIndex - startIndex + 1).Trim();
+			}
+
+			return normalized;
+		}
+
+		/// <summary>
+		/// Removes a surrounding markdown fence block like ```json ... ```.
+		/// </summary>
+		/// <param name="content">Potential fenced content.</param>
+		/// <returns>Inner content when fenced; otherwise original trimmed content.</returns>
+		private static string StripMarkdownJsonFence(string content)
+		{
+			if (string.IsNullOrWhiteSpace(content))
+			{
+				return "";
+			}
+
+			var trimmed = content.Trim();
+			if (!trimmed.StartsWith("```", StringComparison.Ordinal))
+			{
+				return trimmed;
+			}
+
+			var firstLineEndIndex = trimmed.IndexOf('\n');
+			if (firstLineEndIndex < 0)
+			{
+				return trimmed.Replace("```", "").Trim();
+			}
+
+			var contentStartIndex = firstLineEndIndex + 1;
+			var lastFenceIndex = trimmed.LastIndexOf("```", StringComparison.Ordinal);
+			if (lastFenceIndex > contentStartIndex)
+			{
+				return trimmed.Substring(contentStartIndex, lastFenceIndex - contentStartIndex).Trim();
+			}
+
+			return trimmed.Substring(contentStartIndex).Trim();
 		}
 
 		/// <summary>
