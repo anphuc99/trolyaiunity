@@ -880,11 +880,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			try
 			{
 				// // Desktop + non-MyLog: use local Ollama for summarization
-				if (IsDesktopPlatform() && !IsMyLogChatMode())
-				{
-					await EndConversationViaLocalAIAsync();
-					return;
-				}
+				// if (IsDesktopPlatform() && !IsMyLogChatMode())
+				// {
+				// 	await EndConversationViaLocalAIAsync();
+				// 	return;
+				// }
 
 				var responseJson = await HttpClient.PostJsonTaskAsync<object>(GetChatEndEndpoint(), null);
 				if (string.IsNullOrWhiteSpace(responseJson))
@@ -1171,11 +1171,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				if (IsDesktopPlatform() && !HasAudioPayload(payload))
-				{
-					await SendMessageViaLocalAIAsync(payload);
-					return;
-				}
+				// if (IsDesktopPlatform() && !HasAudioPayload(payload))
+				// {
+				// 	await SendMessageViaLocalAIAsync(payload);
+				// 	return;
+				// }
 
 				var savedModel = PlayerPrefs.GetString("SelectedModel", "gemini-flash-lite-latest");
 				if (string.IsNullOrWhiteSpace(payload.Model))
