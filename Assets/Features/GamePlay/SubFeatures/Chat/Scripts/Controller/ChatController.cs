@@ -880,11 +880,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			try
 			{
 				// // Desktop + non-MyLog: use local Ollama for summarization
-				// if (IsDesktopPlatform() && !IsMyLogChatMode())
-				// {
-				// 	await EndConversationViaLocalAIAsync();
-				// 	return;
-				// }
+				if (IsDesktopPlatform() && !IsMyLogChatMode())
+				{
+					await EndConversationViaLocalAIAsync();
+					return;
+				}
 
 				var responseJson = await HttpClient.PostJsonTaskAsync<object>(GetChatEndEndpoint(), null);
 				if (string.IsNullOrWhiteSpace(responseJson))
@@ -966,19 +966,27 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 
 			// Step 4: Parse Ollama summary JSON
+			var rawContent = ollamaResponse.Message.Content;
+			var cleanedContent = NormalizePotentialOllamaJsonReply(rawContent);
+
 			OllamaSummaryResult summaryResult = null;
 			try
 			{
-				summaryResult = JsonConvert.DeserializeObject<OllamaSummaryResult>(ollamaResponse.Message.Content);
+				summaryResult = JsonConvert.DeserializeObject<OllamaSummaryResult>(cleanedContent);
 			}
 			catch (Exception ex)
 			{
 				Debug.LogWarning("[ChatController] Failed to parse Ollama summary JSON: " + ex.Message
-					+ "\nRaw: " + ollamaResponse.Message.Content);
+					+ "\nRaw: " + rawContent
+					+ "\nCleaned: " + cleanedContent);
 			}
 
 			// If JSON parsing fails, use the raw text as summary
-			var summary = summaryResult?.Summary ?? ollamaResponse.Message.Content;
+			var summary = summaryResult?.Summary ?? cleanedContent;
+			if (string.IsNullOrWhiteSpace(summary))
+			{
+				summary = rawContent;
+			}
 			var updatedStoryDescription = summaryResult?.UpdatedStoryDescription ?? "";
 
 			// Step 5: Send pre-computed summary to server
@@ -1171,11 +1179,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				// if (IsDesktopPlatform() && !HasAudioPayload(payload))
-				// {
-				// 	await SendMessageViaLocalAIAsync(payload);
-				// 	return;
-				// }
+				if (IsDesktopPlatform() && !HasAudioPayload(payload))
+				{
+					await SendMessageViaLocalAIAsync(payload);
+					return;
+				}
 
 				var savedModel = PlayerPrefs.GetString("SelectedModel", "gemini-flash-lite-latest");
 				if (string.IsNullOrWhiteSpace(payload.Model))
@@ -1245,11 +1253,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				// if (IsDesktopPlatform())
-				// {
-				// 	await GenerateReplyFromHistoryViaLocalAIAsync(payload);
-				// 	return;
-				// }
+				if (IsDesktopPlatform())
+				{
+					await GenerateReplyFromHistoryViaLocalAIAsync(payload);
+					return;
+				}
 
 				var savedModel = PlayerPrefs.GetString("SelectedModel", "gemini-flash-lite-latest");
 				if (string.IsNullOrWhiteSpace(payload.Model))

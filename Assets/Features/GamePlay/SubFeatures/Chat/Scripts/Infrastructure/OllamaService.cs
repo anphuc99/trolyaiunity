@@ -17,12 +17,14 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 		/// <summary>
 		/// Default Ollama API base URL.
 		/// </summary>
-		public const string DefaultBaseUrl = "http://localhost:11434";
+		public const string DefaultBaseUrl = "http://175.155.64.164:19731";
+
+		public const string AUTHORIZATION = "Bearer ";
 
 		/// <summary>
 		/// Default model to use for local AI generation.
 		/// </summary>
-		public const string DefaultModel = "hf.co/TrevorJS/gemma-4-26B-A4B-it-uncensored-GGUF:Q4_K_M";
+		public const string DefaultModel = "hf.co/mradermacher/Qwen2.5-Coder-32B-Instruct-Uncensored-i1-GGUF:Q4_K_M";
 
 		/// <summary>
 		/// Timeout in seconds for Ollama requests. Local generation may take longer.
@@ -116,6 +118,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 				request.uploadHandler = new UploadHandlerRaw(bodyBytes);
 				request.downloadHandler = new DownloadHandlerBuffer();
 				request.SetRequestHeader("Content-Type", "application/json");
+				request.SetRequestHeader("Authorization", AUTHORIZATION);
 				request.timeout = TimeoutSeconds;
 
 				var operation = request.SendWebRequest();
@@ -208,7 +211,10 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			repairInstructionBuilder.AppendLine("    \"Text\": \"你怎么这样!!!\",");
 			repairInstructionBuilder.AppendLine("    \"Pinyin\": \"Nǐ zěn me zhè yàng!!!\",");
 			repairInstructionBuilder.AppendLine("    \"Tone\": \"Angry and hurt, voice rising with frustration, fast and sharp delivery\",");
+			repairInstructionBuilder.AppendLine("    \"Emotion\": \"angry\",,");
+			repairInstructionBuilder.AppendLine("    \"Intensity\": \"high\",,");
 			repairInstructionBuilder.AppendLine("    \"Translation\": \"Sao bạn lại như vậy!\"");
+			repairInstructionBuilder.AppendLine("    \"Context\": \"Mimi hào hứng vẫy tay\",");
 			repairInstructionBuilder.AppendLine("  }");
 			repairInstructionBuilder.AppendLine("]");
 			repairInstructionBuilder.AppendLine();
@@ -252,6 +258,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 				request.uploadHandler = new UploadHandlerRaw(bodyBytes);
 				request.downloadHandler = new DownloadHandlerBuffer();
 				request.SetRequestHeader("Content-Type", "application/json");
+				request.SetRequestHeader("Authorization", AUTHORIZATION);
 				request.timeout = TimeoutSeconds;
 
 				var operation = request.SendWebRequest();
@@ -351,6 +358,7 @@ Only return the JSON object, no extra text.";
 				Model = resolvedModel,
 				Messages = messages,
 				Stream = false,
+				Format = "json",
 			};
 
 			var jsonBody = JsonConvert.SerializeObject(requestPayload);
@@ -362,6 +370,7 @@ Only return the JSON object, no extra text.";
 				request.uploadHandler = new UploadHandlerRaw(bodyBytes);
 				request.downloadHandler = new DownloadHandlerBuffer();
 				request.SetRequestHeader("Content-Type", "application/json");
+				request.SetRequestHeader("Authorization", AUTHORIZATION);
 				request.timeout = TimeoutSeconds;
 
 				var operation = request.SendWebRequest();

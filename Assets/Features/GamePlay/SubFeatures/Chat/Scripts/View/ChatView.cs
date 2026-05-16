@@ -785,16 +785,16 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? DefaultTtsTone : turn.Tone.Trim();
 
 				// If audio is not ready, trigger resolution now (sequential/JIT)
-				if (turn.AudioClip == null && !turn.IsAudioPreloadCompleted)
-				{
-					SendRequest(ChatRequests.ResolveTurnAudio, turn);
-				}
+				// if (turn.AudioClip == null && !turn.IsAudioPreloadCompleted)
+				// {
+				// 	SendRequest(ChatRequests.ResolveTurnAudio, turn);
+				// }
 
 				// Wait until this turn finishes resolution so text is displayed together with ready audio.
-				while (turn.AudioClip == null && !turn.IsAudioPreloadCompleted)
-				{
-					yield return null;
-				}
+				// while (turn.AudioClip == null && !turn.IsAudioPreloadCompleted)
+				// {
+				// 	yield return null;
+				// }
 
 				var characterMessage = new MessageBubbleData
 				{

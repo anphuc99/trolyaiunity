@@ -934,6 +934,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		[JsonProperty("stream")]
 		public bool Stream { get; set; }
+
+		/// <summary>
+		/// Optional format override. Set to "json" to enforce strict JSON output.
+		/// </summary>
+		[JsonProperty("format", NullValueHandling = NullValueHandling.Ignore)]
+		public string Format { get; set; }
 	}
 
 	/// <summary>
