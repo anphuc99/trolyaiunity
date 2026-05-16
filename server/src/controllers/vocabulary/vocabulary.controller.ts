@@ -1,14 +1,10 @@
 import type { Request, Response } from "express";
 import { IsNull, Not, type DataSource, type Repository } from "typeorm";
 import VocabularyEntity from "../../models/vocabulary.entity.js";
-import VocabularyReviewEntity from "../../models/vocabulary-review.entity.js";
-import VocabularyMemoryEntity from "../../models/vocabulary-memory.entity.js";
 import UserEntity from "../../models/user.entity.js";
 import {
   createInitialReviewState,
-  createReviewFromDifficulty,
-  updateReviewAfterRating,
-  type FSRSRating,
+  advanceCycleStep,
   type ReviewHistoryEntry
 } from "../../services/fsrs.service.js";
 import { createCheapAIService, type CheapAIService } from "../../services/cheap-ai.service.js";
@@ -16,14 +12,15 @@ import { createCheapAIService, type CheapAIService } from "../../services/cheap-
 interface VocabularyController {
   listVocabularies: (request: Request, response: Response) => Promise<void>;
   getVocabulary: (request: Request, response: Response) => Promise<void>;
+  batchReviewByWords: (request: Request, response: Response) => Promise<void>;
   collectVocabulary: (request: Request, response: Response) => Promise<void>;
   updateVocabulary: (request: Request, response: Response) => Promise<void>;
   deleteVocabulary: (request: Request, response: Response) => Promise<void>;
   reviewVocabulary: (request: Request, response: Response) => Promise<void>;
   getLearnedCount: (request: Request, response: Response) => Promise<void>;
+  getTodayNewCount: (request: Request, response: Response) => Promise<void>;
   getDueReviews: (request: Request, response: Response) => Promise<void>;
   getStats: (request: Request, response: Response) => Promise<void>;
-  saveMemory: (request: Request, response: Response) => Promise<void>;
   toggleStar: (request: Request, response: Response) => Promise<void>;
   setCardDirection: (request: Request, response: Response) => Promise<void>;
   lookupWord: (request: Request, response: Response) => Promise<void>;
@@ -31,9 +28,11 @@ interface VocabularyController {
 }
 
 /**
- * Serialises a review entity to a client-facing JSON shape.
+ * Serialises a vocabulary entity (including merged FSRS fields) to a
+ * client-facing JSON shape. The `reviewHistoryJson` text column is parsed
+ * into an array before sending.
  */
-const serialiseReview = (entity: VocabularyReviewEntity) => {
+const serialiseVocabulary = (entity: VocabularyEntity) => {
   let reviewHistory: ReviewHistoryEntry[] = [];
 
   try {
@@ -44,38 +43,23 @@ const serialiseReview = (entity: VocabularyReviewEntity) => {
 
   return {
     id: entity.id,
-    vocabularyId: entity.vocabularyId,
-    stability: entity.stability,
-    difficulty: entity.difficulty,
-    lapses: entity.lapses,
-    currentIntervalDays: entity.currentIntervalDays,
-    nextReviewDate: entity.nextReviewDate,
-    lastReviewDate: entity.lastReviewDate,
-    cardDirection: entity.cardDirection,
-    isStarred: entity.isStarred,
-    reviewHistory
-  };
-};
-
-/**
- * Serialises a memory entity to a client-facing JSON shape.
- */
-const serialiseMemory = (entity: VocabularyMemoryEntity) => {
-  let linkedMessageIds: string[] = [];
-
-  try {
-    linkedMessageIds = JSON.parse(entity.linkedMessageIdsJson || "[]") as string[];
-  } catch {
-    linkedMessageIds = [];
-  }
-
-  return {
-    id: entity.id,
-    vocabularyId: entity.vocabularyId,
-    userMemory: entity.userMemory,
-    linkedMessageIds,
+    chinnese: entity.chinnese,
+    korean: entity.chinnese,
+    vietnamese: entity.vietnamese,
+    pinyin: entity.pinyin ?? null,
+    level: entity.level ?? null,
+    isManuallyAdded: entity.isManuallyAdded,
+    isIgnored: entity.isIgnored,
+    userId: entity.userId,
     createdAt: entity.createdAt,
-    updatedAt: entity.updatedAt
+    updatedAt: entity.updatedAt,
+    cycleStep: entity.stability ?? 0,
+    currentIntervalDays: entity.currentIntervalDays ?? null,
+    nextReviewDate: entity.nextReviewDate ?? null,
+    lastReviewDate: entity.lastReviewDate ?? null,
+    cardDirection: entity.cardDirection ?? "kr-vn",
+    isStarred: entity.isStarred ?? false,
+    reviewHistory
   };
 };
 
@@ -151,8 +135,6 @@ const isValidVietnameseMeaning = (sourceWord: string, meaning: string): boolean 
  */
 export const createVocabularyController = (dataSource: DataSource): VocabularyController => {
   const vocabRepo: Repository<VocabularyEntity> = dataSource.getRepository(VocabularyEntity);
-  const reviewRepo: Repository<VocabularyReviewEntity> = dataSource.getRepository(VocabularyReviewEntity);
-  const memoryRepo: Repository<VocabularyMemoryEntity> = dataSource.getRepository(VocabularyMemoryEntity);
   const userRepo: Repository<UserEntity> = dataSource.getRepository(UserEntity);
   const toDateKey = (value: Date | string) =>
     new Date(value).toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
@@ -170,7 +152,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // List all vocabularies for the current user (with reviews + memories).
+  // List all vocabularies for the current user.
   // ──────────────────────────────────────────────────────────────────────────
   const listVocabularies: VocabularyController["listVocabularies"] = async (request, response) => {
     const userId = request.user?.id;
@@ -186,24 +168,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         order: { createdAt: "DESC" }
       });
 
-      const reviews = await reviewRepo.find({ where: { userId } });
-      const memories = await memoryRepo.find({ where: { userId } });
-
-      const reviewMap = new Map<string, VocabularyReviewEntity>(reviews.map((r: VocabularyReviewEntity) => [r.vocabularyId, r]));
-      const memoryMap = new Map<string, VocabularyMemoryEntity>(memories.map((m: VocabularyMemoryEntity) => [m.vocabularyId, m]));
-
-      const items = vocabularies.map((vocab: VocabularyEntity) => {
-        const review = reviewMap.get(vocab.id);
-        const memory = memoryMap.get(vocab.id);
-
-        return {
-          ...vocab,
-          review: review ? serialiseReview(review) : null,
-          memory: memory ? serialiseMemory(memory) : null
-        };
-      });
-
-      response.json({ vocabularies: items });
+      response.json({ vocabularies: vocabularies.map(serialiseVocabulary) });
     } catch (error) {
       console.error("Failed to list vocabularies.", error);
       response.status(500).json({ message: "Failed to list vocabularies" });
@@ -211,7 +176,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Get a single vocabulary with review + memory.
+  // Get a single vocabulary entry.
   // ──────────────────────────────────────────────────────────────────────────
   const getVocabulary: VocabularyController["getVocabulary"] = async (request, response) => {
     const userId = request.user?.id;
@@ -235,14 +200,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         return;
       }
 
-      const review = await reviewRepo.findOne({ where: { vocabularyId: vocabId, userId } });
-      const memory = await memoryRepo.findOne({ where: { vocabularyId: vocabId, userId } });
-
-      response.json({
-        ...vocab,
-        review: review ? serialiseReview(review) : null,
-        memory: memory ? serialiseMemory(memory) : null
-      });
+      response.json(serialiseVocabulary(vocab));
     } catch (error) {
       console.error("Failed to get vocabulary.", error);
       response.status(500).json({ message: "Failed to get vocabulary" });
@@ -250,8 +208,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Collect (create) a new vocabulary — optionally with initial memory and
-  // an initial difficulty rating that seeds the FSRS review.
+  // Collect (create) a new vocabulary and seed the cycle review state.
   // ──────────────────────────────────────────────────────────────────────────
   const collectVocabulary: VocabularyController["collectVocabulary"] = async (request, response) => {
     const userId = request.user?.id;
@@ -263,23 +220,20 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
 
     const {
       korean,
+      chinnese,
       vietnamese,
       pinyin,
-      level,
-      memory,
-      linkedMessageIds,
-      difficultyRating
+      level
     } = request.body as {
       korean?: string;
+      chinnese?: string;
       vietnamese?: string;
       pinyin?: string;
       level?: string;
-      memory?: string;
-      linkedMessageIds?: string[];
-      difficultyRating?: "very_easy" | "easy" | "medium" | "hard";
     };
 
-    const trimmedKorean = normalizeVocabularyWord(korean ?? "");
+    const sourceWord = chinnese ?? korean;
+    const trimmedKorean = normalizeVocabularyWord(sourceWord ?? "");
     const trimmedVietnamese = (vietnamese ?? "").trim();
     const trimmedPinyin = (pinyin ?? "").trim();
     const trimmedLevel = (level ?? "").trim();
@@ -296,7 +250,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
 
     try {
       // Check duplicate
-      const existing = await vocabRepo.findOne({ where: { korean: trimmedKorean, userId } });
+      const existing = await vocabRepo.findOne({ where: { chinnese: trimmedKorean, userId } });
 
       if (existing) {
         response.status(409).json({ message: "Vocabulary already exists", vocabulary: existing });
@@ -305,59 +259,34 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
 
       const currentUserLevel = await resolveCurrentUserLevel(userId);
 
-      // Create vocabulary
       const vocab = vocabRepo.create({
-        korean: trimmedKorean,
+        chinnese: trimmedKorean,
         vietnamese: trimmedVietnamese,
         pinyin: trimmedPinyin || null,
         level: trimmedLevel || currentUserLevel,
-        isManuallyAdded: !memory,
+        isManuallyAdded: true,
+        isIgnored: false,
+        cardDirection: "kr-vn",
+        isStarred: false,
         userId
       });
 
+      // Seed cycle review state immediately
+      const reviewState = createInitialReviewState();
+
+      vocab.stability = reviewState.cycleStep;
+      vocab.difficulty = null;
+      vocab.lapses = null;
+      vocab.currentIntervalDays = reviewState.currentIntervalDays;
+      vocab.nextReviewDate = new Date(reviewState.nextReviewDate);
+      vocab.lastReviewDate = reviewState.lastReviewDate ? new Date(reviewState.lastReviewDate) : null;
+      vocab.reviewHistoryJson = JSON.stringify(reviewState.reviewHistory);
+
       const saved = await vocabRepo.save(vocab);
-
-      // Create review
-      const reviewState = difficultyRating
-        ? createReviewFromDifficulty(difficultyRating)
-        : createInitialReviewState();
-
-      const reviewEntity = reviewRepo.create({
-        vocabularyId: saved.id,
-        userId,
-        stability: reviewState.stability,
-        difficulty: reviewState.difficulty,
-        lapses: reviewState.lapses,
-        currentIntervalDays: reviewState.currentIntervalDays,
-        nextReviewDate: new Date(reviewState.nextReviewDate),
-        lastReviewDate: reviewState.lastReviewDate ? new Date(reviewState.lastReviewDate) : null,
-        reviewHistoryJson: JSON.stringify(reviewState.reviewHistory)
-      });
-
-      const savedReview = await reviewRepo.save(reviewEntity);
-
-      // Optionally create memory
-      let savedMemory: VocabularyMemoryEntity | null = null;
-
-      if (memory && memory.trim()) {
-        const memoryEntity = memoryRepo.create({
-          vocabularyId: saved.id,
-          userId,
-          userMemory: memory.trim(),
-          linkedMessageIdsJson: JSON.stringify(linkedMessageIds ?? [])
-        });
-
-        savedMemory = await memoryRepo.save(memoryEntity);
-      }
-
-      response.status(201).json({
-        ...saved,
-        review: serialiseReview(savedReview),
-        memory: savedMemory ? serialiseMemory(savedMemory) : null
-      });
+      response.status(201).json(serialiseVocabulary(saved));
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        const existing = await vocabRepo.findOne({ where: { korean: trimmedKorean, userId } });
+        const existing = await vocabRepo.findOne({ where: { chinnese: trimmedKorean, userId } });
         response.status(409).json({ message: "Vocabulary already exists", vocabulary: existing ?? null });
         return;
       }
@@ -384,8 +313,15 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       return;
     }
 
-    const { korean, vietnamese, pinyin, level } = request.body as { korean?: string; vietnamese?: string; pinyin?: string; level?: string };
-    const normalizedKorean = typeof korean === "string" ? normalizeVocabularyWord(korean) : null;
+    const { korean, chinnese, vietnamese, pinyin, level } = request.body as {
+      korean?: string;
+      chinnese?: string;
+      vietnamese?: string;
+      pinyin?: string;
+      level?: string;
+    };
+    const incomingSourceWord = typeof chinnese === "string" ? chinnese : korean;
+    const normalizedKorean = typeof incomingSourceWord === "string" ? normalizeVocabularyWord(incomingSourceWord) : null;
 
     try {
       const vocab = await vocabRepo.findOne({ where: { id: vocabId, userId } });
@@ -395,16 +331,16 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
         return;
       }
 
-      if (typeof korean === "string") {
+      if (typeof korean === "string" || typeof chinnese === "string") {
         if (!normalizedKorean) {
           response.status(400).json({ message: "Korean cannot be empty" });
           return;
         }
 
-        if (normalizedKorean !== vocab.korean) {
+        if (normalizedKorean !== vocab.chinnese) {
           const duplicate = await vocabRepo.findOne({
             where: {
-              korean: normalizedKorean,
+              chinnese: normalizedKorean,
               userId,
               id: Not(vocabId)
             }
@@ -416,12 +352,12 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
           }
         }
 
-        vocab.korean = normalizedKorean;
+        vocab.chinnese = normalizedKorean;
       }
 
       if (vietnamese?.trim()) {
         const normalizedMeaning = vietnamese.trim();
-        const sourceWord = ((typeof korean === "string" ? normalizedKorean : vocab.korean) || "").trim();
+        const sourceWord = (((typeof korean === "string" || typeof chinnese === "string") ? normalizedKorean : vocab.chinnese) || "").trim();
 
         if (!isValidVietnameseMeaning(sourceWord, normalizedMeaning)) {
           response.status(400).json({ message: "Vietnamese meaning is invalid (cannot be Chinese or same as source word)" });
@@ -442,7 +378,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       }
 
       const updated = await vocabRepo.save(vocab);
-      response.json(updated);
+      response.json(serialiseVocabulary(updated));
     } catch (error) {
       if (isUniqueConstraintError(error)) {
         response.status(409).json({ message: "Vocabulary already exists" });
@@ -455,7 +391,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Delete vocabulary (cascade removes review + memory).
+  // Delete vocabulary (cascade removes review).
   // ──────────────────────────────────────────────────────────────────────────
   const deleteVocabulary: VocabularyController["deleteVocabulary"] = async (request, response) => {
     const userId = request.user?.id;
@@ -488,7 +424,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Submit a review rating (FSRS update).
+  // Mark a vocabulary as learned — advances the fixed review cycle by one step.
   // ──────────────────────────────────────────────────────────────────────────
   const reviewVocabulary: VocabularyController["reviewVocabulary"] = async (request, response) => {
     const userId = request.user?.id;
@@ -504,65 +440,67 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
       return;
     }
 
-    const { rating } = request.body as { rating?: number };
-
-    if (!rating || rating < 1 || rating > 4) {
-      response.status(400).json({ message: "Rating must be 1–4" });
-      return;
-    }
-
     try {
-      const reviewEntity = await reviewRepo.findOne({ where: { vocabularyId: vocabId, userId } });
+      const vocab = await vocabRepo.findOne({ where: { id: vocabId, userId } });
 
-      if (!reviewEntity) {
-        response.status(404).json({ message: "Review not found" });
+      if (!vocab || !vocab.nextReviewDate) {
+        response.status(404).json({ message: "Vocabulary not found or review not initialised" });
+        return;
+      }
+
+      // Already memorised — nothing to do
+      if (vocab.isIgnored) {
+        response.json(serialiseVocabulary(vocab));
         return;
       }
 
       const todayKey = toDateKey(new Date());
-      const nextReviewKey = toDateKey(reviewEntity.nextReviewDate);
+      const nextReviewKey = toDateKey(vocab.nextReviewDate);
 
       if (nextReviewKey > todayKey) {
-        // Vocabulary is not yet due for review, ignore the rating but return success
-        response.json(serialiseReview(reviewEntity));
+        // Not yet due — return current state without updating
+        response.json(serialiseVocabulary(vocab));
         return;
       }
 
       let history: ReviewHistoryEntry[] = [];
       try {
-        history = JSON.parse(reviewEntity.reviewHistoryJson || "[]") as ReviewHistoryEntry[];
+        history = JSON.parse(vocab.reviewHistoryJson || "[]") as ReviewHistoryEntry[];
       } catch {
         history = [];
       }
 
       const currentState = {
-        stability: reviewEntity.stability,
-        difficulty: reviewEntity.difficulty,
-        lapses: reviewEntity.lapses,
-        currentIntervalDays: reviewEntity.currentIntervalDays,
-        nextReviewDate: reviewEntity.nextReviewDate instanceof Date
-          ? reviewEntity.nextReviewDate.toISOString()
-          : String(reviewEntity.nextReviewDate),
-        lastReviewDate: reviewEntity.lastReviewDate
-          ? reviewEntity.lastReviewDate instanceof Date
-            ? reviewEntity.lastReviewDate.toISOString()
-            : String(reviewEntity.lastReviewDate)
+        cycleStep: vocab.stability ?? 0,
+        currentIntervalDays: vocab.currentIntervalDays ?? 0,
+        nextReviewDate: vocab.nextReviewDate instanceof Date
+          ? vocab.nextReviewDate.toISOString()
+          : String(vocab.nextReviewDate),
+        lastReviewDate: vocab.lastReviewDate
+          ? vocab.lastReviewDate instanceof Date
+            ? vocab.lastReviewDate.toISOString()
+            : String(vocab.lastReviewDate)
           : null,
         reviewHistory: history
       };
 
-      const updated = updateReviewAfterRating(currentState, rating as FSRSRating);
+      const { state: updated, memorized } = advanceCycleStep(currentState);
 
-      reviewEntity.stability = updated.stability;
-      reviewEntity.difficulty = updated.difficulty;
-      reviewEntity.lapses = updated.lapses;
-      reviewEntity.currentIntervalDays = updated.currentIntervalDays;
-      reviewEntity.nextReviewDate = new Date(updated.nextReviewDate);
-      reviewEntity.lastReviewDate = updated.lastReviewDate ? new Date(updated.lastReviewDate) : null;
-      reviewEntity.reviewHistoryJson = JSON.stringify(updated.reviewHistory);
+      vocab.stability = updated.cycleStep;
+      vocab.difficulty = null;
+      vocab.lapses = null;
+      vocab.currentIntervalDays = updated.currentIntervalDays;
+      vocab.nextReviewDate = new Date(updated.nextReviewDate);
+      vocab.lastReviewDate = updated.lastReviewDate ? new Date(updated.lastReviewDate) : null;
+      vocab.reviewHistoryJson = JSON.stringify(updated.reviewHistory);
 
-      const saved = await reviewRepo.save(reviewEntity);
-      response.json(serialiseReview(saved));
+      // Cycle complete — mark as memorised so it no longer appears in reviews
+      if (memorized) {
+        vocab.isIgnored = true;
+      }
+
+      const saved = await vocabRepo.save(vocab);
+      response.json(serialiseVocabulary(saved));
     } catch (error) {
       console.error("Failed to review vocabulary.", error);
       response.status(500).json({ message: "Failed to review vocabulary" });
@@ -581,7 +519,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     }
 
     try {
-      const count = await reviewRepo.count({
+      const count = await vocabRepo.count({
         where: {
           userId,
           lastReviewDate: Not(IsNull())
@@ -592,6 +530,33 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     } catch (error) {
       console.error("Failed to get learned vocabulary count.", error);
       response.status(500).json({ message: "Failed to get learned vocabulary count" });
+    }
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Count vocabularies created today (used to cap daily new-word intake in chat).
+  // ──────────────────────────────────────────────────────────────────────────
+  const getTodayNewCount: VocabularyController["getTodayNewCount"] = async (request, response) => {
+    const userId = request.user?.id;
+
+    if (!userId) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    try {
+      const vocabs = await vocabRepo.find({
+        where: { userId },
+        select: ["id", "createdAt"]
+      });
+
+      const todayKey = toDateKey(new Date());
+      const count = vocabs.filter((v: VocabularyEntity) => toDateKey(v.createdAt) === todayKey).length;
+
+      response.json({ count });
+    } catch (error) {
+      console.error("Failed to get today's new vocabulary count.", error);
+      response.status(500).json({ message: "Failed to get today's new vocabulary count" });
     }
   };
 
@@ -607,48 +572,17 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     }
 
     try {
-      const reviews = await reviewRepo.find({ where: { userId } });
+      // Fetch only vocabs that have been initialised for review
+      const vocabs = await vocabRepo.find({
+        where: { userId, nextReviewDate: Not(IsNull()) }
+      });
+
       const todayKey = toDateKey(new Date());
-      const dueReviews = reviews.filter((r: VocabularyReviewEntity) => toDateKey(r.nextReviewDate) <= todayKey);
+      const dueVocabs = vocabs.filter(
+        (v: VocabularyEntity) => toDateKey(v.nextReviewDate!) <= todayKey && !v.isIgnored
+      );
 
-      const vocabIds = dueReviews.map((r: VocabularyReviewEntity) => r.vocabularyId);
-      const vocabularies = vocabIds.length
-        ? await vocabRepo
-            .createQueryBuilder("v")
-            .where("v.id IN (:...ids)", { ids: vocabIds })
-            .andWhere("v.user_id = :userId", { userId })
-            .andWhere("v.is_ignored = :isIgnored", { isIgnored: false })
-            .getMany()
-        : [];
-
-      const memories = vocabIds.length
-        ? await memoryRepo
-            .createQueryBuilder("m")
-            .where("m.vocabulary_id IN (:...ids)", { ids: vocabIds })
-            .andWhere("m.user_id = :userId", { userId })
-            .getMany()
-        : [];
-
-      const vocabMap = new Map<string, VocabularyEntity>(vocabularies.map((v: VocabularyEntity) => [v.id, v]));
-      const memoryMap = new Map<string, VocabularyMemoryEntity>(memories.map((m: VocabularyMemoryEntity) => [m.vocabularyId, m]));
-
-      const items = dueReviews
-        .map((r: VocabularyReviewEntity) => {
-          const vocab = vocabMap.get(r.vocabularyId);
-          if (!vocab) {
-            return null;
-          }
-
-          const memory = memoryMap.get(r.vocabularyId);
-          return {
-            ...vocab,
-            review: serialiseReview(r),
-            memory: memory ? serialiseMemory(memory) : null
-          };
-        })
-        .filter(Boolean);
-
-      response.json({ vocabularies: items, total: items.length });
+      response.json({ vocabularies: dueVocabs.map(serialiseVocabulary), total: dueVocabs.length });
     } catch (error) {
       console.error("Failed to get due reviews.", error);
       response.status(500).json({ message: "Failed to get due reviews" });
@@ -668,44 +602,27 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
 
     try {
       const totalVocabularies = await vocabRepo.count({ where: { userId } });
-      const totalReviews = await reviewRepo.count({ where: { userId } });
-      const starredCount = await reviewRepo.count({ where: { userId, isStarred: true } });
+      const withReview = await vocabRepo.count({ where: { userId, nextReviewDate: Not(IsNull()) } });
+      const starredCount = await vocabRepo.count({ where: { userId, isStarred: true } });
 
-      const allReviews = await reviewRepo.find({ where: { userId } });
+      const vocabsWithReview = await vocabRepo.find({
+        where: { userId, nextReviewDate: Not(IsNull()) }
+      });
+
       const now = new Date();
       const todayKey = toDateKey(now);
-      const dueToday = allReviews.filter((r: VocabularyReviewEntity) => toDateKey(r.nextReviewDate) <= todayKey).length;
-      const withoutReview = totalVocabularies - totalReviews;
-
-      // Count difficult today (rated Hard/Again today)
-      const todayStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
-      let difficultCount = 0;
-
-      for (const review of allReviews) {
-        let history: ReviewHistoryEntry[] = [];
-        try {
-          history = JSON.parse(review.reviewHistoryJson || "[]") as ReviewHistoryEntry[];
-        } catch {
-          continue;
-        }
-
-        const hasTodayDifficult = history.some((h) => {
-          const reviewDate = new Date(h.date).toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
-          return reviewDate === todayStr && (h.rating === 1 || h.rating === 2);
-        });
-
-        if (hasTodayDifficult) {
-          difficultCount++;
-        }
-      }
+      const dueToday = vocabsWithReview.filter(
+        (v: VocabularyEntity) => toDateKey(v.nextReviewDate!) <= todayKey
+      ).length;
+      const withoutReview = totalVocabularies - withReview;
 
       response.json({
         totalVocabularies,
-        withReview: totalReviews,
+        withReview,
         withoutReview,
         dueToday,
         starredCount,
-        difficultCount
+        difficultCount: 0
       });
     } catch (error) {
       console.error("Failed to get vocabulary stats.", error);
@@ -714,64 +631,7 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Save / update a memory for a vocabulary.
-  // ──────────────────────────────────────────────────────────────────────────
-  const saveMemory: VocabularyController["saveMemory"] = async (request, response) => {
-    const userId = request.user?.id;
-    const vocabId = String(request.params.id);
-
-    if (!userId) {
-      response.status(401).json({ message: "Unauthorized" });
-      return;
-    }
-
-    if (!isValidVocabId(vocabId)) {
-      response.status(400).json({ message: "Invalid vocabulary ID" });
-      return;
-    }
-
-    const { userMemory, linkedMessageIds } = request.body as {
-      userMemory?: string;
-      linkedMessageIds?: string[];
-    };
-
-    if (!userMemory?.trim()) {
-      response.status(400).json({ message: "Memory content is required" });
-      return;
-    }
-
-    try {
-      const vocab = await vocabRepo.findOne({ where: { id: vocabId, userId } });
-
-      if (!vocab) {
-        response.status(404).json({ message: "Vocabulary not found" });
-        return;
-      }
-
-      let memoryEntity = await memoryRepo.findOne({ where: { vocabularyId: vocabId, userId } });
-
-      if (memoryEntity) {
-        memoryEntity.userMemory = userMemory.trim();
-        memoryEntity.linkedMessageIdsJson = JSON.stringify(linkedMessageIds ?? []);
-      } else {
-        memoryEntity = memoryRepo.create({
-          vocabularyId: vocabId,
-          userId,
-          userMemory: userMemory.trim(),
-          linkedMessageIdsJson: JSON.stringify(linkedMessageIds ?? [])
-        });
-      }
-
-      const saved = await memoryRepo.save(memoryEntity);
-      response.json(serialiseMemory(saved));
-    } catch (error) {
-      console.error("Failed to save memory.", error);
-      response.status(500).json({ message: "Failed to save memory" });
-    }
-  };
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // Toggle star on a vocabulary review.
+  // Toggle star on a vocabulary entry. Initialises FSRS state if needed.
   // ──────────────────────────────────────────────────────────────────────────
   const toggleStar: VocabularyController["toggleStar"] = async (request, response) => {
     const userId = request.user?.id;
@@ -788,29 +648,30 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     }
 
     try {
-      let reviewEntity = await reviewRepo.findOne({ where: { vocabularyId: vocabId, userId } });
+      const vocab = await vocabRepo.findOne({ where: { id: vocabId, userId } });
 
-      if (!reviewEntity) {
-        // Create a default review if missing, then star it
-        const state = createInitialReviewState();
-        reviewEntity = reviewRepo.create({
-          vocabularyId: vocabId,
-          userId,
-          stability: state.stability,
-          difficulty: state.difficulty,
-          lapses: state.lapses,
-          currentIntervalDays: state.currentIntervalDays,
-          nextReviewDate: new Date(state.nextReviewDate),
-          lastReviewDate: null,
-          reviewHistoryJson: "[]",
-          isStarred: true
-        });
-      } else {
-        reviewEntity.isStarred = !reviewEntity.isStarred;
+      if (!vocab) {
+        response.status(404).json({ message: "Vocabulary not found" });
+        return;
       }
 
-      const saved = await reviewRepo.save(reviewEntity);
-      response.json(serialiseReview(saved));
+      if (!vocab.nextReviewDate) {
+        // Cycle review state not yet initialised — initialise and star in one step
+        const state = createInitialReviewState();
+        vocab.stability = state.cycleStep;
+        vocab.difficulty = null;
+        vocab.lapses = null;
+        vocab.currentIntervalDays = state.currentIntervalDays;
+        vocab.nextReviewDate = new Date(state.nextReviewDate);
+        vocab.lastReviewDate = null;
+        vocab.reviewHistoryJson = "[]";
+        vocab.isStarred = true;
+      } else {
+        vocab.isStarred = !(vocab.isStarred ?? false);
+      }
+
+      const saved = await vocabRepo.save(vocab);
+      response.json(serialiseVocabulary(saved));
     } catch (error) {
       console.error("Failed to toggle star.", error);
       response.status(500).json({ message: "Failed to toggle star" });
@@ -843,16 +704,16 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     }
 
     try {
-      const reviewEntity = await reviewRepo.findOne({ where: { vocabularyId: vocabId, userId } });
+      const vocab = await vocabRepo.findOne({ where: { id: vocabId, userId } });
 
-      if (!reviewEntity) {
-        response.status(404).json({ message: "Review not found" });
+      if (!vocab) {
+        response.status(404).json({ message: "Vocabulary not found" });
         return;
       }
 
-      reviewEntity.cardDirection = direction;
-      const saved = await reviewRepo.save(reviewEntity);
-      response.json(serialiseReview(saved));
+      vocab.cardDirection = direction;
+      const saved = await vocabRepo.save(vocab);
+      response.json(serialiseVocabulary(saved));
     } catch (error) {
       console.error("Failed to set card direction.", error);
       response.status(500).json({ message: "Failed to set card direction" });
@@ -896,7 +757,8 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
   // ──────────────────────────────────────────────────────────────────────────
   // Lookup a vocabulary by its Chinese word text.
   // Returns existing DB data or uses cheap AI to translate on the fly.
-  // If the word is new, automatically creates the vocabulary entry.
+  // If the word is new, automatically creates the vocabulary entry with
+  // an initialised FSRS review state.
   // ──────────────────────────────────────────────────────────────────────────
   const lookupWord: VocabularyController["lookupWord"] = async (request, response) => {
     const userId = request.user?.id;
@@ -915,8 +777,8 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     try {
       const cheapAI: CheapAIService = createCheapAIService();
 
-      // Try to find existing vocabulary by korean (Chinese) text
-      const existing = await vocabRepo.findOne({ where: { korean: word, userId } });
+      // Try to find existing vocabulary by source text
+      const existing = await vocabRepo.findOne({ where: { chinnese: word, userId } });
 
       if (existing) {
         let pinyin = existing.pinyin ?? "";
@@ -947,17 +809,11 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
           }
         }
 
-        // Load review if it exists
-        const review = await reviewRepo.findOne({ where: { vocabularyId: existing.id, userId } });
-
         response.json({
-          id: existing.id,
-          korean: existing.korean,
+          ...serialiseVocabulary(existing),
           vietnamese,
           pinyin,
-          level: existing.level ?? null,
-          isNew: false,
-          review: review ? serialiseReview(review) : null
+          isNew: false
         });
         return;
       }
@@ -979,50 +835,131 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
 
       const currentUserLevel = await resolveCurrentUserLevel(userId);
 
-      // Auto-create the vocabulary entry
       const vocab = vocabRepo.create({
-        korean: word,
+        chinnese: word,
         vietnamese,
         pinyin: pinyin || null,
         level: currentUserLevel,
         isManuallyAdded: false,
+        isIgnored: false,
+        cardDirection: "kr-vn",
+        isStarred: false,
         userId
       });
+
+      // Initialise cycle review state immediately
+      const reviewState = createInitialReviewState();
+      vocab.stability = reviewState.cycleStep;
+      vocab.difficulty = null;
+      vocab.lapses = null;
+      vocab.currentIntervalDays = reviewState.currentIntervalDays;
+      vocab.nextReviewDate = new Date(reviewState.nextReviewDate);
+      vocab.lastReviewDate = null;
+      vocab.reviewHistoryJson = JSON.stringify(reviewState.reviewHistory);
+
       const saved = await vocabRepo.save(vocab);
 
-      // Create initial review state
-      const reviewState = createInitialReviewState();
-      const reviewEntity = reviewRepo.create({
-        vocabularyId: saved.id,
-        userId,
-        stability: reviewState.stability,
-        difficulty: reviewState.difficulty,
-        lapses: reviewState.lapses,
-        currentIntervalDays: reviewState.currentIntervalDays,
-        nextReviewDate: new Date(reviewState.nextReviewDate),
-        lastReviewDate: null,
-        reviewHistoryJson: JSON.stringify(reviewState.reviewHistory)
-      });
-      const savedReview = await reviewRepo.save(reviewEntity);
-
       response.json({
-        id: saved.id,
-        korean: saved.korean,
-        vietnamese,
-        pinyin,
-        level: saved.level ?? null,
-        isNew: true,
-        review: serialiseReview(savedReview)
+        ...serialiseVocabulary(saved),
+        isNew: true
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        const existing = await vocabRepo.findOne({ where: { korean: word, userId } });
+        const existing = await vocabRepo.findOne({ where: { chinnese: word, userId } });
         response.status(409).json({ message: "Vocabulary already exists", vocabulary: existing ?? null });
         return;
       }
 
       console.error("Failed to lookup vocabulary word.", error);
       response.status(500).json({ message: "Failed to lookup vocabulary word" });
+    }
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Batch-review vocabularies by word text. Looks up each word by its Chinese
+  // text and advances the FSRS cycle once. Skips words not found or not due.
+  // ──────────────────────────────────────────────────────────────────────────
+  const batchReviewByWords: VocabularyController["batchReviewByWords"] = async (request, response) => {
+    const userId = request.user?.id;
+
+    if (!userId) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const { words } = request.body as { words?: string[] };
+    if (!Array.isArray(words) || words.length === 0) {
+      response.status(400).json({ message: "A non-empty words array is required" });
+      return;
+    }
+
+    const todayKey = toDateKey(new Date());
+    let reviewed = 0;
+    let skipped = 0;
+
+    try {
+      for (const rawWord of words) {
+        const word = normalizeVocabularyWord(rawWord ?? "");
+        if (!word) {
+          skipped++;
+          continue;
+        }
+
+        const vocab = await vocabRepo.findOne({ where: { chinnese: word, userId } });
+        if (!vocab || !vocab.nextReviewDate || vocab.isIgnored) {
+          skipped++;
+          continue;
+        }
+
+        const nextReviewKey = toDateKey(vocab.nextReviewDate);
+        if (nextReviewKey > todayKey) {
+          skipped++;
+          continue;
+        }
+
+        let history: ReviewHistoryEntry[] = [];
+        try {
+          history = JSON.parse(vocab.reviewHistoryJson || "[]") as ReviewHistoryEntry[];
+        } catch {
+          history = [];
+        }
+
+        const currentState = {
+          cycleStep: vocab.stability ?? 0,
+          currentIntervalDays: vocab.currentIntervalDays ?? 0,
+          nextReviewDate: vocab.nextReviewDate instanceof Date
+            ? vocab.nextReviewDate.toISOString()
+            : String(vocab.nextReviewDate),
+          lastReviewDate: vocab.lastReviewDate
+            ? vocab.lastReviewDate instanceof Date
+              ? vocab.lastReviewDate.toISOString()
+              : String(vocab.lastReviewDate)
+            : null,
+          reviewHistory: history
+        };
+
+        const { state: updated, memorized } = advanceCycleStep(currentState);
+
+        vocab.stability = updated.cycleStep;
+        vocab.difficulty = null;
+        vocab.lapses = null;
+        vocab.currentIntervalDays = updated.currentIntervalDays;
+        vocab.nextReviewDate = new Date(updated.nextReviewDate);
+        vocab.lastReviewDate = updated.lastReviewDate ? new Date(updated.lastReviewDate) : null;
+        vocab.reviewHistoryJson = JSON.stringify(updated.reviewHistory);
+
+        if (memorized) {
+          vocab.isIgnored = true;
+        }
+
+        await vocabRepo.save(vocab);
+        reviewed++;
+      }
+
+      response.json({ reviewed, skipped });
+    } catch (error) {
+      console.error("Failed to batch-review vocabularies.", error);
+      response.status(500).json({ message: "Failed to batch-review vocabularies" });
     }
   };
 
@@ -1034,12 +971,13 @@ export const createVocabularyController = (dataSource: DataSource): VocabularyCo
     deleteVocabulary,
     reviewVocabulary,
     getLearnedCount,
+    getTodayNewCount,
     getDueReviews,
     getStats,
-    saveMemory,
     toggleStar,
     setCardDirection,
     lookupWord,
-    ignoreVocabulary
+    ignoreVocabulary,
+    batchReviewByWords
   };
 };

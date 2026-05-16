@@ -4,8 +4,9 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Popup view for displaying vocabulary details and collecting review ratings in chat.
-/// Shown when user clicks a marked vocabulary word in a chat bubble.
+/// Popup view for displaying vocabulary details in chat.
+/// Shown when user clicks a marked vocabulary word in a chat bubble,
+/// or when reviewing used vocabulary after a conversation ends.
 /// </summary>
 namespace Share.Components
 {
@@ -17,38 +18,31 @@ namespace Share.Components
         [SerializeField] private TMP_Text _meaningText;
         [SerializeField] private Button _showMeaningButton;
 
-        [Header("Đánh giá")]
-        [SerializeField] private Button _ratingAgainButton;
-        [SerializeField] private Button _ratingHardButton;
-        [SerializeField] private Button _ratingGoodButton;
-        [SerializeField] private Button _ratingEasyButton;
-
         [Header("Button")]
         [SerializeField] private Button _closeButton;
+        [SerializeField] private Button _nextButton;
 
         [SerializeField] private GameObject _loadingIndicator;
         [SerializeField] private GameObject _contentGroup;
-
-        [SerializeField] private bool _showRatingButtons = true;
 
         [Header("Âm thanh")]
         [SerializeField] private Button _playAudioButton;
         [SerializeField] private TMP_Dropdown _characterDropdown;
 
         /// <summary>
-        /// Stores the current vocabulary ID for review submission.
+        /// Stores the current vocabulary ID for external reference.
         /// </summary>
         private string _currentVocabularyId;
-
-        /// <summary>
-        /// Callback for review rating submission: (vocabularyId, rating).
-        /// </summary>
-        private System.Action<string, int> _onReviewRequested;
 
         /// <summary>
         /// Callback invoked whenever popup is closed.
         /// </summary>
         private System.Action _onClosed;
+
+        /// <summary>
+        /// Callback invoked when the Next button is clicked.
+        /// </summary>
+        private System.Action _onNextRequested;
 
         /// <summary>
         /// Callback for audio playback request: (word, characterName).
@@ -67,29 +61,14 @@ namespace Share.Components
 
         private void Awake()
         {
-            if (_ratingAgainButton != null)
-            {
-                _ratingAgainButton.onClick.AddListener(HandleRatingAgain);
-            }
-
-            if (_ratingHardButton != null)
-            {
-                _ratingHardButton.onClick.AddListener(HandleRatingHard);
-            }
-
-            if (_ratingGoodButton != null)
-            {
-                _ratingGoodButton.onClick.AddListener(HandleRatingGood);
-            }
-
-            if (_ratingEasyButton != null)
-            {
-                _ratingEasyButton.onClick.AddListener(HandleRatingEasy);
-            }
-
             if (_closeButton != null)
             {
                 _closeButton.onClick.AddListener(Hide);
+            }
+
+            if (_nextButton != null)
+            {
+                _nextButton.onClick.AddListener(HandleNext);
             }
 
             if (_playAudioButton != null)
@@ -102,7 +81,7 @@ namespace Share.Components
                 _showMeaningButton.onClick.AddListener(ShowMeaning);
             }
 
-            SetRatingButtonsVisible(_showRatingButtons);
+            SetNextButtonVisible(false);
             UpdateAudioControlsState();
 
             gameObject.SetActive(false);
@@ -110,44 +89,33 @@ namespace Share.Components
 
         private void OnDestroy()
         {
-            if (_ratingAgainButton != null)
-            {
-                _ratingAgainButton.onClick.RemoveListener(HandleRatingAgain);
-            }
-
-            if (_ratingHardButton != null)
-            {
-                _ratingHardButton.onClick.RemoveListener(HandleRatingHard);
-            }
-
-            if (_ratingGoodButton != null)
-            {
-                _ratingGoodButton.onClick.RemoveListener(HandleRatingGood);
-            }
-
-            if (_ratingEasyButton != null)
-            {
-                _ratingEasyButton.onClick.RemoveListener(HandleRatingEasy);
-            }
-
             if (_closeButton != null)
             {
                 _closeButton.onClick.RemoveListener(Hide);
+            }
+
+            if (_nextButton != null)
+            {
+                _nextButton.onClick.RemoveListener(HandleNext);
             }
 
             if (_playAudioButton != null)
             {
                 _playAudioButton.onClick.RemoveListener(HandlePlayAudio);
             }
+
+            if (_showMeaningButton != null)
+            {
+                _showMeaningButton.onClick.RemoveListener(ShowMeaning);
+            }
         }
 
         /// <summary>
-        /// Registers the callback for review rating submission.
+        /// No-op kept for backward compatibility. Rating buttons have been removed.
         /// </summary>
-        /// <param name="onReviewRequested">Callback signature: (vocabularyId, rating).</param>
+        /// <param name="onReviewRequested">Unused.</param>
         public void SetReviewCallback(System.Action<string, int> onReviewRequested)
         {
-            _onReviewRequested = onReviewRequested;
         }
 
         /// <summary>
@@ -157,6 +125,15 @@ namespace Share.Components
         public void SetClosedCallback(System.Action onClosed)
         {
             _onClosed = onClosed;
+        }
+
+        /// <summary>
+        /// Registers callback fired when the Next button is clicked.
+        /// </summary>
+        /// <param name="onNextRequested">Next callback.</param>
+        public void SetNextCallback(System.Action onNextRequested)
+        {
+            _onNextRequested = onNextRequested;
         }
 
         /// <summary>
@@ -248,7 +225,6 @@ namespace Share.Components
             }
 
             SetLoadingState(true);
-            SetRatingButtonsInteractable(false);
             UpdateAudioControlsState();
         }
 
@@ -281,41 +257,26 @@ namespace Share.Components
             
             _meaningText.gameObject.SetActive(false);
             SetLoadingState(false);
-            SetRatingButtonsInteractable(_showRatingButtons);
             UpdateAudioControlsState();
         }
 
         /// <summary>
-        /// Shows or hides the rating section.
+        /// No-op kept for backward compatibility. Rating buttons have been removed.
         /// </summary>
-        /// <param name="visible">Whether rating buttons are visible.</param>
+        /// <param name="visible">Unused.</param>
         public void SetRatingButtonsVisible(bool visible)
         {
-            _showRatingButtons = visible;
+        }
 
-            if (_ratingAgainButton != null)
+        /// <summary>
+        /// Shows or hides the Next button.
+        /// </summary>
+        /// <param name="visible">Whether the Next button should be visible.</param>
+        public void SetNextButtonVisible(bool visible)
+        {
+            if (_nextButton != null)
             {
-                _ratingAgainButton.gameObject.SetActive(visible);
-            }
-
-            if (_ratingHardButton != null)
-            {
-                _ratingHardButton.gameObject.SetActive(visible);
-            }
-
-            if (_ratingGoodButton != null)
-            {
-                _ratingGoodButton.gameObject.SetActive(visible);
-            }
-
-            if (_ratingEasyButton != null)
-            {
-                _ratingEasyButton.gameObject.SetActive(visible);
-            }
-
-            if (!visible)
-            {
-                SetRatingButtonsInteractable(false);
+                _nextButton.gameObject.SetActive(visible);
             }
         }
 
@@ -337,51 +298,11 @@ namespace Share.Components
         }
 
         /// <summary>
-        /// Handles "Again" rating button click (FSRS rating 1 = Again/Hard).
+        /// Handles "Next" button click.
         /// </summary>
-        private void HandleRatingAgain()
+        private void HandleNext()
         {
-            SubmitRating(1);
-        }
-
-        /// <summary>
-        /// Handles "Hard" rating button click (FSRS rating 2 = Hard).
-        /// </summary>
-        private void HandleRatingHard()
-        {
-            SubmitRating(2);
-        }
-
-        /// <summary>
-        /// Handles "Good" rating button click (FSRS rating 3 = Good).
-        /// </summary>
-        private void HandleRatingGood()
-        {
-            SubmitRating(3);
-        }
-
-        /// <summary>
-        /// Handles "Easy" rating button click (FSRS rating 4 = Easy).
-        /// </summary>
-        private void HandleRatingEasy()
-        {
-            SubmitRating(4);
-        }
-
-        /// <summary>
-        /// Submits the review rating and keeps popup state locked until response arrives.
-        /// </summary>
-        /// <param name="rating">FSRS rating value.</param>
-        private void SubmitRating(int rating)
-        {
-            if (string.IsNullOrWhiteSpace(_currentVocabularyId))
-            {
-                return;
-            }
-
-            _onReviewRequested?.Invoke(_currentVocabularyId, rating);
-
-            SetRatingButtonsInteractable(false);
+            _onNextRequested?.Invoke();
         }
 
         /// <summary>
@@ -446,29 +367,14 @@ namespace Share.Components
         }
 
         /// <summary>
-        /// Enables or disables the rating buttons.
+        /// Enables or disables the Next button.
         /// </summary>
-        /// <param name="interactable">Whether buttons should be interactable.</param>
-        private void SetRatingButtonsInteractable(bool interactable)
+        /// <param name="interactable">Whether button should be interactable.</param>
+        private void SetNextButtonInteractable(bool interactable)
         {
-            if (_ratingAgainButton != null)
+            if (_nextButton != null)
             {
-                _ratingAgainButton.interactable = interactable;
-            }
-
-            if (_ratingHardButton != null)
-            {
-                _ratingHardButton.interactable = interactable;
-            }
-
-            if (_ratingGoodButton != null)
-            {
-                _ratingGoodButton.interactable = interactable;
-            }
-
-            if (_ratingEasyButton != null)
-            {
-                _ratingEasyButton.interactable = interactable;
+                _nextButton.interactable = interactable;
             }
         }
 

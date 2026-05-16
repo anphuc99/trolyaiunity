@@ -6,12 +6,12 @@ using Features.GamePlay.SubFeatures.Chat.Requests;
 using Core.Infrastructure.Network;
 using Core.Infrastructure.State;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Share.Utils;
 using CoreGlobalModes = Core.Infrastructure.State.GlobalModes;
 using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -23,17 +23,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 	[Core.Infrastructure.Attributes.ControllerScope(Core.Infrastructure.Attributes.ControllerScopeKey.GamePlayGameplay)]
 	public static class ChatController
 	{
-		private static readonly char[] LearningPathVocabularySeparators = { ',', ';', '，', '；', '|', '\n', '\r', '\t' };
-
 		/// <summary>
 		/// Called when the controller scope is entered.
 		/// </summary>
 		[Core.Infrastructure.Attributes.ControllerInit]
 		public static void OnEnterScope()
 		{
-			ChatState.LearningPathVocabularyCandidates = new List<string>();
-			ChatState.LearnedVocabularySet = new HashSet<string>(StringComparer.Ordinal);
-			ChatState.IsVocabularyMarkerSourceLoaded = false;
 			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		}
 
@@ -43,9 +38,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		[Core.Infrastructure.Attributes.ControllerShutdown]
 		public static void OnExitScope()
 		{
-			ChatState.LearningPathVocabularyCandidates = new List<string>();
-			ChatState.LearnedVocabularySet = new HashSet<string>(StringComparer.Ordinal);
-			ChatState.IsVocabularyMarkerSourceLoaded = false;
 			ChatState.ActiveCharacterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		}
 
@@ -59,7 +51,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			RegisterAutoChatMenu();
 			RegisterEndConversationMenu();
 			_ = LoadDeveloperStateInternalAsync();
-			_ = LoadVocabularyMarkerSourcesInternalAsync();
 			EventBus.Publish(ChatEvents.Installed, null);
 		}
 
@@ -462,6 +453,31 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			_ = LoadVocabularyLearnedCountInternalAsync();
 		}
 
+		/// <summary>
+		/// Loads due and all vocabulary lists for auto-chat word injection.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[Request(ChatRequests.LoadAutoChatVocabulary)]
+		public static void HandleLoadAutoChatVocabulary(object payload)
+		{
+			_ = LoadAutoChatVocabularyInternalAsync();
+		}
+
+		/// <summary>
+		/// Sends a list of vocabulary words to the server for batch review (mark as learned once).
+		/// </summary>
+		/// <param name="payload">Batch review request with word list.</param>
+		[Request(ChatRequests.BatchReviewAutoChatVocabulary)]
+		public static void HandleBatchReviewAutoChatVocabulary(ChatBatchReviewVocabRequestPayload payload)
+		{
+			if (payload == null || payload.Words == null || payload.Words.Count == 0)
+			{
+				return;
+			}
+
+			_ = BatchReviewAutoChatVocabularyInternalAsync(payload);
+		}
+
 		private static void RegisterAddCharacterMenu()
 		{
 			UnregisterAddCharacterMenu();
@@ -772,10 +788,22 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 		}
 
+		/// <summary>
+		/// Ends the conversation. On desktop platforms (non-MyLog mode), compresses history
+		/// and uses local Ollama to summarize before sending the result to the server.
+		/// Otherwise falls back to the server-side AI summarization.
+		/// </summary>
 		private static async Task EndConversationInternalAsync()
 		{
 			try
 			{
+				// Desktop + non-MyLog: use local Ollama for summarization
+				if (IsDesktopPlatform() && !IsMyLogChatMode())
+				{
+					await EndConversationViaLocalAIAsync();
+					return;
+				}
+
 				var responseJson = await HttpClient.PostJsonTaskAsync<object>(GetChatEndEndpoint(), null);
 				if (string.IsNullOrWhiteSpace(responseJson))
 				{
@@ -809,6 +837,197 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
+		/// Ends conversation on desktop using local Ollama for summarization.
+		/// 1. Loads chat history from server.
+		/// 2. Compresses history to CharacterName:Text format.
+		/// 3. Sends compressed history to local Ollama for summarization.
+		/// 4. Sends pre-computed summary to server via /api/journals/end-local.
+		/// </summary>
+		private static async Task EndConversationViaLocalAIAsync()
+		{
+			// Step 1: Load history from server
+			var historyEndpoint = BuildHistoryEndpoint(null);
+			var historyJson = await HttpClient.GetTaskAsync(historyEndpoint);
+			if (string.IsNullOrWhiteSpace(historyJson))
+			{
+				Debug.LogWarning("[ChatController] Empty history for local summarization, falling back to server.");
+				await EndConversationViaServerAsync();
+				return;
+			}
+
+			var historyResponse = JsonConvert.DeserializeObject<ChatHistoryResponsePayload>(historyJson);
+			if (historyResponse?.Messages == null || historyResponse.Messages.Count == 0)
+			{
+				Debug.LogWarning("[ChatController] No messages in history for local summarization, falling back to server.");
+				await EndConversationViaServerAsync();
+				return;
+			}
+
+			// Step 2: Compress history to CharacterName:Text format
+			var compressedHistory = CompressHistoryForSummary(historyResponse.Messages);
+			if (string.IsNullOrWhiteSpace(compressedHistory))
+			{
+				Debug.LogWarning("[ChatController] Compressed history is empty, falling back to server.");
+				await EndConversationViaServerAsync();
+				return;
+			}
+
+			Debug.Log("[ChatController] Compressed history for Ollama summarization:\n" + compressedHistory);
+
+			// Step 3: Send compressed history to local Ollama
+			var ollamaResponse = await OllamaService.SummarizeConversationAsync(compressedHistory);
+			if (ollamaResponse?.Message == null || string.IsNullOrWhiteSpace(ollamaResponse.Message.Content))
+			{
+				Debug.LogWarning("[ChatController] Ollama summarization failed, falling back to server.");
+				await EndConversationViaServerAsync();
+				return;
+			}
+
+			// Step 4: Parse Ollama summary JSON
+			OllamaSummaryResult summaryResult = null;
+			try
+			{
+				summaryResult = JsonConvert.DeserializeObject<OllamaSummaryResult>(ollamaResponse.Message.Content);
+			}
+			catch (Exception ex)
+			{
+				Debug.LogWarning("[ChatController] Failed to parse Ollama summary JSON: " + ex.Message
+					+ "\nRaw: " + ollamaResponse.Message.Content);
+			}
+
+			// If JSON parsing fails, use the raw text as summary
+			var summary = summaryResult?.Summary ?? ollamaResponse.Message.Content;
+			var updatedStoryDescription = summaryResult?.UpdatedStoryDescription ?? "";
+
+			// Step 5: Send pre-computed summary to server
+			var localPayload = new ChatEndConversationLocalRequestPayload
+			{
+				Summary = summary,
+				UpdatedStoryDescription = updatedStoryDescription,
+			};
+
+			var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.JournalsEndLocal, localPayload);
+			if (string.IsNullOrWhiteSpace(responseJson))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to save local AI summary to server."
+				});
+				return;
+			}
+
+			ChatEndConversationResponsePayload response = null;
+			try
+			{
+				response = JsonConvert.DeserializeObject<ChatEndConversationResponsePayload>(responseJson);
+			}
+			catch (Exception ex)
+			{
+				Debug.LogWarning("[ChatController] Failed to parse end-local response: " + ex.Message);
+			}
+
+			EventBus.Publish(ChatEvents.ConversationEnded, response);
+			ChatState.ParentSignals?.OpenHome?.Invoke();
+		}
+
+		/// <summary>
+		/// Fallback: ends conversation via server-side AI summarization.
+		/// </summary>
+		private static async Task EndConversationViaServerAsync()
+		{
+			var responseJson = await HttpClient.PostJsonTaskAsync<object>(GetChatEndEndpoint(), null);
+			if (string.IsNullOrWhiteSpace(responseJson))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to finalize conversation."
+				});
+				return;
+			}
+
+			ChatEndConversationResponsePayload response = null;
+			try
+			{
+				response = JsonConvert.DeserializeObject<ChatEndConversationResponsePayload>(responseJson);
+			}
+			catch (Exception ex)
+			{
+				Debug.LogWarning("[ChatController] Failed to parse end-conversation response: " + ex.Message);
+			}
+
+			EventBus.Publish(ChatEvents.ConversationEnded, response);
+			ChatState.ParentSignals?.OpenHome?.Invoke();
+		}
+
+		/// <summary>
+		/// Compresses chat history messages into a compact format for local AI summarization.
+		/// Format: each line is "CharacterName:Text" for assistant turns, "User:Text" for user messages.
+		/// Developer/system messages are excluded to reduce token count.
+		/// </summary>
+		/// <param name="messages">Chat history messages.</param>
+		/// <returns>Compressed conversation string.</returns>
+		public static string CompressHistoryForSummary(List<ChatHistoryMessagePayload> messages)
+		{
+			if (messages == null || messages.Count == 0)
+			{
+				return "";
+			}
+
+			var builder = new System.Text.StringBuilder();
+
+			foreach (var message in messages)
+			{
+				if (message == null || string.IsNullOrWhiteSpace(message.Content))
+				{
+					continue;
+				}
+
+				var role = (message.Role ?? "").ToLowerInvariant();
+
+				if (role == "user")
+				{
+					var text = message.Content.Trim();
+					if (!string.IsNullOrWhiteSpace(text))
+					{
+						builder.AppendLine("User:" + text);
+					}
+				}
+				else if (role == "assistant")
+				{
+					var turns = ParseAssistantTurns(message.Content);
+					if (turns.Count > 0)
+					{
+						foreach (var turn in turns)
+						{
+							var charName = !string.IsNullOrWhiteSpace(turn.CharacterName)
+								? turn.CharacterName.Trim()
+								: "Mimi";
+							var text = !string.IsNullOrWhiteSpace(turn.Text)
+								? turn.Text.Trim()
+								: "";
+							if (!string.IsNullOrWhiteSpace(text))
+							{
+								builder.AppendLine(charName + ":" + text);
+							}
+						}
+					}
+					else
+					{
+						// Fallback: raw assistant content without JSON structure
+						var text = message.Content.Trim();
+						if (!string.IsNullOrWhiteSpace(text))
+						{
+							builder.AppendLine("Mimi:" + text);
+						}
+					}
+				}
+				// Skip developer and system messages to minimize tokens
+			}
+
+			return builder.ToString().TrimEnd();
+		}
+
+		/// <summary>
 		/// Performs history API call and publishes result.
 		/// </summary>
 		/// <param name="payload">History request payload.</param>
@@ -817,8 +1036,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				await EnsureVocabularyMarkerSourcesLoadedAsync();
-
 				var endpoint = BuildHistoryEndpoint(payload?.SessionId);
 				var responseJson = await HttpClient.GetTaskAsync(endpoint);
 				if (string.IsNullOrWhiteSpace(responseJson))
@@ -846,7 +1063,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 						if (string.Equals(message.Role, "assistant", System.StringComparison.OrdinalIgnoreCase))
 						{
 							var parsedTurns = ParseAssistantTurns(message.Content);
-							ApplyVocabularyMarkersToTurns(parsedTurns);
 							message.Turns = parsedTurns;
 						}
 					}
@@ -865,6 +1081,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 		/// <summary>
 		/// Performs send API call and publishes assistant reply.
+		/// On desktop platforms, uses local Ollama AI and saves history to server.
 		/// </summary>
 		/// <param name="payload">Send payload.</param>
 		/// <returns>Awaitable task.</returns>
@@ -872,7 +1089,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				await EnsureVocabularyMarkerSourcesLoadedAsync();
+				if (IsDesktopPlatform() && !HasAudioPayload(payload))
+				{
+					await SendMessageViaLocalAIAsync(payload);
+					return;
+				}
 
 				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatSendEndpoint(), payload);
 				if (string.IsNullOrWhiteSpace(responseJson))
@@ -905,7 +1126,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				}
 
 				var turns = ParseAssistantTurns(response.Reply);
-				ApplyVocabularyMarkersToTurns(turns);
 
 				EventBus.Publish(ChatEvents.MessageReceived, new ChatAssistantMessagePayload
 				{
@@ -929,6 +1149,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 		/// <summary>
 		/// Performs respond API call and publishes assistant reply without user turn.
+		/// On desktop platforms, uses local Ollama AI and saves history to server.
 		/// </summary>
 		/// <param name="payload">Optional payload for session/model/story context.</param>
 		/// <returns>Awaitable task.</returns>
@@ -936,7 +1157,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				await EnsureVocabularyMarkerSourcesLoadedAsync();
+				if (IsDesktopPlatform())
+				{
+					await GenerateReplyFromHistoryViaLocalAIAsync(payload);
+					return;
+				}
 
 				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatRespondEndpoint(), payload);
 				if (string.IsNullOrWhiteSpace(responseJson))
@@ -959,7 +1184,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				}
 
 				var turns = ParseAssistantTurns(response.Reply);
-				ApplyVocabularyMarkersToTurns(turns);
 
 				EventBus.Publish(ChatEvents.MessageReceived, new ChatAssistantMessagePayload
 				{
@@ -978,6 +1202,423 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					Message = "Failed to generate chat reply from history: " + exception.Message
 				});
 			}
+		}
+
+		/// <summary>
+		/// Checks whether the current platform is a desktop PC (Windows, macOS, Linux).
+		/// When true, local Ollama AI is preferred over server-side cloud AI.
+		/// </summary>
+		/// <returns>True on desktop editor or standalone builds.</returns>
+		private static bool IsDesktopPlatform()
+		{
+			var platform = Application.platform;
+			return platform == RuntimePlatform.WindowsEditor
+				|| platform == RuntimePlatform.WindowsPlayer
+				|| platform == RuntimePlatform.OSXEditor
+				|| platform == RuntimePlatform.OSXPlayer
+				|| platform == RuntimePlatform.LinuxEditor
+				|| platform == RuntimePlatform.LinuxPlayer;
+		}
+
+		/// <summary>
+		/// Checks whether the send payload contains audio data (audio requires server-side processing).
+		/// </summary>
+		/// <param name="payload">Send request payload.</param>
+		/// <returns>True when audio is present.</returns>
+		private static bool HasAudioPayload(ChatSendRequestPayload payload)
+		{
+			return payload != null && !string.IsNullOrWhiteSpace(payload.Audio);
+		}
+
+		/// <summary>
+		/// Sends a user message using local Ollama AI on desktop platforms.
+		/// 1. Requests system prompt + history from server via /api/chat/prepare-local.
+		/// 2. Sends conversation to local Ollama to generate a reply.
+		/// 3. Saves the user message + AI reply to server via /api/chat/save-local.
+		/// 4. Publishes the result to views.
+		/// </summary>
+		/// <param name="payload">Send payload with user message.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task SendMessageViaLocalAIAsync(ChatSendRequestPayload payload)
+		{
+			// Step 1: Get system prompt and history from server
+			var preparePayload = new { message = payload.Message ?? "" };
+			var prepareJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatPrepareLocal, preparePayload);
+			if (string.IsNullOrWhiteSpace(prepareJson))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to prepare local AI prompt from server."
+				});
+				return;
+			}
+
+			var prepareResponse = JsonConvert.DeserializeObject<ChatPrepareLocalResponsePayload>(prepareJson);
+			if (prepareResponse == null || string.IsNullOrWhiteSpace(prepareResponse.SystemPrompt))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Server returned invalid preparation data for local AI."
+				});
+				return;
+			}
+
+			// Step 1.5: Load full history for Ollama analysis (includes system/developer messages)
+			var fullHistory = await LoadOllamaFullHistoryAsync();
+			if (fullHistory == null)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to load full history for local Ollama analysis."
+				});
+				return;
+			}
+
+			// Step 2: Generate reply via local Ollama
+			var ollamaResponse = await OllamaService.SendChatAsync(
+				prepareResponse.SystemPrompt,
+				fullHistory,
+				payload.Message
+			);
+
+			if (ollamaResponse?.Message == null || string.IsNullOrWhiteSpace(ollamaResponse.Message.Content))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Local AI (Ollama) did not return a reply. Make sure Ollama is running."
+				});
+				return;
+			}
+
+			var rawReply = ollamaResponse.Message.Content;
+			var jsonReply = await EnsureValidOllamaReplyJsonAsync(rawReply, prepareResponse.SystemPrompt);
+			if (string.IsNullOrWhiteSpace(jsonReply))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Local AI returned invalid JSON reply format and could not repair it. History was not saved."
+				});
+				return;
+			}
+
+			var normalizedMessageIdReply = ReplaceAssistantMessageIdsWithSystemGuids(jsonReply);
+			if (string.IsNullOrWhiteSpace(normalizedMessageIdReply))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to normalize assistant MessageId before saving history."
+				});
+				return;
+			}
+
+			// Step 3: Save to server history
+			var savePayload = new ChatSaveLocalRequestPayload
+			{
+				Message = payload.Message ?? "",
+				Reply = normalizedMessageIdReply,
+			};
+
+			var saveJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatSaveLocal, savePayload);
+			var saveResponse = string.IsNullOrWhiteSpace(saveJson)
+				? null
+				: JsonConvert.DeserializeObject<ChatSaveLocalResponsePayload>(saveJson);
+
+			// Use cleaned reply from server if available (memory sidecars stripped)
+			var effectiveReply = saveResponse != null && !string.IsNullOrWhiteSpace(saveResponse.Reply)
+				? saveResponse.Reply
+				: normalizedMessageIdReply;
+
+			// Step 4: Publish to views
+			var turns = ParseAssistantTurns(effectiveReply);
+
+			EventBus.Publish(ChatEvents.MessageReceived, new ChatAssistantMessagePayload
+			{
+				Reply = effectiveReply,
+				Model = "ollama/" + OllamaService.DefaultModel,
+				SessionId = payload.SessionId,
+				Turns = turns,
+			});
+
+			_ = PreResolveTtsAudioUrlsAsync(turns);
+		}
+
+		/// <summary>
+		/// Generates a reply from history using local Ollama AI on desktop platforms.
+		/// Similar to SendMessageViaLocalAIAsync but without a new user message.
+		/// </summary>
+		/// <param name="payload">Optional payload for session context.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task GenerateReplyFromHistoryViaLocalAIAsync(ChatSendRequestPayload payload)
+		{
+			// Step 1: Get system prompt and history from server
+			var preparePayload = new { message = "" };
+			var prepareJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatPrepareLocal, preparePayload);
+			if (string.IsNullOrWhiteSpace(prepareJson))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to prepare local AI prompt from server."
+				});
+				return;
+			}
+
+			var prepareResponse = JsonConvert.DeserializeObject<ChatPrepareLocalResponsePayload>(prepareJson);
+			if (prepareResponse == null || string.IsNullOrWhiteSpace(prepareResponse.SystemPrompt))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Server returned invalid preparation data for local AI."
+				});
+				return;
+			}
+
+			// Step 1.5: Load full history for Ollama analysis (includes system/developer messages)
+			var fullHistory = await LoadOllamaFullHistoryAsync();
+			if (fullHistory == null)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to load full history for local Ollama analysis."
+				});
+				return;
+			}
+
+			// Step 2: Generate reply via local Ollama (no user message, just continue from history)
+			var continuePrompt = "Continue the conversation naturally based on the current context.";
+			var ollamaResponse = await OllamaService.SendChatAsync(
+				prepareResponse.SystemPrompt,
+				fullHistory,
+				continuePrompt
+			);
+
+			if (ollamaResponse?.Message == null || string.IsNullOrWhiteSpace(ollamaResponse.Message.Content))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Local AI (Ollama) did not return a reply. Make sure Ollama is running."
+				});
+				return;
+			}
+
+			var rawReply = ollamaResponse.Message.Content;
+			var jsonReply = await EnsureValidOllamaReplyJsonAsync(rawReply, prepareResponse.SystemPrompt);
+			if (string.IsNullOrWhiteSpace(jsonReply))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Local AI returned invalid JSON reply format and could not repair it. History was not saved."
+				});
+				return;
+			}
+
+			var normalizedMessageIdReply = ReplaceAssistantMessageIdsWithSystemGuids(jsonReply);
+			if (string.IsNullOrWhiteSpace(normalizedMessageIdReply))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to normalize assistant MessageId before saving history."
+				});
+				return;
+			}
+
+			// Step 3: Save to server history (no user message for respond-from-history)
+			var savePayload = new ChatSaveLocalRequestPayload
+			{
+				Message = "",
+				Reply = normalizedMessageIdReply,
+			};
+
+			var saveJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatSaveLocal, savePayload);
+			var saveResponse = string.IsNullOrWhiteSpace(saveJson)
+				? null
+				: JsonConvert.DeserializeObject<ChatSaveLocalResponsePayload>(saveJson);
+
+			var effectiveReply = saveResponse != null && !string.IsNullOrWhiteSpace(saveResponse.Reply)
+				? saveResponse.Reply
+				: normalizedMessageIdReply;
+
+			// Step 4: Publish to views
+			var turns = ParseAssistantTurns(effectiveReply);
+
+			EventBus.Publish(ChatEvents.MessageReceived, new ChatAssistantMessagePayload
+			{
+				Reply = effectiveReply,
+				Model = "ollama/" + OllamaService.DefaultModel,
+				SessionId = payload?.SessionId,
+				Turns = turns,
+			});
+
+			_ = PreResolveTtsAudioUrlsAsync(turns);
+		}
+
+		/// <summary>
+		/// Ensures a local Ollama reply is valid assistant-turn JSON.
+		/// If invalid, requests Ollama to reformat into the required JSON shape.
+		/// Returns null when repair fails.
+		/// </summary>
+		/// <param name="reply">Raw Ollama assistant reply.</param>
+		/// <param name="systemPrompt">Original chat system prompt used for generation.</param>
+		/// <returns>Valid assistant-turn JSON, or null when unrecoverable.</returns>
+		private static async Task<string> EnsureValidOllamaReplyJsonAsync(string reply, string systemPrompt)
+		{
+			var current = reply?.Trim() ?? "";
+			if (IsValidAssistantReplyJson(current))
+			{
+				return current;
+			}
+
+			const int maxRepairAttempts = 2;
+			for (var attempt = 1; attempt <= maxRepairAttempts; attempt++)
+			{
+				Debug.Log("[ChatController] Ollama reply JSON invalid. Requesting repair attempt " + attempt + ".");
+
+				var repaired = await OllamaService.RepairReplyJsonAsync(current, systemPrompt);
+				var repairedContent = repaired?.Message?.Content?.Trim() ?? "";
+				if (string.IsNullOrWhiteSpace(repairedContent))
+				{
+					break;
+				}
+
+				if (IsValidAssistantReplyJson(repairedContent))
+				{
+					Debug.Log("[ChatController] Ollama reply JSON repaired successfully.");
+					return repairedContent;
+				}
+
+				current = repairedContent;
+			}
+
+			return null;
+		}
+
+		/// <summary>
+		/// Loads full unfiltered chat history from the dedicated local endpoint for Ollama.
+		/// Returns null when request/parse fails.
+		/// </summary>
+		/// <returns>Full history list, or null on failure.</returns>
+		private static async Task<List<ChatHistoryMessagePayload>> LoadOllamaFullHistoryAsync()
+		{
+			var historyJson = await HttpClient.GetTaskAsync(NetworkEndpoints.ChatHistoryLocal);
+			if (string.IsNullOrWhiteSpace(historyJson))
+			{
+				return null;
+			}
+
+			try
+			{
+				var response = JsonConvert.DeserializeObject<ChatHistoryResponsePayload>(historyJson);
+				return response?.Messages ?? new List<ChatHistoryMessagePayload>();
+			}
+			catch
+			{
+				return null;
+			}
+		}
+
+		/// <summary>
+		/// Validates whether a reply can be parsed as assistant-turn JSON.
+		/// Requires at least one turn and full required prompt fields.
+		/// </summary>
+		/// <param name="reply">Reply text to validate.</param>
+		/// <returns>True when JSON structure is valid for chat turns.</returns>
+		private static bool IsValidAssistantReplyJson(string reply)
+		{
+			if (string.IsNullOrWhiteSpace(reply))
+			{
+				return false;
+			}
+
+			try
+			{
+				var parsedList = JsonConvert.DeserializeObject<List<ChatAssistantTurnPayload>>(reply);
+				if (parsedList != null && parsedList.Count > 0)
+				{
+					for (var i = 0; i < parsedList.Count; i++)
+					{
+						if (!IsValidAssistantTurn(parsedList[i]))
+						{
+							return false;
+						}
+					}
+
+					return true;
+				}
+			}
+			catch
+			{
+			}
+
+			try
+			{
+				var single = JsonConvert.DeserializeObject<ChatAssistantTurnPayload>(reply);
+				return IsValidAssistantTurn(single);
+			}
+			catch
+			{
+			}
+
+			return false;
+		}
+
+		/// <summary>
+		/// Validates one assistant turn against required prompt fields.
+		/// </summary>
+		/// <param name="turn">Assistant turn payload.</param>
+		/// <returns>True when all required fields are present.</returns>
+		private static bool IsValidAssistantTurn(ChatAssistantTurnPayload turn)
+		{
+			return turn != null
+				&& !string.IsNullOrWhiteSpace(turn.MessageId)
+				&& !string.IsNullOrWhiteSpace(turn.CharacterName)
+				&& !string.IsNullOrWhiteSpace(turn.Text)
+				&& !string.IsNullOrWhiteSpace(turn.Pinyin)
+				&& !string.IsNullOrWhiteSpace(turn.Tone)
+				&& !string.IsNullOrWhiteSpace(turn.Translation);
+		}
+
+		/// <summary>
+		/// Replaces all assistant MessageId values with system-generated GUIDs.
+		/// Preserves all other fields (including optional memory sidecar fields).
+		/// </summary>
+		/// <param name="replyJson">Validated assistant reply JSON (array or single object).</param>
+		/// <returns>JSON with new MessageId values, or null when parsing fails.</returns>
+		private static string ReplaceAssistantMessageIdsWithSystemGuids(string replyJson)
+		{
+			if (string.IsNullOrWhiteSpace(replyJson))
+			{
+				return null;
+			}
+
+			try
+			{
+				var token = JToken.Parse(replyJson);
+
+				if (token is JArray array)
+				{
+					for (var i = 0; i < array.Count; i++)
+					{
+						if (!(array[i] is JObject obj))
+						{
+							return null;
+						}
+
+						obj["MessageId"] = Guid.NewGuid().ToString();
+					}
+
+					return array.ToString(Formatting.None);
+				}
+
+				if (token is JObject single)
+				{
+					single["MessageId"] = Guid.NewGuid().ToString();
+					return single.ToString(Formatting.None);
+				}
+			}
+			catch
+			{
+			}
+
+			return null;
 		}
 
 		/// <summary>
@@ -1075,13 +1716,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
-		/// Regex to match **word** vocabulary markup for stripping before TTS.
-		/// </summary>
-		private static readonly Regex VocabMarkupRegex = new Regex(@"\*\*(.+?)\*\*", RegexOptions.Compiled);
-
-		/// <summary>
 		/// Pre-resolves TTS audio URLs for each turn so the View only needs to download audio clips.
-		/// Strips **vocab** markup from text before sending to TTS.
 		/// </summary>
 		/// <param name="turns">Parsed turn list to enrich with AudioUrl.</param>
 		/// <returns>Awaitable task.</returns>
@@ -1091,8 +1726,6 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			{
 				return;
 			}
-
-			await EnsureVocabularyMarkerSourcesLoadedAsync();
 
 			for (var i = 0; i < turns.Count; i++)
 			{
@@ -1111,8 +1744,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 					var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
 					var tone = string.IsNullOrWhiteSpace(turn.Tone) ? "neutral" : turn.Tone.Trim();
-					var cleanText = VocabMarkupRegex.Replace(turn.Text, "$1");
-					turn.AudioUrl = await ResolveTtsAudioUrlAsync(cleanText, tone, characterName, false, turn.MessageId);
+					turn.AudioUrl = await ResolveTtsAudioUrlAsync(turn.Text, tone, characterName, false, turn.MessageId);
 
 					if (!string.IsNullOrWhiteSpace(turn.AudioUrl))
 					{
@@ -1342,289 +1974,157 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
-		/// Ensures learning-path and learned-vocabulary sources are loaded before marking text.
+		/// Loads due vocabulary from the review endpoint and new vocabulary from
+		/// learning paths, then publishes the combined result. Each API call is
+		/// independent so a failure in one does not block the other.
 		/// </summary>
 		/// <returns>Awaitable task.</returns>
-		private static async Task EnsureVocabularyMarkerSourcesLoadedAsync()
-		{
-			if (ChatState.IsVocabularyMarkerSourceLoaded)
-			{
-				return;
-			}
-
-			await LoadVocabularyMarkerSourcesInternalAsync();
-		}
-
-		/// <summary>
-		/// Loads marker candidates from learning paths and learned words from vocabulary list.
-		/// </summary>
-		/// <returns>Awaitable task.</returns>
-		private static async Task LoadVocabularyMarkerSourcesInternalAsync()
+		private static async Task LoadAutoChatVocabularyInternalAsync()
 		{
 			try
 			{
-				var learningPathTask = HttpClient.GetTaskAsync(NetworkEndpoints.LearningPaths);
-				var vocabularyTask = HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyReview);
+				// Fetch due vocabulary, learning paths, and today's new count independently.
+				string dueJson = null;
+				string learningPathsJson = null;
+				string todayNewCountJson = null;
 
-				var learningPathJson = await learningPathTask;
-				var vocabularyJson = await vocabularyTask;
+				try
+				{
+					dueJson = await HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyDue);
+				}
+				catch (Exception dueException)
+				{
+					Debug.LogWarning("[ChatController] Failed to load due vocabulary: " + dueException.Message);
+				}
 
-				ChatState.LearningPathVocabularyCandidates = BuildLearningPathVocabularyCandidates(learningPathJson);
-				ChatState.LearnedVocabularySet = BuildLearnedVocabularySet(vocabularyJson);
-				ChatState.IsVocabularyMarkerSourceLoaded = true;
+				try
+				{
+					learningPathsJson = await HttpClient.GetTaskAsync(NetworkEndpoints.LearningPaths);
+				}
+				catch (Exception lpException)
+				{
+					Debug.LogWarning("[ChatController] Failed to load learning paths: " + lpException.Message);
+				}
+
+				try
+				{
+					todayNewCountJson = await HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyTodayNewCount);
+				}
+				catch (Exception cntException)
+				{
+					Debug.LogWarning("[ChatController] Failed to load today's new vocab count: " + cntException.Message);
+				}
+
+				// Parse due vocabulary.
+				var dueResponse = string.IsNullOrWhiteSpace(dueJson)
+					? null
+					: JsonConvert.DeserializeObject<ChatVocabularyListResponsePayload>(dueJson);
+
+				var dueWords = new List<string>();
+				if (dueResponse?.Vocabularies != null)
+				{
+					for (var i = 0; i < dueResponse.Vocabularies.Count; i++)
+					{
+						var word = dueResponse.Vocabularies[i]?.Korean;
+						if (!string.IsNullOrWhiteSpace(word))
+						{
+							dueWords.Add(word.Trim());
+						}
+					}
+				}
+
+				// Parse new words from learning paths (comma-separated vocabulary field).
+				var dueWordSet = new HashSet<string>(dueWords, StringComparer.OrdinalIgnoreCase);
+				var newWords = new List<string>();
+				var lpRoot = string.IsNullOrWhiteSpace(learningPathsJson)
+					? null
+					: JsonConvert.DeserializeObject<JObject>(learningPathsJson);
+				var learningPaths = lpRoot?["learningPaths"] as JArray;
+
+				if (learningPaths != null)
+				{
+					for (var i = 0; i < learningPaths.Count; i++)
+					{
+						var vocabCsv = learningPaths[i]?["vocabulary"]?.ToString();
+						if (string.IsNullOrWhiteSpace(vocabCsv))
+						{
+							continue;
+						}
+
+						var words = vocabCsv.Split(',');
+						for (var j = 0; j < words.Length; j++)
+						{
+							var word = words[j]?.Trim();
+							if (!string.IsNullOrWhiteSpace(word) && !dueWordSet.Contains(word))
+							{
+								newWords.Add(word);
+								dueWordSet.Add(word); // Prevent duplicates across learning paths.
+							}
+						}
+					}
+				}
+
+				EventBus.Publish(ChatEvents.AutoChatVocabularyLoaded, new ChatAutoChatVocabularyPayload
+				{
+					DueWords = dueWords,
+					NewWords = newWords,
+					TodayNewCount = ParseTodayNewCount(todayNewCountJson),
+				});
 			}
 			catch (Exception exception)
 			{
-				Debug.LogWarning("[ChatController] Failed to load vocabulary marker sources: " + exception.Message);
+				EventBus.Publish(ChatEvents.AutoChatVocabularyLoaded, new ChatAutoChatVocabularyPayload());
+				Debug.LogWarning("[ChatController] Failed to load auto-chat vocabulary: " + exception.Message);
 			}
 		}
 
 		/// <summary>
-		/// Applies vocabulary marker rules to all assistant turns.
+		/// Parses the today-new-count response payload, returning 0 on missing/invalid input.
 		/// </summary>
-		/// <param name="turns">Parsed assistant turns.</param>
-		private static void ApplyVocabularyMarkersToTurns(List<ChatAssistantTurnPayload> turns)
+		/// <param name="json">Raw JSON response body.</param>
+		/// <returns>Count of vocabulary entries created today.</returns>
+		private static int ParseTodayNewCount(string json)
 		{
-			if (turns == null || turns.Count == 0)
+			if (string.IsNullOrWhiteSpace(json))
 			{
-				return;
+				return 0;
 			}
 
-			for (var i = 0; i < turns.Count; i++)
+			try
 			{
-				var turn = turns[i];
-				if (turn == null || string.IsNullOrWhiteSpace(turn.Text))
+				var root = JsonConvert.DeserializeObject<JObject>(json);
+				var token = root?["count"];
+				if (token != null && token.Type != JTokenType.Null)
 				{
-					continue;
+					return token.Value<int>();
 				}
-
-				turn.Text = MarkTextWithLearningPathVocabulary(turn.Text);
 			}
+			catch (Exception parseException)
+			{
+				Debug.LogWarning("[ChatController] Failed to parse today's new vocab count: " + parseException.Message);
+			}
+
+			return 0;
 		}
 
 		/// <summary>
-		/// Marks unlearned learning-path vocabulary in text using **word** markers.
-		/// Overlap resolution is short-first; longer words are considered only if shorter words are learned.
+		/// Posts the list of used vocabulary words to the server for batch review.
+		/// Fire-and-forget; failures are logged but do not block the user.
 		/// </summary>
-		/// <param name="text">Source assistant text.</param>
-		/// <returns>Text with **word** markers for clickable vocab links.</returns>
-		private static string MarkTextWithLearningPathVocabulary(string text)
+		/// <param name="payload">Batch review request with word list.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task BatchReviewAutoChatVocabularyInternalAsync(ChatBatchReviewVocabRequestPayload payload)
 		{
-			if (string.IsNullOrWhiteSpace(text))
+			try
 			{
-				return text;
+				var json = JsonConvert.SerializeObject(payload);
+				await HttpClient.PostJsonTaskAsync(NetworkEndpoints.VocabularyBatchReview, json);
+				Debug.Log("[ChatController] Batch-reviewed " + payload.Words.Count + " auto-chat vocab words.");
 			}
-
-			if (!ChatState.IsVocabularyMarkerSourceLoaded)
+			catch (Exception exception)
 			{
-				return text;
+				Debug.LogWarning("[ChatController] Failed to batch-review auto-chat vocabulary: " + exception.Message);
 			}
-
-			var plainText = VocabMarkupRegex.Replace(text, "$1");
-			var candidates = BuildUnlearnedVocabularyCandidates();
-			if (candidates.Count == 0)
-			{
-				return plainText;
-			}
-
-			var matches = FindShortestFirstMatches(plainText, candidates);
-			if (matches.Count == 0)
-			{
-				return plainText;
-			}
-
-			return InjectVocabularyMarkers(plainText, matches);
-		}
-
-		private static List<string> BuildUnlearnedVocabularyCandidates()
-		{
-			var source = ChatState.LearningPathVocabularyCandidates;
-			var learnedSet = ChatState.LearnedVocabularySet;
-			var unlearned = new List<string>();
-			if (source == null || source.Count == 0)
-			{
-				return unlearned;
-			}
-
-			for (var i = 0; i < source.Count; i++)
-			{
-				var candidate = source[i];
-				if (string.IsNullOrWhiteSpace(candidate))
-				{
-					continue;
-				}
-
-				if (learnedSet != null && learnedSet.Contains(candidate))
-				{
-					continue;
-				}
-
-				unlearned.Add(candidate);
-			}
-
-			unlearned.Sort((left, right) =>
-			{
-				var lengthCompare = left.Length.CompareTo(right.Length);
-				if (lengthCompare != 0)
-				{
-					return lengthCompare;
-				}
-
-				return string.CompareOrdinal(left, right);
-			});
-
-			return unlearned;
-		}
-
-		private static List<(int Start, int Length)> FindShortestFirstMatches(string text, List<string> candidates)
-		{
-			var matches = new List<(int Start, int Length)>();
-			if (string.IsNullOrEmpty(text) || candidates == null || candidates.Count == 0)
-			{
-				return matches;
-			}
-
-			var position = 0;
-			while (position < text.Length)
-			{
-				var matchedLength = 0;
-
-				for (var i = 0; i < candidates.Count; i++)
-				{
-					var candidate = candidates[i];
-					var candidateLength = candidate.Length;
-					if (candidateLength == 0 || position + candidateLength > text.Length)
-					{
-						continue;
-					}
-
-					if (!string.Equals(text.Substring(position, candidateLength), candidate, StringComparison.Ordinal))
-					{
-						continue;
-					}
-
-					matchedLength = candidateLength;
-					break;
-				}
-
-				if (matchedLength > 0)
-				{
-					matches.Add((position, matchedLength));
-					position += matchedLength;
-					continue;
-				}
-
-				position += 1;
-			}
-
-			return matches;
-		}
-
-		private static string InjectVocabularyMarkers(string text, List<(int Start, int Length)> matches)
-		{
-			var builder = new StringBuilder(text.Length + matches.Count * 4);
-			var cursor = 0;
-
-			for (var i = 0; i < matches.Count; i++)
-			{
-				var match = matches[i];
-				if (match.Start > cursor)
-				{
-					builder.Append(text, cursor, match.Start - cursor);
-				}
-
-				builder.Append("**");
-				builder.Append(text, match.Start, match.Length);
-				builder.Append("**");
-
-				cursor = match.Start + match.Length;
-			}
-
-			if (cursor < text.Length)
-			{
-				builder.Append(text, cursor, text.Length - cursor);
-			}
-
-			return builder.ToString();
-		}
-
-		private static List<string> BuildLearningPathVocabularyCandidates(string responseJson)
-		{
-			var result = new List<string>();
-			if (string.IsNullOrWhiteSpace(responseJson))
-			{
-				return result;
-			}
-
-			var response = JsonConvert.DeserializeObject<ChatLearningPathListResponsePayload>(responseJson);
-			var paths = response?.LearningPaths;
-			if (paths == null || paths.Count == 0)
-			{
-				return result;
-			}
-
-			var seen = new HashSet<string>(StringComparer.Ordinal);
-			for (var i = 0; i < paths.Count; i++)
-			{
-				var vocabulary = paths[i]?.Vocabulary;
-				if (string.IsNullOrWhiteSpace(vocabulary))
-				{
-					continue;
-				}
-
-				var tokens = vocabulary.Split(LearningPathVocabularySeparators, StringSplitOptions.RemoveEmptyEntries);
-				for (var j = 0; j < tokens.Length; j++)
-				{
-					var normalized = NormalizeVocabularyWord(tokens[j]);
-					if (string.IsNullOrWhiteSpace(normalized) || !seen.Add(normalized))
-					{
-						continue;
-					}
-
-					result.Add(normalized);
-				}
-			}
-
-			return result;
-		}
-
-		private static HashSet<string> BuildLearnedVocabularySet(string responseJson)
-		{
-			var result = new HashSet<string>(StringComparer.Ordinal);
-			if (string.IsNullOrWhiteSpace(responseJson))
-			{
-				return result;
-			}
-
-			var response = JsonConvert.DeserializeObject<ChatVocabularyListResponsePayload>(responseJson);
-			var vocabularies = response?.Vocabularies;
-			if (vocabularies == null || vocabularies.Count == 0)
-			{
-				return result;
-			}
-
-			for (var i = 0; i < vocabularies.Count; i++)
-			{
-				var normalized = NormalizeVocabularyWord(vocabularies[i]?.Korean);
-				if (string.IsNullOrWhiteSpace(normalized))
-				{
-					continue;
-				}
-
-				result.Add(normalized);
-			}
-
-			return result;
-		}
-
-		private static string NormalizeVocabularyWord(string value)
-		{
-			if (string.IsNullOrWhiteSpace(value))
-			{
-				return string.Empty;
-			}
-
-			return value.Replace("**", string.Empty).Trim();
 		}
 
 		/// <summary>

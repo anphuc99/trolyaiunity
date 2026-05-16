@@ -19,10 +19,16 @@ interface ChatController {
   sendMessage: (request: Request, response: Response) => Promise<void>;
   respondFromHistory: (request: Request, response: Response) => Promise<void>;
   getHistory: (request: Request, response: Response) => Promise<void>;
+  /** Returns full history (including system/developer/recall entries) for local Ollama analysis. */
+  getOllamaHistory: (request: Request, response: Response) => Promise<void>;
   appendDeveloperMessage: (request: Request, response: Response) => Promise<void>;
   editMessage: (request: Request, response: Response) => Promise<void>;
   getDeveloperState: (request: Request, response: Response) => Promise<void>;
   transcribeAudio: (request: Request, response: Response) => Promise<void>;
+  /** Returns system prompt + history for local AI clients (PC Ollama). */
+  prepareLocalPrompt: (request: Request, response: Response) => Promise<void>;
+  /** Saves user message + locally-generated AI reply to history. */
+  saveLocalReply: (request: Request, response: Response) => Promise<void>;
 }
 
 interface ChatControllerDeps {
@@ -1298,6 +1304,33 @@ export const createChatController = (
     }
   };
 
+  /**
+   * Returns full chat history for local Ollama clients.
+   * Unlike getHistory, this endpoint does NOT filter out system/developer/recall messages.
+   */
+  const getOllamaHistory: ChatController["getOllamaHistory"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const sessionId = getSessionId(request.query?.sessionId);
+
+    try {
+      const messages = await historyStore.load(request.user.id);
+      const adjustedMessages = applyAssistantEdits(messages);
+      response.json({
+        messages: adjustedMessages
+      });
+    } catch (error) {
+      console.error("Error in getOllamaHistory:", error);
+      response.status(500).json({
+        message: "Failed to load full chat history for Ollama",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
   const appendDeveloperMessage: ChatController["appendDeveloperMessage"] = async (request, response) => {
     if (!request.user) {
       response.status(401).json({ message: "Unauthorized" });
@@ -1554,13 +1587,117 @@ export const createChatController = (
     }
   };
 
+  /**
+   * Returns the system prompt and chat history so a local AI client (e.g. Ollama on PC)
+   * can generate a reply without the server calling a cloud AI service.
+   */
+  const prepareLocalPrompt: ChatController["prepareLocalPrompt"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const message = typeof request.body?.message === "string" ? request.body.message.trim() : "";
+
+    try {
+      const { prompt: systemPrompt, activeCharacters } = await buildSystemPrompt(request.user.id, request.body, message || undefined);
+      await historyStore.ensureSystemMessage(request.user.id, systemPrompt);
+      const history = await historyStore.load(request.user.id);
+
+      response.json({
+        systemPrompt,
+        history: history.filter(m => m.role !== "developer"),
+        activeCharacters
+      });
+    } catch (error) {
+      console.error("Error in prepareLocalPrompt:", error);
+      response.status(500).json({
+        message: "Failed to prepare local prompt",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
+  /**
+   * Saves a user message and a locally-generated assistant reply to chat history.
+   * Also performs memory extraction if ChromaDB is configured.
+   */
+  const saveLocalReply: ChatController["saveLocalReply"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const message = typeof request.body?.message === "string" ? request.body.message.trim() : "";
+    const reply = typeof request.body?.reply === "string" ? request.body.reply.trim() : "";
+
+    if (!reply) {
+      response.status(400).json({ message: "Reply is required" });
+      return;
+    }
+
+    try {
+      // Extract and store memory sidecars (fire-and-forget, non-blocking)
+      let cleanReply = reply;
+      if (vectorMemoryService) {
+        const turns = parseAssistantReply(reply);
+        const candidates = extractMemorySidecars(turns);
+        const itemsToStore = candidates.filter(shouldStoreMemory);
+        if (itemsToStore.length) {
+          const user = await userRepository.findOne({ where: { id: request.user!.id } });
+          const storyId = user?.currentStoryId ?? null;
+          const items = itemsToStore.map((c) => buildMemoryItemFromCandidate(c, request.user!.id, storyId, message));
+          vectorMemoryService
+            .upsert(request.user!.id, items)
+            .then(() => {
+              console.log("[Memory] Chroma upsert success:", {
+                userId: request.user!.id,
+                storyId,
+                itemCount: items.length,
+                source: "saveLocalReply"
+              });
+            })
+            .catch((err) => {
+              console.warn("[Memory] Chroma upsert failed:", {
+                userId: request.user!.id,
+                storyId,
+                itemCount: items.length,
+                source: "saveLocalReply",
+                error: err instanceof Error ? err.message : String(err)
+              });
+            });
+        }
+        cleanReply = stripMemorySidecar(reply);
+      }
+
+      const messagesToAppend: ChatHistoryMessage[] = [];
+      if (message) {
+        messagesToAppend.push({ role: "user", content: message });
+      }
+      messagesToAppend.push({ role: "assistant", content: cleanReply });
+
+      await historyStore.append(request.user.id, messagesToAppend);
+
+      response.json({ ok: true, reply: cleanReply });
+    } catch (error) {
+      console.error("Error in saveLocalReply:", error);
+      response.status(500).json({
+        message: "Failed to save local reply",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
   return {
     sendMessage,
     respondFromHistory,
     getHistory,
+    getOllamaHistory,
     appendDeveloperMessage,
     editMessage,
     getDeveloperState,
-    transcribeAudio
+    transcribeAudio,
+    prepareLocalPrompt,
+    saveLocalReply
   };
 };

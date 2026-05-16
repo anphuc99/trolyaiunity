@@ -27,7 +27,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private const int RecordingFrequencyHz = 16000;
 		private const int MaxRecordingSeconds = 60;
 		private const string DefaultSpeechLanguage = "zh";
-		private const string AutoChatContext = "AI tự nói chuyện ít nhất 10 tin nhắn mỗi lượt. Các nhân vật không được phép ngủ";
+		private const string AutoChatContextTemplate = "AI tự nói chuyện ít nhất {0} tin nhắn mỗi lượt. Các nhân vật không được phép ngủ";
 
 		[SerializeField]
 		private TMP_InputField _inputField;
@@ -64,6 +64,18 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		[SerializeField]
 		private TextMeshProUGUI _countVocabText;
+		[SerializeField]
+		private bool _isBlackUI;
+		[SerializeField]
+		private GameObject _topMenu;
+		[SerializeField]
+		private GameObject _bottomMenu;
+		[SerializeField]
+		private GameObject _body;
+		[SerializeField]
+		private TMP_InputField _inputNumberAutochat;
+		[SerializeField]
+		private Button _buttonApplyAutoChat;
 
 		/// <summary>
 		/// Regex to match **word** vocabulary markup in assistant text.
@@ -91,7 +103,29 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private bool _hasSceneCharacters;
 		private bool _isAutoChatEnabled;
 		private bool _isAutoChatAwaitingReply;
+		private bool _isAutoChatAwaitingApply;
 		private bool _hasSentAutoChatContext;
+		private int _autoChatTargetTurnCount = 10;
+		private int _autoChatGeneratedTurnCount;
+		private bool _isAutoChatBatchGenerating;
+		private readonly List<ChatAssistantTurnPayload> _autoChatBatchBuffer = new List<ChatAssistantTurnPayload>();
+		private const int MaxAutoChatNewVocabPerDay = 10;
+		private const int MaxAutoChatOldVocabPool = 100;
+		private const int AutoChatNewVocabWordsPerTurn = 3;
+		private const int AutoChatOldVocabWordsPerTurn = 5;
+		private readonly List<string> _autoChatVocabPool = new List<string>();
+		private int _autoChatVocabIndex;
+		private int _autoChatVocabWordsPerTurn;
+		private readonly List<string> _autoChatPendingVocabWords = new List<string>();
+		private readonly HashSet<string> _autoChatUsedVocabWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		private bool _isAutoChatVocabLoaded;
+		private readonly List<string> _vocabReviewQueue = new List<string>();
+		private int _vocabReviewIndex;
+		private bool _isVocabReviewMode;
+		private Vector2 _saveBodyOriginalAnchorMin;
+		private Vector2 _saveBodyOriginalAnchorMax;
+		private Vector2 _saveBodyOriginalOffsetMin;
+		private Vector2 _saveBodyOriginalOffsetMax;
 
 		/// <summary>
 		/// Rich text marker shown in the input field when a voice recording is pending.
@@ -127,13 +161,13 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			SendChatMessage(_inputField.text);
 		}
-
 		protected override void OnDisabled()
 		{
 			StopAutoChatMode();
 			StopRecordingIfNeeded();
 			UnbindInputFieldEvents();
 			UnbindRecordButtonEvents();
+			UnbindApplyAutoChatButtonEvents();
 			UnbindAudioInputGuard();
 			RestoreForegroundRuntimeMode();
 		}
@@ -237,6 +271,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		protected override void OnEnabled()
 		{
 			EnsureDependencies();
+			ResetAutoChatInputUi();
 			EnableBackgroundRuntimeMode();
 			RefreshSceneCharacterState();
 			RefreshHistory();
@@ -251,6 +286,26 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[OnEvent(ChatEvents.Installed)]
 		private void OnInstalled(object payload)
 		{
+			if (_isBlackUI)
+			{
+				_topMenu.SetActive(false);
+				_bottomMenu.SetActive(false);
+				var r = _body != null ? _body.GetComponent<RectTransform>() : null;
+				if (r != null)
+				{
+					_saveBodyOriginalAnchorMin = r.anchorMin;
+					_saveBodyOriginalAnchorMax = r.anchorMax;
+					_saveBodyOriginalOffsetMin = r.offsetMin;
+					_saveBodyOriginalOffsetMax = r.offsetMax;
+
+					r.anchorMin = new Vector2(0f, 0f);
+					r.anchorMax = new Vector2(1f, 1f);
+
+					// Keep current left/right spacing, force Bottom and Top to 0.
+					r.offsetMin = new Vector2(r.offsetMin.x, 0f);
+					r.offsetMax = new Vector2(r.offsetMax.x, 0f);
+				}
+			}
 			gameObject.SetActive(true);
 			EnsureDependencies();
 			EnableBackgroundRuntimeMode();
@@ -267,6 +322,19 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[OnEvent(ChatEvents.Uninstalled)]
 		private void OnUninstalled(object payload)
 		{
+			if (_isBlackUI)
+			{
+				_topMenu.SetActive(true);
+				_bottomMenu.SetActive(true);
+				var r = _body != null ? _body.GetComponent<RectTransform>() : null;
+				if (r != null)
+				{
+					r.anchorMin = _saveBodyOriginalAnchorMin;
+					r.anchorMax = _saveBodyOriginalAnchorMax;
+					r.offsetMin = _saveBodyOriginalOffsetMin;
+					r.offsetMax = _saveBodyOriginalOffsetMax;
+				}
+			}
 			StopAllCoroutines();
 			StopAutoChatMode();
 			StopRecordingIfNeeded();
@@ -427,6 +495,17 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[OnEvent(ChatEvents.EndConversationRequested)]
 		private void OnEndConversationRequested(object payload)
 		{
+			// Save used vocab words for post-chat review before StopAutoChatMode clears them.
+			_vocabReviewQueue.Clear();
+			_vocabReviewIndex = 0;
+			if (_autoChatUsedVocabWords.Count > 0)
+			{
+				foreach (var word in _autoChatUsedVocabWords)
+				{
+					_vocabReviewQueue.Add(word);
+				}
+			}
+
 			StopAutoChatMode();
 			SendRequest(ChatRequests.EndConversation);
 		}
@@ -438,6 +517,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[OnEvent(ChatEvents.ConversationEnded)]
 		private void OnConversationEnded(object payload)
 		{
+			if (_vocabReviewQueue.Count > 0)
+			{
+				StartVocabReviewMode();
+				return;
+			}
+
 			ClearConversationState();
 		}
 
@@ -553,6 +638,69 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_isAutoChatAwaitingReply = false;
 
 			var turns = response.Turns != null && response.Turns.Count > 0 ? response.Turns : new List<ChatAssistantTurnPayload>();
+
+			// Batch generating phase: buffer turns silently without display or TTS playback.
+			if (_isAutoChatBatchGenerating)
+			{
+				var turnCount = 0;
+				for (var i = 0; i < turns.Count; i++)
+				{
+					if (turns[i] == null)
+					{
+						continue;
+					}
+
+					_autoChatBatchBuffer.Add(turns[i]);
+					turnCount++;
+				}
+
+				// If no structured turns, count the raw reply as one turn.
+				if (turnCount == 0 && !string.IsNullOrWhiteSpace(response.Reply))
+				{
+					_autoChatBatchBuffer.Add(new ChatAssistantTurnPayload
+					{
+						MessageId = Guid.NewGuid().ToString("N"),
+						CharacterName = DefaultCharacterDisplayName,
+						Text = response.Reply,
+						Tone = DefaultTtsTone,
+						IsAudioPreloadCompleted = true,
+					});
+					turnCount = 1;
+				}
+
+				_autoChatGeneratedTurnCount += turnCount;
+				Debug.Log("[ChatView] Auto chat batch gen: " + _autoChatGeneratedTurnCount + "/" + _autoChatTargetTurnCount + " turns buffered.");
+
+				// Check which vocab words AI actually used in this response.
+				CheckAutoChatVocabUsage(turns, response.Reply);
+
+				if (_autoChatGeneratedTurnCount >= _autoChatTargetTurnCount)
+				{
+					// Enough turns generated. Move buffer to queue and start playback.
+					_isAutoChatBatchGenerating = false;
+					SetAutoChatTargetInputVisible(false);
+					for (var i = 0; i < _autoChatBatchBuffer.Count; i++)
+					{
+						_pendingCharacterTurns.Enqueue(_autoChatBatchBuffer[i]);
+					}
+
+					_autoChatBatchBuffer.Clear();
+					SetCharacterRespondingState(true);
+
+					if (!_isProcessingCharacterTurns)
+					{
+						StartCoroutine(ProcessCharacterTurnsSequentially());
+					}
+				}
+				else
+				{
+					// Need more turns. Request the next generation.
+					TryTriggerNextAutoChatTurn();
+				}
+
+				return;
+			}
+
 			if (turns.Count == 0)
 			{
 				_messageContainer.AddNewMessage(new MessageBubbleData
@@ -651,6 +799,14 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			_isProcessingCharacterTurns = false;
 			SetCharacterRespondingState(false);
+
+			// If batch playback just finished, stop auto chat entirely.
+			if (_isAutoChatEnabled && !_isAutoChatBatchGenerating && _autoChatGeneratedTurnCount >= _autoChatTargetTurnCount)
+			{
+				StopAutoChatMode();
+				yield break;
+			}
+
 			TryTriggerNextAutoChatTurn();
 		}
 
@@ -752,9 +908,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			if (_vocabPopupView != null)
 			{
-				_vocabPopupView.SetRatingButtonsVisible(true);
-				_vocabPopupView.SetReviewCallback(HandleVocabReviewRequested);
 				_vocabPopupView.SetClosedCallback(HandleVocabPopupClosed);
+				_vocabPopupView.SetNextCallback(HandleVocabReviewNext);
 				_vocabPopupView.SetAudioPlayCallback(HandleVocabAudioPlayRequested);
 				RefreshVocabCharacterOptions();
 			}
@@ -765,6 +920,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			BindRecordButtonEvents();
+			BindApplyAutoChatButtonEvents();
 			UpdateRecordButtonVisualState();
 
 			SetChatInputInteractable(!_isCharacterResponding && _hasSceneCharacters);
@@ -1020,6 +1176,140 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			_recordButton.onClick.RemoveListener(HandleRecordButtonClicked);
+		}
+
+		/// <summary>
+		/// Binds click listener for the Apply Auto Chat button.
+		/// </summary>
+		private void BindApplyAutoChatButtonEvents()
+		{
+			if (_buttonApplyAutoChat == null)
+			{
+				return;
+			}
+
+			_buttonApplyAutoChat.onClick.RemoveListener(HandleApplyAutoChatClicked);
+			_buttonApplyAutoChat.onClick.AddListener(HandleApplyAutoChatClicked);
+		}
+
+		/// <summary>
+		/// Unbinds click listener for the Apply Auto Chat button.
+		/// </summary>
+		private void UnbindApplyAutoChatButtonEvents()
+		{
+			if (_buttonApplyAutoChat == null)
+			{
+				return;
+			}
+
+			_buttonApplyAutoChat.onClick.RemoveListener(HandleApplyAutoChatClicked);
+		}
+
+		/// <summary>
+		/// Handles Apply Auto Chat button click.
+		/// </summary>
+		private void HandleApplyAutoChatClicked()
+		{
+			if (_isAutoChatEnabled)
+			{
+				return;
+			}
+
+			if (!_isAutoChatAwaitingApply)
+			{
+				EnterAutoChatApplyMode();
+				return;
+			}
+
+			StartAutoChatMode();
+		}
+
+		/// <summary>
+		/// Shows and enables auto-chat target input, waiting for Apply.
+		/// </summary>
+		private void EnterAutoChatApplyMode()
+		{
+			_isAutoChatAwaitingApply = true;
+			SetAutoChatTargetInputVisible(true);
+			SetAutoChatTargetInputInteractable(true);
+
+			if (_buttonApplyAutoChat != null)
+			{
+				_buttonApplyAutoChat.interactable = true;
+			}
+
+			if (_inputNumberAutochat != null)
+			{
+				_inputNumberAutochat.ActivateInputField();
+				_inputNumberAutochat.Select();
+			}
+		}
+
+		/// <summary>
+		/// Resets auto-chat target input UI to idle state.
+		/// </summary>
+		private void ResetAutoChatInputUi()
+		{
+			_isAutoChatAwaitingApply = false;
+			SetAutoChatTargetInputInteractable(true);
+			SetAutoChatTargetInputVisible(false);
+
+			if (_buttonApplyAutoChat != null)
+			{
+				_buttonApplyAutoChat.interactable = true;
+			}
+		}
+
+		/// <summary>
+		/// Shows or hides the auto-chat target input field.
+		/// </summary>
+		/// <param name="isVisible">True to show the input field.</param>
+		private void SetAutoChatTargetInputVisible(bool isVisible)
+		{
+			if (_inputNumberAutochat == null)
+			{
+				return;
+			}
+
+			_inputNumberAutochat.gameObject.SetActive(isVisible);
+		}
+
+		/// <summary>
+		/// Enables or disables editing for the auto-chat target input field.
+		/// </summary>
+		/// <param name="isInteractable">True to allow editing.</param>
+		private void SetAutoChatTargetInputInteractable(bool isInteractable)
+		{
+			if (_inputNumberAutochat == null)
+			{
+				return;
+			}
+
+			_inputNumberAutochat.interactable = isInteractable;
+			if (!isInteractable)
+			{
+				_inputNumberAutochat.DeactivateInputField();
+			}
+		}
+
+		/// <summary>
+		/// Parses the target turn count from the auto chat input field.
+		/// Returns at least 1, defaults to 10 when input is empty or invalid.
+		/// </summary>
+		/// <returns>Clamped target turn count.</returns>
+		private int ParseAutoChatTargetCount()
+		{
+			if (_inputNumberAutochat == null || string.IsNullOrWhiteSpace(_inputNumberAutochat.text))
+			{
+				return 10;
+			}
+
+			if (int.TryParse(_inputNumberAutochat.text.Trim(), out var parsed) && parsed >= 1)
+			{
+				return parsed;
+			}
+
+			return 10;
 		}
 
 		private void HandleInputSubmitted(string value)
@@ -1457,7 +1747,13 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			StartAutoChatMode();
+			if (_isAutoChatAwaitingApply)
+			{
+				ResetAutoChatInputUi();
+				return;
+			}
+
+			EnterAutoChatApplyMode();
 		}
 
 		/// <summary>
@@ -1477,11 +1773,23 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
+			_autoChatTargetTurnCount = ParseAutoChatTargetCount();
+			_autoChatGeneratedTurnCount = 0;
+			_isAutoChatAwaitingApply = false;
+			_isAutoChatBatchGenerating = true;
+			_autoChatBatchBuffer.Clear();
 			_isAutoChatEnabled = true;
 			_isAutoChatAwaitingReply = false;
 			_hasSentAutoChatContext = false;
+			SetAutoChatTargetInputInteractable(false);
+			if (_buttonApplyAutoChat != null)
+			{
+				_buttonApplyAutoChat.interactable = false;
+			}
+			SetChatInputInteractable(false);
+			Debug.Log("[ChatView] Auto chat batch started. Target: " + _autoChatTargetTurnCount + " turns.");
 			EnsureAutoChatTranslationsVisible();
-			TryTriggerNextAutoChatTurn();
+			SendRequest(ChatRequests.LoadAutoChatVocabulary);
 		}
 
 		private void EnsureAutoChatTranslationsVisible()
@@ -1500,9 +1808,263 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		/// </summary>
 		private void StopAutoChatMode()
 		{
+			var wasBatchGenerating = _isAutoChatBatchGenerating;
 			_isAutoChatEnabled = false;
 			_isAutoChatAwaitingReply = false;
+			_isAutoChatAwaitingApply = false;
 			_hasSentAutoChatContext = false;
+			_isAutoChatBatchGenerating = false;
+			_autoChatGeneratedTurnCount = 0;
+			_autoChatBatchBuffer.Clear();
+			ClearAutoChatVocabState();
+			SetAutoChatTargetInputInteractable(true);
+			SetAutoChatTargetInputVisible(false);
+			if (_buttonApplyAutoChat != null)
+			{
+				_buttonApplyAutoChat.interactable = true;
+			}
+
+			// Re-enable chat input if we were in batch generation (input was disabled).
+			if (wasBatchGenerating && !_isCharacterResponding)
+			{
+				SetChatInputInteractable(_hasSceneCharacters);
+			}
+		}
+
+		/// <summary>
+		/// Handles auto-chat vocabulary loaded from controller.
+		/// Stores the due/new word pools and triggers the first auto-chat turn.
+		/// </summary>
+		/// <param name="payload">Auto-chat vocabulary payload.</param>
+		[OnEvent(ChatEvents.AutoChatVocabularyLoaded)]
+		private void OnAutoChatVocabularyLoaded(object payload)
+		{
+			if (!_isAutoChatEnabled)
+			{
+				return;
+			}
+
+			var vocabPayload = payload as ChatAutoChatVocabularyPayload;
+			InitializeAutoChatVocabPool(vocabPayload);
+			_isAutoChatVocabLoaded = true;
+			Debug.Log("[ChatView] Auto chat vocab loaded. Pool size: " + _autoChatVocabPool.Count + ", per turn: " + _autoChatVocabWordsPerTurn + ", today new count: " + (vocabPayload?.TodayNewCount ?? 0));
+			TryTriggerNextAutoChatTurn();
+		}
+
+		/// <summary>
+		/// Initializes the auto-chat vocabulary pool from the loaded payload.
+		/// Mode A (today's new < 10): pool of up to 10 new words, 3 per turn.
+		/// Mode B (today's new >= 10): pool of up to 100 due/old words, 5 per turn.
+		/// Mode C (no due words and daily new cap reached): empty pool, no insertion.
+		/// Pool rotates back to start when exhausted.
+		/// </summary>
+		/// <param name="payload">Loaded vocabulary payload.</param>
+		private void InitializeAutoChatVocabPool(ChatAutoChatVocabularyPayload payload)
+		{
+			_autoChatVocabPool.Clear();
+			_autoChatVocabIndex = 0;
+			_autoChatVocabWordsPerTurn = 0;
+			_autoChatPendingVocabWords.Clear();
+
+			if (payload == null)
+			{
+				return;
+			}
+
+			if (payload.TodayNewCount < MaxAutoChatNewVocabPerDay && payload.NewWords != null && payload.NewWords.Count > 0)
+			{
+				// Mode A: introduce new words, capped at 10 per day total.
+				var capacity = Mathf.Min(payload.NewWords.Count, MaxAutoChatNewVocabPerDay);
+				for (var i = 0; i < capacity; i++)
+				{
+					if (!string.IsNullOrWhiteSpace(payload.NewWords[i]))
+					{
+						_autoChatVocabPool.Add(payload.NewWords[i]);
+					}
+				}
+
+				if (_autoChatVocabPool.Count > 0)
+				{
+					_autoChatVocabWordsPerTurn = AutoChatNewVocabWordsPerTurn;
+					return;
+				}
+			}
+
+			if (payload.DueWords != null && payload.DueWords.Count > 0)
+			{
+				// Mode B: review old/due words, capped at 100 in rotation.
+				var capacity = Mathf.Min(payload.DueWords.Count, MaxAutoChatOldVocabPool);
+				for (var i = 0; i < capacity; i++)
+				{
+					if (!string.IsNullOrWhiteSpace(payload.DueWords[i]))
+					{
+						_autoChatVocabPool.Add(payload.DueWords[i]);
+					}
+				}
+
+				if (_autoChatVocabPool.Count > 0)
+				{
+					_autoChatVocabWordsPerTurn = AutoChatOldVocabWordsPerTurn;
+				}
+			}
+			// Mode C: pool stays empty; chat continues without word injection.
+		}
+
+		/// <summary>
+		/// Clears all auto-chat vocabulary state.
+		/// </summary>
+		private void ClearAutoChatVocabState()
+		{
+			_autoChatVocabPool.Clear();
+			_autoChatVocabIndex = 0;
+			_autoChatVocabWordsPerTurn = 0;
+			_autoChatPendingVocabWords.Clear();
+			_autoChatUsedVocabWords.Clear();
+			_isAutoChatVocabLoaded = false;
+		}
+
+		/// <summary>
+		/// Selects the next batch of vocabulary words for auto-chat context.
+		/// Starts from carry-over (unused) words, then fills from the active pool.
+		/// When the pool is exhausted, the index rotates back to the start.
+		/// </summary>
+		/// <returns>List of up to _autoChatVocabWordsPerTurn words.</returns>
+		private List<string> SelectNextAutoChatVocabWords()
+		{
+			if (_autoChatVocabPool.Count == 0 || _autoChatVocabWordsPerTurn <= 0)
+			{
+				return new List<string>();
+			}
+
+			var selected = new List<string>(_autoChatPendingVocabWords);
+			_autoChatPendingVocabWords.Clear();
+
+			var safetyGuard = 0;
+			while (selected.Count < _autoChatVocabWordsPerTurn)
+			{
+				if (_autoChatVocabIndex >= _autoChatVocabPool.Count)
+				{
+					_autoChatVocabIndex = 0;
+				}
+
+				selected.Add(_autoChatVocabPool[_autoChatVocabIndex]);
+				_autoChatVocabIndex++;
+
+				// Safety break: avoid infinite loop if pool is smaller than per-turn count.
+				safetyGuard++;
+				if (safetyGuard >= _autoChatVocabPool.Count && selected.Count >= _autoChatVocabPool.Count)
+				{
+					break;
+				}
+			}
+
+			return selected;
+		}
+
+		/// <summary>
+		/// Builds the vocabulary context string to include in auto-chat turn requests.
+		/// Returns null when no vocabulary is available.
+		/// </summary>
+		/// <returns>Vocab instruction string, or null.</returns>
+		private string BuildAutoChatVocabContext()
+		{
+			if (!_isAutoChatVocabLoaded)
+			{
+				return null;
+			}
+
+			var words = SelectNextAutoChatVocabWords();
+			if (words.Count == 0)
+			{
+				return null;
+			}
+
+			// Store selected words so we can check usage later.
+			_autoChatPendingVocabWords.Clear();
+			for (var i = 0; i < words.Count; i++)
+			{
+				_autoChatPendingVocabWords.Add(words[i]);
+			}
+
+			return "Hãy chèn các từ vựng sau vào câu nói: " + string.Join(", ", words);
+		}
+
+		/// <summary>
+		/// Checks which pending vocabulary words were used by the AI in its response.
+		/// Words not found in **word** markup are carried over to the next turn.
+		/// </summary>
+		/// <param name="turns">Structured turns from the response.</param>
+		/// <param name="rawReply">Raw reply text.</param>
+		private void CheckAutoChatVocabUsage(List<ChatAssistantTurnPayload> turns, string rawReply)
+		{
+			if (_autoChatPendingVocabWords.Count == 0)
+			{
+				return;
+			}
+
+			// Combine all text sources for checking.
+			var combinedText = string.Empty;
+			if (turns != null)
+			{
+				for (var i = 0; i < turns.Count; i++)
+				{
+					if (turns[i]?.Text != null)
+					{
+						combinedText += turns[i].Text;
+					}
+				}
+			}
+
+			if (!string.IsNullOrWhiteSpace(rawReply))
+			{
+				combinedText += rawReply;
+			}
+
+			var unusedWords = new List<string>();
+			for (var i = 0; i < _autoChatPendingVocabWords.Count; i++)
+			{
+				var word = _autoChatPendingVocabWords[i];
+				if (ContainsVocabWord(combinedText, word))
+				{
+					_autoChatUsedVocabWords.Add(word);
+				}
+				else
+				{
+					unusedWords.Add(word);
+				}
+			}
+
+			_autoChatPendingVocabWords.Clear();
+			for (var i = 0; i < unusedWords.Count; i++)
+			{
+				_autoChatPendingVocabWords.Add(unusedWords[i]);
+			}
+
+			if (unusedWords.Count > 0)
+			{
+				Debug.Log("[ChatView] Auto chat vocab carry-over: " + unusedWords.Count + " unused words.");
+			}
+		}
+
+		/// <summary>
+		/// Checks whether the reply text contains a vocabulary word, with or without **word** markup.
+		/// </summary>
+		/// <param name="text">Reply text to inspect.</param>
+		/// <param name="word">Vocabulary word to find.</param>
+		/// <returns>True when word is found in either format.</returns>
+		private static bool ContainsVocabWord(string text, string word)
+		{
+			if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(word))
+			{
+				return false;
+			}
+
+			if (text.IndexOf("**" + word + "**", StringComparison.OrdinalIgnoreCase) >= 0)
+			{
+				return true;
+			}
+
+			return text.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0;
 		}
 
 		/// <summary>
@@ -1512,7 +2074,13 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		/// </summary>
 		private void TryTriggerNextAutoChatTurn()
 		{
-			if (!_isAutoChatEnabled || _isAutoChatAwaitingReply || _isCharacterResponding)
+			if (!_isAutoChatEnabled || _isAutoChatAwaitingReply)
+			{
+				return;
+			}
+
+			// During batch generation, skip the responding check since nothing is playing yet.
+			if (!_isAutoChatBatchGenerating && _isCharacterResponding)
 			{
 				return;
 			}
@@ -1526,11 +2094,27 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 			_isAutoChatAwaitingReply = true;
 
+			// Build vocab context for this turn.
+			var vocabContext = BuildAutoChatVocabContext();
+			Debug.Log(vocabContext);
+
 			if (!_hasSentAutoChatContext)
 			{
 				_hasSentAutoChatContext = true;
-				HandleSaveAndSendContextClicked(AutoChatContext);
+				var fullContext = string.Format(AutoChatContextTemplate, _autoChatTargetTurnCount);
+				if (!string.IsNullOrEmpty(vocabContext))
+				{
+					fullContext += "\n" + vocabContext;
+				}
+
+				HandleSaveAndSendContextClicked(fullContext);
 				return;
+			}
+
+			// For subsequent turns, update context with vocab words before requesting reply.
+			if (!string.IsNullOrEmpty(vocabContext))
+			{
+				HandleSaveContextClicked(vocabContext);
 			}
 
 			SendRequest(ChatRequests.GenerateReplyFromHistory, new ChatSendRequestPayload
@@ -1731,11 +2315,17 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		/// <summary>
 		/// Handles vocabulary review completion from controller.
+		/// In review mode, advances to the next word automatically.
 		/// </summary>
 		/// <param name="payload">Unused payload.</param>
 		[OnEvent(ChatEvents.VocabReviewCompleted)]
 		private void OnVocabReviewCompleted(object payload)
 		{
+			if (_isVocabReviewMode)
+			{
+				return;
+			}
+
 			if (_vocabPopupView != null)
 			{
 				_vocabPopupView.Hide();
@@ -1761,29 +2351,113 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		/// <summary>
 		/// Re-loads learned vocabulary count after popup closes.
+		/// If in review mode and popup is closed early, finishes review and navigates home.
 		/// </summary>
 		private void HandleVocabPopupClosed()
 		{
 			RefreshVocabularyLearnedCount();
+
+			if (_isVocabReviewMode)
+			{
+				FinishVocabReviewMode();
+			}
 		}
 
 		/// <summary>
-		/// Handles vocab review rating from the popup and forwards to controller.
+		/// Handles Next button in vocab review popup.
+		/// Sends a single-word review for the current word, then advances to the next.
 		/// </summary>
-		/// <param name="vocabularyId">Reviewed vocabulary id.</param>
-		/// <param name="rating">FSRS rating value.</param>
-		private void HandleVocabReviewRequested(string vocabularyId, int rating)
+		private void HandleVocabReviewNext()
 		{
-			if (string.IsNullOrWhiteSpace(vocabularyId))
+			if (!_isVocabReviewMode)
 			{
 				return;
 			}
 
-			SendRequest(ChatRequests.ReviewVocabulary, new ChatVocabReviewRequestPayload
+			// Review the current word before advancing.
+			if (_vocabReviewIndex < _vocabReviewQueue.Count)
 			{
-				VocabularyId = vocabularyId,
-				Rating = rating
+				var currentWord = _vocabReviewQueue[_vocabReviewIndex];
+				SendRequest(ChatRequests.BatchReviewAutoChatVocabulary, new ChatBatchReviewVocabRequestPayload
+				{
+					Words = new System.Collections.Generic.List<string> { currentWord }
+				});
+			}
+
+			_vocabReviewIndex++;
+			if (_vocabReviewIndex < _vocabReviewQueue.Count)
+			{
+				ShowCurrentVocabReview();
+			}
+			else
+			{
+				if (_vocabPopupView != null)
+				{
+					_vocabPopupView.Hide();
+				}
+
+				FinishVocabReviewMode();
+			}
+		}
+
+		/// <summary>
+		/// Starts post-conversation vocabulary review mode.
+		/// Shows vocab words one by one in the popup for the user to review.
+		/// </summary>
+		private void StartVocabReviewMode()
+		{
+			_isVocabReviewMode = true;
+			_vocabReviewIndex = 0;
+
+			if (_vocabPopupView != null)
+			{
+				_vocabPopupView.SetNextButtonVisible(true);
+			}
+
+			Debug.Log("[ChatView] Starting vocab review mode with " + _vocabReviewQueue.Count + " words.");
+			ShowCurrentVocabReview();
+		}
+
+		/// <summary>
+		/// Shows the current vocabulary word in the review popup via server lookup.
+		/// </summary>
+		private void ShowCurrentVocabReview()
+		{
+			if (_vocabReviewIndex >= _vocabReviewQueue.Count)
+			{
+				return;
+			}
+
+			var word = _vocabReviewQueue[_vocabReviewIndex];
+			if (_vocabPopupView != null)
+			{
+				SetVocabAudioRequestInProgress(false);
+				RefreshVocabCharacterOptions();
+				_vocabPopupView.ShowLoading(word);
+			}
+
+			SendRequest(ChatRequests.LookupVocabulary, new ChatVocabLookupRequestPayload
+			{
+				Word = word
 			});
+		}
+
+		/// <summary>
+		/// Ends vocab review mode, clears review queue, and navigates home.
+		/// </summary>
+		private void FinishVocabReviewMode()
+		{
+			_isVocabReviewMode = false;
+			_vocabReviewQueue.Clear();
+			_vocabReviewIndex = 0;
+
+			if (_vocabPopupView != null)
+			{
+				_vocabPopupView.SetNextButtonVisible(false);
+			}
+
+			Debug.Log("[ChatView] Vocab review mode finished.");
+			ClearConversationState();
 		}
 
 		/// <summary>
@@ -1848,7 +2522,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				SetVocabAudioRequestInProgress(false);
 			}
 
-			if (_isAutoChatEnabled && _isAutoChatAwaitingReply)
+			if (_isAutoChatEnabled && (_isAutoChatAwaitingReply || _isAutoChatBatchGenerating))
 			{
 				Debug.LogWarning("[ChatView] Auto chat stopped because request failed.", this);
 				StopAutoChatMode();

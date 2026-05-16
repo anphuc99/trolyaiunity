@@ -17,15 +17,16 @@ export const createVocabularyRoutes = (dataSource: DataSource) => {
 
   router.get("/lookup", controller.lookupWord);
   router.get("/learned-count", controller.getLearnedCount);
+  router.get("/today-new-count", controller.getTodayNewCount);
   router.get("/stats", controller.getStats);
   router.get("/due", controller.getDueReviews);
+  router.post("/batch-review", controller.batchReviewByWords);
   router.get("/", controller.listVocabularies);
   router.get("/:id", controller.getVocabulary);
   router.post("/", controller.collectVocabulary);
   router.put("/:id", controller.updateVocabulary);
   router.delete("/:id", controller.deleteVocabulary);
   router.post("/:id/review", controller.reviewVocabulary);
-  router.put("/:id/memory", controller.saveMemory);
   router.put("/:id/star", controller.toggleStar);
   router.put("/:id/direction", controller.setCardDirection);
   router.put("/:id/ignore", controller.ignoreVocabulary);

@@ -15,13 +15,17 @@ namespace Core.Infrastructure.Network
 		public const string Voices = "/api/voices";
 		public const string Levels = "/api/levels";
 		public const string ChatHistory = "/api/chat/history";
+		public const string ChatHistoryLocal = "/api/chat/history-local";
 		public const string ChatSend = "/api/chat/send";
 		public const string ChatRespond = "/api/chat/respond";
 		public const string ChatTranscribe = "/api/chat/transcribe";
 		public const string ChatDeveloperState = "/api/chat/developer-state";
 		public const string ChatDeveloper = "/api/chat/developer";
+		public const string ChatPrepareLocal = "/api/chat/prepare-local";
+		public const string ChatSaveLocal = "/api/chat/save-local";
 		public const string Journals = "/api/journals";
 		public const string JournalsEnd = "/api/journals/end";
+		public const string JournalsEndLocal = "/api/journals/end-local";
 		public const string JournalReviewDue = "/api/journals/review/due";
 		public const string JournalReview = "/api/journals/review";
 		public const string Stories = "/api/stories";
@@ -50,8 +54,11 @@ namespace Core.Infrastructure.Network
 		public const string CharacterRelationshipsEvaluateSession = "/api/character-relationships/evaluate-session";
 		public const string VocabularyLookup = "/api/vocabulary/lookup";
 		public const string VocabularyLearnedCount = "/api/vocabulary/learned-count";
+		public const string VocabularyTodayNewCount = "/api/vocabulary/today-new-count";
 		public const string VocabularyDue = "/api/vocabulary/due";
+		public const string VocabularyBatchReview = "/api/vocabulary/batch-review";
 		public const string VocabularyReview = "/api/vocabulary";
 		public const string VocabularyIgnore = "/api/vocabulary";
+		public const string VocabularyList = "/api/vocabulary";
 	}
 }

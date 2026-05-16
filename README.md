@@ -122,10 +122,51 @@ The chat server supports optional long-term AI memory backed by ChromaDB. When e
 
 ## Chat: Auto Talk Mode (Client)
 
-The GamePlay Chat client supports an auto-conversation mode controlled from parent menu and keyboard shortcut.
+The GamePlay Chat client supports a batch auto-conversation mode controlled from parent menu, keyboard shortcut, and an Apply confirmation step.
 
 - Menu: `Chat tự động` (toggle on/off)
 - Shortcut: `Ctrl+R` (same toggle behavior)
-- First auto turn: sends context `AI tự nói chuyện` through the same Save + Send flow used by context popup
-- Follow-up turns: repeatedly requests `GenerateReplyFromHistory`
-- Auto mode stops when user toggles off, chat ends/uninstalls, no active scene characters remain, or an in-flight auto request fails
+- Toggle ON: shows `_inputNumberAutochat` so user can set target turn count.
+- Apply button: starts batch auto chat using `_inputNumberAutochat` and disables that input while generation is running.
+- **Phase 1 – Generation**: sends context `AI tự nói chuyện ít nhất {N} tin nhắn mỗi lượt` then repeatedly requests `GenerateReplyFromHistory`, buffering all turns silently (no display, no TTS playback). Chat input is disabled during this phase.
+- **Vocabulary injection**: At the start of auto-chat, due vocabulary (max 40) and new vocabulary (max 20) are loaded from server. Each turn, 5 words are injected into the AI context with `**word**` markup instruction. If the AI doesn't use all 5, unused words carry over to the next turn. When all 60 words are exhausted, the pool cycles.
+- **Phase 2 – Playback**: once the accumulated turn count reaches or exceeds N, `_inputNumberAutochat` is hidden, then all buffered turns are enqueued and played back sequentially with TTS audio (audio is pre-loaded by Controller during Phase 1).
+- After playback completes, auto chat stops automatically.
+- Auto mode also stops when user toggles off, chat ends/uninstalls, no active scene characters remain, or a request fails.
+
+## Chat: Local AI via Ollama (PC Desktop)
+
+On desktop platforms (Windows, macOS, Linux), the Chat client uses a local Ollama instance (`gemma4:e4b`) instead of sending messages to the server's cloud AI (Gemini). This eliminates cloud API costs for PC users and provides faster response times.
+
+### How It Works
+
+1. **Client detects desktop platform** (`Application.platform` check in `ChatController`).
+2. **Prepare**: Client calls `POST /api/chat/prepare-local` to get the server-built system prompt and chat history (the server still owns prompt engineering, user data, and memory retrieval).
+3. **Generate locally**: Client sends the prompt + history + user message to the local Ollama instance at `http://localhost:11434/api/chat`.
+4. **Save to server**: Client sends the locally-generated reply back to the server via `POST /api/chat/save-local`, which stores it in chat history and performs memory extraction.
+5. **Display**: The reply is parsed and published to views as normal.
+
+### Prerequisites
+
+- **Ollama** must be installed and running locally: https://ollama.com
+- Pull the model: `ollama pull gemma4:e4b`
+- Ollama runs on `http://localhost:11434` by default.
+
+### Audio Messages
+
+Audio messages (voice recordings) still go through the server's cloud AI since Ollama does not support audio input. The local AI path is bypassed when the payload contains audio.
+
+### Server Endpoints
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/chat/prepare-local` | POST | Returns system prompt + history for local AI |
+| `/api/chat/save-local` | POST | Saves user message + AI reply to history |
+
+### Key Files
+
+- `Assets/Features/GamePlay/SubFeatures/Chat/Scripts/Infrastructure/OllamaService.cs` — Ollama HTTP client
+- `Assets/Features/GamePlay/SubFeatures/Chat/Scripts/Controller/ChatController.cs` — Platform detection + local AI flow
+- `Assets/Features/GamePlay/SubFeatures/Chat/Scripts/Model/ChatModel.cs` — Ollama/local AI payload models
+- `server/src/controllers/chat/chat.controller.ts` — `prepareLocalPrompt` + `saveLocalReply` handlers
+- `server/src/routes/chat.routes.ts` — Route registration

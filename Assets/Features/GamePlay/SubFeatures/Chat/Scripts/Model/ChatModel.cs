@@ -239,6 +239,42 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 	}
 
 	/// <summary>
+	/// Request payload for ending a conversation with a pre-computed local AI summary.
+	/// </summary>
+	public sealed class ChatEndConversationLocalRequestPayload
+	{
+		/// <summary>
+		/// Pre-computed conversation summary from local AI.
+		/// </summary>
+		[JsonProperty("summary")]
+		public string Summary { get; set; }
+
+		/// <summary>
+		/// Optional updated story description from local AI.
+		/// </summary>
+		[JsonProperty("updatedStoryDescription")]
+		public string UpdatedStoryDescription { get; set; }
+	}
+
+	/// <summary>
+	/// Ollama summary response parsed from JSON output.
+	/// </summary>
+	public sealed class OllamaSummaryResult
+	{
+		/// <summary>
+		/// Summary of the conversation in Vietnamese.
+		/// </summary>
+		[JsonProperty("Summary")]
+		public string Summary { get; set; }
+
+		/// <summary>
+		/// Updated story description in Vietnamese.
+		/// </summary>
+		[JsonProperty("UpdatedStoryDescription")]
+		public string UpdatedStoryDescription { get; set; }
+	}
+
+	/// <summary>
 	/// Response payload for /api/text-to-speech.
 	/// </summary>
 	public sealed class ChatTextToSpeechResponsePayload
@@ -738,5 +774,172 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		[JsonProperty("vocabularies")]
 		public System.Collections.Generic.List<ChatVocabularyListItemPayload> Vocabularies { get; set; }
 			= new System.Collections.Generic.List<ChatVocabularyListItemPayload>();
+	}
+
+	/// <summary>
+	/// Response payload from /api/chat/prepare-local.
+	/// Contains the system prompt and history for local AI generation.
+	/// </summary>
+	public sealed class ChatPrepareLocalResponsePayload
+	{
+		/// <summary>
+		/// Server-built system instruction prompt.
+		/// </summary>
+		[JsonProperty("systemPrompt")]
+		public string SystemPrompt { get; set; }
+
+		/// <summary>
+		/// Chat history excluding developer messages.
+		/// </summary>
+		[JsonProperty("history")]
+		public System.Collections.Generic.List<ChatHistoryMessagePayload> History { get; set; }
+			= new System.Collections.Generic.List<ChatHistoryMessagePayload>();
+
+		/// <summary>
+		/// Active character names in the current scene.
+		/// </summary>
+		[JsonProperty("activeCharacters")]
+		public System.Collections.Generic.List<string> ActiveCharacters { get; set; }
+			= new System.Collections.Generic.List<string>();
+	}
+
+	/// <summary>
+	/// Request payload for saving a locally-generated AI reply to server history.
+	/// </summary>
+	public sealed class ChatSaveLocalRequestPayload
+	{
+		/// <summary>
+		/// User message text (may be empty for respond-from-history).
+		/// </summary>
+		[JsonProperty("message")]
+		public string Message { get; set; }
+
+		/// <summary>
+		/// AI-generated reply JSON string from local Ollama.
+		/// </summary>
+		[JsonProperty("reply")]
+		public string Reply { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload from /api/chat/save-local.
+	/// </summary>
+	public sealed class ChatSaveLocalResponsePayload
+	{
+		/// <summary>
+		/// True when history was saved successfully.
+		/// </summary>
+		[JsonProperty("ok")]
+		public bool Ok { get; set; }
+
+		/// <summary>
+		/// Cleaned reply with memory sidecars stripped.
+		/// </summary>
+		[JsonProperty("reply")]
+		public string Reply { get; set; }
+	}
+
+	/// <summary>
+	/// Single message object for Ollama chat API.
+	/// </summary>
+	public sealed class OllamaChatMessage
+	{
+		/// <summary>
+		/// Role: system, user, or assistant.
+		/// </summary>
+		[JsonProperty("role")]
+		public string Role { get; set; }
+
+		/// <summary>
+		/// Message content.
+		/// </summary>
+		[JsonProperty("content")]
+		public string Content { get; set; }
+	}
+
+	/// <summary>
+	/// Request payload for Ollama /api/chat endpoint.
+	/// </summary>
+	public sealed class OllamaChatRequestPayload
+	{
+		/// <summary>
+		/// Model name (e.g. gemma4:e4b).
+		/// </summary>
+		[JsonProperty("model")]
+		public string Model { get; set; }
+
+		/// <summary>
+		/// Conversation messages including system prompt.
+		/// </summary>
+		[JsonProperty("messages")]
+		public System.Collections.Generic.List<OllamaChatMessage> Messages { get; set; }
+			= new System.Collections.Generic.List<OllamaChatMessage>();
+
+		/// <summary>
+		/// Whether to stream the response. Always false for this integration.
+		/// </summary>
+		[JsonProperty("stream")]
+		public bool Stream { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload from Ollama /api/chat endpoint (non-streaming).
+	/// </summary>
+	public sealed class OllamaChatResponsePayload
+	{
+		/// <summary>
+		/// Model that generated the response.
+		/// </summary>
+		[JsonProperty("model")]
+		public string Model { get; set; }
+
+		/// <summary>
+		/// Assistant message from Ollama.
+		/// </summary>
+		[JsonProperty("message")]
+		public OllamaChatMessage Message { get; set; }
+
+		/// <summary>
+		/// Whether the response generation is complete.
+		/// </summary>
+		[JsonProperty("done")]
+		public bool Done { get; set; }
+	}
+
+	/// <summary>
+	/// Payload published when auto-chat vocabulary has been loaded from server.
+	/// Contains due (old/review) words and non-due (new) words.
+	/// </summary>
+	public sealed class ChatAutoChatVocabularyPayload
+	{
+		/// <summary>
+		/// Vocabulary words that are due for review (old).
+		/// </summary>
+		public System.Collections.Generic.List<string> DueWords { get; set; }
+			= new System.Collections.Generic.List<string>();
+
+		/// <summary>
+		/// Vocabulary words that are not due (new).
+		/// </summary>
+		public System.Collections.Generic.List<string> NewWords { get; set; }
+			= new System.Collections.Generic.List<string>();
+
+		/// <summary>
+		/// Number of vocabulary entries created today (used to cap daily new-word intake).
+		/// </summary>
+		public int TodayNewCount { get; set; }
+	}
+
+	/// <summary>
+	/// Request payload sent to server to batch-review vocabulary words by text.
+	/// </summary>
+	public sealed class ChatBatchReviewVocabRequestPayload
+	{
+		/// <summary>
+		/// List of vocabulary word strings to mark as reviewed.
+		/// </summary>
+		[Newtonsoft.Json.JsonProperty("words")]
+		public System.Collections.Generic.List<string> Words { get; set; }
+			= new System.Collections.Generic.List<string>();
 	}
 }

@@ -14,12 +14,15 @@ export const createChatRoutes = (dataSource: DataSource) => {
   const controller = createChatController(dataSource);
 
   router.get("/history", requireAuth, controller.getHistory);
+  router.get("/history-local", requireAuth, controller.getOllamaHistory);
   router.get("/developer-state", requireAuth, controller.getDeveloperState);
   router.post("/developer", requireAuth, controller.appendDeveloperMessage);
   router.post("/edit", requireAuth, controller.editMessage);
   router.post("/send", requireAuth, controller.sendMessage);
   router.post("/respond", requireAuth, controller.respondFromHistory);
   router.post("/transcribe", requireAuth, controller.transcribeAudio);
+  router.post("/prepare-local", requireAuth, controller.prepareLocalPrompt);
+  router.post("/save-local", requireAuth, controller.saveLocalReply);
 
   return router;
 };
