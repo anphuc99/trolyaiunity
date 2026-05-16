@@ -55,6 +55,10 @@ export interface ChatPromptParams {
    */
   relationshipSummary?: string | null;
   /**
+   * Optional summary of the last journal entry to provide more context.
+   */
+  lastJournalSummary?: string | null;
+  /**
    * Optional prior summary.
    */
   contextSummary?: string | null;
@@ -209,7 +213,7 @@ ${userInfoBlock}
 SCENE / CONTEXT
 ====================================
 ${context}
-${maybe("STORY PLOT", params.storyPlot)}${maybe("STORY DESCRIPTION", params.storyDescription)}${maybe("STORY PROGRESS", params.storyProgress)}${relationshipBlock}${maybe("PREVIOUS SUMMARY", params.contextSummary)}${relatedStoryBlock}${characterRules}${pronunciationBlock}${recallMemoryBlock}
+${maybe("STORY PLOT", params.storyPlot)}${maybe("STORY DESCRIPTION", params.storyDescription)}${maybe("STORY PROGRESS", params.storyProgress)}${maybe("LAST JOURNAL SUMMARY", params.lastJournalSummary)}${relationshipBlock}${maybe("PREVIOUS SUMMARY", params.contextSummary)}${relatedStoryBlock}${characterRules}${pronunciationBlock}${recallMemoryBlock}
 ====================================
 DIALOGUE RULES
 ====================================

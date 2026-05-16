@@ -9,6 +9,7 @@ import StoryEntity from "../../models/story.entity.js";
 import UserEntity from "../../models/user.entity.js";
 import CharacterEntity from "../../models/character.entity.js";
 import CharacterRelationshipEntity from "../../models/character-relationship.entity.js";
+import JournalEntity from "../../models/journal.entity.js";
 import { createChatHistoryStore, type ChatHistoryMessage, type ChatHistoryStore } from "../../services/chat-history.service.js";
 import { createVectorMemoryService, type VectorMemoryService } from "../../services/vector-memory.service.js";
 import { extractMemorySidecars, shouldStoreMemory, buildMemoryItemFromCandidate, stripMemorySidecar } from "../../services/memory-extraction.service.js";
@@ -174,6 +175,7 @@ export const createChatController = (
   const storyRepository = dataSource.getRepository(StoryEntity);
   const characterRepository = dataSource.getRepository(CharacterEntity);
   const relationshipRepository = dataSource.getRepository(CharacterRelationshipEntity);
+  const journalRepository = dataSource.getRepository(JournalEntity);
 
   // OpenAI configuration
   const openAIApiKey = process.env.OPENAI_API_KEY ?? "";
@@ -849,6 +851,17 @@ export const createChatController = (
     const story = await loadStoryForPrompt(userId);
     console.log("Loaded story for prompt:", story);
 
+    let lastJournalSummary: string | null = null;
+    if (story) {
+      const lastJournal = await journalRepository.findOne({
+        where: { storyId: story.id, userId },
+        order: { createdAt: "DESC" }
+      });
+      if (lastJournal) {
+        lastJournalSummary = lastJournal.summary;
+      }
+    }
+
     // Extract active character names from developer messages in history
     // (needed for relationship block and RECALL_MEMORY scope)
     const history = await historyStore.load(userId);
@@ -883,6 +896,7 @@ export const createChatController = (
         storyPlot: story?.name || null,
         storyDescription: story?.description || null,
         storyProgress: story?.currentProgress ?? null,
+        lastJournalSummary,
         relationshipSummary,
         contextSummary: getOptionalString(payload.contextSummary) || null,
         relatedStoryMessages: getOptionalString(payload.relatedStoryMessages) || null,
