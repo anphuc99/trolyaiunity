@@ -156,6 +156,19 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 		}
 
 		/// <summary>
+		/// Sends a request to Ollama to generate a conversational outline before generating the actual JSON response.
+		/// </summary>
+		public static async Task<OllamaChatResponsePayload> GenerateOutlineAsync(
+			List<ChatHistoryMessagePayload> history,
+			string userMessage,
+			string baseUrl = null,
+			string model = null)
+		{
+			var outlineSystemPrompt = "你是一个剧本导演。请根据聊天记录和用户的最新消息，为接下来的角色回复起草一个详细的大纲。请包含：1）当前的场景/背景；2）角色在当前情境下的合理想法和心理活动；3）各个角色接下来将要说的话的要点。请仅返回中文大纲文本，不需要生成JSON格式。";
+			return await SendChatAsync(outlineSystemPrompt, history, userMessage, baseUrl, model);
+		}
+
+		/// <summary>
 		/// Requests Ollama to rewrite an invalid reply into valid assistant-turn JSON.
 		/// Used as a safety gate before saving local replies to server history.
 		/// </summary>

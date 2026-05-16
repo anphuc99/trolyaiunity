@@ -1376,11 +1376,21 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				return;
 			}
 
-			// Step 2: Generate reply via local Ollama
+			// Step 2a: Generate outline via local Ollama
+			var outlineResponse = await OllamaService.GenerateOutlineAsync(fullHistory, payload.Message);
+			var outlineText = outlineResponse?.Message?.Content ?? "";
+			
+			var finalUserMessage = payload.Message;
+			if (!string.IsNullOrWhiteSpace(outlineText))
+			{
+				finalUserMessage += $"\n\n[请根据以下大纲生成对话JSON：\n{outlineText}\n]";
+			}
+
+			// Step 2b: Generate reply via local Ollama
 			var ollamaResponse = await OllamaService.SendChatAsync(
 				prepareResponse.SystemPrompt,
 				fullHistory,
-				payload.Message
+				finalUserMessage
 			);
 
 			if (ollamaResponse?.Message == null || string.IsNullOrWhiteSpace(ollamaResponse.Message.Content))
@@ -1485,12 +1495,22 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				return;
 			}
 
-			// Step 2: Generate reply via local Ollama (no user message, just continue from history)
+			// Step 2a: Generate outline via local Ollama
 			var continuePrompt = "Continue the conversation naturally based on the current context.";
+			var outlineResponse = await OllamaService.GenerateOutlineAsync(fullHistory, continuePrompt);
+			var outlineText = outlineResponse?.Message?.Content ?? "";
+			
+			var finalContinuePrompt = continuePrompt;
+			if (!string.IsNullOrWhiteSpace(outlineText))
+			{
+				finalContinuePrompt += $"\n\n[请根据以下大纲生成对话JSON：\n{outlineText}\n]";
+			}
+
+			// Step 2b: Generate reply via local Ollama (no user message, just continue from history)
 			var ollamaResponse = await OllamaService.SendChatAsync(
 				prepareResponse.SystemPrompt,
 				fullHistory,
-				continuePrompt
+				finalContinuePrompt
 			);
 
 			if (ollamaResponse?.Message == null || string.IsNullOrWhiteSpace(ollamaResponse.Message.Content))
