@@ -1,5 +1,7 @@
 import type { Request, Response } from "express";
 import fs from "fs/promises";
+import path from "path";
+import crypto from "crypto";
 import type { DataSource } from "typeorm";
 import CharacterEntity from "../../models/character.entity.js";
 import MessageEntity from "../../models/message.entity.js";
@@ -7,10 +9,14 @@ import MyLogMessageEntity from "../../models/my-log-message.entity.js";
 import UserEntity from "../../models/user.entity.js";
 import { createChatHistoryStore } from "../../services/chat-history.service.js";
 import { createCheapAIService } from "../../services/cheap-ai.service.js";
-import { buildAudioId, createTtsAudio, createGeminiTtsAudio, getAudioPath } from "../../services/tts.service.js";
+import { buildAudioId, createTtsAudio, createGeminiTtsAudio, getAudioPath, convertWavToMp3 } from "../../services/tts.service.js";
+import type { ReferenceAudioVectorService } from "../../services/reference-audio-vector.service.js";
 
 interface TtsController {
   getTextToSpeech: (request: Request, response: Response) => Promise<void>;
+  getReferenceAudio: (request: Request, response: Response) => Promise<void>;
+  processTtsWav: (request: Request, response: Response) => Promise<void>;
+  checkAudioExists: (request: Request, response: Response) => Promise<void>; // Thêm dòng này
 }
 
 const NO_AUDIO_ERROR_MARKER = "gemini tts returned no audio data";
@@ -54,7 +60,7 @@ const buildAssistantRewriteNote = (messageId: string, text: string, pinyin: stri
  * @param dataSource - Initialized TypeORM data source.
  * @returns The TTS controller handlers.
  */
-export const createTtsController = (dataSource: DataSource): TtsController => {
+export const createTtsController = (dataSource: DataSource, refAudioService?: ReferenceAudioVectorService): TtsController => {
   const characterRepository = dataSource.getRepository(CharacterEntity);
   const messageRepository = dataSource.getRepository(MessageEntity);
   const myLogMessageRepository = dataSource.getRepository(MyLogMessageEntity);
@@ -163,6 +169,73 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
       myLogMessage.content = rewrittenText;
       myLogMessage.audio = newAudioId;
       await myLogMessageRepository.save(myLogMessage);
+    }
+  };
+
+  const checkAudioExists: TtsController["checkAudioExists"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const text = typeof request.query.text === "string" ? request.query.text.trim() : "";
+    const tone = typeof request.query.tone === "string" ? request.query.tone.trim() : "Neutral and calm, natural conversational tone, medium pace";
+    const characterName = typeof request.query.characterName === "string" ? request.query.characterName.trim() : "";
+
+    if (!text) {
+      response.status(400).json({ message: "Text is required" });
+      return;
+    }
+
+    if (!characterName) {
+      response.status(400).json({ message: "characterName is required" });
+      return;
+    }
+
+    const userId = request.user.id;
+
+    try {
+      // 1. Lấy cấu hình voice của nhân vật
+      const resolvedSettings = await resolveCharacterVoiceSettings(userId, characterName);
+
+      // 2. Tạo audioId dựa trên tham số (giống như getTextToSpeech)
+      const audioId = buildAudioId(
+        text,
+        tone,
+        `${resolvedSettings.voiceModel}:${resolvedSettings.voiceName ?? ""}`,
+        resolvedSettings.pitch,
+        resolvedSettings.speakingRate
+      );
+
+      console.log(text, tone, characterName, resolvedSettings.voiceModel, resolvedSettings.voiceName, resolvedSettings.pitch, resolvedSettings.speakingRate, "=>", audioId);
+
+      // 3. Lấy đường dẫn vật lý của file audio
+      const audioPath = getAudioPath(audioId);
+
+      // 4. Kiểm tra xem file có tồn tại không
+      try {
+        await fs.access(audioPath);
+        // Nếu không có lỗi văng ra nghĩa là file tồn tại
+        response.json({
+          exists: true,
+          audioId: audioId,
+          url: `/audio/${audioId}.mp3`
+        });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException)?.code === "ENOENT") {
+          // ENOENT nghĩa là Error NO ENTry (Không tìm thấy file)
+          response.json({ exists: false });
+        } else {
+          // Bắn ra lỗi nếu là các lỗi truy cập khác (vd: permission denied)
+          throw error;
+        }
+      }
+    } catch (error) {
+      console.error("Failed to check audio existence.", error);
+      response.status(500).json({
+        message: "Failed to check audio existence",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   };
 
@@ -330,5 +403,145 @@ export const createTtsController = (dataSource: DataSource): TtsController => {
     }
   };
 
-  return { getTextToSpeech };
+  /**
+   * Finds the best reference audio for GPT-SoVITS local TTS.
+   * Uses ChromaDB semantic search filtered by emotion, intensity, and voice name.
+   */
+  const getReferenceAudio: TtsController["getReferenceAudio"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const text = typeof request.query.text === "string" ? request.query.text.trim() : "";
+    const emotion = typeof request.query.emotion === "string" ? request.query.emotion.trim() : "";
+    const intensity = typeof request.query.intensity === "string" ? request.query.intensity.trim() : "";
+    const voiceName = typeof request.query.voiceName === "string" ? request.query.voiceName.trim() : "";
+
+    if (!emotion || !voiceName) {
+      response.status(400).json({ message: "emotion and voiceName are required" });
+      return;
+    }
+
+    if (!refAudioService) {
+      response.status(503).json({ message: "Reference audio service is not available (ChromaDB not configured)" });
+      return;
+    }
+
+    try {
+      const result = await refAudioService.query({
+        text: text || "你好",
+        emotion,
+        intensity: intensity || "medium",
+        voiceName
+      });
+
+      if (!result) {
+        response.status(404).json({ message: "No reference audio found for the given parameters" });
+        return;
+      }
+
+      response.json({ success: true, reference: result });
+    } catch (error) {
+      console.error("Failed to query reference audio.", error);
+      response.status(500).json({
+        message: "Failed to query reference audio",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
+  /**
+   * Accepts a WAV file upload from the Unity client (generated by local GPT-SoVITS),
+   * applies pitch adjustment, trims silence, converts to MP3, and returns the audio URL.
+   */
+  const processTtsWav: TtsController["processTtsWav"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const file = (request as any).file as { buffer: Buffer; mimetype: string } | undefined;
+    if (!file) {
+      response.status(400).json({ message: "Audio file (WAV) is required" });
+      return;
+    }
+
+    const text = typeof request.body.text === "string" ? request.body.text.trim() : "";
+    const tone = typeof request.body.tone === "string" ? request.body.tone.trim() : "";
+    const characterName = typeof request.body.characterName === "string" ? request.body.characterName.trim() : "";
+    const messageId = typeof request.body.messageId === "string" ? request.body.messageId.trim() : "";
+    
+    
+    if (!text) {
+      response.status(400).json({ message: "text is required" });
+      return;
+    }
+    
+    const userId = request.user.id;
+
+    try {
+      const resolvedSettings = await resolveCharacterVoiceSettings(userId, characterName);
+      const audioId = buildAudioId(
+        text,
+        tone,
+        `${resolvedSettings.voiceModel}:${resolvedSettings.voiceName ?? ""}`,
+        resolvedSettings.pitch,
+        resolvedSettings.speakingRate
+      );
+      console.log(text, tone, characterName, resolvedSettings.voiceModel, resolvedSettings.voiceName, resolvedSettings.pitch, resolvedSettings.speakingRate, "=>", audioId);
+
+      const AUDIO_DIR = path.join(process.cwd(), "data", "audio");
+      await fs.mkdir(AUDIO_DIR, { recursive: true });
+
+      const mp3Buffer = await convertWavToMp3(
+        file.buffer,
+        resolvedSettings.pitch,
+        resolvedSettings.speakingRate
+      );
+
+      const filePath = path.join(AUDIO_DIR, `${audioId}.mp3`);
+      await fs.unlink(filePath).catch((error) => {
+        if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
+          throw error;
+        }
+      });
+      await fs.writeFile(filePath, mp3Buffer);
+
+      // Attach audio to message if messageId is provided
+      if (messageId) {
+        const message = await messageRepository.findOne({
+          where: { id: messageId, userId }
+        });
+
+        if (message && (!message.audio || !message.audio.trim())) {
+          message.audio = audioId;
+          await messageRepository.save(message);
+        } else {
+          const myLogMessage = await myLogMessageRepository.findOne({
+            where: { id: messageId, userId }
+          });
+
+          if (myLogMessage && (!myLogMessage.audio || !myLogMessage.audio.trim())) {
+            myLogMessage.audio = audioId;
+            await myLogMessageRepository.save(myLogMessage);
+          }
+        }
+      }
+
+      response.json({
+        success: true,
+        audioId,
+        url: `/audio/${audioId}.mp3`
+      });
+    } catch (error) {
+      console.error("Failed to process TTS WAV.", error);
+      response.status(500).json({
+        message: "Failed to process TTS WAV",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
+  return { getTextToSpeech, getReferenceAudio, processTtsWav, checkAudioExists };
 };

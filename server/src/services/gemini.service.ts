@@ -9,7 +9,8 @@ export const GEMINI_MODELS = [
   "gemini-2.5-pro",
   "gemini-3.1-flash-lite-preview",
   "gemini-3-flash-preview",
-  "gemini-3-pro-preview"
+  "gemini-3-pro-preview",
+  "gemini-flash-lite-latest"
 ] as const;
 
 export type GeminiModel = (typeof GEMINI_MODELS)[number];
@@ -225,18 +226,18 @@ export const createGeminiChatService = (config: GeminiChatServiceConfig): Gemini
 
   const createReply: GeminiChatService["createReply"] = async (message, history = [], modelOverride, audioParts, sessionKey) => {
     const resolvedModel = modelOverride?.trim() || defaultModel;
-    
+
     // Find system message from history
     const systemMessage = history.find((entry) => entry.role === "system");
     const systemPrompt = systemMessage?.content ?? "";
-    
+
     // Build enhanced system instruction with developer role explanation
     const systemInstruction = buildGeminiSystemInstruction(systemPrompt);
     console.log("Gemini system instruction:", systemInstruction);
-    
+
     // Convert history to Gemini format (excluding system messages)
     const geminiHistory = convertHistoryToGeminiFormat(history);
-    
+
     // Get the generative model with system instruction
     const model = genAI.getGenerativeModel({
       model: resolvedModel,
@@ -275,7 +276,7 @@ export const createGeminiChatService = (config: GeminiChatServiceConfig): Gemini
         userMessage = formatMergedDeveloperUserMessage(trailingDevMessages, userMessage);
       }
     }
-    
+
     if (!userMessage && geminiHistory.length === 0 && (!audioParts || audioParts.length === 0)) {
       throw new Error("No message or history provided for Gemini");
     }

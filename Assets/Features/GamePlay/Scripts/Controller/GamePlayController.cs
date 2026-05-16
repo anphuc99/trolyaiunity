@@ -265,12 +265,15 @@ namespace Features.GamePlay.Controller
 				GetCharacterVoiceNameByName = GetChatCharacterVoiceName,
 				GetCharacterPitchByName = GetChatCharacterPitch,
 				GetCharacterSpeakingRateByName = GetChatCharacterSpeakingRate,
+				GetCharacterVoiceModelByName = GetChatCharacterVoiceModel,
 				OpenHome = () => HandleOpenSubController(GamePlaySubControllerType.Home),
 			});
 			JournalController.SetParentSignals(new JournalParentSignals { 
 				OnEchoed = OnSubControllerEchoed,
 				GetCharacterNames = GetChatCharacterNames,
 				GetAvatar = GetChatCharacterAvatar, 
+				GetCharacterVoiceNameByName = GetChatCharacterVoiceName,
+				GetCharacterVoiceModelByName = GetChatCharacterVoiceModel
 			});
 			MyLogController.SetParentSignals(new MyLogParentSignals
 			{
@@ -288,6 +291,7 @@ namespace Features.GamePlay.Controller
 				GetCharacterVoiceNameByName = GetChatCharacterVoiceName,
 				GetCharacterPitchByName = GetChatCharacterPitch,
 				GetCharacterSpeakingRateByName = GetChatCharacterSpeakingRate,
+				GetCharacterVoiceModelByName = GetChatCharacterVoiceModel,
 			});
 			StoryController.SetParentSignals(new StoryParentSignals { OnEchoed = OnSubControllerEchoed });
 			TaskController.SetParentSignals(new TaskParentSignals { OnEchoed = OnSubControllerEchoed });
@@ -518,6 +522,18 @@ namespace Features.GamePlay.Controller
 
 			return GamePlayState.ChatCharacterByName.TryGetValue(characterName.Trim(), out var cachedCharacter)
 				? cachedCharacter.SpeakingRate
+				: null;
+		}
+
+		private static string GetChatCharacterVoiceModel(string characterName)
+		{
+			if (string.IsNullOrWhiteSpace(characterName))
+			{
+				return null;
+			}
+
+			return GamePlayState.ChatCharacterByName.TryGetValue(characterName.Trim(), out var cachedCharacter)
+				? cachedCharacter.VoiceModel
 				: null;
 		}
 

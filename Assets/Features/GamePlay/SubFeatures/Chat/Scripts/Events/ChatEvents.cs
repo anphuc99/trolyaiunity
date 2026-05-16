@@ -27,5 +27,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Events
 		public const string VocabularyLearnedCountLoaded = "game.play.chat.vocabulary.learned.count.loaded.event";
 		public const string MessageContentUpdated = "game.play.chat.message.content.updated.event";
 		public const string AutoChatVocabularyLoaded = "game.play.chat.autochat.vocabulary.loaded.event";
+		public const string VocabExampleGenerated = "game.play.chat.vocab.example.generated.event";
+		public const string MissionVocabularyLoaded = "game.play.chat.mission.vocabulary.loaded.event";
 	}
 }

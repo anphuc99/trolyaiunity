@@ -634,7 +634,8 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		/// </summary>
 		/// <param name="word">Vocabulary word to pronounce.</param>
 		/// <param name="characterName">Selected character name from dropdown.</param>
-		private void HandleVocabAudioPlayRequested(string word, string characterName)
+		/// <param name="forceReload">Whether to force reload the TTS audio.</param>
+		private void HandleVocabAudioPlayRequested(string word, string characterName, bool forceReload)
 		{
 			if (string.IsNullOrWhiteSpace(word))
 			{
@@ -655,7 +656,7 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				MessageIndex = -1,
 				CharacterName = selectedCharacterName,
 				Text = word.Trim(),
-				ForceReload = false,
+				ForceReload = forceReload,
 			});
 		}
 
@@ -1177,7 +1178,9 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				CharacterName = messageData.Type == MessageBubbleType.User ? "User" : messageData.SenderName,
 				Text = text,
 				Tone = messageData.Tone,
-				ForceReload = forceReload
+				ForceReload = forceReload,
+				Emotion = messageData.Emotion,
+				Intensity = messageData.Intensity
 			});
 		}
 

@@ -60,6 +60,12 @@ namespace Share.Components
 		[SerializeField]
 		private int _messageIndex = -1;
 
+		[SerializeField]
+		private string _emotion;
+
+		[SerializeField]
+		private string _intensity;
+
 		private string _rawVocabText;
 
 		/// <summary>
@@ -96,6 +102,19 @@ namespace Share.Components
 		{
 			get => _message;
 			set => _message = value;
+		}
+
+		[SerializeField]
+		[TextArea(1, 4)]
+		private string _context;
+
+		/// <summary>
+		/// Context describing character actions or situation.
+		/// </summary>
+		public string Context
+		{
+			get => _context;
+			set => _context = value;
 		}
 
 		/// <summary>
@@ -177,6 +196,24 @@ namespace Share.Components
 		{
 			get => _messageIndex;
 			set => _messageIndex = value;
+		}
+
+		/// <summary>
+		/// Emotion label for text-to-speech.
+		/// </summary>
+		public string Emotion
+		{
+			get => _emotion;
+			set => _emotion = value;
+		}
+
+		/// <summary>
+		/// Emotional intensity for text-to-speech.
+		/// </summary>
+		public string Intensity
+		{
+			get => _intensity;
+			set => _intensity = value;
 		}
 
 		/// <summary>

@@ -27,7 +27,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private const int RecordingFrequencyHz = 16000;
 		private const int MaxRecordingSeconds = 60;
 		private const string DefaultSpeechLanguage = "zh";
-		private const string AutoChatContextTemplate = "AI tự nói chuyện ít nhất {0} tin nhắn mỗi lượt. Các nhân vật không được phép ngủ";
+		private const string AutoChatContextTemplate = "AI tự nói chuyện khoảng {0} tin nhắn mỗi lượt. Các nhân vật không được phép ngủ";
 
 		[SerializeField]
 		private TMP_InputField _inputField;
@@ -76,6 +76,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private TMP_InputField _inputNumberAutochat;
 		[SerializeField]
 		private Button _buttonApplyAutoChat;
+
+		[SerializeField] 
+		private ChatMissionView _chatMissionView;
 
 		/// <summary>
 		/// Regex to match **word** vocabulary markup in assistant text.
@@ -237,6 +240,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_pendingAudioBase64 = null;
 			UnbindAudioInputGuard();
 
+			// Check user text against mission vocabulary before sending.
+			if (!hasAudio && !string.IsNullOrWhiteSpace(userTextForTracking))
+			{
+				CheckMissionVocabUsage(userTextForTracking);
+			}
+
 			SendRequest(ChatRequests.SendMessage, payload);
 
 			if (_inputField != null)
@@ -313,6 +322,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			SendRequest(ChatRequests.LoadDeveloperState);
 			RefreshHistory();
 			RefreshVocabularyLearnedCount();
+			LoadMissionVocabulary();
 		}
 
 		/// <summary>
@@ -354,6 +364,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_messageContainer.OnVocabWordClicked = null;
 			}
 			_reloadingTtsMessageIndices.Clear();
+			_autoChatUsedVocabWords.Clear();
 			if (_characterVoiceAudioSource != null)
 			{
 				_characterVoiceAudioSource.Stop();
@@ -367,6 +378,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_contextPopupView.HideImmediate();
 			}
 			RestoreForegroundRuntimeMode();
+			ClearMissionVocabulary();
 			gameObject.SetActive(false);
 		}
 
@@ -507,7 +519,17 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			}
 
 			StopAutoChatMode();
-			SendRequest(ChatRequests.EndConversation);
+
+			// If we have words to review, start review mode first.
+			// Otherwise, end the conversation on server immediately.
+			if (_vocabReviewQueue.Count > 0)
+			{
+				StartVocabReviewMode();
+			}
+			else
+			{
+				SendRequest(ChatRequests.EndConversation);
+			}
 		}
 
 		/// <summary>
@@ -517,12 +539,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		[OnEvent(ChatEvents.ConversationEnded)]
 		private void OnConversationEnded(object payload)
 		{
-			if (_vocabReviewQueue.Count > 0)
-			{
-				StartVocabReviewMode();
-				return;
-			}
-
 			ClearConversationState();
 		}
 
@@ -596,17 +612,21 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 					var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? DefaultCharacterDisplayName : turn.CharacterName.Trim();
 					var text = string.IsNullOrWhiteSpace(turn.Text) ? string.Empty : turn.Text;
+					
 					mapped.Add(new MessageBubbleData
 					{
 						MessageId = string.IsNullOrWhiteSpace(turn.MessageId) ? Guid.NewGuid().ToString("N") : turn.MessageId,
 						Type = MessageBubbleType.Character,
 						SenderName = characterName,
+						Context = turn.Context,
 						Message = ConvertVocabMarkupToRichText(text),
 						OriginalMessage = StripVocabMarkup(text),
 						RawVocabText = text,
 						Translation = turn.Translation,
 						Pinyin = turn.Pinyin,
 						Tone = string.IsNullOrWhiteSpace(turn.Tone) ? DefaultTtsTone : turn.Tone.Trim(),
+						Emotion = turn.Emotion,
+						Intensity = turn.Intensity,
 						Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, characterName),
 					});
 				}
@@ -764,23 +784,32 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? DefaultTtsTone : turn.Tone.Trim();
 
-				// Wait until this turn finishes preload so text is displayed together with ready audio.
-				while (turn.AudioClip == null && !turn.IsAudioPreloadCompleted)
-				{
-					yield return null;
-				}
+				// If audio is not ready, trigger resolution now (sequential/JIT)
+				// if (turn.AudioClip == null && !turn.IsAudioPreloadCompleted)
+				// {
+				// 	SendRequest(ChatRequests.ResolveTurnAudio, turn);
+				// }
+
+				// Wait until this turn finishes resolution so text is displayed together with ready audio.
+				// while (turn.AudioClip == null && !turn.IsAudioPreloadCompleted)
+				// {
+				// 	yield return null;
+				// }
 
 				var characterMessage = new MessageBubbleData
 				{
 					MessageId = string.IsNullOrWhiteSpace(turn.MessageId) ? Guid.NewGuid().ToString("N") : turn.MessageId,
 					Type = MessageBubbleType.Character,
 					SenderName = characterName,
+					Context = turn.Context,
 					Message = ConvertVocabMarkupToRichText(messageText),
 					OriginalMessage = StripVocabMarkup(messageText),
 					RawVocabText = messageText,
 					Translation = turn.Translation,
 					Pinyin = turn.Pinyin,
 					Tone = tone,
+					Emotion = turn.Emotion,
+					Intensity = turn.Intensity,
 					Avatar = SendRequest<Sprite>(ChatRequests.GetCharacterAvatar, characterName),
 				};
 
@@ -791,10 +820,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				}
 				ScrollMessagesToBottom();
 
-				if (turn.AudioClip != null)
-				{
-					yield return StartCoroutine(PlayCharacterVoiceAsync(turn.AudioClip));
-				}
+				// if (turn.AudioClip != null)
+				// {
+				// 	yield return StartCoroutine(PlayCharacterVoiceAsync(turn.AudioClip));
+				// }
 			}
 
 			_isProcessingCharacterTurns = false;
@@ -911,6 +940,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_vocabPopupView.SetClosedCallback(HandleVocabPopupClosed);
 				_vocabPopupView.SetNextCallback(HandleVocabReviewNext);
 				_vocabPopupView.SetAudioPlayCallback(HandleVocabAudioPlayRequested);
+				_vocabPopupView.SetGenerateExampleCallback(HandleGenerateVocabExample);
 				RefreshVocabCharacterOptions();
 			}
 
@@ -1628,6 +1658,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				CharacterName = messageData.Type == MessageBubbleType.User ? "User" : messageData.SenderName,
 				Text = string.IsNullOrWhiteSpace(messageData.OriginalMessage) ? messageData.Message : messageData.OriginalMessage,
 				Tone = string.IsNullOrWhiteSpace(messageData.Tone) ? DefaultTtsTone : messageData.Tone,
+				Emotion = messageData.Emotion,
+				Intensity = messageData.Intensity,
 			});
 		}
 
@@ -1665,6 +1697,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				Tone = tone,
 				ForceReload = true,
 				MessageIndex = messageData.MessageIndex,
+				Emotion = messageData.Emotion,
+				Intensity = messageData.Intensity,
 			});
 		}
 
@@ -1919,7 +1953,6 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_autoChatVocabIndex = 0;
 			_autoChatVocabWordsPerTurn = 0;
 			_autoChatPendingVocabWords.Clear();
-			_autoChatUsedVocabWords.Clear();
 			_isAutoChatVocabLoaded = false;
 		}
 
@@ -2101,7 +2134,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			if (!_hasSentAutoChatContext)
 			{
 				_hasSentAutoChatContext = true;
-				var fullContext = string.Format(AutoChatContextTemplate, _autoChatTargetTurnCount);
+				var fullContext = string.Format(AutoChatContextTemplate, Mathf.Min(_autoChatTargetTurnCount, 10));
 				if (!string.IsNullOrEmpty(vocabContext))
 				{
 					fullContext += "\n" + vocabContext;
@@ -2209,6 +2242,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_isProcessingCharacterTurns = false;
 			SetCharacterRespondingState(false);
 			_reloadingTtsMessageIndices.Clear();
+			_autoChatUsedVocabWords.Clear();
 
 			if (_characterVoiceAudioSource != null)
 			{
@@ -2310,6 +2344,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				SetVocabAudioRequestInProgress(false);
 				_vocabPopupView.ShowResult(result.Id, result.Word, result.Pinyin, result.Vietnamese);
+				_vocabPopupView.gameObject.SetActive(true);
 			}
 		}
 
@@ -2330,6 +2365,41 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			{
 				_vocabPopupView.Hide();
 			}
+		}
+
+		/// <summary>
+		/// Handles the AI-generated vocabulary example sentence result from controller.
+		/// Forwards the result to the vocab popup view for display.
+		/// </summary>
+		/// <param name="payload">Example result payload.</param>
+		[OnEvent(ChatEvents.VocabExampleGenerated)]
+		private void OnVocabExampleGenerated(object payload)
+		{
+			var result = payload as ChatVocabExampleResultPayload;
+			if (result == null || _vocabPopupView == null)
+			{
+				return;
+			}
+
+			_vocabPopupView.ShowExampleSentence(result.Sentence, result.Pinyin, result.Translation);
+		}
+
+		/// <summary>
+		/// Callback from vocab popup when the Example Sentences button is clicked.
+		/// Triggers a request to generate a story-relevant example sentence.
+		/// </summary>
+		/// <param name="word">The vocabulary word to generate an example for.</param>
+		private void HandleGenerateVocabExample(string word)
+		{
+			if (string.IsNullOrWhiteSpace(word))
+			{
+				return;
+			}
+
+			SendRequest(ChatRequests.GenerateVocabExample, new ChatVocabExampleRequestPayload
+			{
+				Word = word.Trim()
+			});
 		}
 
 		/// <summary>
@@ -2409,13 +2479,13 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 			_isVocabReviewMode = true;
 			_vocabReviewIndex = 0;
 
+			Debug.Log("[ChatView] Starting vocab review mode with " + _vocabReviewQueue.Count + " words.");
+			ShowCurrentVocabReview();
+
 			if (_vocabPopupView != null)
 			{
 				_vocabPopupView.SetNextButtonVisible(true);
 			}
-
-			Debug.Log("[ChatView] Starting vocab review mode with " + _vocabReviewQueue.Count + " words.");
-			ShowCurrentVocabReview();
 		}
 
 		/// <summary>
@@ -2456,8 +2526,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_vocabPopupView.SetNextButtonVisible(false);
 			}
 
-			Debug.Log("[ChatView] Vocab review mode finished.");
-			ClearConversationState();
+			Debug.Log("[ChatView] Vocab review mode finished. Now ending conversation on server.");
+
+			// After review is finished, finalize the conversation (summarize) on server.
+			SendRequest(ChatRequests.EndConversation);
 		}
 
 		/// <summary>
@@ -2465,7 +2537,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		/// </summary>
 		/// <param name="word">Vocabulary word to pronounce.</param>
 		/// <param name="characterName">Selected character name from dropdown.</param>
-		private void HandleVocabAudioPlayRequested(string word, string characterName)
+		/// <param name="forceReload">Whether to force reload the TTS audio.</param>
+		private void HandleVocabAudioPlayRequested(string word, string characterName, bool forceReload)
 		{
 			if (string.IsNullOrWhiteSpace(word))
 			{
@@ -2486,6 +2559,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				CharacterName = selectedCharacterName,
 				Text = StripVocabMarkup(word.Trim()),
 				Tone = DefaultTtsTone,
+				ForceReload = forceReload
 			});
 		}
 
@@ -2544,5 +2618,93 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_vocabPopupView.SetAudioRequestInProgress(isInProgress);
 			}
 		}
+
+		#region Mission Vocabulary
+
+		/// <summary>
+		/// Requests due vocabulary from server for the mission panel.
+		/// </summary>
+		private void LoadMissionVocabulary()
+		{
+			SendRequest(ChatRequests.LoadMissionVocabulary);
+		}
+
+		/// <summary>
+		/// Handles mission vocabulary loaded from controller.
+		/// Populates the ChatMissionView with due vocabulary items.
+		/// </summary>
+		/// <param name="payload">Mission vocabulary payload.</param>
+		[OnEvent(ChatEvents.MissionVocabularyLoaded)]
+		private void OnMissionVocabularyLoaded(object payload)
+		{
+			if (_chatMissionView == null)
+			{
+				return;
+			}
+
+			var missionPayload = payload as ChatMissionVocabularyPayload;
+			if (missionPayload == null || missionPayload.Items == null || missionPayload.Items.Count == 0)
+			{
+				_chatMissionView.ClearAll();
+				_chatMissionView.gameObject.SetActive(false);
+				return;
+			}
+
+			var entries = new List<MissionVocabEntry>();
+			for (var i = 0; i < missionPayload.Items.Count; i++)
+			{
+				var item = missionPayload.Items[i];
+				if (item == null || string.IsNullOrWhiteSpace(item.Korean))
+				{
+					continue;
+				}
+
+				entries.Add(new MissionVocabEntry
+				{
+					Hanzi = item.Korean.Trim(),
+					Pinyin = item.Pinyin,
+					Vietnamese = item.Vietnamese,
+				});
+			}
+
+			if (entries.Count > 0)
+			{
+				_chatMissionView.gameObject.SetActive(true);
+				_chatMissionView.SetMissionItems(entries);
+			}
+			else
+			{
+				_chatMissionView.ClearAll();
+				_chatMissionView.gameObject.SetActive(false);
+			}
+		}
+
+		/// <summary>
+		/// Checks user text against mission vocabulary words.
+		/// Marks matching words as completed (strikethrough) and moves them to the bottom.
+		/// </summary>
+		/// <param name="userText">User message text.</param>
+		private void CheckMissionVocabUsage(string userText)
+		{
+			if (_chatMissionView == null || string.IsNullOrWhiteSpace(userText))
+			{
+				return;
+			}
+
+			_chatMissionView.CheckAndMarkUsedWords(userText);
+		}
+
+		/// <summary>
+		/// Clears mission vocabulary state.
+		/// </summary>
+		private void ClearMissionVocabulary()
+		{
+			if (_chatMissionView != null)
+			{
+				_chatMissionView.ClearAll();
+			}
+		}
+
+		#endregion
 	}
 }

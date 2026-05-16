@@ -17,6 +17,7 @@ import { createMyLogRoutes } from "./mylog.routes.js";
 import { createLearningPathRoutes } from "./learning-path.routes.js";
 import { createCharacterRelationshipsRoutes } from "./character-relationships.routes.js";
 import { createChromaDbAdminRoutes } from "./chromadb-admin.routes.js";
+import type { ReferenceAudioVectorService } from "../services/reference-audio-vector.service.js";
 
 /**
  * Creates the root API router with all route groups.
@@ -24,7 +25,7 @@ import { createChromaDbAdminRoutes } from "./chromadb-admin.routes.js";
  * @param dataSource - Initialized TypeORM data source.
  * @returns The configured API router.
  */
-export const createApiRouter = (dataSource: DataSource) => {
+export const createApiRouter = (dataSource: DataSource, refAudioService?: ReferenceAudioVectorService) => {
   const router = Router();
 
   // ChromaDB admin API
@@ -45,7 +46,7 @@ export const createApiRouter = (dataSource: DataSource) => {
   router.use("/mylog", createMyLogRoutes(dataSource));
   router.use("/learning-paths", createLearningPathRoutes(dataSource));
   router.use("/character-relationships", createCharacterRelationshipsRoutes(dataSource));
-  router.use("/", createSharedRoutes(dataSource));
+  router.use("/", createSharedRoutes(dataSource, refAudioService));
 
   return router;
 };

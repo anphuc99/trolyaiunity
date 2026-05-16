@@ -8,12 +8,14 @@ import { AppDataSource } from "./data-source.js";
 import { createApiRouter } from "./routes/index.js";
 import { embeddedClientAssets, embeddedClientIndexHtml } from "./embedded-client.js";
 import { seedDefaultLevels, seedDefaultVoices } from "./services/seed.service.js";
+import { createReferenceAudioVectorService, type ReferenceAudioVectorService } from "./services/reference-audio-vector.service.js";
 
 const DEFAULT_PORT = 4000;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const AVATARS_DIR = path.join(process.cwd(), "public", "avatars");
 const AUDIO_DIR = path.join(process.cwd(), "data", "audio");
+const REF_FILES_DIR = path.join(process.cwd(), "data", "dataset_chinese");
 const CLIENT_DIST_CANDIDATES = [
   process.env.CLIENT_DIST_DIR,
   path.resolve(process.cwd(), "client", "dist"),
@@ -57,7 +59,7 @@ const sendEmbeddedAsset = (assetPath: string, res: express.Response) => {
  *
  * @returns Configured Express application.
  */
-const createApp = () => {
+const createApp = (refAudioService?: ReferenceAudioVectorService) => {
   const app = express();
 
   app.use(cors({
@@ -72,8 +74,9 @@ const createApp = () => {
   app.use("/public", express.static(PUBLIC_DIR));
   app.use("/public/avatars", express.static(AVATARS_DIR));
   app.use("/audio", express.static(AUDIO_DIR));
+  app.use("/ref-files", express.static(REF_FILES_DIR));
 
-  app.use("/api", createApiRouter(AppDataSource));
+  app.use("/api", createApiRouter(AppDataSource, refAudioService));
 
   // Convenient redirect for ChromaDB admin UI
   app.get("/chromadb", (_req, res) => {
@@ -118,7 +121,21 @@ const startServer = async () => {
       );
     }
 
-    const app = createApp();
+    // Initialize reference audio vector service if ChromaDB is available
+    let refAudioService: ReferenceAudioVectorService | undefined;
+    const chromaUrl = process.env.CHROMA_URL;
+    if (chromaUrl) {
+      try {
+        refAudioService = createReferenceAudioVectorService({ chromaUrl });
+        await refAudioService.indexAll();
+        console.log("Reference audio index initialized successfully.");
+      } catch (error) {
+        console.warn("Failed to initialize reference audio index (ChromaDB may be unavailable).", error);
+        refAudioService = undefined;
+      }
+    }
+
+    const app = createApp(refAudioService);
     const port = Number(process.env.PORT ?? DEFAULT_PORT);
     const host = process.env.HOST || "localhost";
 

@@ -37,5 +37,10 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Model
 		/// Optional callback for getting cached character speaking rate by character name.
 		/// </summary>
 		public Func<string, float?> GetCharacterSpeakingRateByName { get; set; }
+
+		/// <summary>
+		/// Optional callback for getting cached character voice model by character name.
+		/// </summary>
+		public Func<string, string> GetCharacterVoiceModelByName { get; set; }
 	}
 }

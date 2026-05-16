@@ -66,6 +66,13 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		public Func<string, float?> GetCharacterSpeakingRateByName { get; set; }
 
 		/// <summary>
+		/// Optional callback for getting cached character voice model by character name.
+		/// Returns values such as "openai", "gemini".
+		/// When model is "gemini" on PC, the local GPT-SoVITS pipeline is used instead.
+		/// </summary>
+		public Func<string, string> GetCharacterVoiceModelByName { get; set; }
+
+		/// <summary>
 		/// Optional callback for returning to the Home subcontroller.
 		/// </summary>
 		public Action OpenHome { get; set; }

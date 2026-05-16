@@ -29,6 +29,8 @@ interface ChatController {
   prepareLocalPrompt: (request: Request, response: Response) => Promise<void>;
   /** Saves user message + locally-generated AI reply to history. */
   saveLocalReply: (request: Request, response: Response) => Promise<void>;
+  /** Generates a story-relevant example sentence for a vocabulary word using VectorDB memories. */
+  generateVocabExample: (request: Request, response: Response) => Promise<void>;
 }
 
 interface ChatControllerDeps {
@@ -51,6 +53,7 @@ interface AssistantTurn {
   MessageId?: string;
   CharacterName?: string;
   Text?: string;
+  Context?: string;
   Pinyin?: string;
   Tone?: string;
   Translation?: string;
@@ -491,12 +494,13 @@ export const createChatController = (
 
       const messageId = typeof turn.MessageId === "string" ? turn.MessageId.trim() : "";
       const characterName = typeof turn.CharacterName === "string" ? turn.CharacterName.trim() : "";
+      const context = typeof turn.Context === "string" ? turn.Context.trim() : "";
       const text = typeof turn.Text === "string" ? turn.Text.trim() : "";
       const pinyin = typeof turn.Pinyin === "string" ? turn.Pinyin.trim() : "";
       const tone = typeof turn.Tone === "string" ? turn.Tone.trim() : "";
       const translation = typeof turn.Translation === "string" ? turn.Translation.trim() : "";
 
-      if (!messageId || !characterName || !text || !pinyin || !tone || !translation) {
+      if (!messageId || !characterName || !context || !text || !pinyin || !tone || !translation) {
         return false;
       }
     }
@@ -518,7 +522,7 @@ export const createChatController = (
       "Retry now and return ONLY valid JSON array.",
       "Requirements:",
       "- Must be a JSON array (1-10 items).",
-      "- Every item must include non-empty string fields: MessageId, CharacterName, Text, Pinyin, Tone, Translation.",
+      "- Every item must include non-empty string fields: MessageId, CharacterName, Context, Text, Pinyin, Tone, Translation.",
       "- No markdown, no explanations, no comments."
     ].join("\n");
   };
@@ -898,7 +902,8 @@ export const createChatController = (
 
     const message = typeof request.body?.message === "string" ? request.body.message.trim() : "";
     const sessionId = getSessionId(request.body?.sessionId);
-    const modelOverride = "gemini-3.1-flash-lite-preview";
+    const modelOverride = request.body?.model || "gemini-flash-lite-latest";
+    console.log("modelOverride: ", modelOverride);
     const audioBase64 = typeof request.body?.audio === "string" ? request.body.audio.trim() : "";
     const hasAudio = Boolean(audioBase64);
 
@@ -1126,7 +1131,7 @@ export const createChatController = (
       return;
     }
 
-    const modelOverride = "gemini-3.1-flash-lite-preview";
+    const modelOverride = "gemini-flash-lite-latest";
 
     const useGemini = isGeminiModel(modelOverride || openAIModel);
     const selectedService = useGemini ? geminiService : openAIService;
@@ -1688,6 +1693,86 @@ export const createChatController = (
     }
   };
 
+  // ──────────────────────────────────────────────────────────────────────────────
+  // Generate a story-relevant example sentence for a vocabulary word.
+  // Uses VectorDB memories to provide context, then asks cheap AI to compose
+  // a single sentence that naturally uses the word within the story world.
+  // ──────────────────────────────────────────────────────────────────────────────
+  const generateVocabExample: ChatController["generateVocabExample"] = async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const word = typeof request.body?.word === "string" ? request.body.word.trim() : "";
+    if (!word) {
+      response.status(400).json({ message: "Field 'word' is required." });
+      return;
+    }
+
+    try {
+      const cheapAI = createCheapAIService();
+
+      // Retrieve story-related memories for this word
+      let memoryContext = "";
+      if (memoryRetrievalService) {
+        try {
+          const userEntity = await userRepository.findOne({ where: { id: request.user.id } });
+          const storyId = userEntity?.currentStoryId ?? null;
+          memoryContext = await memoryRetrievalService.retrieveMemoryBriefFromQueries(
+            request.user.id,
+            [`example sentence using word ${word}`, `story context for ${word}`],
+            { storyId, activeCharacters: [] }
+          );
+        } catch (memErr) {
+          console.warn("[Chat] Memory retrieval failed for vocab example:", memErr);
+        }
+      }
+
+      const storyBlock = memoryContext
+        ? `\nStory/Memory context:\n${memoryContext}\n`
+        : "";
+
+      const prompt = `You are a Chinese language teaching assistant.
+
+Generate ONE example sentence in Chinese that uses the word "${word}".
+${storyBlock}
+Rules:
+- The sentence MUST contain the word "${word}".
+- If story context is provided, make the sentence relate to that story/characters.
+- Keep the sentence at an intermediate learner level (HSK3-4).
+- The sentence should be short, around 5-7 Chinese characters.
+- Output ONLY valid JSON: {"sentence": "...", "pinyin": "...", "translation": "..."}
+- "sentence" is the Chinese sentence.
+- "pinyin" is the full pinyin with tone marks.
+- "translation" is the Vietnamese translation.
+- No markdown, no explanation.
+
+Output:`;
+
+      const generativeModel = new (await import("@google/generative-ai")).GoogleGenerativeAI(
+        process.env.GOOGLE_API_KEY ?? ""
+      ).getGenerativeModel({ model: process.env.CHEAP_AI_MODEL ?? "gemini-flash-lite-latest" });
+
+      const result = await generativeModel.generateContent(prompt);
+      const text = result.response.text().trim();
+      const jsonText = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+      const parsed = JSON.parse(jsonText) as { sentence?: string; pinyin?: string; translation?: string };
+
+      response.json({
+        sentence: typeof parsed.sentence === "string" ? parsed.sentence.trim() : "",
+        pinyin: typeof parsed.pinyin === "string" ? parsed.pinyin.trim() : "",
+        translation: typeof parsed.translation === "string" ? parsed.translation.trim() : ""
+      });
+    } catch (error) {
+      console.error("Error in generateVocabExample:", error);
+      response.status(500).json({
+        message: "Failed to generate example sentence",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
+
   return {
     sendMessage,
     respondFromHistory,
@@ -1698,6 +1783,7 @@ export const createChatController = (
     getDeveloperState,
     transcribeAudio,
     prepareLocalPrompt,
-    saveLocalReply
+    saveLocalReply,
+    generateVocabExample
   };
 };

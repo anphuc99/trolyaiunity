@@ -225,6 +225,18 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
+		/// Resolves TTS audio for a specific assistant turn.
+		/// Used by View to trigger sequential JIT (Just-In-Time) audio generation.
+		/// </summary>
+		/// <param name="turn">The turn payload to resolve audio for.</param>
+		[Request(ChatRequests.ResolveTurnAudio)]
+		public static void HandleResolveTurnAudio(ChatAssistantTurnPayload turn)
+		{
+			if (turn == null) return;
+			_ = ResolveTurnAudioInternalAsync(turn);
+		}
+
+		/// <summary>
 		/// Gets cached character avatar sprite from parent signal.
 		/// </summary>
 		/// <param name="payload">Character name payload.</param>
@@ -476,6 +488,76 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 
 			_ = BatchReviewAutoChatVocabularyInternalAsync(payload);
+		}
+
+		/// <summary>
+		/// Handles vocabulary example sentence generation from chat popup.
+		/// </summary>
+		/// <param name="payload">Request payload with word.</param>
+		[Request(ChatRequests.GenerateVocabExample)]
+		public static void HandleGenerateVocabExample(ChatVocabExampleRequestPayload payload)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.Word))
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Missing word for example sentence generation."
+				});
+				return;
+			}
+
+			_ = GenerateVocabExampleInternalAsync(payload);
+		}
+
+		/// <summary>
+		/// Loads due vocabulary items for the mission panel.
+		/// </summary>
+		/// <param name="payload">Unused payload.</param>
+		[Request(ChatRequests.LoadMissionVocabulary)]
+		public static void HandleLoadMissionVocabulary(object payload)
+		{
+			_ = LoadMissionVocabularyInternalAsync();
+		}
+
+		private static async Task LoadMissionVocabularyInternalAsync()
+		{
+			try
+			{
+				var json = await HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyDue);
+				var result = new ChatMissionVocabularyPayload();
+
+				if (!string.IsNullOrWhiteSpace(json))
+				{
+					var parsed = JsonConvert.DeserializeObject<JObject>(json);
+					var vocabArray = parsed?["vocabularies"] as JArray;
+					if (vocabArray != null)
+					{
+						for (var i = 0; i < vocabArray.Count; i++)
+						{
+							var item = vocabArray[i];
+							var korean = item?["korean"]?.ToString();
+							if (string.IsNullOrWhiteSpace(korean))
+							{
+								continue;
+							}
+
+							result.Items.Add(new ChatMissionVocabItemPayload
+							{
+								Korean = korean.Trim(),
+								Pinyin = item?["pinyin"]?.ToString() ?? string.Empty,
+								Vietnamese = item?["vietnamese"]?.ToString() ?? string.Empty,
+							});
+						}
+					}
+				}
+
+				EventBus.Publish(ChatEvents.MissionVocabularyLoaded, result);
+			}
+			catch (Exception exception)
+			{
+				Debug.LogWarning("[ChatController] Failed to load mission vocabulary: " + exception.Message);
+				EventBus.Publish(ChatEvents.MissionVocabularyLoaded, new ChatMissionVocabularyPayload());
+			}
 		}
 
 		private static void RegisterAddCharacterMenu()
@@ -797,7 +879,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				// Desktop + non-MyLog: use local Ollama for summarization
+				// // Desktop + non-MyLog: use local Ollama for summarization
 				if (IsDesktopPlatform() && !IsMyLogChatMode())
 				{
 					await EndConversationViaLocalAIAsync();
@@ -884,19 +966,27 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 
 			// Step 4: Parse Ollama summary JSON
+			var rawContent = ollamaResponse.Message.Content;
+			var cleanedContent = NormalizePotentialOllamaJsonReply(rawContent);
+
 			OllamaSummaryResult summaryResult = null;
 			try
 			{
-				summaryResult = JsonConvert.DeserializeObject<OllamaSummaryResult>(ollamaResponse.Message.Content);
+				summaryResult = JsonConvert.DeserializeObject<OllamaSummaryResult>(cleanedContent);
 			}
 			catch (Exception ex)
 			{
 				Debug.LogWarning("[ChatController] Failed to parse Ollama summary JSON: " + ex.Message
-					+ "\nRaw: " + ollamaResponse.Message.Content);
+					+ "\nRaw: " + rawContent
+					+ "\nCleaned: " + cleanedContent);
 			}
 
 			// If JSON parsing fails, use the raw text as summary
-			var summary = summaryResult?.Summary ?? ollamaResponse.Message.Content;
+			var summary = summaryResult?.Summary ?? cleanedContent;
+			if (string.IsNullOrWhiteSpace(summary))
+			{
+				summary = rawContent;
+			}
 			var updatedStoryDescription = summaryResult?.UpdatedStoryDescription ?? "";
 
 			// Step 5: Send pre-computed summary to server
@@ -1095,6 +1185,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					return;
 				}
 
+				var savedModel = PlayerPrefs.GetString("SelectedModel", "gemini-flash-lite-latest");
+				if (string.IsNullOrWhiteSpace(payload.Model))
+				{
+					payload.Model = savedModel;
+				}
+
 				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatSendEndpoint(), payload);
 				if (string.IsNullOrWhiteSpace(responseJson))
 				{
@@ -1136,7 +1232,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					Transcribe = response.Transcribe,
 				});
 
-				_ = PreResolveTtsAudioUrlsAsync(turns);
+				// _ = PreResolveTtsAudioUrlsAsync(turns);
 			}
 			catch (Exception exception)
 			{
@@ -1161,6 +1257,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				{
 					await GenerateReplyFromHistoryViaLocalAIAsync(payload);
 					return;
+				}
+
+				var savedModel = PlayerPrefs.GetString("SelectedModel", "gemini-flash-lite-latest");
+				if (string.IsNullOrWhiteSpace(payload.Model))
+				{
+					payload.Model = savedModel;
 				}
 
 				var responseJson = await HttpClient.PostJsonTaskAsync(GetChatRespondEndpoint(), payload);
@@ -1193,7 +1295,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					Turns = turns,
 				});
 
-				_ = PreResolveTtsAudioUrlsAsync(turns);
+				// _ = PreResolveTtsAudioUrlsAsync(turns);
 			}
 			catch (Exception exception)
 			{
@@ -1453,7 +1555,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 		/// <summary>
 		/// Ensures a local Ollama reply is valid assistant-turn JSON.
-		/// If invalid, requests Ollama to reformat into the required JSON shape.
+		/// If invalid, normalizes malformed wrappers/special characters and requests Ollama
+		/// to reformat into the required JSON shape.
 		/// Returns null when repair fails.
 		/// </summary>
 		/// <param name="reply">Raw Ollama assistant reply.</param>
@@ -1461,7 +1564,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		/// <returns>Valid assistant-turn JSON, or null when unrecoverable.</returns>
 		private static async Task<string> EnsureValidOllamaReplyJsonAsync(string reply, string systemPrompt)
 		{
-			var current = reply?.Trim() ?? "";
+			var current = NormalizePotentialOllamaJsonReply(reply);
 			if (IsValidAssistantReplyJson(current))
 			{
 				return current;
@@ -1473,7 +1576,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				Debug.Log("[ChatController] Ollama reply JSON invalid. Requesting repair attempt " + attempt + ".");
 
 				var repaired = await OllamaService.RepairReplyJsonAsync(current, systemPrompt);
-				var repairedContent = repaired?.Message?.Content?.Trim() ?? "";
+				var repairedContent = NormalizePotentialOllamaJsonReply(repaired?.Message?.Content);
 				if (string.IsNullOrWhiteSpace(repairedContent))
 				{
 					break;
@@ -1489,6 +1592,100 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 
 			return null;
+		}
+
+		/// <summary>
+		/// Normalizes candidate JSON text from Ollama by removing markdown code fences,
+		/// stripping invisible/control characters, and trimming surrounding noise.
+		/// </summary>
+		/// <param name="reply">Raw assistant reply text.</param>
+		/// <returns>Sanitized text that is easier to parse as JSON.</returns>
+		private static string NormalizePotentialOllamaJsonReply(string reply)
+		{
+			if (string.IsNullOrWhiteSpace(reply))
+			{
+				return "";
+			}
+
+			var normalized = StripMarkdownJsonFence(reply.Trim());
+
+			var sanitizedBuilder = new StringBuilder(normalized.Length);
+			for (var i = 0; i < normalized.Length; i++)
+			{
+				var ch = normalized[i];
+
+				if (ch == '\uFEFF' || ch == '\u200B' || ch == '\u200C' || ch == '\u200D' || ch == '\u2060')
+				{
+					continue;
+				}
+
+				if (char.IsControl(ch) && ch != '\r' && ch != '\n' && ch != '\t')
+				{
+					continue;
+				}
+
+				sanitizedBuilder.Append(ch);
+			}
+
+			normalized = sanitizedBuilder.ToString().Trim();
+
+			var firstObjectIndex = normalized.IndexOf('{');
+			var firstArrayIndex = normalized.IndexOf('[');
+
+			var startIndex = -1;
+			if (firstObjectIndex >= 0 && firstArrayIndex >= 0)
+			{
+				startIndex = Math.Min(firstObjectIndex, firstArrayIndex);
+			}
+			else
+			{
+				startIndex = Math.Max(firstObjectIndex, firstArrayIndex);
+			}
+
+			var lastObjectIndex = normalized.LastIndexOf('}');
+			var lastArrayIndex = normalized.LastIndexOf(']');
+			var endIndex = Math.Max(lastObjectIndex, lastArrayIndex);
+
+			if (startIndex >= 0 && endIndex >= startIndex)
+			{
+				normalized = normalized.Substring(startIndex, endIndex - startIndex + 1).Trim();
+			}
+
+			return normalized;
+		}
+
+		/// <summary>
+		/// Removes a surrounding markdown fence block like ```json ... ```.
+		/// </summary>
+		/// <param name="content">Potential fenced content.</param>
+		/// <returns>Inner content when fenced; otherwise original trimmed content.</returns>
+		private static string StripMarkdownJsonFence(string content)
+		{
+			if (string.IsNullOrWhiteSpace(content))
+			{
+				return "";
+			}
+
+			var trimmed = content.Trim();
+			if (!trimmed.StartsWith("```", StringComparison.Ordinal))
+			{
+				return trimmed;
+			}
+
+			var firstLineEndIndex = trimmed.IndexOf('\n');
+			if (firstLineEndIndex < 0)
+			{
+				return trimmed.Replace("```", "").Trim();
+			}
+
+			var contentStartIndex = firstLineEndIndex + 1;
+			var lastFenceIndex = trimmed.LastIndexOf("```", StringComparison.Ordinal);
+			if (lastFenceIndex > contentStartIndex)
+			{
+				return trimmed.Substring(contentStartIndex, lastFenceIndex - contentStartIndex).Trim();
+			}
+
+			return trimmed.Substring(contentStartIndex).Trim();
 		}
 
 		/// <summary>
@@ -1717,6 +1914,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 		/// <summary>
 		/// Pre-resolves TTS audio URLs for each turn so the View only needs to download audio clips.
+		/// When the character uses gpt-sovits, the full local TTS pipeline is executed.
 		/// </summary>
 		/// <param name="turns">Parsed turn list to enrich with AudioUrl.</param>
 		/// <returns>Awaitable task.</returns>
@@ -1744,7 +1942,9 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 					var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
 					var tone = string.IsNullOrWhiteSpace(turn.Tone) ? "neutral" : turn.Tone.Trim();
-					turn.AudioUrl = await ResolveTtsAudioUrlAsync(turn.Text, tone, characterName, false, turn.MessageId);
+					turn.AudioUrl = await ResolveTtsAudioUrlAsync(
+						turn.Text, tone, characterName, false, turn.MessageId,
+						turn.Emotion, turn.Intensity);
 
 					if (!string.IsNullOrWhiteSpace(turn.AudioUrl))
 					{
@@ -1760,6 +1960,44 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				{
 					turn.IsAudioPreloadCompleted = true;
 				}
+			}
+		}
+
+		/// <summary>
+		/// Resolves audio for a single turn. Called sequentially by the View.
+		/// </summary>
+		private static async Task ResolveTurnAudioInternalAsync(ChatAssistantTurnPayload turn)
+		{
+			if (turn == null || turn.IsAudioPreloadCompleted) return;
+
+			try
+			{
+				if (string.IsNullOrWhiteSpace(turn.Text))
+				{
+					turn.IsAudioPreloadCompleted = true;
+					return;
+				}
+
+				var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
+				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? "neutral" : turn.Tone.Trim();
+
+				turn.AudioUrl = await ResolveTtsAudioUrlAsync(
+					turn.Text, tone, characterName, false, turn.MessageId,
+					turn.Emotion, turn.Intensity);
+
+				if (!string.IsNullOrWhiteSpace(turn.AudioUrl))
+				{
+					var audioType = AudioUrlUtils.ResolveAudioType(turn.AudioUrl);
+					turn.AudioClip = await HttpClient.DownloadAudioClipTaskAsync(turn.AudioUrl, audioType);
+				}
+			}
+			catch (Exception ex)
+			{
+				Debug.LogWarning("[ChatController] Failed to resolve turn audio: " + ex.Message);
+			}
+			finally
+			{
+				turn.IsAudioPreloadCompleted = true;
 			}
 		}
 
@@ -1788,7 +2026,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					? null
 					: ChatState.ParentSignals?.GetCharacterSpeakingRateByName?.Invoke(characterName);
 
-				var audioUrl = await ResolveTtsAudioUrlAsync(payload.Text, payload.Tone, characterName, payload.ForceReload, payload.MessageId);
+				var audioUrl = await ResolveTtsAudioUrlAsync(payload.Text, payload.Tone, characterName, payload.ForceReload, payload.MessageId, payload.Emotion, payload.Intensity);
 
 				AudioClip audioClip = null;
 				if (!string.IsNullOrWhiteSpace(audioUrl))
@@ -1810,6 +2048,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					AudioClip = audioClip,
 					ForceReload = payload.ForceReload,
 					MessageIndex = payload.MessageIndex,
+					Emotion = payload.Emotion,
+					Intensity = payload.Intensity,
 				});
 			}
 			catch (Exception exception)
@@ -1930,6 +2170,54 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
 				{
 					Message = "Failed to review vocabulary: " + exception.Message
+				});
+			}
+		}
+
+		/// <summary>
+		/// Generates a story-relevant example sentence for a vocabulary word via API.
+		/// </summary>
+		/// <param name="payload">Request payload with word.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task GenerateVocabExampleInternalAsync(ChatVocabExampleRequestPayload payload)
+		{
+			try
+			{
+				var word = payload.Word.Trim();
+				var body = new ChatVocabExampleRequestPayload { Word = word };
+				var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatGenerateVocabExample, body);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = "Empty response from example sentence generation."
+					});
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<ChatVocabExampleResponsePayload>(responseJson);
+				if (response == null || string.IsNullOrWhiteSpace(response.Sentence))
+				{
+					EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+					{
+						Message = "Failed to parse example sentence response."
+					});
+					return;
+				}
+
+				EventBus.Publish(ChatEvents.VocabExampleGenerated, new ChatVocabExampleResultPayload
+				{
+					Word = word,
+					Sentence = response.Sentence,
+					Pinyin = response.Pinyin,
+					Translation = response.Translation
+				});
+			}
+			catch (Exception exception)
+			{
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Failed to generate example sentence: " + exception.Message
 				});
 			}
 		}
@@ -2129,48 +2417,111 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 		/// <summary>
 		/// Calls the TTS endpoint and returns the resolved absolute audio URL.
+		/// On PC when character uses gpt-sovits voice model, uses the local GPT-SoVITS pipeline instead.
 		/// </summary>
 		/// <param name="text">Text to synthesize.</param>
 		/// <param name="tone">Tone hint.</param>
 		/// <param name="characterName">Character name.</param>
 		/// <param name="forceReload">Whether to force regeneration.</param>
 		/// <param name="messageId">Optional AI-generated message id for server-side rewrite tracking.</param>
+		/// <param name="emotion">Optional emotion label from AI (used by GPT-SoVITS path).</param>
+		/// <param name="intensity">Optional intensity label from AI (used by GPT-SoVITS path).</param>
 		/// <returns>Absolute audio URL, or null on failure.</returns>
-		private static async Task<string> ResolveTtsAudioUrlAsync(string text, string tone, string characterName, bool forceReload = false, string messageId = null)
+		private static async Task<string> ResolveTtsAudioUrlAsync(
+			string text,
+			string tone,
+			string characterName,
+			bool forceReload = false,
+			string messageId = null,
+			string emotion = null,
+			string intensity = null)
 		{
 			try
 			{
-				var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload, messageId);
-				var endpoint = NetworkEndpoints.TextToSpeech + query;
-				var responseJson = await HttpClient.GetTaskAsync(endpoint);
-				if (string.IsNullOrWhiteSpace(responseJson))
+				// ── 1. Check if audio already exists on server (Cache lookup) ──────────
+				if (!forceReload && !string.IsNullOrWhiteSpace(characterName))
 				{
-					return null;
-				}
-
-				var ttsResponse = JsonConvert.DeserializeObject<ChatTextToSpeechResponsePayload>(responseJson);
-
-				// When the server rewrites the text for TTS compatibility, notify the view
-				// so it can update the displayed message content.
-				if (ttsResponse?.Rewritten == true && !string.IsNullOrWhiteSpace(messageId))
-				{
-					EventBus.Publish(ChatEvents.MessageContentUpdated, new ChatMessageContentUpdatedPayload
+					var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload, messageId);
+					var endpoint = NetworkEndpoints.CheckAudio + query;
+					var responseJson = await HttpClient.GetTaskAsync(endpoint);
+					if (!string.IsNullOrWhiteSpace(responseJson))
 					{
-						MessageId = messageId,
-						Text = ttsResponse.Text,
-						Pinyin = ttsResponse.Pinyin,
-					});
+						var ttsResponse = JsonConvert.DeserializeObject<ChatCheckAudioResponsePayload>(responseJson);
+						if (ttsResponse != null && ttsResponse.Exists == true && !string.IsNullOrWhiteSpace(ttsResponse.Url))
+						{
+							var settingsForUrl = UnityEngine.Resources.Load<NetworkSettings>("NetworkSettings");
+							var baseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settingsForUrl != null ? settingsForUrl.BaseUrl : null);
+							return AudioUrlUtils.ResolveAudioUrl(ttsResponse.Url, baseUrl);
+						}
+					}
 				}
 
-				var rawUrl = ttsResponse?.Url;
-				if (string.IsNullOrWhiteSpace(rawUrl))
+				// ── 2. GPT-SoVITS path (PC only, when character uses gemini voice model) ──
+				if (IsDesktopPlatform() && !string.IsNullOrWhiteSpace(characterName) && !string.Equals(characterName.Trim(), "User", StringComparison.OrdinalIgnoreCase))
 				{
-					return null;
+					var voiceModel = ChatState.ParentSignals?.GetCharacterVoiceModelByName?.Invoke(characterName.Trim());
+					if (string.Equals(voiceModel, "gemini", StringComparison.OrdinalIgnoreCase))
+					{
+						var voiceName = ChatState.ParentSignals?.GetCharacterVoiceNameByName?.Invoke(characterName.Trim());
+						var settings = UnityEngine.Resources.Load<NetworkSettings>("NetworkSettings");
+						var serverBaseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settings != null ? settings.BaseUrl : null);
+						if (!string.IsNullOrWhiteSpace(serverBaseUrl))
+						{
+							var mp3Url = await Share.Utils.GptSoVitsTtsService.SynthesizeAsync(
+								text,
+								emotion,
+								intensity,
+								voiceName,
+								tone,
+								characterName,
+								messageId,
+								serverBaseUrl);
+
+							if (!string.IsNullOrWhiteSpace(mp3Url))
+							{
+								return mp3Url;
+							}
+
+							Debug.LogWarning("[ChatController] GPT-SoVITS pipeline failed; falling back to server TTS.");
+						}
+					}
 				}
 
-				var settings = UnityEngine.Resources.Load<NetworkSettings>("NetworkSettings");
-				var baseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settings != null ? settings.BaseUrl : null);
-				return AudioUrlUtils.ResolveAudioUrl(rawUrl, baseUrl);
+				// ── 3. Standard server TTS path ─────────────────────────────────────────
+				{
+					var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload, messageId);
+					var endpoint = NetworkEndpoints.TextToSpeech + query;
+					var responseJson = await HttpClient.GetTaskAsync(endpoint);
+					if (string.IsNullOrWhiteSpace(responseJson))
+					{
+						return null;
+					}
+
+					var ttsResponse = JsonConvert.DeserializeObject<ChatTextToSpeechResponsePayload>(responseJson);
+
+					// When the server rewrites the text for TTS compatibility, notify the view
+					// so it can update the displayed message content.
+					if (ttsResponse?.Rewritten == true && !string.IsNullOrWhiteSpace(messageId))
+					{
+						EventBus.Publish(ChatEvents.MessageContentUpdated, new ChatMessageContentUpdatedPayload
+						{
+							MessageId = messageId,
+							Text = ttsResponse.Text,
+							Pinyin = ttsResponse.Pinyin,
+						});
+					}
+
+					var rawUrl = ttsResponse?.Url;
+					if (string.IsNullOrWhiteSpace(rawUrl))
+					{
+						return null;
+					}
+
+					var settingsForUrl = UnityEngine.Resources.Load<NetworkSettings>("NetworkSettings");
+					var baseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settingsForUrl != null ? settingsForUrl.BaseUrl : null);
+					return AudioUrlUtils.ResolveAudioUrl(rawUrl, baseUrl);
+				}
+
 			}
 			catch (Exception exception)
 			{

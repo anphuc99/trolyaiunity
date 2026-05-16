@@ -23,6 +23,7 @@ export const createChatRoutes = (dataSource: DataSource) => {
   router.post("/transcribe", requireAuth, controller.transcribeAudio);
   router.post("/prepare-local", requireAuth, controller.prepareLocalPrompt);
   router.post("/save-local", requireAuth, controller.saveLocalReply);
+  router.post("/generate-vocab-example", requireAuth, controller.generateVocabExample);
 
   return router;
 };

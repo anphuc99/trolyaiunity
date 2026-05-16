@@ -155,10 +155,43 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Model
 	}
 
 	/// <summary>
-	/// Error payload for request failures.
-	/// </summary>
 	public sealed class PracticeVocabularyErrorPayload
 	{
 		public string Message { get; set; }
+	}
+
+	/// <summary>
+	/// Request payload for generating a vocabulary example sentence.
+	/// </summary>
+	public sealed class PracticeVocabExampleRequestPayload
+	{
+		[JsonProperty("word")]
+		public string Word { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload from the generate-vocab-example endpoint.
+	/// </summary>
+	public sealed class PracticeVocabExampleResponsePayload
+	{
+		[JsonProperty("sentence")]
+		public string Sentence { get; set; }
+
+		[JsonProperty("pinyin")]
+		public string Pinyin { get; set; }
+
+		[JsonProperty("translation")]
+		public string Translation { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload when a vocabulary example sentence has been generated.
+	/// </summary>
+	public sealed class PracticeVocabExampleResultPayload
+	{
+		public string Word { get; set; }
+		public string Sentence { get; set; }
+		public string Pinyin { get; set; }
+		public string Translation { get; set; }
 	}
 }

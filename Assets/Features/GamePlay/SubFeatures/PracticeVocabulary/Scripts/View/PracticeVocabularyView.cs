@@ -78,6 +78,7 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 			{
 				_vocabularyPopupView.SetReviewCallback(null);
 				_vocabularyPopupView.SetAudioPlayCallback(null);
+				_vocabularyPopupView.SetGenerateExampleCallback(null);
 			}
 
 			SetAudioRequestInProgress(false);
@@ -199,6 +200,23 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 			StartCoroutine(PlayVocabularyAudio(playback));
 		}
 
+		/// <summary>
+		/// Handles the AI-generated vocabulary example sentence result from controller.
+		/// Forwards the result to the vocab popup view for display.
+		/// </summary>
+		/// <param name="payload">Example result payload.</param>
+		[OnEvent(PracticeVocabularyEvents.VocabExampleGenerated)]
+		private void OnVocabExampleGenerated(object payload)
+		{
+			var result = payload as PracticeVocabExampleResultPayload;
+			if (result == null || _vocabularyPopupView == null)
+			{
+				return;
+			}
+
+			_vocabularyPopupView.ShowExampleSentence(result.Sentence, result.Pinyin, result.Translation);
+		}
+
 		private IEnumerator PlayVocabularyAudio(PracticeVocabularyPlayAudioPayload playback)
 		{
 			if (playback.AudioClip == null)
@@ -246,7 +264,8 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 		/// </summary>
 		/// <param name="word">Vocabulary word to synthesize.</param>
 		/// <param name="characterName">Selected character name from dropdown.</param>
-		private void HandleVocabularyAudioPlayRequested(string word, string characterName)
+		/// <param name="forceReload">Whether to force reload the TTS audio.</param>
+		private void HandleVocabularyAudioPlayRequested(string word, string characterName, bool forceReload)
 		{
 			if (string.IsNullOrWhiteSpace(word))
 			{
@@ -267,7 +286,39 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 				CharacterName = selectedCharacterName,
 				Text = word.Trim(),
 				Tone = DefaultTtsTone,
+				ForceReload = forceReload
 			});
+		}
+
+		/// <summary>
+		/// Callback from vocab popup when the Example Sentences button is clicked.
+		/// Triggers a request to generate a story-relevant example sentence.
+		/// </summary>
+		/// <param name="word">The vocabulary word to generate an example for.</param>
+		private void HandleGenerateVocabExample(string word)
+		{
+			if (string.IsNullOrWhiteSpace(word))
+			{
+				return;
+			}
+
+			SendRequest(PracticeVocabularyRequests.GenerateVocabExample, new PracticeVocabExampleRequestPayload
+			{
+				Word = word.Trim()
+			});
+		}
+
+		/// <summary>
+		/// Callback from vocab popup when the Next button is clicked.
+		/// Submits a default rating (3) and advances to the next word.
+		/// </summary>
+		private void HandleVocabReviewNext()
+		{
+			var current = GetCurrentVocabulary();
+			if (current != null)
+			{
+				HandleReviewRequested(current.Id, 3);
+			}
 		}
 
 		/// <summary>
@@ -354,7 +405,9 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 
 			_vocabularyPopupView.SetRatingButtonsVisible(true);
 			_vocabularyPopupView.SetReviewCallback(HandleReviewRequested);
+			_vocabularyPopupView.SetNextCallback(HandleVocabReviewNext);
 			_vocabularyPopupView.SetAudioPlayCallback(HandleVocabularyAudioPlayRequested);
+			_vocabularyPopupView.SetGenerateExampleCallback(HandleGenerateVocabExample);
 			RefreshVocabularyCharacterOptions();
 		}
 
@@ -434,6 +487,7 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.View
 
 			SetAudioRequestInProgress(false);
 			RefreshVocabularyCharacterOptions();
+			_vocabularyPopupView.SetNextButtonVisible(false);
 
 			var safeWord = string.IsNullOrWhiteSpace(vocabulary.Korean) ? string.Empty : vocabulary.Korean.Trim();
 			_vocabularyPopupView.ShowLoading(safeWord);

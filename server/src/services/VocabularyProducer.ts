@@ -15,14 +15,15 @@ export class VocabularyProducer {
    * @returns Danh sách VocabularyEntity đã đến hạn
    */
   async getDueVocabularies(userId: number, limit: number = 20): Promise<VocabularyEntity[]> {
-    const now = new Date();
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
 
-    // Tìm các từ vựng đã đến hạn dựa trên nextReviewDate <= thời gian hiện tại
+    // Tìm các từ vựng đã đến hạn dựa trên nextReviewDate <= cuối ngày hôm nay
     return this.vocabRepo.find({
       where: {
         userId,
         isIgnored: false,
-        nextReviewDate: LessThanOrEqual(now) as unknown as Date,
+        nextReviewDate: LessThanOrEqual(endOfDay) as unknown as Date,
       },
       order: {
         // Ưu tiên ôn tập những từ đã quá hạn lâu nhất trước

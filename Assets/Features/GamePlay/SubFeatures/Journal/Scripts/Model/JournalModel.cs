@@ -178,6 +178,16 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 		/// True to force TTS regeneration on server.
 		/// </summary>
 		public bool ForceReload { get; set; }
+
+		/// <summary>
+		/// Emotion label for this turn (e.g. happy, sad, neutral).
+		/// </summary>
+		public string Emotion { get; set; }
+
+		/// <summary>
+		/// Emotional intensity for this turn: low | medium | high.
+		/// </summary>
+		public string Intensity { get; set; }
 	}
 
 	/// <summary>
@@ -238,6 +248,16 @@ namespace Features.GamePlay.SubFeatures.Journal.Model
 		/// </summary>
 		[JsonIgnore]
 		public UnityEngine.AudioClip Clip { get; set; }
+
+		/// <summary>
+		/// Emotion label for this turn.
+		/// </summary>
+		public string Emotion { get; set; }
+
+		/// <summary>
+		/// Emotional intensity for this turn.
+		/// </summary>
+		public string Intensity { get; set; }
 	}
 
 	/// <summary>

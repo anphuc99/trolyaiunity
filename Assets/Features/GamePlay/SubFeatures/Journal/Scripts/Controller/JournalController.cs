@@ -3,6 +3,7 @@ using Features.GamePlay.SubFeatures.Journal.Infrastructure;
 using Features.GamePlay.SubFeatures.Journal.Infrastructure.Attributes;
 using Features.GamePlay.SubFeatures.Journal.Model;
 using Features.GamePlay.SubFeatures.Journal.Requests;
+using Features.GamePlay.SubFeatures.Chat.Model;
 using Core.Infrastructure.Network;
 using Core.Infrastructure.Scenes;
 using Core.Infrastructure.State;
@@ -352,24 +353,15 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 		{
 			try
 			{
-				var endpoint = BuildTextToSpeechEndpoint(payload.Text, payload.Tone, payload.CharacterName, payload.ForceReload, payload.MessageId);
-				var responseJson = await HttpClient.GetTaskAsync(endpoint);
-				if (string.IsNullOrWhiteSpace(responseJson))
-				{
-					PublishError("Empty text-to-speech response from server.");
-					return;
-				}
+				var resolvedUrl = await ResolveTtsAudioUrlAsync(
+					payload.Text,
+					payload.Tone,
+					payload.CharacterName,
+					payload.ForceReload,
+					payload.MessageId,
+					payload.Emotion,
+					payload.Intensity);
 
-				var response = JsonConvert.DeserializeObject<JournalTextToSpeechResponsePayload>(responseJson);
-				if (response == null || string.IsNullOrWhiteSpace(response.Url))
-				{
-					PublishError("Server returned invalid text-to-speech payload.");
-					return;
-				}
-
-				var settings = Resources.Load<NetworkSettings>("NetworkSettings");
-				var baseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settings != null ? settings.BaseUrl : null);
-				var resolvedUrl = AudioUrlUtils.ResolveAudioUrl(response.Url, baseUrl);
 				if (string.IsNullOrWhiteSpace(resolvedUrl))
 				{
 					PublishError("Failed to resolve audio URL.");
@@ -386,13 +378,109 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 					CharacterName = payload.CharacterName,
 					Text = payload.Text,
 					Tone = payload.Tone,
-					AudioUrl = response.Url,
-					Clip = clip
+					AudioUrl = resolvedUrl,
+					Clip = clip,
+					Emotion = payload.Emotion,
+					Intensity = payload.Intensity
 				});
 			}
 			catch (Exception exception)
 			{
 				PublishError("Failed to load journal audio: " + exception.Message);
+			}
+		}
+
+		private static bool IsDesktopPlatform()
+		{
+			return Application.platform == RuntimePlatform.WindowsPlayer ||
+			       Application.platform == RuntimePlatform.OSXPlayer ||
+			       Application.platform == RuntimePlatform.LinuxPlayer ||
+			       Application.platform == RuntimePlatform.WindowsEditor ||
+			       Application.platform == RuntimePlatform.OSXEditor ||
+			       Application.platform == RuntimePlatform.LinuxEditor;
+		}
+
+		private static async Task<string> ResolveTtsAudioUrlAsync(
+			string text,
+			string tone,
+			string characterName,
+			bool forceReload = false,
+			string messageId = null,
+			string emotion = null,
+			string intensity = null)
+		{
+			try
+			{
+				// ── 1. Check if audio already exists on server (Cache lookup) ──────────
+				if (!forceReload && !string.IsNullOrWhiteSpace(characterName))
+				{
+					var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload, messageId);
+					var endpoint = NetworkEndpoints.CheckAudio + query;
+					var responseJson = await HttpClient.GetTaskAsync(endpoint);
+					if (!string.IsNullOrWhiteSpace(responseJson))
+					{
+						var ttsResponse = JsonConvert.DeserializeObject<ChatCheckAudioResponsePayload>(responseJson);
+						if (ttsResponse != null && ttsResponse.Exists == true && !string.IsNullOrWhiteSpace(ttsResponse.Url))
+						{
+							var settingsForUrl = UnityEngine.Resources.Load<NetworkSettings>("NetworkSettings");
+							var baseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settingsForUrl != null ? settingsForUrl.BaseUrl : null);
+							return AudioUrlUtils.ResolveAudioUrl(ttsResponse.Url, baseUrl);
+						}
+					}
+				}
+
+				// ── 2. GPT-SoVITS path (PC only, when character uses gemini voice model) ──
+				if (IsDesktopPlatform() && !string.IsNullOrWhiteSpace(characterName) && !string.Equals(characterName.Trim(), "User", StringComparison.OrdinalIgnoreCase))
+				{
+					var voiceModel = JournalState.ParentSignals?.GetCharacterVoiceModelByName?.Invoke(characterName.Trim());
+					if (string.Equals(voiceModel, "gemini", StringComparison.OrdinalIgnoreCase))
+					{
+						var voiceName = JournalState.ParentSignals?.GetCharacterVoiceNameByName?.Invoke(characterName.Trim());
+						var settings = UnityEngine.Resources.Load<NetworkSettings>("NetworkSettings");
+						var serverBaseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settings != null ? settings.BaseUrl : null);
+						if (!string.IsNullOrWhiteSpace(serverBaseUrl))
+						{
+							var mp3Url = await Share.Utils.GptSoVitsTtsService.SynthesizeAsync(
+								text,
+								emotion,
+								intensity,
+								voiceName,
+								tone,
+								characterName,
+								messageId,
+								serverBaseUrl);
+
+							if (!string.IsNullOrWhiteSpace(mp3Url))
+							{
+								return mp3Url;
+							}
+
+							Debug.LogWarning("[JournalController] GPT-SoVITS pipeline failed; falling back to server TTS.");
+						}
+					}
+				}
+
+				// ── 3. Standard server TTS path ─────────────────────────────────────────
+				{
+					var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload, messageId);
+					var endpoint = NetworkEndpoints.TextToSpeech + query;
+					var responseJson = await HttpClient.GetTaskAsync(endpoint);
+					if (string.IsNullOrWhiteSpace(responseJson))
+					{
+						return null;
+					}
+
+					var ttsResponse = JsonConvert.DeserializeObject<ChatTextToSpeechResponsePayload>(responseJson);
+
+					var settings = UnityEngine.Resources.Load<NetworkSettings>("NetworkSettings");
+					var serverBaseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settings != null ? settings.BaseUrl : null);
+					return AudioUrlUtils.ResolveAudioUrl(ttsResponse?.Url, serverBaseUrl);
+				}
+			}
+			catch (Exception exception)
+			{
+				Debug.LogWarning("[JournalController] Failed to resolve TTS audio URL: " + exception.Message);
+				return null;
 			}
 		}
 
@@ -486,38 +574,7 @@ namespace Features.GamePlay.SubFeatures.Journal.Controller
 			return NetworkEndpoints.Journals + "/" + journalId + "/audio";
 		}
 
-		/// <summary>
-		/// Builds text-to-speech endpoint with query parameters.
-		/// </summary>
-		/// <param name="text">Message text.</param>
-		/// <param name="tone">Optional tone hint.</param>
-		/// <param name="characterName">Character display name.</param>
-		/// <param name="forceReload">True to force regeneration on server.</param>
-		/// <param name="messageId">Optional message id for persisting missing audio mapping.</param>
-		/// <returns>Resolved endpoint path.</returns>
-		private static string BuildTextToSpeechEndpoint(string text, string tone, string characterName, bool forceReload, string messageId = null)
-		{
-			var safeText = string.IsNullOrWhiteSpace(text) ? string.Empty : text;
-			var safeTone = string.IsNullOrWhiteSpace(tone) ? "neutral" : tone.Trim();
-			var safeName = string.IsNullOrWhiteSpace(characterName) ? string.Empty : characterName.Trim();
-			var safeMessageId = string.IsNullOrWhiteSpace(messageId) ? string.Empty : messageId.Trim();
-			var endpoint = NetworkEndpoints.TextToSpeech;
-			var query = "text=" + Uri.EscapeDataString(safeText)
-				+ "&tone=" + Uri.EscapeDataString(safeTone)
-				+ "&characterName=" + Uri.EscapeDataString(safeName);
-
-			if (!string.IsNullOrWhiteSpace(safeMessageId))
-			{
-				query += "&messageId=" + Uri.EscapeDataString(safeMessageId);
-			}
-
-			if (forceReload)
-			{
-				query += "&force=true";
-			}
-
-			return endpoint + "?" + query;
-		}
+		// BuildTextToSpeechEndpoint has been replaced by AudioUrlUtils.BuildTextToSpeechQuery usage in ResolveTtsAudioUrlAsync
 
 		/// <summary>
 		/// Tries to resolve journal id from multiple payload shapes.

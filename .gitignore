@@ -98,7 +98,15 @@ InitTestScene*.unity*
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
 node_modules/
-server/data/
+server/data/*
+!server/data/dataset_chinese/
+!server/data/dataset_chinese/**
+
+!server/data/reference_audios/
+!server/data/reference_audios/**
+
+!server/data/reference_audios/reference_index.json
+!server/data/dataset.list
 server/Library/
 server/Temp/
 server/dist/

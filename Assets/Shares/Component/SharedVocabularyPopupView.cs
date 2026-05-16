@@ -2,6 +2,7 @@ using TMPro;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 /// <summary>
 /// Popup view for displaying vocabulary details in chat.
@@ -21,6 +22,7 @@ namespace Share.Components
         [Header("Button")]
         [SerializeField] private Button _closeButton;
         [SerializeField] private Button _nextButton;
+        [SerializeField] private Button _exampleSentencesButton;
 
         [SerializeField] private GameObject _loadingIndicator;
         [SerializeField] private GameObject _contentGroup;
@@ -28,6 +30,7 @@ namespace Share.Components
         [Header("Âm thanh")]
         [SerializeField] private Button _playAudioButton;
         [SerializeField] private TMP_Dropdown _characterDropdown;
+        [SerializeField] [Min(0.1f)] private float _audioLongPressSeconds = 0.45f;
 
         /// <summary>
         /// Stores the current vocabulary ID for external reference.
@@ -45,9 +48,22 @@ namespace Share.Components
         private System.Action _onNextRequested;
 
         /// <summary>
-        /// Callback for audio playback request: (word, characterName).
+        /// Callback invoked when the Example Sentences button is clicked: (word).
         /// </summary>
-        private System.Action<string, string> _onPlayAudioRequested;
+        private System.Action<string> _onGenerateExampleRequested;
+
+        /// <summary>
+        /// True while waiting for example sentence response from server.
+        /// </summary>
+        private bool _isExampleRequestInProgress;
+
+        /// <summary>
+        /// Callback for audio playback request: (word, characterName, forceReload).
+        /// </summary>
+        private System.Action<string, string, bool> _onPlayAudioRequested;
+
+        private Coroutine _audioLongPressCoroutine;
+        private bool _suppressNextAudioClick;
 
         /// <summary>
         /// True while lookup data is loading.
@@ -58,6 +74,9 @@ namespace Share.Components
         /// True while waiting for vocabulary audio response from server.
         /// </summary>
         private bool _isAudioRequestInProgress;
+
+        private string _cachedMeaning;
+        private string _cachedExample;
 
         private void Awake()
         {
@@ -74,11 +93,17 @@ namespace Share.Components
             if (_playAudioButton != null)
             {
                 _playAudioButton.onClick.AddListener(HandlePlayAudio);
+                SetupAudioLongPressEvents();
             }
 
             if (_showMeaningButton != null)
             {
                 _showMeaningButton.onClick.AddListener(ShowMeaning);
+            }
+
+            if (_exampleSentencesButton != null)
+            {
+                _exampleSentencesButton.onClick.AddListener(HandleGenerateExample);
             }
 
             SetNextButtonVisible(false);
@@ -99,6 +124,8 @@ namespace Share.Components
                 _nextButton.onClick.RemoveListener(HandleNext);
             }
 
+            CancelAudioLongPress();
+
             if (_playAudioButton != null)
             {
                 _playAudioButton.onClick.RemoveListener(HandlePlayAudio);
@@ -107,6 +134,11 @@ namespace Share.Components
             if (_showMeaningButton != null)
             {
                 _showMeaningButton.onClick.RemoveListener(ShowMeaning);
+            }
+
+            if (_exampleSentencesButton != null)
+            {
+                _exampleSentencesButton.onClick.RemoveListener(HandleGenerateExample);
             }
         }
 
@@ -139,8 +171,8 @@ namespace Share.Components
         /// <summary>
         /// Registers callback fired when play-audio button is clicked.
         /// </summary>
-        /// <param name="onPlayAudioRequested">Callback signature: (word, characterName).</param>
-        public void SetAudioPlayCallback(System.Action<string, string> onPlayAudioRequested)
+        /// <param name="onPlayAudioRequested">Callback signature: (word, characterName, forceReload).</param>
+        public void SetAudioPlayCallback(System.Action<string, string, bool> onPlayAudioRequested)
         {
             _onPlayAudioRequested = onPlayAudioRequested;
             UpdateAudioControlsState();
@@ -252,9 +284,11 @@ namespace Share.Components
 
             if (_meaningText != null)
             {
-                _meaningText.text = meaning ?? string.Empty;
+                _cachedMeaning = meaning ?? string.Empty;
+                _meaningText.text = _cachedMeaning;
             }
             
+            _cachedExample = string.Empty;
             _meaningText.gameObject.SetActive(false);
             SetLoadingState(false);
             UpdateAudioControlsState();
@@ -302,6 +336,7 @@ namespace Share.Components
         /// </summary>
         private void HandleNext()
         {
+            SetNextButtonInteractable(false);
             _onNextRequested?.Invoke();
         }
 
@@ -310,6 +345,12 @@ namespace Share.Components
         /// </summary>
         private void HandlePlayAudio()
         {
+            if (_suppressNextAudioClick)
+            {
+                _suppressNextAudioClick = false;
+                return;
+            }
+
             if (_onPlayAudioRequested == null)
             {
                 return;
@@ -321,7 +362,102 @@ namespace Share.Components
                 return;
             }
 
-            _onPlayAudioRequested.Invoke(word.Trim(), GetSelectedCharacterName());
+            _onPlayAudioRequested.Invoke(word.Trim(), GetSelectedCharacterName(), false);
+        }
+
+        private void SetupAudioLongPressEvents()
+        {
+            if (_playAudioButton == null)
+            {
+                return;
+            }
+
+            var trigger = _playAudioButton.GetComponent<EventTrigger>();
+            if (trigger == null)
+            {
+                trigger = _playAudioButton.gameObject.AddComponent<EventTrigger>();
+            }
+
+            if (trigger.triggers == null)
+            {
+                trigger.triggers = new List<EventTrigger.Entry>();
+            }
+
+            AddEventTrigger(trigger, EventTriggerType.PointerDown, OnAudioPointerDown);
+            AddEventTrigger(trigger, EventTriggerType.PointerUp, OnAudioPointerUpOrExit);
+            AddEventTrigger(trigger, EventTriggerType.PointerExit, OnAudioPointerUpOrExit);
+        }
+
+        private void AddEventTrigger(EventTrigger trigger, EventTriggerType eventType, System.Action<BaseEventData> handler)
+        {
+            for (var i = 0; i < trigger.triggers.Count; i++)
+            {
+                if (trigger.triggers[i].eventID == eventType)
+                {
+                    trigger.triggers[i].callback.AddListener(eventData => handler?.Invoke(eventData));
+                    return;
+                }
+            }
+
+            var entry = new EventTrigger.Entry
+            {
+                eventID = eventType,
+                callback = new EventTrigger.TriggerEvent()
+            };
+            entry.callback.AddListener(eventData => handler?.Invoke(eventData));
+            trigger.triggers.Add(entry);
+        }
+
+        private void OnAudioPointerDown(BaseEventData eventData)
+        {
+            if (_audioLongPressCoroutine != null)
+            {
+                StopCoroutine(_audioLongPressCoroutine);
+            }
+
+            _audioLongPressCoroutine = StartCoroutine(DetectAudioLongPress());
+        }
+
+        private void OnAudioPointerUpOrExit(BaseEventData eventData)
+        {
+            CancelAudioLongPress();
+        }
+
+        private System.Collections.IEnumerator DetectAudioLongPress()
+        {
+            yield return new WaitForSeconds(_audioLongPressSeconds);
+
+            _audioLongPressCoroutine = null;
+
+            if (_isAudioRequestInProgress)
+            {
+                yield break;
+            }
+
+            if (_onPlayAudioRequested == null)
+            {
+                yield break;
+            }
+
+            var word = _vocabText != null ? _vocabText.text : null;
+            if (string.IsNullOrWhiteSpace(word))
+            {
+                yield break;
+            }
+
+            _suppressNextAudioClick = true;
+            _onPlayAudioRequested.Invoke(word.Trim(), GetSelectedCharacterName(), true);
+        }
+
+        private void CancelAudioLongPress()
+        {
+            if (_audioLongPressCoroutine == null)
+            {
+                return;
+            }
+
+            StopCoroutine(_audioLongPressCoroutine);
+            _audioLongPressCoroutine = null;
         }
 
         /// <summary>
@@ -363,6 +499,7 @@ namespace Share.Components
                 _contentGroup.SetActive(!isLoading);
             }
 
+            SetNextButtonInteractable(!isLoading);
             UpdateAudioControlsState();
         }
 
@@ -405,7 +542,104 @@ namespace Share.Components
         {
             if (_meaningText != null)
             {
+                _meaningText.text = _cachedMeaning;
                 _meaningText.gameObject.SetActive(true);
+            }
+
+            if (_onNextRequested != null)
+            {
+                SetNextButtonVisible(true);
+                SetNextButtonInteractable(true);
+            }
+        }
+
+        /// <summary>
+        /// Registers callback fired when the Example Sentences button is clicked.
+        /// </summary>
+        /// <param name="onGenerateExample">Callback signature: (word).</param>
+        public void SetGenerateExampleCallback(System.Action<string> onGenerateExample)
+        {
+            _onGenerateExampleRequested = onGenerateExample;
+        }
+
+        /// <summary>
+        /// Handles the Example Sentences button click.
+        /// </summary>
+        private void HandleGenerateExample()
+        {
+            if (_onGenerateExampleRequested == null)
+            {
+                return;
+            }
+
+            var word = _vocabText != null ? _vocabText.text : null;
+            if (string.IsNullOrWhiteSpace(word))
+            {
+                return;
+            }
+
+            _isExampleRequestInProgress = true;
+            SetExampleButtonInteractable(false);
+            _onGenerateExampleRequested.Invoke(word.Trim());
+        }
+
+        /// <summary>
+        /// Displays the AI-generated example sentence in the meaning text area.
+        /// </summary>
+        /// <param name="sentence">Chinese sentence.</param>
+        /// <param name="pinyin">Pinyin reading.</param>
+        /// <param name="translation">Vietnamese translation.</param>
+        public void ShowExampleSentence(string sentence, string pinyin, string translation)
+        {
+            _isExampleRequestInProgress = false;
+            SetExampleButtonInteractable(true);
+
+            if (_meaningText == null)
+            {
+                return;
+            }
+
+            var builder = new System.Text.StringBuilder();
+
+            if (!string.IsNullOrWhiteSpace(sentence))
+            {
+                builder.Append(sentence);
+            }
+
+            if (!string.IsNullOrWhiteSpace(pinyin))
+            {
+                if (builder.Length > 0) builder.Append("\n");
+                builder.Append("<i>");
+                builder.Append(pinyin);
+                builder.Append("</i>");
+            }
+
+            if (!string.IsNullOrWhiteSpace(translation))
+            {
+                if (builder.Length > 0) builder.Append("\n");
+                builder.Append(translation);
+            }
+
+            _cachedExample = builder.ToString();
+            _meaningText.text = _cachedExample;
+            _meaningText.gameObject.SetActive(true);
+
+            if (_onNextRequested != null)
+            {
+                SetNextButtonVisible(true);
+                SetNextButtonInteractable(true);
+            }
+        }
+
+        /// <summary>
+        /// Enables or disables the example sentences button.
+        /// </summary>
+        /// <param name="interactable">Whether the button should be interactable.</param>
+        private void SetExampleButtonInteractable(bool interactable)
+        {
+            if (_exampleSentencesButton != null)
+            {
+                _exampleSentencesButton.interactable = interactable;
             }
         }
     }

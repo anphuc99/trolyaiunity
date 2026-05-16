@@ -17,12 +17,14 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 		/// <summary>
 		/// Default Ollama API base URL.
 		/// </summary>
-		public const string DefaultBaseUrl = "http://localhost:11434";
+		public const string DefaultBaseUrl = "http://175.155.64.164:19731";
+
+		public const string AUTHORIZATION = "Bearer ";
 
 		/// <summary>
 		/// Default model to use for local AI generation.
 		/// </summary>
-		public const string DefaultModel = "gemma4:e4b";
+		public const string DefaultModel = "hf.co/mradermacher/Qwen2.5-Coder-32B-Instruct-Uncensored-i1-GGUF:Q4_K_M";
 
 		/// <summary>
 		/// Timeout in seconds for Ollama requests. Local generation may take longer.
@@ -33,8 +35,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 
 		/// <summary>
 		/// Sends a chat request to the local Ollama instance and returns the assistant reply.
-		/// History is compressed into CharacterName:Text lines and embedded in the system prompt
-		/// so Ollama treats it as context only and never tries to continue or mimic the format.
+		/// Uses the provided system prompt + raw history turns as Ollama messages.
 		/// </summary>
 		/// <param name="systemPrompt">System instruction prompt from server.</param>
 		/// <param name="history">Chat history messages.</param>
@@ -53,27 +54,45 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			var resolvedModel = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
 			var url = resolvedBaseUrl + "/api/chat";
 
-			// Build a single system message that contains both the original system prompt and the
-			// full compressed chat history. Embedding history in the system role prevents Ollama
-			// from mistaking the CharacterName:Text lines as a format it should continue producing.
-			var systemBuilder = new StringBuilder();
-			if (!string.IsNullOrWhiteSpace(systemPrompt))
+			var messages = new List<OllamaChatMessage>();
+
+			var trimmedSystemPrompt = systemPrompt?.Trim() ?? "";
+			if (!string.IsNullOrWhiteSpace(trimmedSystemPrompt))
 			{
-				systemBuilder.AppendLine(systemPrompt.Trim());
+				messages.Add(new OllamaChatMessage { Role = "system", Content = trimmedSystemPrompt });
 			}
 
-			var compressedHistory = BuildCompressedHistory(history);
-			if (!string.IsNullOrWhiteSpace(compressedHistory))
+			if (history != null && history.Count > 0)
 			{
-				systemBuilder.AppendLine();
-				systemBuilder.AppendLine("Lịch sử chat (chỉ để tham khảo ngữ cảnh, không phải định dạng trả lời):");
-				systemBuilder.AppendLine(compressedHistory);
-			}
+				foreach (var message in history)
+				{
+					if (message == null || string.IsNullOrWhiteSpace(message.Content))
+					{
+						continue;
+					}
 
-			var messages = new List<OllamaChatMessage>
-			{
-				new OllamaChatMessage { Role = "system", Content = systemBuilder.ToString().Trim() },
-			};
+					var role = (message.Role ?? "").Trim().ToLowerInvariant();
+					if (role == "system")
+					{
+						continue;
+					}
+
+					if (role == "assistant" && IsRecallMemoryContent(message.Content))
+					{
+						continue;
+					}
+
+					var mappedRole = role == "assistant"
+						? "assistant"
+						: role == "developer" ? "system" : "user";
+
+					messages.Add(new OllamaChatMessage
+					{
+						Role = mappedRole,
+						Content = message.Content.Trim(),
+					});
+				}
+			}
 
 			// Only the current user message goes as a real turn.
 			var currentUserMessage = userMessage?.Trim() ?? "";
@@ -99,6 +118,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 				request.uploadHandler = new UploadHandlerRaw(bodyBytes);
 				request.downloadHandler = new DownloadHandlerBuffer();
 				request.SetRequestHeader("Content-Type", "application/json");
+				request.SetRequestHeader("Authorization", AUTHORIZATION);
 				request.timeout = TimeoutSeconds;
 
 				var operation = request.SendWebRequest();
@@ -191,7 +211,10 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			repairInstructionBuilder.AppendLine("    \"Text\": \"你怎么这样!!!\",");
 			repairInstructionBuilder.AppendLine("    \"Pinyin\": \"Nǐ zěn me zhè yàng!!!\",");
 			repairInstructionBuilder.AppendLine("    \"Tone\": \"Angry and hurt, voice rising with frustration, fast and sharp delivery\",");
+			repairInstructionBuilder.AppendLine("    \"Emotion\": \"angry\",,");
+			repairInstructionBuilder.AppendLine("    \"Intensity\": \"high\",,");
 			repairInstructionBuilder.AppendLine("    \"Translation\": \"Sao bạn lại như vậy!\"");
+			repairInstructionBuilder.AppendLine("    \"Context\": \"Mimi hào hứng vẫy tay\",");
 			repairInstructionBuilder.AppendLine("  }");
 			repairInstructionBuilder.AppendLine("]");
 			repairInstructionBuilder.AppendLine();
@@ -235,6 +258,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 				request.uploadHandler = new UploadHandlerRaw(bodyBytes);
 				request.downloadHandler = new DownloadHandlerBuffer();
 				request.SetRequestHeader("Content-Type", "application/json");
+				request.SetRequestHeader("Authorization", AUTHORIZATION);
 				request.timeout = TimeoutSeconds;
 
 				var operation = request.SendWebRequest();
@@ -334,6 +358,7 @@ Only return the JSON object, no extra text.";
 				Model = resolvedModel,
 				Messages = messages,
 				Stream = false,
+				Format = "json",
 			};
 
 			var jsonBody = JsonConvert.SerializeObject(requestPayload);
@@ -345,6 +370,7 @@ Only return the JSON object, no extra text.";
 				request.uploadHandler = new UploadHandlerRaw(bodyBytes);
 				request.downloadHandler = new DownloadHandlerBuffer();
 				request.SetRequestHeader("Content-Type", "application/json");
+				request.SetRequestHeader("Authorization", AUTHORIZATION);
 				request.timeout = TimeoutSeconds;
 
 				var operation = request.SendWebRequest();
@@ -381,58 +407,6 @@ Only return the JSON object, no extra text.";
 		}
 
 		/// <summary>
-		/// Builds a compact text block from the full chat history for embedding in the system prompt.
-		/// Format per line: "User:<text>", "developer:<text>", or "<CharacterName>:<text>".
-		/// Developer messages are included for character/context awareness.
-		/// Recall-memory tool messages and system messages are skipped.
-		/// </summary>
-		private static string BuildCompressedHistory(List<ChatHistoryMessagePayload> history)
-		{
-			if (history == null || history.Count == 0)
-			{
-				return "";
-			}
-
-			var sb = new StringBuilder();
-			foreach (var msg in history)
-			{
-				if (msg == null || string.IsNullOrWhiteSpace(msg.Content))
-				{
-					continue;
-				}
-
-				var role = (msg.Role ?? "").ToLowerInvariant();
-				if (role == "system")
-				{
-					continue;
-				}
-
-				if (role == "assistant")
-				{
-					// Skip recall-memory tool calls — they are internal AI mechanism messages
-					// (JSON like {"recall_memory":[...]}) and must not leak into the context.
-					if (IsRecallMemoryContent(msg.Content))
-					{
-						continue;
-					}
-
-					var compressed = CompressAssistantContent(msg.Content);
-					if (!string.IsNullOrWhiteSpace(compressed))
-					{
-						sb.AppendLine(compressed);
-					}
-				}
-				else
-				{
-					var label = role == "developer" ? "developer" : "User";
-					sb.AppendLine(label + ":" + msg.Content.Trim());
-				}
-			}
-
-			return sb.ToString().TrimEnd();
-		}
-
-		/// <summary>
 		/// Returns true when the message content is a recall-memory tool call.
 		/// Recall-memory messages are JSON objects with a "recall_memory" array key,
 		/// produced by the server AI pipeline — they must not be treated as dialogue.
@@ -461,63 +435,5 @@ Only return the JSON object, no extra text.";
 			}
 		}
 
-		/// <summary>
-		/// Compresses an assistant reply (JSON array or single object of turns) into compact
-		/// "CharacterName:Text" lines. Falls back to "Mimi:content" when JSON cannot be parsed.
-		/// </summary>
-		private static string CompressAssistantContent(string content)
-		{
-			if (string.IsNullOrWhiteSpace(content))
-			{
-				return "";
-			}
-
-			try
-			{
-				var turns = JsonConvert.DeserializeObject<List<ChatAssistantTurnPayload>>(content);
-				if (turns != null && turns.Count > 0)
-				{
-					return BuildCompressedTurns(turns);
-				}
-			}
-			catch { }
-
-			try
-			{
-				var turn = JsonConvert.DeserializeObject<ChatAssistantTurnPayload>(content);
-				if (turn != null && !string.IsNullOrWhiteSpace(turn.Text))
-				{
-					var name = !string.IsNullOrWhiteSpace(turn.CharacterName) ? turn.CharacterName.Trim() : "Mimi";
-					return name + ":" + turn.Text.Trim();
-				}
-			}
-			catch { }
-
-			return "Mimi:" + content.Trim();
-		}
-
-		/// <summary>
-		/// Formats a list of parsed assistant turns as "CharacterName:Text" lines.
-		/// </summary>
-		private static string BuildCompressedTurns(List<ChatAssistantTurnPayload> turns)
-		{
-			var sb = new StringBuilder();
-			foreach (var turn in turns)
-			{
-				if (turn == null)
-				{
-					continue;
-				}
-
-				var name = !string.IsNullOrWhiteSpace(turn.CharacterName) ? turn.CharacterName.Trim() : "Mimi";
-				var text = !string.IsNullOrWhiteSpace(turn.Text) ? turn.Text.Trim() : "";
-				if (!string.IsNullOrWhiteSpace(text))
-				{
-					sb.AppendLine(name + ":" + text);
-				}
-			}
-
-			return sb.ToString().TrimEnd();
-		}
 	}
 }

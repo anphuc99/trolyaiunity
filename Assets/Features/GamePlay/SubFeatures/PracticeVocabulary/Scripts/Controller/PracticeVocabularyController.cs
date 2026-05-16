@@ -5,6 +5,7 @@ using Features.GamePlay.SubFeatures.PracticeVocabulary.Model;
 using Features.GamePlay.SubFeatures.PracticeVocabulary.Requests;
 using Core.Infrastructure.Network;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Share.Utils;
 using System;
 using System.Collections.Generic;
@@ -184,6 +185,22 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Controller
 			_ = IgnoreVocabularyInternalAsync(payload);
 		}
 
+		/// <summary>
+		/// Handles vocabulary example sentence generation from practice popup.
+		/// </summary>
+		/// <param name="payload">Request payload with word.</param>
+		[Request(PracticeVocabularyRequests.GenerateVocabExample)]
+		public static void HandleGenerateVocabExample(PracticeVocabExampleRequestPayload payload)
+		{
+			if (payload == null || string.IsNullOrWhiteSpace(payload.Word))
+			{
+				PublishError("Missing word for example sentence generation.");
+				return;
+			}
+
+			_ = GenerateVocabExampleInternalAsync(payload);
+		}
+
 		private sealed class ResolvedTtsPayload
 		{
 			public string Url;
@@ -300,6 +317,45 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Controller
 		}
 
 		/// <summary>
+		/// Generates a story-relevant example sentence for a vocabulary word via API.
+		/// </summary>
+		/// <param name="payload">Request payload with word.</param>
+		/// <returns>Awaitable task.</returns>
+		private static async Task GenerateVocabExampleInternalAsync(PracticeVocabExampleRequestPayload payload)
+		{
+			try
+			{
+				var word = payload.Word.Trim();
+				var body = new PracticeVocabExampleRequestPayload { Word = word };
+				var responseJson = await HttpClient.PostJsonTaskAsync(NetworkEndpoints.ChatGenerateVocabExample, body);
+				if (string.IsNullOrWhiteSpace(responseJson))
+				{
+					PublishError("Empty response from example sentence generation.");
+					return;
+				}
+
+				var response = JsonConvert.DeserializeObject<PracticeVocabExampleResponsePayload>(responseJson);
+				if (response == null || string.IsNullOrWhiteSpace(response.Sentence))
+				{
+					PublishError("Failed to parse example sentence response.");
+					return;
+				}
+
+				EventBus.Publish(PracticeVocabularyEvents.VocabExampleGenerated, new PracticeVocabExampleResultPayload
+				{
+					Word = word,
+					Sentence = response.Sentence,
+					Pinyin = response.Pinyin,
+					Translation = response.Translation
+				});
+			}
+			catch (Exception exception)
+			{
+				PublishError("Failed to generate example sentence: " + exception.Message);
+			}
+		}
+
+		/// <summary>
 		/// Resolves vocabulary TTS URL, downloads audio clip and publishes playback event.
 		/// </summary>
 		/// <param name="payload">Audio request payload.</param>
@@ -376,36 +432,115 @@ namespace Features.GamePlay.SubFeatures.PracticeVocabulary.Controller
 		{
 			try
 			{
-				var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload);
-				var endpoint = NetworkEndpoints.TextToSpeech + query;
-				var responseJson = await HttpClient.GetTaskAsync(endpoint);
-				if (string.IsNullOrWhiteSpace(responseJson))
+				// ── 1. Check if audio already exists on server (Cache lookup) ──────────
+				if (!forceReload && !string.IsNullOrWhiteSpace(characterName))
 				{
-					return null;
+					var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload);
+					var endpoint = NetworkEndpoints.CheckAudio + query;
+					var responseJson = await HttpClient.GetTaskAsync(endpoint);
+					if (!string.IsNullOrWhiteSpace(responseJson))
+					{
+						var cacheResponse = JsonConvert.DeserializeObject<JObject>(responseJson);
+						if (cacheResponse != null && cacheResponse["exists"]?.Value<bool>() == true && !string.IsNullOrWhiteSpace(cacheResponse["url"]?.Value<string>()))
+						{
+							var settingsForUrl = Resources.Load<NetworkSettings>("NetworkSettings");
+							var cacheBaseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settingsForUrl != null ? settingsForUrl.BaseUrl : null);
+							return new ResolvedTtsPayload
+							{
+								Url = AudioUrlUtils.ResolveAudioUrl(cacheResponse["url"].Value<string>(), cacheBaseUrl),
+								Text = text,
+								Pinyin = null,
+								Rewritten = false
+							};
+						}
+					}
 				}
 
-				var ttsResponse = JsonConvert.DeserializeObject<PracticeVocabularyTextToSpeechResponsePayload>(responseJson);
-				var rawUrl = ttsResponse?.Url;
-				if (string.IsNullOrWhiteSpace(rawUrl))
+				// ── 2. GPT-SoVITS path (PC only, when character uses gemini voice model) ──
+				if (IsDesktopPlatform() && !string.IsNullOrWhiteSpace(characterName) && !string.Equals(characterName.Trim(), "User", StringComparison.OrdinalIgnoreCase))
 				{
-					return null;
+					var voiceModel = PracticeVocabularyState.ParentSignals?.GetCharacterVoiceModelByName?.Invoke(characterName.Trim());
+					if (string.Equals(voiceModel, "gemini", StringComparison.OrdinalIgnoreCase))
+					{
+						var voiceName = PracticeVocabularyState.ParentSignals?.GetCharacterVoiceNameByName?.Invoke(characterName.Trim());
+						var settings = Resources.Load<NetworkSettings>("NetworkSettings");
+						var serverBaseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settings != null ? settings.BaseUrl : null);
+						if (!string.IsNullOrWhiteSpace(serverBaseUrl))
+						{
+							var mp3Url = await GptSoVitsTtsService.SynthesizeAsync(
+								text,
+								null, // emotion
+								null, // intensity
+								voiceName,
+								tone,
+								characterName,
+								null, // messageId
+								serverBaseUrl);
+
+							if (!string.IsNullOrWhiteSpace(mp3Url))
+							{
+								return new ResolvedTtsPayload
+								{
+									Url = mp3Url,
+									Text = text,
+									Pinyin = null,
+									Rewritten = false
+								};
+							}
+
+							Debug.LogWarning("[PracticeVocabularyController] GPT-SoVITS pipeline failed; falling back to server TTS.");
+						}
+					}
 				}
 
-				var settings = Resources.Load<NetworkSettings>("NetworkSettings");
-				var baseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settings != null ? settings.BaseUrl : null);
-				return new ResolvedTtsPayload
+				// ── 3. Standard server TTS path ─────────────────────────────────────────
 				{
-					Url = AudioUrlUtils.ResolveAudioUrl(rawUrl, baseUrl),
-					Text = ttsResponse.Text,
-					Pinyin = ttsResponse.Pinyin,
-					Rewritten = ttsResponse.Rewritten,
-				};
+					var query = AudioUrlUtils.BuildTextToSpeechQuery(text, tone, characterName, forceReload);
+					var endpoint = NetworkEndpoints.TextToSpeech + query;
+					var responseJson = await HttpClient.GetTaskAsync(endpoint);
+					if (string.IsNullOrWhiteSpace(responseJson))
+					{
+						return null;
+					}
+
+					var ttsResponse = JsonConvert.DeserializeObject<PracticeVocabularyTextToSpeechResponsePayload>(responseJson);
+					var rawUrl = ttsResponse?.Url;
+					if (string.IsNullOrWhiteSpace(rawUrl))
+					{
+						return null;
+					}
+
+					var settings = Resources.Load<NetworkSettings>("NetworkSettings");
+					var baseUrl = AudioUrlUtils.NormalizeServerBaseUrl(settings != null ? settings.BaseUrl : null);
+					return new ResolvedTtsPayload
+					{
+						Url = AudioUrlUtils.ResolveAudioUrl(rawUrl, baseUrl),
+						Text = ttsResponse.Text,
+						Pinyin = ttsResponse.Pinyin,
+						Rewritten = ttsResponse.Rewritten,
+					};
+				}
 			}
 			catch (Exception exception)
 			{
 				Debug.LogWarning("[PracticeVocabularyController] TTS resolution failed: " + exception.Message);
 				return null;
 			}
+		}
+
+		/// <summary>
+		/// Checks whether the current platform is a desktop PC (Windows, macOS, Linux).
+		/// </summary>
+		/// <returns>True on desktop editor or standalone builds.</returns>
+		private static bool IsDesktopPlatform()
+		{
+			var platform = Application.platform;
+			return platform == RuntimePlatform.WindowsEditor
+				|| platform == RuntimePlatform.WindowsPlayer
+				|| platform == RuntimePlatform.OSXEditor
+				|| platform == RuntimePlatform.OSXPlayer
+				|| platform == RuntimePlatform.LinuxEditor
+				|| platform == RuntimePlatform.LinuxPlayer;
 		}
 
 		/// <summary>

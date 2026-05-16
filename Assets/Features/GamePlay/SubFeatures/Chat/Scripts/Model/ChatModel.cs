@@ -89,6 +89,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// View-local message index for reloading UI state tracking.
 		/// </summary>
 		public int MessageIndex { get; set; } = -1;
+
+		/// <summary>
+		/// Emotion label for this turn (e.g. happy, sad, neutral).
+		/// </summary>
+		public string Emotion { get; set; }
+
+		/// <summary>
+		/// Emotional intensity for this turn: low | medium | high.
+		/// </summary>
+		public string Intensity { get; set; }
 	}
 
 	/// <summary>
@@ -151,6 +161,16 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// View-local message index for reloading UI state tracking.
 		/// </summary>
 		public int MessageIndex { get; set; } = -1;
+
+		/// <summary>
+		/// Emotion label for this turn.
+		/// </summary>
+		public string Emotion { get; set; }
+
+		/// <summary>
+		/// Emotional intensity for this turn.
+		/// </summary>
+		public string Intensity { get; set; }
 	}
 
 	/// <summary>
@@ -310,6 +330,21 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		public string Pinyin { get; set; }
 	}
 
+	public sealed class ChatCheckAudioResponsePayload
+	{
+		[JsonProperty("exists")]
+		public bool Exists { get; set; }
+		[JsonProperty("audioId")]
+		public string AudioId { get; set; }
+		[JsonProperty("url")]
+		public string Url { get; set; }
+
+		[JsonProperty("message")]
+		public string Message { get; set; }
+		[JsonProperty("error")]
+		public string Error { get; set; }
+	}
+
 	/// <summary>
 	/// Event payload for notifying views that a message's content was rewritten by the TTS service.
 	/// </summary>
@@ -373,6 +408,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		public string Text { get; set; }
 
 		/// <summary>
+		/// Context of the action/situation.
+		/// </summary>
+		[JsonProperty("Context")]
+		public string Context { get; set; }
+
+		/// <summary>
 		/// Pinyin reading of the text.
 		/// </summary>
 		[JsonProperty("Pinyin")]
@@ -413,6 +454,19 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		[JsonProperty("Transcribe")]
 		public string Transcribe { get; set; }
+
+		/// <summary>
+		/// Emotion label for this turn (e.g. happy, sad, neutral).
+		/// One of: angry, shouting, disgusted, sad, scared, surprised, shy, affectionate, happy, excited, serious, neutral.
+		/// </summary>
+		[JsonProperty("Emotion")]
+		public string Emotion { get; set; }
+
+		/// <summary>
+		/// Emotional intensity for this turn: low | medium | high.
+		/// </summary>
+		[JsonProperty("Intensity")]
+		public string Intensity { get; set; }
 	}
 
 	/// <summary>
@@ -880,6 +934,12 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		/// </summary>
 		[JsonProperty("stream")]
 		public bool Stream { get; set; }
+
+		/// <summary>
+		/// Optional format override. Set to "json" to enforce strict JSON output.
+		/// </summary>
+		[JsonProperty("format", NullValueHandling = NullValueHandling.Ignore)]
+		public string Format { get; set; }
 	}
 
 	/// <summary>
@@ -941,5 +1001,92 @@ namespace Features.GamePlay.SubFeatures.Chat.Model
 		[Newtonsoft.Json.JsonProperty("words")]
 		public System.Collections.Generic.List<string> Words { get; set; }
 			= new System.Collections.Generic.List<string>();
+	}
+
+	/// <summary>
+	/// Request payload for generating a vocabulary example sentence.
+	/// </summary>
+	public sealed class ChatVocabExampleRequestPayload
+	{
+		/// <summary>
+		/// The Chinese word to generate an example sentence for.
+		/// </summary>
+		[Newtonsoft.Json.JsonProperty("word")]
+		public string Word { get; set; }
+	}
+
+	/// <summary>
+	/// Response payload from the generate-vocab-example endpoint.
+	/// </summary>
+	public sealed class ChatVocabExampleResponsePayload
+	{
+		/// <summary>
+		/// The example sentence in Chinese.
+		/// </summary>
+		[Newtonsoft.Json.JsonProperty("sentence")]
+		public string Sentence { get; set; }
+
+		/// <summary>
+		/// Pinyin reading of the sentence.
+		/// </summary>
+		[Newtonsoft.Json.JsonProperty("pinyin")]
+		public string Pinyin { get; set; }
+
+		/// <summary>
+		/// Vietnamese translation of the sentence.
+		/// </summary>
+		[Newtonsoft.Json.JsonProperty("translation")]
+		public string Translation { get; set; }
+	}
+
+	/// <summary>
+	/// Event payload when a vocabulary example sentence has been generated.
+	/// </summary>
+	public sealed class ChatVocabExampleResultPayload
+	{
+		/// <summary>
+		/// The Chinese word the example was generated for.
+		/// </summary>
+		public string Word { get; set; }
+
+		/// <summary>
+		/// The example sentence in Chinese.
+		/// </summary>
+		public string Sentence { get; set; }
+
+		/// <summary>
+		/// Pinyin reading of the sentence.
+		/// </summary>
+		public string Pinyin { get; set; }
+
+		/// <summary>
+		/// Vietnamese translation of the sentence.
+		/// </summary>
+		public string Translation { get; set; }
+	}
+
+	/// <summary>
+	/// Payload published when mission vocabulary has been loaded from server.
+	/// Contains due vocabulary words with their pinyin and meaning.
+	/// </summary>
+	public sealed class ChatMissionVocabularyPayload
+	{
+		public System.Collections.Generic.List<ChatMissionVocabItemPayload> Items { get; set; }
+			= new System.Collections.Generic.List<ChatMissionVocabItemPayload>();
+	}
+
+	/// <summary>
+	/// Single mission vocabulary item with hanzi, pinyin, and Vietnamese meaning.
+	/// </summary>
+	public sealed class ChatMissionVocabItemPayload
+	{
+		[JsonProperty("korean")]
+		public string Korean { get; set; }
+
+		[JsonProperty("pinyin")]
+		public string Pinyin { get; set; }
+
+		[JsonProperty("vietnamese")]
+		public string Vietnamese { get; set; }
 	}
 }
