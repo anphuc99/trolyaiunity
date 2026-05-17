@@ -1638,6 +1638,15 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 			normalized = sanitizedBuilder.ToString().Trim();
 
+			// Strip Ollama thinking/channel markers (e.g. "<|channel>thought\n<channel|>content...")
+			normalized = StripOllamaChannelMarkers(normalized);
+
+			// If it looks like pipe-delimited format, return as is (do not extract JSON blocks)
+			if (!normalized.StartsWith("[") && !normalized.StartsWith("{") && normalized.Split('|').Length >= 7)
+			{
+				return normalized;
+			}
+
 			var firstObjectIndex = normalized.IndexOf('{');
 			var firstArrayIndex = normalized.IndexOf('[');
 
@@ -1695,6 +1704,68 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 
 			return trimmed.Substring(contentStartIndex).Trim();
+		}
+
+		/// <summary>
+		/// Strips Ollama thinking/channel markers that some models prepend before actual content.
+		/// Handles patterns like: &lt;|channel&gt;thought\n&lt;channel|&gt;actual_content
+		/// Also handles &lt;think&gt;...&lt;/think&gt; blocks from reasoning models.
+		/// </summary>
+		/// <param name="content">Raw content that may contain channel markers.</param>
+		/// <returns>Content with channel markers removed.</returns>
+		private static string StripOllamaChannelMarkers(string content)
+		{
+			if (string.IsNullOrWhiteSpace(content))
+			{
+				return "";
+			}
+
+			var result = content;
+
+			// Strip <think>...</think> blocks (DeepSeek-R1 style)
+			while (true)
+			{
+				var thinkStart = result.IndexOf("<think>", StringComparison.OrdinalIgnoreCase);
+				if (thinkStart < 0) break;
+				var thinkEnd = result.IndexOf("</think>", thinkStart, StringComparison.OrdinalIgnoreCase);
+				if (thinkEnd < 0)
+				{
+					// Unclosed think tag: strip from <think> to end
+					result = result.Substring(0, thinkStart).Trim();
+					break;
+				}
+
+				result = (result.Substring(0, thinkStart) + result.Substring(thinkEnd + "</think>".Length)).Trim();
+			}
+
+			// Strip <|channel>...<channel|> markers (QwQ style)
+			var channelEndMarker = "<channel|>";
+			var channelEndIndex = result.IndexOf(channelEndMarker, StringComparison.Ordinal);
+			if (channelEndIndex >= 0)
+			{
+				result = result.Substring(channelEndIndex + channelEndMarker.Length).Trim();
+			}
+
+			// Also strip standalone <|channel>... lines that weren't followed by <channel|>
+			var lines = result.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+			var cleanedBuilder = new StringBuilder();
+			for (var i = 0; i < lines.Length; i++)
+			{
+				var line = lines[i].Trim();
+				if (line.StartsWith("<|channel>", StringComparison.OrdinalIgnoreCase))
+				{
+					continue;
+				}
+				if (line.StartsWith("<channel|>", StringComparison.OrdinalIgnoreCase))
+				{
+					cleanedBuilder.AppendLine(line.Substring("<channel|>".Length).Trim());
+					continue;
+				}
+
+				cleanedBuilder.AppendLine(line);
+			}
+
+			return cleanedBuilder.ToString().Trim();
 		}
 
 		/// <summary>
@@ -1763,13 +1834,24 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		/// <returns>True when all required fields are present.</returns>
 		private static bool IsValidAssistantTurn(ChatAssistantTurnPayload turn)
 		{
-			return turn != null
-				&& !string.IsNullOrWhiteSpace(turn.MessageId)
-				&& !string.IsNullOrWhiteSpace(turn.CharacterName)
-				&& !string.IsNullOrWhiteSpace(turn.Text)
-				&& !string.IsNullOrWhiteSpace(turn.Pinyin)
-				&& !string.IsNullOrWhiteSpace(turn.Tone)
-				&& !string.IsNullOrWhiteSpace(turn.Translation);
+			if (turn == null
+				|| string.IsNullOrWhiteSpace(turn.MessageId)
+				|| string.IsNullOrWhiteSpace(turn.CharacterName)
+				|| string.IsNullOrWhiteSpace(turn.Text)
+				|| string.IsNullOrWhiteSpace(turn.Tone)
+				|| string.IsNullOrWhiteSpace(turn.Translation))
+			{
+				return false;
+			}
+
+			// Narrator (叙述者) is allowed to have empty Pinyin
+			var isNarrator = turn.CharacterName == "\u53d9\u8ff0\u8005";
+			if (!isNarrator && string.IsNullOrWhiteSpace(turn.Pinyin))
+			{
+				return false;
+			}
+
+			return true;
 		}
 
 		/// <summary>
@@ -1934,10 +2016,24 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					if (parts.Length >= 7)
 					{
 						var characterName = parts[1].Trim();
+						var pinyin = parts[3].Trim();
+
+						// Auto-correct narrator name if misspelled or if pinyin strongly indicates it's the narrator
+						var isLikelyNarrator = pinyin == "-" || 
+											   characterName.Equals("Narrator", StringComparison.OrdinalIgnoreCase) ||
+											   characterName.Equals("System", StringComparison.OrdinalIgnoreCase) ||
+											   characterName.Equals("Hệ thống", StringComparison.OrdinalIgnoreCase) ||
+											   characterName.Equals("Người dẫn chuyện", StringComparison.OrdinalIgnoreCase);
+						
+						if (isLikelyNarrator)
+						{
+							characterName = "\u53d9\u8ff0\u8005"; // Force to 叙述者
+						}
+
 						var emotion = parts[4].Trim().ToLower();
 						var intensity = parts[5].Trim().ToLower();
 						var tone = $"{emotion}, {intensity}";
-						var pinyin = parts[3].Trim();
+						
 						if (characterName == "\u53d9\u8ff0\u8005" && pinyin == "-")
 						{
 							pinyin = "";
@@ -1985,6 +2081,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			return new List<ChatAssistantTurnPayload>();
 		}
 
+		private static readonly HashSet<string> _resolvingAudioMessageIds = new HashSet<string>();
+
 		/// <summary>
 		/// Pre-resolves TTS audio URLs for each turn so the View only needs to download audio clips.
 		/// When the character uses gpt-sovits, the full local TTS pipeline is executed.
@@ -2012,6 +2110,13 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					{
 						continue;
 					}
+					
+					var msgId = string.IsNullOrWhiteSpace(turn.MessageId) ? turn.Text : turn.MessageId;
+					if (_resolvingAudioMessageIds.Contains(msgId))
+					{
+						continue;
+					}
+					_resolvingAudioMessageIds.Add(msgId);
 
 					var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
 					var tone = string.IsNullOrWhiteSpace(turn.Tone) ? "neutral" : turn.Tone.Trim();
@@ -2032,6 +2137,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				finally
 				{
 					turn.IsAudioPreloadCompleted = true;
+					var finishMsgId = string.IsNullOrWhiteSpace(turn.MessageId) ? turn.Text : turn.MessageId;
+					_resolvingAudioMessageIds.Remove(finishMsgId);
 				}
 			}
 		}
@@ -2043,6 +2150,9 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			if (turn == null || turn.IsAudioPreloadCompleted) return;
 
+			var msgId = string.IsNullOrWhiteSpace(turn.MessageId) ? turn.Text : turn.MessageId;
+			var didAddTracker = false;
+
 			try
 			{
 				if (string.IsNullOrWhiteSpace(turn.Text))
@@ -2050,6 +2160,19 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					turn.IsAudioPreloadCompleted = true;
 					return;
 				}
+				
+				if (_resolvingAudioMessageIds.Contains(msgId))
+				{
+					// Already being resolved by preload or another call, wait for it to finish
+					while (_resolvingAudioMessageIds.Contains(msgId))
+					{
+						await Task.Delay(100);
+					}
+					return; // Let the other process set the completed flags
+				}
+				
+				_resolvingAudioMessageIds.Add(msgId);
+				didAddTracker = true;
 
 				var characterName = string.IsNullOrWhiteSpace(turn.CharacterName) ? "Mimi" : turn.CharacterName.Trim();
 				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? "neutral" : turn.Tone.Trim();
@@ -2070,7 +2193,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 			}
 			finally
 			{
-				turn.IsAudioPreloadCompleted = true;
+				if (didAddTracker)
+				{
+					turn.IsAudioPreloadCompleted = true;
+					_resolvingAudioMessageIds.Remove(msgId);
+				}
 			}
 		}
 

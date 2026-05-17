@@ -830,6 +830,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				{
 					yield return StartCoroutine(PlayCharacterVoiceAsync(turn.AudioClip));
 				}
+				if(isNarrator)
+				{
+					yield return new WaitForSeconds(2f);
+				}
 			}
 
 			_isProcessingCharacterTurns = false;

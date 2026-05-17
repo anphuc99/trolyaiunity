@@ -456,7 +456,18 @@ export const createChatController = (
       return null;
     }
 
-    const isNarrator = characterName === "\u53d9\u8ff0\u8005";
+    let finalCharacterName = characterName;
+    const isLikelyNarrator = pinyin === "-" || 
+                             characterName.toLowerCase() === "narrator" || 
+                             characterName.toLowerCase() === "system" || 
+                             characterName.toLowerCase() === "hệ thống" || 
+                             characterName.toLowerCase() === "người dẫn chuyện";
+                             
+    if (isLikelyNarrator) {
+      finalCharacterName = "\u53d9\u8ff0\u8005"; // Force to 叙述者
+    }
+
+    const isNarrator = finalCharacterName === "\u53d9\u8ff0\u8005";
 
     // Detect field swapping: Pinyin must NOT contain Hanzi characters (skip for narrator whose Pinyin is "-")
     if (!isNarrator && HAS_HANZI.test(pinyin)) {
@@ -475,7 +486,7 @@ export const createChatController = (
 
     return {
       MessageId: messageId,
-      CharacterName: characterName,
+      CharacterName: finalCharacterName,
       Text: hanzi,
       Pinyin: isNarrator && pinyin === "-" ? "" : pinyin,
       Tone: tone,
