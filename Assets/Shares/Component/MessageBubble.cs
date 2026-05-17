@@ -175,8 +175,9 @@ namespace Share.Components
 
 			if (_speakerButton != null)
 			{
-				_speakerButton.gameObject.SetActive(!data.IsTtsReloading && !data.IsTtsPlaying);
-				_speakerButton.interactable = !string.IsNullOrWhiteSpace(data.Message);
+				var isNarrator = data.SenderName == "\u53d9\u8ff0\u8005";
+				_speakerButton.gameObject.SetActive(!isNarrator && !data.IsTtsReloading && !data.IsTtsPlaying);
+				_speakerButton.interactable = !isNarrator && !string.IsNullOrWhiteSpace(data.Message);
 			}
 
 			if (_translateButton != null)

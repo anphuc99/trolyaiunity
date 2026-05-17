@@ -367,6 +367,11 @@ namespace Share.Components
 		private static string BuildDisplayBaseText(MessageBubbleData message, string originalText)
 		{
 			var baseText = originalText ?? string.Empty;
+			var isNarrator = message != null && message.SenderName == "\u53d9\u8ff0\u8005";
+			if (isNarrator)
+			{
+				baseText = $"<size=50>{baseText}</size>";
+			}
 			if (message != null && !string.IsNullOrWhiteSpace(message.Context))
 			{
 				baseText = $"<size=30>{message.Context.Trim()}</size>\n{TranslationSeparator}\n" + baseText;
@@ -410,8 +415,11 @@ namespace Share.Components
 
 		private string BuildDefaultMessageText(MessageBubbleData message, string originalText)
 		{
+			// Narrator (叙述者): skip ruby pinyin formatting, display at size 50
+			var isNarrator = message != null && message.SenderName == "\u53d9\u8ff0\u8005";
+
 			string baseText;
-			if (!_usePinyinRubyOnTranslate || message == null || string.IsNullOrWhiteSpace(message.Pinyin))
+			if (isNarrator || !_usePinyinRubyOnTranslate || message == null || string.IsNullOrWhiteSpace(message.Pinyin))
 			{
 				baseText = originalText ?? string.Empty;
 			}
@@ -424,6 +432,11 @@ namespace Share.Components
 					textForRuby,
 					message.Pinyin,
 					RubyWrapHanCountPerLine);
+			}
+
+			if (isNarrator)
+			{
+				baseText = $"<size=50>{baseText}</size>";
 			}
 
 			if (message != null && !string.IsNullOrWhiteSpace(message.Context))

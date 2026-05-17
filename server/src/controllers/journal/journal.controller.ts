@@ -126,7 +126,14 @@ export const createJournalController = (
 
     if (!VALID_EMOTIONS.has(emotion.toLowerCase())) return null;
     if (!VALID_INTENSITIES.has(intensity.toLowerCase())) return null;
-    if (HAS_HANZI.test(pinyin)) return null;
+
+    const isNarrator = characterName === "\u53d9\u8ff0\u8005";
+
+    // Detect field swapping: Pinyin must NOT contain Hanzi characters (skip for narrator whose Pinyin is "-")
+    if (!isNarrator && HAS_HANZI.test(pinyin)) return null;
+
+    // For non-narrator characters, Hanzi should contain at least some Chinese characters
+    if (!isNarrator && !HAS_HANZI.test(hanzi)) return null;
 
     const tone = `${emotion.toLowerCase()}, ${intensity.toLowerCase()}`;
 
@@ -134,7 +141,7 @@ export const createJournalController = (
       MessageId: messageId,
       CharacterName: characterName,
       Text: hanzi,
-      Pinyin: pinyin,
+      Pinyin: isNarrator && pinyin === "-" ? "" : pinyin,
       Tone: tone,
       Emotion: emotion.toLowerCase(),
       Intensity: intensity.toLowerCase(),

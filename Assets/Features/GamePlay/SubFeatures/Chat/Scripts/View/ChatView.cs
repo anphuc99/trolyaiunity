@@ -782,19 +782,24 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					continue;
 				}
 
+				var isNarrator = characterName == "\u53d9\u8ff0\u8005";
 				var tone = string.IsNullOrWhiteSpace(turn.Tone) ? DefaultTtsTone : turn.Tone.Trim();
 
-				// If audio is not ready, trigger resolution now (sequential/JIT)
-				// if (turn.AudioClip == null && !turn.IsAudioPreloadCompleted)
-				// {
-				// 	SendRequest(ChatRequests.ResolveTurnAudio, turn);
-				// }
+				// Skip audio resolution for narrator (no TTS)
+				if (!isNarrator)
+				{
+					// If audio is not ready, trigger resolution now (sequential/JIT)
+					if (turn.AudioClip == null && !turn.IsAudioPreloadCompleted)
+					{
+						SendRequest(ChatRequests.ResolveTurnAudio, turn);
+					}
 
-				// Wait until this turn finishes resolution so text is displayed together with ready audio.
-				// while (turn.AudioClip == null && !turn.IsAudioPreloadCompleted)
-				// {
-				// 	yield return null;
-				// }
+					// Wait until this turn finishes resolution so text is displayed together with ready audio.
+					while (turn.AudioClip == null && !turn.IsAudioPreloadCompleted)
+					{
+						yield return null;
+					}
+				}
 
 				var characterMessage = new MessageBubbleData
 				{
@@ -820,10 +825,11 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				}
 				ScrollMessagesToBottom();
 
-				// if (turn.AudioClip != null)
-				// {
-				// 	yield return StartCoroutine(PlayCharacterVoiceAsync(turn.AudioClip));
-				// }
+				// Only play audio for non-narrator characters
+				if (!isNarrator && turn.AudioClip != null)
+				{
+					yield return StartCoroutine(PlayCharacterVoiceAsync(turn.AudioClip));
+				}
 			}
 
 			_isProcessingCharacterTurns = false;
@@ -1642,6 +1648,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
+			// Narrator messages do not have TTS audio
+			if (messageData.SenderName == "\u53d9\u8ff0\u8005")
+			{
+				return;
+			}
+
 			if (_reloadingTtsMessageIndices.Contains(messageData.MessageIndex) || messageData.IsTtsReloading || messageData.IsTtsPlaying)
 			{
 				return;
@@ -1666,6 +1678,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private void HandleMessageSpeakerLongPressed(MessageBubbleData messageData)
 		{
 			if (_messageContainer == null || messageData == null)
+			{
+				return;
+			}
+
+			// Narrator messages do not have TTS audio
+			if (messageData.SenderName == "\u53d9\u8ff0\u8005")
 			{
 				return;
 			}

@@ -701,6 +701,12 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 				return;
 			}
 
+			// Narrator messages do not have TTS audio
+			if (messageData.SenderName == "\u53d9\u8ff0\u8005")
+			{
+				return;
+			}
+
 			if (_reloadingTtsMessageIndices.Contains(messageData.MessageIndex) || messageData.IsTtsReloading)
 			{
 				return;
@@ -712,6 +718,12 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		private void HandleMessageSpeakerLongPressed(MessageBubbleData messageData)
 		{
 			if (_chatVariantRoot == null || messageData == null)
+			{
+				return;
+			}
+
+			// Narrator messages do not have TTS audio
+			if (messageData.SenderName == "\u53d9\u8ff0\u8005")
 			{
 				return;
 			}
@@ -1136,6 +1148,12 @@ namespace Features.GamePlay.SubFeatures.Journal.View
 		private static bool CanAutoPlayMessage(MessageBubbleData messageData)
 		{
 			if (messageData == null || messageData.MessageIndex < 0)
+			{
+				return false;
+			}
+
+			// Narrator messages do not have TTS audio, skip them in autoplay
+			if (messageData.SenderName == "\u53d9\u8ff0\u8005")
 			{
 				return false;
 			}

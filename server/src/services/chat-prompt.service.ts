@@ -12,16 +12,16 @@ export interface ChatPromptParams {
     * Optional human-readable level description coming from the database.
     * Note: this is stored in the `levels.descript` column.
    */
-    levelDescription?: string | null;
-    /**
-    * Optional grammar guideline coming from the database.
-    * Note: this is stored in the `levels.guideline` column.
-    */
-    levelGuideline?: string | null;
-    /**
-    * Optional per-level max word limit coming from the database.
-    */
-    levelMaxWords?: number | null;
+  levelDescription?: string | null;
+  /**
+  * Optional grammar guideline coming from the database.
+  * Note: this is stored in the `levels.guideline` column.
+  */
+  levelGuideline?: string | null;
+  /**
+  * Optional per-level max word limit coming from the database.
+  */
+  levelMaxWords?: number | null;
   /**
    * User's display name.
    */
@@ -217,11 +217,11 @@ ${maybe("STORY PLOT", params.storyPlot)}${maybe("STORY DESCRIPTION", params.stor
 NARRATOR (叙述者)
 ====================================
 - There is a special narrator character named "叙述者".
-- "叙述者" describes character actions, scene changes, and atmosphere IN CHINESE (Simplified).
+- "叙述者" describes character actions, scene changes, and atmosphere IN VIETNAMESE.
 - "叙述者" MUST appear BEFORE each character's dialogue line to describe what the character is doing.
 - "叙述者" always uses Emotion=neutral, Intensity=low.
-- "叙述者" lines should be short descriptive narration in Chinese, NOT dialogue.
-- "叙述者" Pinyin and Translation follow the same rules as normal characters.
+- "叙述者" lines: Hanzi field = Vietnamese narration text, Pinyin field = "-", Translation field = same as Hanzi (Vietnamese).
+- "叙述者" does NOT have audio playback (no TTS).
 
 ====================================
 DIALOGUE RULES
@@ -241,11 +241,11 @@ Field order: MessageId|CharacterName|Hanzi|Pinyin|Emotion|Intensity|Translation
 Field definitions:
 - MessageId: UUID string (e.g., "30dd879c-ee2f-11db-8314-0800200c9a66").
 - CharacterName: speaker name OR "叙述者" for narration.
-- Hanzi: Chinese text (Simplified). May contain Latin letters for foreign names.
-- Pinyin: Pinyin reading of Hanzi. MUST SEPARATE EVERY SINGLE SYLLABLE WITH A SPACE (e.g., "Nǐ hǎo", "wǒ men" not "wǒmen"). Must NOT contain any Chinese characters.
+- Hanzi: For characters = Chinese text (Simplified, may contain Latin letters for foreign names). For "叙述者" = Vietnamese narration text.
+- Pinyin: For characters = Pinyin reading of Hanzi, MUST SEPARATE EVERY SINGLE SYLLABLE WITH A SPACE (e.g., "Nǐ hǎo", "wǒ men" not "wǒmen"), must NOT contain any Chinese characters. For "叙述者" = "-" (dash only).
 - Emotion: MUST be exactly one of these 12 values (lowercase): angry, shouting, disgusted, sad, scared, surprised, shy, affectionate, happy, excited, serious, neutral.
 - Intensity: MUST be exactly one of: low, medium, high.
-- Translation: Vietnamese translation of Hanzi.
+- Translation: Vietnamese translation. For "叙述者" = same as Hanzi field.
 
 CRITICAL RULES:
 - Return ONLY pipe-delimited lines. No JSON, no markdown, no extra commentary.
@@ -274,17 +274,17 @@ EXAMPLES
 ====================================
 
 Example (normal reply with narrator):
-11111111-2222-3333-4444-555555555555|叙述者|Mimi 微笑着向你挥手。|Mimi wēi xiào zhe xiàng nǐ huī shǒu.|neutral|low|Mimi mỉm cười vẫy tay chào bạn.
+11111111-2222-3333-4444-555555555555|叙述者|Mimi mỉm cười vẫy tay chào bạn.|-|neutral|low|Mimi mỉm cười vẫy tay chào bạn.
 30dd879c-ee2f-11db-8314-0800200c9a66|Mimi|你好！|Nǐ hǎo!|happy|low|Xin chào!
 
 Example (angry scene):
-a1b2c3d4-0000-1111-2222-333333333333|叙述者|Mimi 猛地站起来，瞪着你。|Mimi měng de zhàn qǐ lái, dèng zhe nǐ.|neutral|low|Mimi đột ngột đứng dậy, trừng mắt nhìn bạn.
+a1b2c3d4-0000-1111-2222-333333333333|叙述者|Mimi đột ngột đứng dậy, trừng mắt nhìn bạn.|-|neutral|low|Mimi đột ngột đứng dậy, trừng mắt nhìn bạn.
 a1b2c3d4-e5f6-7890-abcd-ef1234567890|Mimi|你怎么这样!!!|Nǐ zěn me zhè yàng!!!|angry|high|Sao bạn lại như vậy!
 
 Example (two characters):
-b0c1d2e3-0000-0000-0000-000000000001|叙述者|Mimi 开心地拍手。|Mimi kāi xīn de pāi shǒu.|neutral|low|Mimi vui vẻ vỗ tay.
+b0c1d2e3-0000-0000-0000-000000000001|叙述者|Mimi vui vẻ vỗ tay.|-|neutral|low|Mimi vui vẻ vỗ tay.
 b0c1d2e3-f4a5-6789-abcd-ef1234567890|Mimi|我喜欢吃炸鸡！|Wǒ xǐ huan chī zhá jī!|happy|high|Tôi thích ăn gà rán!
-c2d3e4f5-0000-0000-0000-000000000002|叙述者|Lisa 笑着摇摇头。|Lisa xiào zhe yáo yáo tóu.|neutral|low|Lisa cười lắc đầu.
+c2d3e4f5-0000-0000-0000-000000000002|叙述者|Lisa cười lắc đầu.|-|neutral|low|Lisa cười lắc đầu.
 c2d3e4f5-a6b7-8901-bcde-222222222222|Lisa|我更喜欢披萨！|Wǒ gèng xǐ huan pī sà!|happy|medium|Tôi thích pizza hơn!
 
 ====================================

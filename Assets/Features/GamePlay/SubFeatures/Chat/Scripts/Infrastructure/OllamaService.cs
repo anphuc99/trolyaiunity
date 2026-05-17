@@ -195,8 +195,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			repairInstructionBuilder.AppendLine("3) Field order: MessageId|CharacterName|Hanzi|Pinyin|Emotion|Intensity|Translation");
 			repairInstructionBuilder.AppendLine("4) MessageId: UUID-like string.");
 			repairInstructionBuilder.AppendLine("5) CharacterName: speaker name or 叙述者 for narrator.");
-			repairInstructionBuilder.AppendLine("6) Hanzi: Chinese text (Simplified). May contain Latin letters for names.");
-			repairInstructionBuilder.AppendLine("7) Pinyin: Latin characters with tone marks. Must NOT contain any Chinese characters.");
+			repairInstructionBuilder.AppendLine("6) Hanzi: Chinese text (Simplified) for characters. Vietnamese text for 叙述者 narrator.");
+			repairInstructionBuilder.AppendLine("7) Pinyin: Latin characters with tone marks for characters. Use \"-\" for 叙述者 narrator.");
 			repairInstructionBuilder.AppendLine("8) Emotion: one of: angry, shouting, disgusted, sad, scared, surprised, shy, affectionate, happy, excited, serious, neutral.");
 			repairInstructionBuilder.AppendLine("9) Intensity: one of: low, medium, high.");
 			repairInstructionBuilder.AppendLine("10) Translation: Vietnamese only.");
@@ -204,10 +204,10 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			repairInstructionBuilder.AppendLine("12) 叙述者 narrator lines should appear before character dialogue lines.");
 			repairInstructionBuilder.AppendLine();
 			repairInstructionBuilder.AppendLine("REFERENCE EXAMPLES (follow this style):");
-			repairInstructionBuilder.AppendLine("11111111-2222-3333-4444-555555555555|叙述者|Mimi 猛地站起来，瞪着你。|Mimi měng de zhàn qǐ lái, dèng zhe nǐ.|neutral|low|Mimi đột ngột đứng dậy, trừng mắt nhìn bạn.");
+			repairInstructionBuilder.AppendLine("11111111-2222-3333-4444-555555555555|叙述者|Mimi đột ngột đứng dậy, trừng mắt nhìn bạn.|-|neutral|low|Mimi đột ngột đứng dậy, trừng mắt nhìn bạn.");
 			repairInstructionBuilder.AppendLine("317e30c6-6c46-448c-b1a4-91aa5b9253a1|Mimi|你怎么这样!!!|Nǐ zěn me zhè yàng!!!|angry|high|Sao bạn lại như vậy!");
 			repairInstructionBuilder.AppendLine();
-			repairInstructionBuilder.AppendLine("a1b2c3d4-0000-0000-0000-000000000001|叙述者|Mimi 微笑着向你挥手。|Mimi wēi xiào zhe xiàng nǐ huī shǒu.|neutral|low|Mimi mỉm cười vẫy tay chào bạn.");
+			repairInstructionBuilder.AppendLine("a1b2c3d4-0000-0000-0000-000000000001|叙述者|Mimi mỉm cười vẫy tay chào bạn.|-|neutral|low|Mimi mỉm cười vẫy tay chào bạn.");
 			repairInstructionBuilder.AppendLine("a1b2c3d4-e5f6-7890-abcd-ef1234567890|Mimi|好的，我们这周末去公园！|Hǎo de, wǒ men zhè zhōu mò qù gōng yuán!|happy|medium|Được rồi, chúng ta sẽ đi công viên cuối tuần này!");
 			repairInstructionBuilder.AppendLine();
 			repairInstructionBuilder.AppendLine("INVALID ASSISTANT RESPONSE TO FIX:");

@@ -456,9 +456,17 @@ export const createChatController = (
       return null;
     }
 
-    // Detect field swapping: Pinyin must NOT contain Hanzi characters
-    if (HAS_HANZI.test(pinyin)) {
+    const isNarrator = characterName === "\u53d9\u8ff0\u8005";
+
+    // Detect field swapping: Pinyin must NOT contain Hanzi characters (skip for narrator whose Pinyin is "-")
+    if (!isNarrator && HAS_HANZI.test(pinyin)) {
       console.warn(`[Chat] Pipe parse: Pinyin field contains Chinese characters, possible field swap: "${pinyin}"`);
+      return null;
+    }
+
+    // For non-narrator characters, Hanzi should contain at least some Chinese characters
+    if (!isNarrator && !HAS_HANZI.test(hanzi)) {
+      console.warn(`[Chat] Pipe parse: Hanzi field contains no Chinese characters for character "${characterName}": "${hanzi}"`);
       return null;
     }
 
@@ -469,7 +477,7 @@ export const createChatController = (
       MessageId: messageId,
       CharacterName: characterName,
       Text: hanzi,
-      Pinyin: pinyin,
+      Pinyin: isNarrator && pinyin === "-" ? "" : pinyin,
       Tone: tone,
       Emotion: emotion.toLowerCase(),
       Intensity: intensity.toLowerCase(),
@@ -578,13 +586,19 @@ export const createChatController = (
       const text = typeof turn.Text === "string" ? turn.Text.trim() : "";
       const pinyin = typeof turn.Pinyin === "string" ? turn.Pinyin.trim() : "";
       const translation = typeof turn.Translation === "string" ? turn.Translation.trim() : "";
+      const isNarrator = characterName === "\u53d9\u8ff0\u8005";
 
-      if (!messageId || !characterName || !text || !pinyin || !translation) {
+      if (!messageId || !characterName || !text || !translation) {
+        return false;
+      }
+
+      // Narrator lines may have empty pinyin (Pinyin = "-" → converted to "")
+      if (!isNarrator && !pinyin) {
         return false;
       }
 
       // Validate Pinyin does not contain Chinese characters (field swap detection)
-      if (HAS_HANZI.test(pinyin)) {
+      if (!isNarrator && HAS_HANZI.test(pinyin)) {
         return false;
       }
     }
@@ -607,12 +621,12 @@ export const createChatController = (
       "Requirements:",
       "- Each line: MessageId|CharacterName|Hanzi|Pinyin|Emotion|Intensity|Translation",
       "- Exactly 7 fields per line separated by | (pipe).",
-      "- Hanzi: Chinese text (Simplified). May contain Latin letters for names.",
-      "- Pinyin: Latin characters with tone marks ONLY. Must NOT contain any Chinese characters.",
+      "- For character lines: Hanzi = Chinese text (Simplified), Pinyin = Latin with tone marks.",
+      "- For \u53d9\u8ff0\u8005 narrator lines: Hanzi = Vietnamese narration, Pinyin = \"-\", Translation = same as Hanzi.",
       "- Emotion: one of: angry, shouting, disgusted, sad, scared, surprised, shy, affectionate, happy, excited, serious, neutral.",
       "- Intensity: one of: low, medium, high.",
       "- Translation: Vietnamese only.",
-      "- 叙述者 narrator line MUST appear before each character dialogue line.",
+      "- \u53d9\u8ff0\u8005 narrator line MUST appear before each character dialogue line.",
       "- No JSON, no markdown, no explanations, no comments."
     ].join("\n");
   };
