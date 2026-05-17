@@ -819,10 +819,10 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				};
 
 				_messageContainer.AddNewMessage(characterMessage);
-				if (_isAutoChatEnabled && !characterMessage.IsTranslationExpanded && !string.IsNullOrWhiteSpace(characterMessage.Translation))
-				{
-					_messageContainer.ToggleMessageTranslation(characterMessage);
-				}
+				// if (_isAutoChatEnabled && !characterMessage.IsTranslationExpanded && !string.IsNullOrWhiteSpace(characterMessage.Translation))
+				// {
+				// 	_messageContainer.ToggleMessageTranslation(characterMessage);
+				// }
 				ScrollMessagesToBottom();
 
 				// Only play audio for non-narrator characters
@@ -832,7 +832,12 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				}
 				if(isNarrator)
 				{
-					yield return new WaitForSeconds(2f);
+					yield return new WaitForSeconds(3f);
+				}
+
+				if (!isNarrator && _isAutoChatEnabled)
+				{
+					yield return new WaitForSeconds(5f);
 				}
 			}
 
@@ -1861,7 +1866,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			_messageContainer.SetCharacterTranslationsExpanded(true);
+			// _messageContainer.SetCharacterTranslationsExpanded(true);
 		}
 
 		/// <summary>
@@ -1915,10 +1920,9 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		/// <summary>
 		/// Initializes the auto-chat vocabulary pool from the loaded payload.
-		/// Mode A (today's new < 10): pool of up to 10 new words, 3 per turn.
-		/// Mode B (today's new >= 10): pool of up to 100 due/old words, 5 per turn.
-		/// Mode C (no due words and daily new cap reached): empty pool, no insertion.
-		/// Pool rotates back to start when exhausted.
+		/// The server's VocabularyDue endpoint already handles the priority:
+		/// due/old words first, then new words from the current level's learning path.
+		/// All words arrive in DueWords; pool rotates back to start when exhausted.
 		/// </summary>
 		/// <param name="payload">Loaded vocabulary payload.</param>
 		private void InitializeAutoChatVocabPool(ChatAutoChatVocabularyPayload payload)
@@ -1933,28 +1937,8 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				return;
 			}
 
-			if (payload.TodayNewCount < MaxAutoChatNewVocabPerDay && payload.NewWords != null && payload.NewWords.Count > 0)
-			{
-				// Mode A: introduce new words, capped at 10 per day total.
-				var capacity = Mathf.Min(payload.NewWords.Count, MaxAutoChatNewVocabPerDay);
-				for (var i = 0; i < capacity; i++)
-				{
-					if (!string.IsNullOrWhiteSpace(payload.NewWords[i]))
-					{
-						_autoChatVocabPool.Add(payload.NewWords[i]);
-					}
-				}
-
-				if (_autoChatVocabPool.Count > 0)
-				{
-					_autoChatVocabWordsPerTurn = AutoChatNewVocabWordsPerTurn;
-					return;
-				}
-			}
-
 			if (payload.DueWords != null && payload.DueWords.Count > 0)
 			{
-				// Mode B: review old/due words, capped at 100 in rotation.
 				var capacity = Mathf.Min(payload.DueWords.Count, MaxAutoChatOldVocabPool);
 				for (var i = 0; i < capacity; i++)
 				{
@@ -1969,7 +1953,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 					_autoChatVocabWordsPerTurn = AutoChatOldVocabWordsPerTurn;
 				}
 			}
-			// Mode C: pool stays empty; chat continues without word injection.
+			// Pool stays empty when no words are available; chat continues without word injection.
 		}
 
 		/// <summary>
@@ -2047,7 +2031,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_autoChatPendingVocabWords.Add(words[i]);
 			}
 
-			return "";
+			return "Hãy chèn các từ vựng sau vào câu nói: " + string.Join(", ", words);;
 		}
 
 		/// <summary>

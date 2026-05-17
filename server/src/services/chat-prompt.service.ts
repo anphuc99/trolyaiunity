@@ -196,11 +196,12 @@ export const buildChatSystemPrompt = (params: ChatPromptParams): string => {
 ====================================
 ABSOLUTE RULES (SYSTEM CRITICAL)
 ====================================
-1. Reply in Chinese (Hanzi field only. Use Simplified Chinese).
-2. Keep replies short and friendly.
-3. Max ${maxWords} Chinese words/characters per sentence when possible.
-4. Avoid numerals; write numbers in Chinese characters.
-5. Translation must be Vietnamese only.
+1. The Hanzi field for character dialogue MUST ALWAYS be in CHINESE (Simplified Chinese, 简体中文). NEVER put Vietnamese in the Hanzi field.
+2. The Translation field MUST ALWAYS be in VIETNAMESE (tiếng Việt). NEVER put Chinese in the Translation field.
+3. Keep replies short and friendly.
+4. Max ${maxWords} Chinese words/characters per sentence when possible.
+5. Avoid numerals; write numbers in Chinese characters.
+6. DO NOT swap Hanzi and Translation. Hanzi = Chinese, Translation = Vietnamese. This is NON-NEGOTIABLE.
 
 ====================================
 LANGUAGE LEVEL: ${level}
@@ -237,21 +238,28 @@ RESPONSE FORMAT (PIPE-DELIMITED TEXT)
 ====================================
 Each line is ONE message. Fields are separated by "|" (pipe character).
 Field order: MessageId|CharacterName|Hanzi|Pinyin|Emotion|Intensity|Translation
+There are exactly 7 fields per line, separated by exactly 6 pipe "|" characters. NO MORE, NO LESS.
 
 Field definitions:
 - MessageId: UUID string (e.g., "30dd879c-ee2f-11db-8314-0800200c9a66").
 - CharacterName: speaker name OR "叙述者" for narration.
-- Hanzi: For characters = Chinese text (Simplified, may contain Latin letters for foreign names). For "叙述者" = Vietnamese narration text.
+- Hanzi: ⚠️ For characters = MUST BE CHINESE text (简体中文, Simplified Chinese, may contain Latin letters for foreign names). NEVER Vietnamese here. For "叙述者" = Vietnamese narration text.
 - Pinyin: For characters = Pinyin reading of Hanzi, MUST SEPARATE EVERY SINGLE SYLLABLE WITH A SPACE (e.g., "Nǐ hǎo", "wǒ men" not "wǒmen"), must NOT contain any Chinese characters. For "叙述者" = "-" (dash only).
 - Emotion: MUST be exactly one of these 12 values (lowercase): angry, shouting, disgusted, sad, scared, surprised, shy, affectionate, happy, excited, serious, neutral.
 - Intensity: MUST be exactly one of: low, medium, high.
-- Translation: Vietnamese translation. For "叙述者" = same as Hanzi field.
+- Translation: ⚠️ MUST BE VIETNAMESE (tiếng Việt). NEVER Chinese here. For "叙述者" = same as Hanzi field.
 
 CRITICAL RULES:
 - Return ONLY pipe-delimited lines. No JSON, no markdown, no extra commentary.
 - Do NOT use "|" inside any field value.
-- Each line must have exactly 7 fields separated by 6 pipe characters.
+- Each line must have EXACTLY 7 fields separated by EXACTLY 6 pipe characters. Count your pipes!
 - "叙述者" narrator line MUST appear before each character dialogue line.
+
+⚠️ COMMON MISTAKES TO AVOID:
+- DO NOT write Vietnamese in the Hanzi field for character lines. The Hanzi field must contain CHINESE.
+- DO NOT write Chinese in the Translation field. The Translation must be VIETNAMESE.
+- DO NOT add extra pipe characters. Each line has exactly 6 pipes.
+- For 叙述者 lines, Pinyin is ONE single "-" (not two dashes, not empty).
 
 ====================================
 HANZI STYLE MARKERS

@@ -2015,6 +2015,19 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					var parts = line.Split('|');
 					if (parts.Length >= 7)
 					{
+						// Fix lines with 8+ fields (AI sometimes emits extra dashes for narrator).
+						// If narrator has 8 fields like: id|叙述者|text|-|-|neutral|low|text
+						// we need to shift so Emotion/Intensity/Translation are correct.
+						if (parts.Length >= 8 && parts[3].Trim() == "-" && parts[4].Trim() == "-")
+						{
+							// Collapse the extra dash: treat parts[3]="-" as Pinyin, skip parts[4], shift the rest.
+							parts = new[]
+							{
+								parts[0], parts[1], parts[2], parts[3],
+								parts[5], parts[6], parts[7]
+							};
+						}
+
 						var characterName = parts[1].Trim();
 						var pinyin = parts[3].Trim();
 
@@ -2039,16 +2052,33 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 							pinyin = "";
 						}
 
+						var hanziField = parts[2].Trim();
+						var translationField = parts[6].Trim();
+
+						// Detect and fix swapped Hanzi/Translation for character lines.
+						// If Hanzi has no CJK characters but Translation does, the AI swapped them.
+						if (characterName != "\u53d9\u8ff0\u8005"
+							&& !string.IsNullOrEmpty(hanziField)
+							&& !string.IsNullOrEmpty(translationField)
+							&& !ContainsCjk(hanziField)
+							&& ContainsCjk(translationField))
+						{
+							Debug.LogWarning($"[ChatController] Detected swapped Hanzi/Translation for {characterName}, auto-correcting.");
+							var temp = hanziField;
+							hanziField = translationField;
+							translationField = temp;
+						}
+
 						turns.Add(new ChatAssistantTurnPayload
 						{
 							MessageId = parts[0].Trim(),
 							CharacterName = characterName,
-							Text = parts[2].Trim(),
+							Text = hanziField,
 							Pinyin = pinyin,
 							Tone = tone,
 							Emotion = emotion,
 							Intensity = intensity,
-							Translation = parts[6].Trim()
+							Translation = translationField
 						});
 					}
 				}
@@ -2462,48 +2492,18 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		}
 
 		/// <summary>
-		/// Loads due vocabulary from the review endpoint and new vocabulary from
-		/// learning paths, then publishes the combined result. Each API call is
-		/// independent so a failure in one does not block the other.
+		/// Loads vocabulary from the server due endpoint and publishes the result.
+		/// The server handles the full logic: due/old words first, then if none are
+		/// due it generates up to 10 new words from the current level's learning path.
+		/// This mirrors the PracticeVocabulary flow exactly.
 		/// </summary>
 		/// <returns>Awaitable task.</returns>
 		private static async Task LoadAutoChatVocabularyInternalAsync()
 		{
 			try
 			{
-				// Fetch due vocabulary, learning paths, and today's new count independently.
-				string dueJson = null;
-				string learningPathsJson = null;
-				string todayNewCountJson = null;
+				var dueJson = await HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyDue);
 
-				try
-				{
-					dueJson = await HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyDue);
-				}
-				catch (Exception dueException)
-				{
-					Debug.LogWarning("[ChatController] Failed to load due vocabulary: " + dueException.Message);
-				}
-
-				try
-				{
-					learningPathsJson = await HttpClient.GetTaskAsync(NetworkEndpoints.LearningPaths);
-				}
-				catch (Exception lpException)
-				{
-					Debug.LogWarning("[ChatController] Failed to load learning paths: " + lpException.Message);
-				}
-
-				try
-				{
-					todayNewCountJson = await HttpClient.GetTaskAsync(NetworkEndpoints.VocabularyTodayNewCount);
-				}
-				catch (Exception cntException)
-				{
-					Debug.LogWarning("[ChatController] Failed to load today's new vocab count: " + cntException.Message);
-				}
-
-				// Parse due vocabulary.
 				var dueResponse = string.IsNullOrWhiteSpace(dueJson)
 					? null
 					: JsonConvert.DeserializeObject<ChatVocabularyListResponsePayload>(dueJson);
@@ -2521,42 +2521,11 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 					}
 				}
 
-				// Parse new words from learning paths (comma-separated vocabulary field).
-				var dueWordSet = new HashSet<string>(dueWords, StringComparer.OrdinalIgnoreCase);
-				var newWords = new List<string>();
-				var lpRoot = string.IsNullOrWhiteSpace(learningPathsJson)
-					? null
-					: JsonConvert.DeserializeObject<JObject>(learningPathsJson);
-				var learningPaths = lpRoot?["learningPaths"] as JArray;
-
-				if (learningPaths != null)
-				{
-					for (var i = 0; i < learningPaths.Count; i++)
-					{
-						var vocabCsv = learningPaths[i]?["vocabulary"]?.ToString();
-						if (string.IsNullOrWhiteSpace(vocabCsv))
-						{
-							continue;
-						}
-
-						var words = vocabCsv.Split(',');
-						for (var j = 0; j < words.Length; j++)
-						{
-							var word = words[j]?.Trim();
-							if (!string.IsNullOrWhiteSpace(word) && !dueWordSet.Contains(word))
-							{
-								newWords.Add(word);
-								dueWordSet.Add(word); // Prevent duplicates across learning paths.
-							}
-						}
-					}
-				}
-
 				EventBus.Publish(ChatEvents.AutoChatVocabularyLoaded, new ChatAutoChatVocabularyPayload
 				{
 					DueWords = dueWords,
-					NewWords = newWords,
-					TodayNewCount = ParseTodayNewCount(todayNewCountJson),
+					NewWords = new List<string>(),
+					TodayNewCount = 0,
 				});
 			}
 			catch (Exception exception)
@@ -2605,8 +2574,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				var json = JsonConvert.SerializeObject(payload);
-				await HttpClient.PostJsonTaskAsync(NetworkEndpoints.VocabularyBatchReview, json);
+				await HttpClient.PostJsonTaskAsync(NetworkEndpoints.VocabularyBatchReview, payload);
 				Debug.Log("[ChatController] Batch-reviewed " + payload.Words.Count + " auto-chat vocab words.");
 			}
 			catch (Exception exception)
@@ -2728,6 +2696,32 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				Debug.LogWarning("[ChatController] TTS resolution failed: " + exception.Message);
 				return null;
 			}
+		}
+
+		/// <summary>
+		/// Returns true if the string contains at least one CJK Unified Ideograph character.
+		/// Used to detect whether a field is Chinese text or Vietnamese/Latin text.
+		/// </summary>
+		/// <param name="text">Text to check.</param>
+		/// <returns>True if any CJK character is found.</returns>
+		private static bool ContainsCjk(string text)
+		{
+			if (string.IsNullOrEmpty(text))
+			{
+				return false;
+			}
+
+			for (var i = 0; i < text.Length; i++)
+			{
+				var c = text[i];
+				// CJK Unified Ideographs: U+4E00 to U+9FFF
+				if (c >= '\u4E00' && c <= '\u9FFF')
+				{
+					return true;
+				}
+			}
+
+			return false;
 		}
 	}
 }
