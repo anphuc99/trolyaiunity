@@ -879,8 +879,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				// // Desktop + non-MyLog: use local Ollama for summarization
-				if (IsDesktopPlatform() && !IsMyLogChatMode())
+				// // Desktop + non-MyLog: use local Ollama for summarization if selected
+				if (IsDesktopPlatform() && IsOllamaSelected() && !IsMyLogChatMode())
 				{
 					await EndConversationViaLocalAIAsync();
 					return;
@@ -1179,7 +1179,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				if (IsDesktopPlatform() && !HasAudioPayload(payload))
+				if (IsDesktopPlatform() && IsOllamaSelected() && !HasAudioPayload(payload))
 				{
 					await SendMessageViaLocalAIAsync(payload);
 					return;
@@ -1253,7 +1253,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 		{
 			try
 			{
-				if (IsDesktopPlatform())
+				if (IsDesktopPlatform() && IsOllamaSelected())
 				{
 					await GenerateReplyFromHistoryViaLocalAIAsync(payload);
 					return;
@@ -1320,6 +1320,15 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				|| platform == RuntimePlatform.OSXPlayer
 				|| platform == RuntimePlatform.LinuxEditor
 				|| platform == RuntimePlatform.LinuxPlayer;
+		}
+
+		/// <summary>
+		/// Checks whether the user has explicitly selected the Ollama model.
+		/// </summary>
+		/// <returns>True when Ollama is selected.</returns>
+		private static bool IsOllamaSelected()
+		{
+			return string.Equals(PlayerPrefs.GetString("SelectedModel", "gemini-flash-lite-latest"), "ollama", StringComparison.OrdinalIgnoreCase);
 		}
 
 		/// <summary>

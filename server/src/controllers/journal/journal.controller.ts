@@ -48,8 +48,22 @@ interface AssistantTurn {
   Text?: string;
   Pinyin?: string;
   Tone?: string;
+  Emotion?: string;
+  Intensity?: string;
   Translation?: string;
 }
+
+/** Valid emotion values for assistant turns. */
+const VALID_EMOTIONS = new Set([
+  "angry", "shouting", "disgusted", "sad", "scared", "surprised",
+  "shy", "affectionate", "happy", "excited", "serious", "neutral"
+]);
+
+/** Valid intensity values for assistant turns. */
+const VALID_INTENSITIES = new Set(["low", "medium", "high"]);
+
+/** Regex to detect Chinese characters (CJK Unified Ideographs). */
+const HAS_HANZI = /[\u4e00-\u9fa5]/;
 
 /**
  * Builds the Journal controller with injected data source dependencies.
@@ -95,6 +109,47 @@ export const createJournalController = (
     return parsed;
   };
 
+  /**
+   * Parses a pipe-delimited line into an AssistantTurn object.
+   * Expected format: MessageId|CharacterName|Hanzi|Pinyin|Emotion|Intensity|Translation
+   */
+  const parsePipeLine = (line: string): AssistantTurn | null => {
+    const parts = line.split("|");
+    if (parts.length !== 7) {
+      return null;
+    }
+
+    const [messageId, characterName, hanzi, pinyin, emotion, intensity, translation] = parts.map(p => p.trim());
+    if (!messageId || !characterName || !hanzi || !pinyin || !emotion || !intensity || !translation) {
+      return null;
+    }
+
+    if (!VALID_EMOTIONS.has(emotion.toLowerCase())) return null;
+    if (!VALID_INTENSITIES.has(intensity.toLowerCase())) return null;
+    if (HAS_HANZI.test(pinyin)) return null;
+
+    const tone = `${emotion.toLowerCase()}, ${intensity.toLowerCase()}`;
+
+    return {
+      MessageId: messageId,
+      CharacterName: characterName,
+      Text: hanzi,
+      Pinyin: pinyin,
+      Tone: tone,
+      Emotion: emotion.toLowerCase(),
+      Intensity: intensity.toLowerCase(),
+      Translation: translation
+    };
+  };
+
+  /**
+   * Checks if content looks like pipe-delimited format.
+   */
+  const isPipeDelimited = (content: string): boolean => {
+    const firstLine = content.split("\n")[0].trim();
+    return !firstLine.startsWith("[") && !firstLine.startsWith("{") && (firstLine.split("|").length - 1) >= 6;
+  };
+
   const parseAssistantReply = (content: string): AssistantTurn[] => {
     const trimmed = content.trim();
 
@@ -102,6 +157,18 @@ export const createJournalController = (
       return [];
     }
 
+    // Try pipe-delimited format first
+    if (isPipeDelimited(trimmed)) {
+      const lines = trimmed.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+      const turns: AssistantTurn[] = [];
+      for (const line of lines) {
+        const turn = parsePipeLine(line);
+        if (turn) turns.push(turn);
+      }
+      if (turns.length > 0) return turns;
+    }
+
+    // Fallback: JSON parsing (backward compatibility)
     const tryParse = (input: string) => {
       try {
         const parsed = JSON.parse(input) as unknown;
@@ -299,7 +366,9 @@ export const createJournalController = (
         const characterName = typeof turn.CharacterName === "string" ? turn.CharacterName.trim() : "Mimi";
         const translation = typeof turn.Translation === "string" ? turn.Translation.trim() : "";
         const pinyin = typeof turn.Pinyin === "string" ? turn.Pinyin.trim() : "";
-        const tone = typeof turn.Tone === "string" ? turn.Tone.trim() : "";
+        const tone = typeof turn.Tone === "string" && turn.Tone.trim()
+          ? turn.Tone.trim()
+          : (turn.Emotion && turn.Intensity ? `${turn.Emotion}, ${turn.Intensity}` : "");
         const voiceKey = normalizeName(characterName || "Mimi");
         const voiceSettings = voiceByCharacter.get(voiceKey);
         const audio = tone ? buildAudioId(content, tone, `${voiceSettings?.voiceModel ?? "openai"}:${voiceSettings?.voiceName ?? ""}`, voiceSettings?.pitch ?? undefined, voiceSettings?.speakingRate ?? undefined) : null;

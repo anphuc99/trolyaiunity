@@ -5,6 +5,7 @@ using Features.GamePlay.SubFeatures.Chat.Model;
 using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.Networking;
+using Shares.Model;
 
 namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 {
@@ -17,14 +18,14 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 		/// <summary>
 		/// Default Ollama API base URL.
 		/// </summary>
-		public const string DefaultBaseUrl = "http://175.155.64.164:19731";
+		public const string DefaultBaseUrl = "http://localhost:11434";
 
-		public const string AUTHORIZATION = "Bearer ";
+		public static string AUTHORIZATION => "Bearer " + EnvSettings.Instance.OllamaAuthorization;
 
 		/// <summary>
 		/// Default model to use for local AI generation.
 		/// </summary>
-		public const string DefaultModel = "hf.co/mradermacher/Qwen2.5-Coder-32B-Instruct-Uncensored-i1-GGUF:Q4_K_M";
+		public const string DefaultModel = "hf.co/TrevorJS/gemma-4-E4B-it-uncensored-GGUF:Q8_0";
 
 		/// <summary>
 		/// Timeout in seconds for Ollama requests. Local generation may take longer.
@@ -184,53 +185,30 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 			// makes the repair request too large and causes Ollama to produce a new reply
 			// instead of strictly reformatting the invalid content.
 			var repairInstructionBuilder = new StringBuilder();
-			repairInstructionBuilder.AppendLine("Rewrite the assistant response into a STRICT valid JSON reply.");
-			repairInstructionBuilder.AppendLine("Do NOT generate new dialogue. Only reformat the content below into valid JSON.");
+			repairInstructionBuilder.AppendLine("Rewrite the assistant response into STRICT pipe-delimited format.");
+			repairInstructionBuilder.AppendLine("Do NOT generate new dialogue. Only reformat the content below.");
 			repairInstructionBuilder.AppendLine();
 
-			repairInstructionBuilder.AppendLine("JSON FORMAT GUIDE (MUST MATCH):");
-			repairInstructionBuilder.AppendLine("1) Return ONLY valid JSON. No markdown, no code fences, no explanation.");
-			repairInstructionBuilder.AppendLine("2) Return a JSON ARRAY of 1-10 objects.");
-			repairInstructionBuilder.AppendLine("3) Every object MUST include EXACT keys with this casing:");
-			repairInstructionBuilder.AppendLine("   MessageId, CharacterName, Text, Pinyin, Tone, Translation");
-			repairInstructionBuilder.AppendLine("4) MessageId should be UUID-like string.");
-			repairInstructionBuilder.AppendLine("5) Text: Chinese (Simplified). Keep original meaning.");
-			repairInstructionBuilder.AppendLine("6) Pinyin: include spaces between syllables.");
-			repairInstructionBuilder.AppendLine("7) Tone: English-only descriptive direction.");
-			repairInstructionBuilder.AppendLine("8) Translation: Vietnamese only.");
-			repairInstructionBuilder.AppendLine("9) If memory sidecar fields exist or are needed, use EXACT key names:");
-			repairInstructionBuilder.AppendLine("   GlobalMemoryEn, GlobalMemoryType, GlobalMemoryImportance");
-			repairInstructionBuilder.AppendLine("   ImportantMemoryEn, ImportantMemoryType, ImportantMemoryImportance, ImportantMemoryActor");
-			repairInstructionBuilder.AppendLine("10) Do NOT return recall_memory command in this repair step.");
+			repairInstructionBuilder.AppendLine("PIPE-DELIMITED FORMAT GUIDE (MUST MATCH):");
+			repairInstructionBuilder.AppendLine("1) Return ONLY pipe-delimited lines. No JSON, no markdown, no code fences, no explanation.");
+			repairInstructionBuilder.AppendLine("2) Each line represents one message with exactly 7 fields separated by | (pipe).");
+			repairInstructionBuilder.AppendLine("3) Field order: MessageId|CharacterName|Hanzi|Pinyin|Emotion|Intensity|Translation");
+			repairInstructionBuilder.AppendLine("4) MessageId: UUID-like string.");
+			repairInstructionBuilder.AppendLine("5) CharacterName: speaker name or 叙述者 for narrator.");
+			repairInstructionBuilder.AppendLine("6) Hanzi: Chinese text (Simplified). May contain Latin letters for names.");
+			repairInstructionBuilder.AppendLine("7) Pinyin: Latin characters with tone marks. Must NOT contain any Chinese characters.");
+			repairInstructionBuilder.AppendLine("8) Emotion: one of: angry, shouting, disgusted, sad, scared, surprised, shy, affectionate, happy, excited, serious, neutral.");
+			repairInstructionBuilder.AppendLine("9) Intensity: one of: low, medium, high.");
+			repairInstructionBuilder.AppendLine("10) Translation: Vietnamese only.");
+			repairInstructionBuilder.AppendLine("11) Do NOT use | inside any field value.");
+			repairInstructionBuilder.AppendLine("12) 叙述者 narrator lines should appear before character dialogue lines.");
 			repairInstructionBuilder.AppendLine();
 			repairInstructionBuilder.AppendLine("REFERENCE EXAMPLES (follow this style):");
-			repairInstructionBuilder.AppendLine("[");
-			repairInstructionBuilder.AppendLine("  {");
-			repairInstructionBuilder.AppendLine("    \"MessageId\": \"317e30c6-6c46-448c-b1a4-91aa5b9253a1\",");
-			repairInstructionBuilder.AppendLine("    \"CharacterName\": \"Mimi\",");
-			repairInstructionBuilder.AppendLine("    \"Text\": \"你怎么这样!!!\",");
-			repairInstructionBuilder.AppendLine("    \"Pinyin\": \"Nǐ zěn me zhè yàng!!!\",");
-			repairInstructionBuilder.AppendLine("    \"Tone\": \"Angry and hurt, voice rising with frustration, fast and sharp delivery\",");
-			repairInstructionBuilder.AppendLine("    \"Emotion\": \"angry\",,");
-			repairInstructionBuilder.AppendLine("    \"Intensity\": \"high\",,");
-			repairInstructionBuilder.AppendLine("    \"Translation\": \"Sao bạn lại như vậy!\"");
-			repairInstructionBuilder.AppendLine("    \"Context\": \"Mimi hào hứng vẫy tay\",");
-			repairInstructionBuilder.AppendLine("  }");
-			repairInstructionBuilder.AppendLine("]");
+			repairInstructionBuilder.AppendLine("11111111-2222-3333-4444-555555555555|叙述者|Mimi 猛地站起来，瞪着你。|Mimi měng de zhàn qǐ lái, dèng zhe nǐ.|neutral|low|Mimi đột ngột đứng dậy, trừng mắt nhìn bạn.");
+			repairInstructionBuilder.AppendLine("317e30c6-6c46-448c-b1a4-91aa5b9253a1|Mimi|你怎么这样!!!|Nǐ zěn me zhè yàng!!!|angry|high|Sao bạn lại như vậy!");
 			repairInstructionBuilder.AppendLine();
-			repairInstructionBuilder.AppendLine("[");
-			repairInstructionBuilder.AppendLine("  {");
-			repairInstructionBuilder.AppendLine("    \"MessageId\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",");
-			repairInstructionBuilder.AppendLine("    \"CharacterName\": \"Mimi\",");
-			repairInstructionBuilder.AppendLine("    \"Text\": \"好的，我们这周末去公园！\",");
-			repairInstructionBuilder.AppendLine("    \"Pinyin\": \"Hǎo de, wǒ men zhè zhōu mò qù gōng yuán!\",");
-			repairInstructionBuilder.AppendLine("    \"Tone\": \"Excited and happy, bright voice with a big smile, upbeat pace\",");
-			repairInstructionBuilder.AppendLine("    \"Translation\": \"Được rồi, chúng ta sẽ đi công viên cuối tuần này!\",");
-			repairInstructionBuilder.AppendLine("    \"GlobalMemoryEn\": \"The group decided to visit the park this weekend.\",");
-			repairInstructionBuilder.AppendLine("    \"GlobalMemoryType\": \"plan\",");
-			repairInstructionBuilder.AppendLine("    \"GlobalMemoryImportance\": \"high\"");
-			repairInstructionBuilder.AppendLine("  }");
-			repairInstructionBuilder.AppendLine("]");
+			repairInstructionBuilder.AppendLine("a1b2c3d4-0000-0000-0000-000000000001|叙述者|Mimi 微笑着向你挥手。|Mimi wēi xiào zhe xiàng nǐ huī shǒu.|neutral|low|Mimi mỉm cười vẫy tay chào bạn.");
+			repairInstructionBuilder.AppendLine("a1b2c3d4-e5f6-7890-abcd-ef1234567890|Mimi|好的，我们这周末去公园！|Hǎo de, wǒ men zhè zhōu mò qù gōng yuán!|happy|medium|Được rồi, chúng ta sẽ đi công viên cuối tuần này!");
 			repairInstructionBuilder.AppendLine();
 			repairInstructionBuilder.AppendLine("INVALID ASSISTANT RESPONSE TO FIX:");
 			repairInstructionBuilder.AppendLine(invalidReply.Trim());
@@ -239,7 +217,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 
 			var messages = new List<OllamaChatMessage>
 			{
-				new OllamaChatMessage { Role = "system", Content = "You are a strict JSON formatter for chat assistant replies." },
+				new OllamaChatMessage { Role = "system", Content = "You are a strict pipe-delimited text formatter for chat assistant replies. Format: MessageId|CharacterName|Hanzi|Pinyin|Emotion|Intensity|Translation" },
 				new OllamaChatMessage { Role = "user", Content = repairInstruction },
 			};
 

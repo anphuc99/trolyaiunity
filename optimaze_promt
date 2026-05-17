@@ -1,0 +1,42 @@
+# Kế hoạch Tối ưu hóa Cấu trúc Prompt Chat
+
+Mục tiêu là giảm đáng kể lượng token tiêu thụ và đơn giản hóa cấu trúc phản hồi của AI. Chúng ta sẽ chuyển từ định dạng mảng JSON phức tạp sang định dạng văn bản thuần túy phân tách bằng dấu gạch đứng (`|`).
+
+## Cần Người dùng Phê duyệt
+
+> [!WARNING]
+> Thay đổi này ảnh hưởng đến cách AI tạo phản hồi và cách server phân tích chúng. Em đã thiết kế kế hoạch để backend server tự động chuyển đổi định dạng `|` mới quay lại mảng JSON mà Unity Client mong đợi. Điều này đảm bảo code phía client (`OllamaService.cs`, `ChatView`, v.v.) sẽ **không** bị lỗi và không cần thay đổi.
+
+## Câu hỏi Mở
+
+> [!IMPORTANT]
+> 1. **Xác nhận định dạng**: Em đề xuất định dạng sau cho AI. Mỗi dòng đại diện cho một lượt hội thoại:
+>    `MessageId|CharacterName|Text|Pinyin|Tone|Emotion|Intensity|Translation`
+>    (Đã loại bỏ `Context` vì nhân vật "System" sẽ đảm nhận việc dẫn chuyện). Đây có đúng là thứ tự anh muốn không?
+> 2. **Nhân vật System**: Em sẽ tự động thêm "System" vào danh sách các nhân vật đang hoạt động và thêm quy tắc: "System đóng vai trò là người dẫn chuyện (narrator)". Anh có muốn "System" sử dụng một Emotion hoặc Tone mặc định nào không?
+> 3. **Lưu trữ Lịch sử**: Em dự định lưu định dạng `|` gọn nhẹ này trực tiếp vào database chat history để tiết kiệm token cho các lượt chat tiếp theo. Server sẽ parse và trả về JSON chỉ khi client yêu cầu thông qua API. Anh thấy phương án này có ổn không?
+
+## Các Thay đổi Đề xuất
+
+### chat-prompt.service.ts
+Sửa đổi các hướng dẫn trong system prompt:
+- **Xóa bỏ** tất cả các trường và quy tắc liên quan đến ký ức (`GlobalMemoryEn`, `ImportantMemoryEn`, v.v.).
+- **Xóa bỏ** hoàn toàn phần `SUMMARY`.
+- **Cập nhật RESPONSE FORMAT**: Hướng dẫn AI phản hồi bằng văn bản thuần túy, mỗi dòng là một tin nhắn, phân tách bằng dấu `|`. Loại bỏ trường `Context`.
+- **Thêm quy tắc nhân vật**: Cho phép `CharacterName = "System"` làm người dẫn chuyện với các quy tắc hội thoại bình thường.
+
+#### [MODIFY] chat-prompt.service.ts
+Cập nhật `buildChatSystemPrompt` để phản ánh các quy tắc mới. Loại bỏ logic memory sidecar khỏi prompt. Thay thế các ví dụ JSON bằng ví dụ sử dụng dấu `|`.
+
+### chat.controller.ts
+Cập nhật logic parsing để hỗ trợ định dạng mới trong khi vẫn đảm bảo client nhận được JSON.
+
+#### [MODIFY] chat.controller.ts
+- Cập nhật `parseAssistantReply`: Phát hiện văn bản phân tách bằng `|`, tách theo dòng, sau đó tách theo `|` và map các trường quay lại object `AssistantTurn`.
+- Cập nhật `buildJsonRetryPrompt`: Thay đổi hướng dẫn retry để yêu cầu AI sử dụng định dạng `|` thay vì JSON.
+- Đảm bảo các phản hồi API (`sendMessage`, `respondFromHistory`, `getHistory`) chuyển đổi các lượt hội thoại đã parse thành chuỗi JSON khi trả về client.
+
+## Kế hoạch Xác minh
+
+### Kiểm tra Thủ công
+- Sau khi áp dụng các thay đổi, server phải parse thành công định dạng `|` mới từ AI và Unity client phải tiếp tục nhận được các payload JSON tiêu chuẩn một cách mượt mà.

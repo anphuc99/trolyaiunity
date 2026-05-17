@@ -112,3 +112,7 @@ server/Temp/
 server/dist/
 server/.env
 servertoken.txt
+
+# Local Environment SO settings
+/[Aa]ssets/[Rr]esources/EnvSettings.asset
+/[Aa]ssets/[Rr]esources/EnvSettings.asset.meta

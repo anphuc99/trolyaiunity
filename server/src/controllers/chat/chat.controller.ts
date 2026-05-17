@@ -57,19 +57,24 @@ interface AssistantTurn {
   Context?: string;
   Pinyin?: string;
   Tone?: string;
+  Emotion?: string;
+  Intensity?: string;
   Translation?: string;
   Transcribe?: string;
-  /** Sidecar: global/objective memory (first item only). */
-  GlobalMemoryEn?: string;
-  GlobalMemoryType?: string;
-  GlobalMemoryImportance?: string;
-  /** Sidecar: character subjective memory (any item, actor = CharacterName). */
-  ImportantMemoryEn?: string;
-  ImportantMemoryType?: string;
-  ImportantMemoryImportance?: string;
-  ImportantMemoryActor?: string;
   [key: string]: unknown;
 }
+
+/** Valid emotion values for assistant turns. */
+const VALID_EMOTIONS = new Set([
+  "angry", "shouting", "disgusted", "sad", "scared", "surprised",
+  "shy", "affectionate", "happy", "excited", "serious", "neutral"
+]);
+
+/** Valid intensity values for assistant turns. */
+const VALID_INTENSITIES = new Set(["low", "medium", "high"]);
+
+/** Regex to detect Chinese characters (CJK Unified Ideographs). */
+const HAS_HANZI = /[\u4e00-\u9fa5]/;
 
 type ChatReplyService = OpenAIChatService | GeminiChatService;
 
@@ -425,6 +430,62 @@ export const createChatController = (
     ].join("\n");
   };
 
+  /**
+   * Parses a pipe-delimited line into an AssistantTurn object.
+   * Expected format: MessageId|CharacterName|Hanzi|Pinyin|Emotion|Intensity|Translation
+   *
+   * @param line - A single pipe-delimited line.
+   * @returns AssistantTurn object or null when the line is invalid.
+   */
+  const parsePipeLine = (line: string): AssistantTurn | null => {
+    const parts = line.split("|");
+    if (parts.length !== 7) {
+      return null;
+    }
+
+    const [messageId, characterName, hanzi, pinyin, emotion, intensity, translation] = parts.map(p => p.trim());
+    if (!messageId || !characterName || !hanzi || !pinyin || !emotion || !intensity || !translation) {
+      return null;
+    }
+
+    // Validate emotion & intensity
+    if (!VALID_EMOTIONS.has(emotion.toLowerCase())) {
+      return null;
+    }
+    if (!VALID_INTENSITIES.has(intensity.toLowerCase())) {
+      return null;
+    }
+
+    // Detect field swapping: Pinyin must NOT contain Hanzi characters
+    if (HAS_HANZI.test(pinyin)) {
+      console.warn(`[Chat] Pipe parse: Pinyin field contains Chinese characters, possible field swap: "${pinyin}"`);
+      return null;
+    }
+
+    // Generate Tone from Emotion + Intensity
+    const tone = `${emotion.toLowerCase()}, ${intensity.toLowerCase()}`;
+
+    return {
+      MessageId: messageId,
+      CharacterName: characterName,
+      Text: hanzi,
+      Pinyin: pinyin,
+      Tone: tone,
+      Emotion: emotion.toLowerCase(),
+      Intensity: intensity.toLowerCase(),
+      Translation: translation
+    };
+  };
+
+  /**
+   * Checks if content looks like pipe-delimited format (contains | separators on non-JSON lines).
+   */
+  const isPipeDelimited = (content: string): boolean => {
+    const firstLine = content.split("\n")[0].trim();
+    // Pipe-delimited if the first non-empty line contains multiple pipes and doesn't start with [ or {
+    return !firstLine.startsWith("[") && !firstLine.startsWith("{") && (firstLine.split("|").length - 1) >= 6;
+  };
+
   const parseAssistantReply = (content: string): AssistantTurn[] => {
     const trimmed = content.trim();
 
@@ -432,6 +493,22 @@ export const createChatController = (
       return [];
     }
 
+    // ── Try pipe-delimited format first ─────────────────────────────────
+    if (isPipeDelimited(trimmed)) {
+      const lines = trimmed.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+      const turns: AssistantTurn[] = [];
+      for (const line of lines) {
+        const turn = parsePipeLine(line);
+        if (turn) {
+          turns.push(turn);
+        }
+      }
+      if (turns.length > 0) {
+        return turns;
+      }
+    }
+
+    // ── Fallback: try JSON parsing (backward compatibility) ────────────
     const tryParse = (input: string) => {
       try {
         const parsed = JSON.parse(input) as unknown;
@@ -479,7 +556,9 @@ export const createChatController = (
   };
 
   /**
-   * Validates that assistant turns match the required JSON schema shape.
+   * Validates that assistant turns match the required schema shape.
+   * Supports both new pipe-delimited format (no Context/Tone required)
+   * and legacy JSON format (Context/Tone present).
    *
    * @param turns - Parsed assistant turns.
    * @returns True when all required fields exist and are non-empty strings.
@@ -496,13 +575,16 @@ export const createChatController = (
 
       const messageId = typeof turn.MessageId === "string" ? turn.MessageId.trim() : "";
       const characterName = typeof turn.CharacterName === "string" ? turn.CharacterName.trim() : "";
-      const context = typeof turn.Context === "string" ? turn.Context.trim() : "";
       const text = typeof turn.Text === "string" ? turn.Text.trim() : "";
       const pinyin = typeof turn.Pinyin === "string" ? turn.Pinyin.trim() : "";
-      const tone = typeof turn.Tone === "string" ? turn.Tone.trim() : "";
       const translation = typeof turn.Translation === "string" ? turn.Translation.trim() : "";
 
-      if (!messageId || !characterName || !context || !text || !pinyin || !tone || !translation) {
+      if (!messageId || !characterName || !text || !pinyin || !translation) {
+        return false;
+      }
+
+      // Validate Pinyin does not contain Chinese characters (field swap detection)
+      if (HAS_HANZI.test(pinyin)) {
         return false;
       }
     }
@@ -511,21 +593,27 @@ export const createChatController = (
   };
 
   /**
-   * Creates a corrective retry prompt when assistant output is not valid JSON schema.
+   * Creates a corrective retry prompt when assistant output is not valid pipe-delimited format.
    *
-   * @param userMessage - Original user message.
+   * @param promptSeed - Original user message seed for retry.
    * @returns Retry prompt text.
    */
-  const buildJsonRetryPrompt = (promptSeed: string) => {
+  const buildFormatRetryPrompt = (promptSeed: string) => {
     return [
       promptSeed,
       "",
-      "Your previous response did not match the required JSON format.",
-      "Retry now and return ONLY valid JSON array.",
+      "Your previous response did not match the required PIPE-DELIMITED format.",
+      "Retry now and return ONLY pipe-delimited lines.",
       "Requirements:",
-      "- Must be a JSON array (1-10 items).",
-      "- Every item must include non-empty string fields: MessageId, CharacterName, Context, Text, Pinyin, Tone, Translation.",
-      "- No markdown, no explanations, no comments."
+      "- Each line: MessageId|CharacterName|Hanzi|Pinyin|Emotion|Intensity|Translation",
+      "- Exactly 7 fields per line separated by | (pipe).",
+      "- Hanzi: Chinese text (Simplified). May contain Latin letters for names.",
+      "- Pinyin: Latin characters with tone marks ONLY. Must NOT contain any Chinese characters.",
+      "- Emotion: one of: angry, shouting, disgusted, sad, scared, surprised, shy, affectionate, happy, excited, serious, neutral.",
+      "- Intensity: one of: low, medium, high.",
+      "- Translation: Vietnamese only.",
+      "- 叙述者 narrator line MUST appear before each character dialogue line.",
+      "- No JSON, no markdown, no explanations, no comments."
     ].join("\n");
   };
 
@@ -544,7 +632,7 @@ export const createChatController = (
       `Your previous response used invalid CharacterName values: ${invalidNames.map(n => `"${n}"`).join(", ")}.`,
       `ONLY the following CharacterName values are allowed: ${allowedNames.map(n => `"${n}"`).join(", ")}.`,
       "Retry now. Use ONLY allowed CharacterName values.",
-      "Return ONLY valid JSON array with the correct CharacterName values."
+      "Return ONLY pipe-delimited lines with the correct CharacterName values."
     ].join("\n");
   };
 
@@ -561,6 +649,8 @@ export const createChatController = (
     }
 
     const allowedSet = new Set(allowedNames.map(n => n.trim().toLowerCase()));
+    // Always allow the narrator character
+    allowedSet.add("\u53d9\u8ff0\u8005");
     const invalidNames: string[] = [];
 
     for (const turn of turns) {
@@ -572,6 +662,7 @@ export const createChatController = (
 
     return { valid: invalidNames.length === 0, invalidNames };
   };
+
 
   /**
    * Requests a reply from AI and retries with a corrective prompt when JSON format is invalid
@@ -622,8 +713,8 @@ export const createChatController = (
         if (attempt > retryLimit) {
           break;
         }
-        console.warn(`Assistant reply JSON invalid at attempt ${attempt}. Retrying with strict JSON format reminder.`);
-        prompt = buildJsonRetryPrompt(retryPromptSeed);
+        console.warn(`Assistant reply format invalid at attempt ${attempt}. Retrying with strict format reminder.`);
+        prompt = buildFormatRetryPrompt(retryPromptSeed);
         continue;
       }
 
@@ -643,7 +734,7 @@ export const createChatController = (
       prompt = buildCharacterNameRetryPrompt(retryPromptSeed, invalidNames, effectiveAllowedNames);
     }
 
-    throw new Error("AI returned invalid JSON format after retries");
+    throw new Error("AI returned invalid format after retries");
   };
 
   const collectAssistantMessageIds = (messages: { role: string; content: string }[]) => {

@@ -27,7 +27,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 		private const int RecordingFrequencyHz = 16000;
 		private const int MaxRecordingSeconds = 60;
 		private const string DefaultSpeechLanguage = "zh";
-		private const string AutoChatContextTemplate = "AI tự nói chuyện khoảng {0} tin nhắn mỗi lượt. Các nhân vật không được phép ngủ";
+		private const string AutoChatContextTemplate = "AI tự nói chuyện khoảng {0} tin nhắn mỗi lượt. Các nhân vật không được phép ngủ. Yêu cầu: Phải diễn đúng theo context, không được nhảy cóc nội dung và không được diễn sai mục đích.";
 
 		[SerializeField]
 		private TMP_InputField _inputField;
@@ -1744,10 +1744,16 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 
 		private void HandleSaveContextClicked(string context)
 		{
+			var enrichedContext = context;
+			if (!string.IsNullOrWhiteSpace(enrichedContext) && !enrichedContext.Contains("không được nhảy cóc"))
+			{
+				enrichedContext += "\n(Yêu cầu: Phải diễn đúng context, không được nhảy cóc và diễn sai mục đích)";
+			}
+
 			SendRequest(ChatRequests.SaveContext, new ChatSaveContextRequestPayload
 			{
 				SessionId = string.IsNullOrWhiteSpace(_sessionId) ? null : _sessionId,
-				Context = context,
+				Context = enrichedContext,
 			});
 		}
 
@@ -2019,7 +2025,7 @@ namespace Features.GamePlay.SubFeatures.Chat.View
 				_autoChatPendingVocabWords.Add(words[i]);
 			}
 
-			return "Hãy chèn các từ vựng sau vào câu nói: " + string.Join(", ", words);
+			return "";
 		}
 
 		/// <summary>
