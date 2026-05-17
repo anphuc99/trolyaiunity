@@ -1736,7 +1736,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 
 			try
 			{
-				var parsedList = JsonConvert.DeserializeObject<List<ChatAssistantTurnPayload>>(reply);
+				var parsedList = ParseAssistantTurns(reply);
 				if (parsedList != null && parsedList.Count > 0)
 				{
 					for (var i = 0; i < parsedList.Count; i++)
@@ -1746,18 +1746,8 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 							return false;
 						}
 					}
-
 					return true;
 				}
-			}
-			catch
-			{
-			}
-
-			try
-			{
-				var single = JsonConvert.DeserializeObject<ChatAssistantTurnPayload>(reply);
-				return IsValidAssistantTurn(single);
 			}
 			catch
 			{
@@ -1795,6 +1785,37 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				return null;
 			}
 
+			var trimmed = replyJson.Trim();
+
+			// 1) Handle Pipe-Delimited
+			if (!trimmed.StartsWith("[") && !trimmed.StartsWith("{") && trimmed.Split('|').Length >= 7)
+			{
+				var lines = trimmed.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+				var builder = new StringBuilder();
+				var replacedAny = false;
+				for (var index = 0; index < lines.Length; index++)
+				{
+					var line = lines[index];
+					var parts = line.Split('|');
+					if (parts.Length >= 7)
+					{
+						parts[0] = Guid.NewGuid().ToString();
+						builder.AppendLine(string.Join("|", parts));
+						replacedAny = true;
+					}
+					else
+					{
+						builder.AppendLine(line);
+					}
+				}
+				
+				if (replacedAny)
+				{
+					return builder.ToString().Trim();
+				}
+			}
+
+			// 2) Handle JSON Fallback
 			try
 			{
 				var token = JToken.Parse(replyJson);
@@ -1900,6 +1921,49 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				return new List<ChatAssistantTurnPayload>();
 			}
 
+			var trimmed = reply.Trim();
+
+			// 1) Try Pipe-Delimited format first
+			if (!trimmed.StartsWith("[") && !trimmed.StartsWith("{") && trimmed.Split('|').Length >= 7)
+			{
+				var lines = trimmed.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+				var turns = new List<ChatAssistantTurnPayload>();
+				foreach (var line in lines)
+				{
+					var parts = line.Split('|');
+					if (parts.Length >= 7)
+					{
+						var characterName = parts[1].Trim();
+						var emotion = parts[4].Trim().ToLower();
+						var intensity = parts[5].Trim().ToLower();
+						var tone = $"{emotion}, {intensity}";
+						var pinyin = parts[3].Trim();
+						if (characterName == "\u53d9\u8ff0\u8005" && pinyin == "-")
+						{
+							pinyin = "";
+						}
+
+						turns.Add(new ChatAssistantTurnPayload
+						{
+							MessageId = parts[0].Trim(),
+							CharacterName = characterName,
+							Text = parts[2].Trim(),
+							Pinyin = pinyin,
+							Tone = tone,
+							Emotion = emotion,
+							Intensity = intensity,
+							Translation = parts[6].Trim()
+						});
+					}
+				}
+
+				if (turns.Count > 0)
+				{
+					return turns;
+				}
+			}
+
+			// 2) Fallback to JSON
 			try
 			{
 				var parsedList = JsonConvert.DeserializeObject<List<ChatAssistantTurnPayload>>(reply);

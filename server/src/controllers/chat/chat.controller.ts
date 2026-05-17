@@ -485,12 +485,10 @@ export const createChatController = (
     };
   };
 
-  /**
-   * Checks if content looks like pipe-delimited format (contains | separators on non-JSON lines).
-   */
   const isPipeDelimited = (content: string): boolean => {
-    const firstLine = content.split("\n")[0].trim();
-    // Pipe-delimited if the first non-empty line contains multiple pipes and doesn't start with [ or {
+    const lines = content.split("\n").map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith("```"));
+    if (lines.length === 0) return false;
+    const firstLine = lines[0];
     return !firstLine.startsWith("[") && !firstLine.startsWith("{") && (firstLine.split("|").length - 1) >= 6;
   };
 

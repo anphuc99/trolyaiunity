@@ -149,11 +149,10 @@ export const createJournalController = (
     };
   };
 
-  /**
-   * Checks if content looks like pipe-delimited format.
-   */
   const isPipeDelimited = (content: string): boolean => {
-    const firstLine = content.split("\n")[0].trim();
+    const lines = content.split("\n").map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith("```"));
+    if (lines.length === 0) return false;
+    const firstLine = lines[0];
     return !firstLine.startsWith("[") && !firstLine.startsWith("{") && (firstLine.split("|").length - 1) >= 6;
   };
 
