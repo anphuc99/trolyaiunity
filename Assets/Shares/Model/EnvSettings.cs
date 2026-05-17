@@ -17,6 +17,7 @@ namespace Shares.Model
 		[Header("Endpoints")]
 		public string BaseUrl = "http://localhost:4000";
 		public string OllamaUrl = "http://localhost:11434";
+		public string OllamaModel = "";
 
 		[Header("Environment")]
 		public string EnvironmentName = "development";

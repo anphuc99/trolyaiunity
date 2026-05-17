@@ -18,14 +18,14 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 		/// <summary>
 		/// Default Ollama API base URL.
 		/// </summary>
-		public const string DefaultBaseUrl = "http://localhost:11434";
+		public static string DefaultBaseUrl => EnvSettings.Instance.OllamaUrl;
 
 		public static string AUTHORIZATION => "Bearer " + EnvSettings.Instance.OllamaAuthorization;
 
 		/// <summary>
 		/// Default model to use for local AI generation.
 		/// </summary>
-		public const string DefaultModel = "hf.co/TrevorJS/gemma-4-E4B-it-uncensored-GGUF:Q8_0";
+		public static string DefaultModel => EnvSettings.Instance.OllamaModel;
 
 		/// <summary>
 		/// Timeout in seconds for Ollama requests. Local generation may take longer.
