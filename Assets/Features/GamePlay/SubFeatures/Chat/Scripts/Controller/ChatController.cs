@@ -945,23 +945,17 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				return;
 			}
 
-			// Step 2: Compress history to CharacterName:Text format
-			var compressedHistory = CompressHistoryForSummary(historyResponse.Messages);
-			if (string.IsNullOrWhiteSpace(compressedHistory))
-			{
-				Debug.LogWarning("[ChatController] Compressed history is empty, falling back to server.");
-				await EndConversationViaServerAsync();
-				return;
-			}
+			Debug.Log($"[ChatController] Sending {historyResponse.Messages.Count} history messages to Ollama for summarization.");
 
-			Debug.Log("[ChatController] Compressed history for Ollama summarization:\n" + compressedHistory);
-
-			// Step 3: Send compressed history to local Ollama
-			var ollamaResponse = await OllamaService.SummarizeConversationAsync(compressedHistory);
+			// Step 3: Send history directly to local Ollama
+			var ollamaResponse = await OllamaService.SummarizeConversationAsync(historyResponse.Messages);
 			if (ollamaResponse?.Message == null || string.IsNullOrWhiteSpace(ollamaResponse.Message.Content))
 			{
-				Debug.LogWarning("[ChatController] Ollama summarization failed, falling back to server.");
-				await EndConversationViaServerAsync();
+				Debug.LogWarning("[ChatController] Ollama summarization failed.");
+				EventBus.Publish(ChatEvents.RequestFailed, new ChatErrorPayload
+				{
+					Message = "Ollama summarization failed."
+				});
 				return;
 			}
 
@@ -1450,7 +1444,10 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				Turns = turns,
 			});
 
-			_ = PreResolveTtsAudioUrlsAsync(turns);
+			// TTS is resolved sequentially by the View via ResolveTurnAudio per turn.
+			// Do NOT call PreResolveTtsAudioUrlsAsync here – it races with the View's
+			// ProcessCharacterTurnsSequentially and causes messages to display before
+			// their audio is ready.
 		}
 
 		/// <summary>
@@ -1559,7 +1556,10 @@ namespace Features.GamePlay.SubFeatures.Chat.Controller
 				Turns = turns,
 			});
 
-			_ = PreResolveTtsAudioUrlsAsync(turns);
+			// TTS is resolved sequentially by the View via ResolveTurnAudio per turn.
+			// Do NOT call PreResolveTtsAudioUrlsAsync here – it races with the View's
+			// ProcessCharacterTurnsSequentially and causes messages to display before
+			// their audio is ready.
 		}
 
 		/// <summary>

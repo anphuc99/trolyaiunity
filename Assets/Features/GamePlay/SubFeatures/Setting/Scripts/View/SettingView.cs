@@ -37,6 +37,7 @@ namespace Features.GamePlay.SubFeatures.Setting.View
 			("Gemini 3 Pro Preview", "gemini-3.1-pro-preview"),
 			("Gemini 3 Flash Lite Preview", "gemini-3.1-flash-lite-preview"),
 			("Gemini Flash Lite Lastest", "gemini-flash-lite-latest"),
+			("Gemini 2.5 Flash Lite", "gemini-2.5-flash-lite"),
 			("Ollama Local", "ollama")
 		};
 

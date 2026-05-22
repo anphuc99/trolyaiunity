@@ -303,20 +303,54 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 
 		/// <summary>
 		/// Sends a summarization request to the local Ollama instance.
-		/// Uses a simple prompt with compressed conversation history.
+		/// Uses the full conversation history.
 		/// </summary>
-		/// <param name="compressedHistory">Compressed conversation in CharacterName:Text format.</param>
+		/// <param name="history">Conversation history.</param>
 		/// <param name="baseUrl">Ollama API base URL.</param>
 		/// <param name="model">Model name.</param>
 		/// <returns>Raw assistant content string, or null on failure.</returns>
 		public static async Task<OllamaChatResponsePayload> SummarizeConversationAsync(
-			string compressedHistory,
+			List<ChatHistoryMessagePayload> history,
 			string baseUrl = null,
 			string model = null)
 		{
 			var resolvedBaseUrl = string.IsNullOrWhiteSpace(baseUrl) ? DefaultBaseUrl : baseUrl.TrimEnd('/');
 			var resolvedModel = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
 			var url = resolvedBaseUrl + "/api/chat";
+
+			var messages = new List<OllamaChatMessage>();
+
+			if (history != null && history.Count > 0)
+			{
+				foreach (var message in history)
+				{
+					if (message == null || string.IsNullOrWhiteSpace(message.Content))
+					{
+						continue;
+					}
+
+					var role = (message.Role ?? "").Trim().ToLowerInvariant();
+					if (role == "system")
+					{
+						continue;
+					}
+
+					if (role == "assistant" && IsRecallMemoryContent(message.Content))
+					{
+						continue;
+					}
+
+					var mappedRole = role == "assistant"
+						? "assistant"
+						: role == "developer" ? "system" : "user";
+
+					messages.Add(new OllamaChatMessage
+					{
+						Role = mappedRole,
+						Content = message.Content.Trim(),
+					});
+				}
+			}
 
 			var summaryInstruction = @"Please summarize the above conversation in Vietnamese, update the story description, and return it in JSON format as follows:
 {
@@ -325,11 +359,7 @@ namespace Features.GamePlay.SubFeatures.Chat.Infrastructure
 }
 Only return the JSON object, no extra text.";
 
-			var messages = new List<OllamaChatMessage>
-			{
-				new OllamaChatMessage { Role = "user", Content = compressedHistory },
-				new OllamaChatMessage { Role = "user", Content = summaryInstruction }
-			};
+			messages.Add(new OllamaChatMessage { Role = "user", Content = summaryInstruction });
 
 			var requestPayload = new OllamaChatRequestPayload
 			{
